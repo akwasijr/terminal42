@@ -24,7 +24,7 @@ mac:
         - arm64
   hardenedRuntime: false
   gatekeeperAssess: false
-  identity: null
+  identity: '-'
   notarize: false
   extendInfo:
     NSCameraUsageDescription: Terminal42 does not use the camera.
