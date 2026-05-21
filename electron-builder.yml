@@ -1,0 +1,52 @@
+appId: com.akwasifosuhene.terminal42
+productName: Terminal42
+copyright: Copyright © 2026 Akwasi Fosuhene
+directories:
+  buildResources: build
+  output: dist
+files:
+  - 'out/**/*'
+  - 'package.json'
+  - '!**/node_modules/*/{README.md,readme.md,CHANGELOG.md,changelog.md,*.d.ts,*.map}'
+  - '!**/node_modules/*/{test,tests,__tests__,docs,doc,example,examples}'
+asarUnpack:
+  - '**/node_modules/node-pty/**/*'
+  - '**/node_modules/better-sqlite3/**/*'
+mac:
+  category: public.app-category.developer-tools
+  icon: build/icon.icns
+  target:
+    - target: zip
+      arch:
+        - arm64
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  identity: null
+  notarize: false
+  extendInfo:
+    NSCameraUsageDescription: Terminal42 does not use the camera.
+    NSMicrophoneUsageDescription: Terminal42 does not use the microphone.
+dmg:
+  artifactName: Terminal42-${version}-${arch}.dmg
+  icon: build/icon.icns
+  writeUpdateInfo: false
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: build/icon.ico
+  artifactName: Terminal42-Setup-${version}.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Terminal42
+linux:
+  target: AppImage
+  category: Development
+  icon: build/icon.png
+  artifactName: Terminal42-${version}-${arch}.${ext}
+publish: null

@@ -1,0 +1,251 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Light tokens */
+  --bg: 250 250 250;
+  --surface: 255 255 255;
+  --elevated: 245 245 245;
+  --border: 229 229 229;
+  --border-strong: 212 212 212;
+  --text-primary: 23 23 23;
+  --text-secondary: 82 82 82;
+  --text-muted: 140 140 140;
+  --accent: 14 165 233;
+  --accent-text: 255 255 255;
+  --success: 22 163 74;
+  --warning: 217 119 6;
+  --error: 220 38 38;
+}
+
+.dark {
+  --bg: 8 8 10;             /* deepest: canvas / page background */
+  --surface: 18 18 22;      /* one shade up: toolbars, rails, inspector */
+  --elevated: 28 28 34;     /* above surface: chips, hover states */
+  --border: 38 38 44;
+  --border-strong: 56 56 64;
+  --text-primary: 245 245 245;
+  --text-secondary: 161 161 161;
+  --text-muted: 110 110 110;
+  --accent: 56 189 248;
+  --accent-text: 10 10 10;
+  --success: 34 197 94;
+  --warning: 245 158 11;
+  --error: 239 68 68;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow: hidden;
+  user-select: none;
+}
+
+.titlebar-drag { -webkit-app-region: drag; }
+.titlebar-no-drag { -webkit-app-region: no-drag; }
+
+button, input, [role="button"] { -webkit-app-region: no-drag; }
+
+/* Text caret colour: use the foreground text colour, never the accent.
+   The bright accent caret reads as a stray accent line inside inputs. */
+input, textarea, [contenteditable] {
+  caret-color: rgb(var(--text-primary));
+}
+
+*:focus-visible {
+  outline: none;
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgb(var(--border-strong)); border-radius: 6px; border: 2px solid rgb(var(--bg)); }
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--text-muted)); }
+
+/* xterm terminal scrollbar — thinner, subtle */
+.xterm-viewport::-webkit-scrollbar { width: 6px; }
+.xterm-viewport::-webkit-scrollbar-track { background: transparent; }
+.xterm-viewport::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; border: none; }
+.xterm-viewport::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* Translucent sidebar (uses backdrop blur over the desktop bg).
+   Saturate is dropped so warm desktop wallpapers don't tint the sidebar
+   warmer than the (cool) right panel. */
+html[data-translucent="true"] nav.t42-sidebar {
+  background-color: rgb(var(--surface) / 0.78);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* Mindmap (markmap): themed for accessibility */
+.t42-mindmap .markmap-node > circle {
+  fill: rgb(var(--surface));
+  stroke: rgb(var(--accent));
+  stroke-width: 1.5;
+}
+.t42-mindmap .markmap-node > circle:hover { fill: rgb(var(--elevated)); cursor: pointer; }
+.t42-mindmap .markmap-node-text {
+  fill: rgb(var(--text-primary)) !important;
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+}
+.t42-mindmap .markmap-link { stroke: rgb(var(--border-strong)); stroke-width: 1.5; opacity: 0.8; }
+.t42-mindmap foreignObject { color: rgb(var(--text-primary)); }
+.t42-mindmap foreignObject div { color: rgb(var(--text-primary)) !important; line-height: 1.45; }
+.t42-mindmap foreignObject a { color: rgb(var(--accent)); text-decoration: underline; }
+.t42-mindmap foreignObject code {
+  background: rgb(var(--elevated));
+  color: rgb(var(--text-primary));
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+/* Brief wizard page transitions: small slide + fade so each page swap
+   feels like one card moving in instead of a hard flicker. The grid
+   children inside the page additionally stagger their fade so it reads
+   as a sweep rather than one block popping in. */
+/* Pages fade in place — no horizontal motion. Horizontal slide reads as
+   a continuous scroll between pages; opacity-only swap reads as discrete
+   tabs flipping, which is the desired feel. Kept fast (110ms) so a quick
+   click never feels animated; just snaps. */
+@keyframes wizardPageFwd {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes wizardPageBack {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.wizard-page-fwd  { animation: wizardPageFwd  110ms ease-out both; }
+.wizard-page-back { animation: wizardPageBack 110ms ease-out both; }
+
+/* Page contents land as one block: no per-grid-item stagger. The earlier
+   stagger made each step feel like it kept animating after arrival, which
+   read as continuous flow instead of discrete pages. */
+.wizard-page-fwd  .grid > *,
+.wizard-page-back .grid > * {
+  animation: none;
+}
+
+/* ─── Sketching pencil: used on the canvas Generating placeholder ─────── */
+@keyframes pencilDraw {
+  0%   { stroke-dashoffset: var(--t42-dash, 360); }
+  50%  { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: calc(var(--t42-dash, 360) * -1); }
+}
+@keyframes pencilBob {
+  0%, 100% { transform: translate(192px, 60px) rotate(0deg); }
+  50%      { transform: translate(192px, 58px) rotate(-3deg); }
+}
+.t42-pencil { display: inline-flex; align-items: center; color: rgb(var(--text-muted)); }
+.t42-pencil svg { overflow: visible; }
+.t42-pencil .t42-pencil-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  /* Pulled from inline `style="stroke-dasharray: N"` on each path */
+  stroke-dashoffset: 0;
+  animation: pencilDraw 2.4s ease-in-out infinite;
+  /* Use the per-element stroke-dasharray as the dash length */
+  --t42-dash: 360;
+}
+/* Each path can set its own dash length via inline style; the keyframe
+   reads --t42-dash. Fallback to 360 above. */
+.t42-pencil .t42-pencil-line[style*="stroke-dasharray: 60"]  { --t42-dash: 60; }
+.t42-pencil .t42-pencil-line[style*="stroke-dasharray: 80"]  { --t42-dash: 80; }
+.t42-pencil .t42-pencil-line[style*="stroke-dasharray: 200"] { --t42-dash: 200; }
+.t42-pencil .t42-pencil-line[style*="stroke-dasharray: 280"] { --t42-dash: 280; }
+.t42-pencil .t42-pencil-line[style*="stroke-dasharray: 600"] { --t42-dash: 600; }
+/* Sequence delays for multi-stroke variants (slides, chart bars, etc.) */
+.t42-pencil .t42-pencil-d1 { animation-delay: 0.3s; }
+.t42-pencil .t42-pencil-d2 { animation-delay: 0.6s; }
+.t42-pencil .t42-pencil-glyph {
+  animation: pencilBob 2.4s ease-in-out infinite;
+  transform-box: fill-box;
+}
+
+/* ─── Three-box stack: used in chat rails (rail + main chat) ─────────── */
+@keyframes thinkingStack {
+  0%   { opacity: 0; transform: translateX(-4px) scale(0.6); }
+  35%  { opacity: 1; transform: translateX(0)    scale(1);   }
+  75%  { opacity: 1; transform: translateX(0)    scale(1);   }
+  100% { opacity: 0; transform: translateX(2px)  scale(0.85);}
+}
+.t42-boxes { display: inline-flex; flex-direction: row; gap: 3px; align-items: center; }
+.t42-boxes span {
+  width: 7px; height: 7px;
+  background: rgb(var(--text-muted));
+  border-radius: 1.5px;
+  animation: thinkingStack 1.2s ease-in-out infinite;
+}
+.t42-boxes span:nth-child(2) { animation-delay: 180ms; }
+.t42-boxes span:nth-child(3) { animation-delay: 360ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wizard-page-fwd, .wizard-page-back,
+  .wizard-page-fwd .grid > *, .wizard-page-back .grid > * { animation: none; }
+  .t42-boxes span,
+  .t42-pencil .t42-pencil-line { animation: none; }
+}
+
+/* ─── Clean range slider ─────────────────────────────────────────────────
+   Strip the OS chrome and replace with a thin track + small accent thumb.
+   Used everywhere we render a <input type="range" class="t42-range">. */
+.t42-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 18px;
+  background: transparent;
+  cursor: pointer;
+}
+.t42-range::-webkit-slider-runnable-track {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  border: 0;
+}
+.t42-range::-moz-range-track {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  border: 0;
+}
+.t42-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 12px;
+  width: 12px;
+  background: rgb(var(--accent));
+  border-radius: 999px;
+  border: 0;
+  margin-top: -4.5px;
+  box-shadow: 0 0 0 2px rgb(var(--surface));
+  cursor: grab;
+}
+.t42-range::-moz-range-thumb {
+  height: 12px;
+  width: 12px;
+  background: rgb(var(--accent));
+  border-radius: 999px;
+  border: 0;
+  box-shadow: 0 0 0 2px rgb(var(--surface));
+  cursor: grab;
+}
+.t42-range:focus {
+  outline: none;
+}
+.t42-range:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 2px rgb(var(--surface)), 0 0 0 4px rgba(255, 255, 255, 0.12);
+}
