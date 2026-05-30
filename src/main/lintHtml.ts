@@ -9,10 +9,10 @@ export type LintViolation = {
   selector?: string
 }
 
-export function lintHtml(html: string, aiRules: AiRuleId[] | null): LintViolation[] {
+export function lintHtml(_html: string, _aiRules: AiRuleId[] | null): LintViolation[] {
   return []
 }
 
-export function buildFixPrompt(violations: LintViolation[], previousFile: string, nextFile: string): string {
+export function buildFixPrompt(_violations: LintViolation[], _previousFile: string, _nextFile: string): string {
   return ''
 }

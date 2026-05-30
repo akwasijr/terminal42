@@ -162,7 +162,7 @@ async function copyTemplateInto(templateId: string, destDir: string): Promise<vo
   if (r.code !== 0) throw new Error(`copy failed: ${r.stderr}`)
 }
 
-async function uniqueDestDir(parent: string, baseName: string): Promise<string> {
+async function _uniqueDestDir(parent: string, baseName: string): Promise<string> {
   let candidate = join(parent, baseName)
   if (!existsSync(candidate)) return candidate
   for (let i = 2; i < 1000; i++) {
@@ -172,7 +172,7 @@ async function uniqueDestDir(parent: string, baseName: string): Promise<string> 
   return join(parent, `${baseName}-${randomUUID().slice(0, 6)}`)
 }
 
-export function registerTemplatesIpc(getWindow: () => BrowserWindow | null): void {
+export function registerTemplatesIpc(_getWindow: () => BrowserWindow | null): void {
   ipcMain.handle('templates:list', async () => {
     try {
       return await listTemplates()

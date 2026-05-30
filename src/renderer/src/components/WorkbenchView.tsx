@@ -4,7 +4,7 @@ import { CATEGORIES, categorize, type Category } from './categorize'
 import { STARTER_PACK, type StarterSkill } from './starterPack'
 import {
   IconPlus, IconClose, IconTerminal, IconChat, IconUser, IconCode, IconWorkflow,
-  IconSearch, IconTrash, IconClock, IconPlay, IconChevronRight, IconRefresh
+  IconSearch, IconTrash, IconClock, IconPlay, IconRefresh
 } from './icons'
 
 type FilterKind = 'all' | 'skill' | 'recipe' | 'starter'
@@ -25,11 +25,6 @@ const FORMAT_TINT: Record<SkillFormat, string> = {
 
 type Project = { id: string; name: string }
 
-function bodyPreview(body: string, max = 120): string {
-  const flat = body.replace(/^---[\s\S]*?---/, '').replace(/[#*`>_]/g, '').replace(/\s+/g, ' ').trim()
-  if (flat.length <= max) return flat
-  return flat.slice(0, max).trimEnd() + '…'
-}
 
 function starterMode(s: StarterSkill): Category {
   const map: Record<string, Category> = {

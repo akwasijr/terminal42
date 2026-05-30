@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Transformer } from 'markmap-lib'
 import { Markmap, deriveOptions } from 'markmap-view'
 import type { Project } from '../../../preload/index'
-import { IconCheck, IconFolder, IconPlus } from './icons'
+import { IconFolder, IconPlus } from './icons'
 
 const transformer = new Transformer()
 
@@ -128,7 +128,7 @@ export function BrainNotes() {
   const [view, setView] = useState<ViewMode>('split')
   const [path, setPath] = useState<string>('')
   const [editorDirty, setEditorDirty] = useState(false)
-  const [insights, setInsights] = useState<InsightsState | null>(null)
+  const [, setInsights] = useState<InsightsState | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
   const mmRef = useRef<Markmap | null>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -219,16 +219,6 @@ export function BrainNotes() {
     onChange(next)
   }
 
-  const runInsightsNow = async () => {
-    if (insights?.lastStatus === 'running') return
-    setInsights((s) => s ? { ...s, lastStatus: 'running' } : s)
-    await window.terminal42.insights.runNow()
-  }
-
-  const setCadence = async (c: 'off' | 'daily' | '3d' | 'weekly') => {
-    const next = await window.terminal42.insights.setCadence(c)
-    setInsights(next as InsightsState)
-  }
 
   const ago = savedAt ? `Saved ${formatRel(savedAt)}` : 'Auto-saves as you type'
   const stats = computeStats(body)
@@ -379,70 +369,6 @@ function formatRel(ts: number): string {
   if (diff < 60_000) return `${Math.round(diff / 1000)}s ago`
   if (diff < 3600_000) return `${Math.round(diff / 60_000)}m ago`
   return new Date(ts).toLocaleTimeString()
-}
-
-function InsightsBar({
-  insights,
-  onRun,
-  onCadence
-}: {
-  insights: InsightsState | null
-  onRun: () => void
-  onCadence: (c: 'off' | 'daily' | '3d' | 'weekly') => void
-}) {
-  if (!insights) return null
-  const running = insights.lastStatus === 'running'
-  const last = insights.lastRunAt
-    ? `Last run ${formatRel(insights.lastRunAt)}: ${insights.lastSummary || (insights.lastStatus === 'error' ? 'failed' : ':')}`
-    : 'Never run yet'
-  return (
-    <div className="flex items-center justify-between gap-3 bg-surface/50 px-6 py-2">
-      <div className="flex items-center gap-2 min-w-0 text-[12px] text-text-muted">
-        <span
-          className={
-            'inline-block h-2 w-2 shrink-0 rounded-full ' +
-            (running
-              ? 'animate-pulse bg-accent'
-              : insights.lastStatus === 'error'
-              ? 'bg-rose-500'
-              : insights.lastStatus === 'ok'
-              ? 'bg-emerald-500'
-              : 'bg-text-muted/50')
-          }
-          aria-hidden="true"
-        />
-        <span className="truncate">
-          <span className="text-text-secondary">Insights agent</span>
-          <span className="mx-1.5">·</span>
-          <span title={insights.lastError || ''}>{last}</span>
-        </span>
-      </div>
-      <div className="flex items-center gap-2">
-        <label className="flex items-center gap-1.5 text-[11px] text-text-muted">
-          <span className="hidden sm:inline">Cadence</span>
-          <select
-            value={insights.cadence}
-            onChange={(e) => onCadence(e.target.value as 'off' | 'daily' | '3d' | 'weekly')}
-            className="rounded-md bg-bg px-2 py-1 text-[12px] text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            aria-label="Insights cadence"
-          >
-            <option value="off">Off</option>
-            <option value="daily">Daily</option>
-            <option value="3d">Every 3 days</option>
-            <option value="weekly">Weekly</option>
-          </select>
-        </label>
-        <button
-          type="button"
-          onClick={onRun}
-          disabled={running}
-          className="rounded-md bg-bg px-2.5 py-1 text-[12px] text-text-secondary hover:bg-elevated hover:text-text-primary disabled:opacity-50 disabled:cursor-wait focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        >
-          {running ? 'Running…' : 'Run insights now'}
-        </button>
-      </div>
-    </div>
-  )
 }
 
 // ─── Onboarding interview ────────────────────────────────────────────

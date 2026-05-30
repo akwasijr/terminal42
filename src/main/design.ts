@@ -8,9 +8,7 @@ import { getDb } from './db'
 import { extractPptxFacts, pptxFactsToPrompt, type PptxFacts } from './pptx'
 import { pptxToPdf } from './render'
 import { getSettings } from './settings'
-import { pickRecipes, formatRecipesForPrompt } from './starterRecipes'
 import { lintHtml, buildFixPrompt } from './lintHtml'
-import { buildFoundationBlock } from './designFoundation'
 import {
   type ExportFormat,
   extFor,
@@ -30,7 +28,6 @@ import type {
   DesignMessage,
   DesignKind,
   DesignGroup,
-  DesignFidelity,
   DesignBrief,
   Design,
   DesignVersion,
@@ -470,55 +467,6 @@ function escapeCssString(value: string): string {
 
 // ─── Design prefix (built-in for design.send) ─────────────────────────────
 
-// Anti-AI rule definitions. Mirrors src/renderer/src/lib/aiRules.ts. We
-// duplicate the prompt lines here so the main process doesn't reach into
-// renderer code. When a rule's id is missing or true in brief.aiRules, the
-// rule is enforced. When explicitly false, the rule is dropped from the
-// prompt (the user has chosen to allow that AI behaviour for this design).
-// One-liner per rule, optimised for prompt size. The wizard's aiRules.ts
-// keeps the longer educational text for the UI; the model only needs the
-// terse directive. Average ~80 chars each.
-const AI_RULE_PROMPT_LINES: Record<string, string> = {
-  noFakeMeta:           'No invented version pills, BETA/NEW/PRO chips, breadcrumbs, "Last updated" stamps, or bylines.',
-  noFakeTestimonials:   'No invented testimonials. Use a placeholder block "[testimonial]" if structurally needed.',
-  noFakeStats:          'No invented stats ("10x faster", "trusted by 10,000+", "4.9/5"). Use "[stat]" placeholder.',
-  noEmojiIcons:         'No emoji as icons. Use real inline SVG line icons or omit.',
-  noAllCaps:            'No spaced ALL-CAPS. Sentence case for body, Title Case for headings. CAPS only on tiny labels (<= 2 words).',
-  noGradients:          'No gradients of any kind unless explicitly asked. Solid fills from the brand palette only.',
-  noHeavyShadow:        'Subtle shadows only (offset 0 1px, blur 2-4px, 4-8% opacity). No glows, no neon, no stacked, no coloured.',
-  noBlobs:              'No decorative blobs, aurora/mesh backgrounds, floating circles, squiggles, or wavy dividers.',
-  noFloatingDashboard:  'No tilted/perspective fake dashboard hero shots. Omit or use a flat illustration.',
-  noEmojiFeatureGrid:   'No three-column emoji-icon feature grid with lorem-ipsum. Real copy + real SVG icons or omit.',
-  noGenericHero:        'No generic AI marketing copy: "Supercharge", "Modern X for modern Y", "The future of X", "Empower", "Unlock the power", "Build better, faster, smarter", "Everything you need to". Be specific.',
-  noOversizedHero:      'Heroes fit their content. No 100vh default. No 80px+ headlines unless asked.',
-  noInter:              'Do not default to Inter. If unspecified prefer DM Sans, Plus Jakarta, Geist, Satoshi, Space Grotesk, IBM Plex, or Fraunces (display).',
-  noEyebrowPills:       'No eyebrow / kicker pills above hero h1 (small dot/icon + tagline chip). Start with the headline.',
-  noEmphasisColor:      'No mid-heading colour shift on one or two words. Single-colour headings; emphasise with weight or a sub-line.',
-  noEmDashes:           'No em-dashes (U+2014) or en-dashes (U+2013) anywhere. Use commas, periods, colons, ASCII hyphens, or " \u00b7 ".',
-  noAccentLines:        'No decorative accent bars: no underline strokes under headings, no glowing rules, no neon strokes, no full-width ticker stripes, no left-edge coloured stripe (border-l-4) on alerts/callouts/banners. Alerts use tinted bg + icon + text only.',
-  noVerboseText:        'Cut filler. No descriptive subtitle below a heading ("Revenue / Track your revenue"). No "Below you can / Here you can / Welcome to" intros. No paragraphs added to balance layout. Numbers, rows, charts speak.',
-  noIconContainers:     'No coloured tiles around icons (no `bg-blue-100 rounded-full` discs, no soft pastel halos). Icons stand alone in text-muted, brand on hover.',
-  noExcessOutlines:     'Default to NO border. Cards: ONE of {1px border, shadow, elevated bg}, never a combo. Floating + tinted surfaces (toast, banner, alert, callout, popover) get fill + maybe shadow, never a ring AND never a left-edge stripe. Sidebar active = bg tint, never outline. Zebra tables drop per-row borders.',
-  noAiSparkleIcons:     'No sparkle/wand/star/AI-badge icons sprinkled across the UI. Only on the actual AI trigger button. Section headings get their real semantic icon or none.'
-}
-// Display order. Rules listed here go into the prompt; anything else in
-// brief.aiRules is ignored.
-const AI_RULE_ORDER = [
-  'noFakeMeta', 'noFakeTestimonials', 'noFakeStats',
-  'noEmojiIcons', 'noAllCaps', 'noGradients', 'noHeavyShadow',
-  'noBlobs', 'noFloatingDashboard', 'noEmojiFeatureGrid',
-  'noGenericHero', 'noOversizedHero', 'noInter',
-  'noEyebrowPills', 'noEmphasisColor', 'noEmDashes', 'noAccentLines',
-  'noVerboseText', 'noIconContainers', 'noExcessOutlines', 'noAiSparkleIcons'
-]
-
-function aiRulePromptLines(rules: Record<string, boolean> | null | undefined): string[] {
-  return AI_RULE_ORDER
-    .filter((id) => rules == null || rules[id] !== false) // missing = enforced
-    .map((id) => AI_RULE_PROMPT_LINES[id])
-    .filter(Boolean)
-}
-
 
 // ─── Prompt construction (stripped for public release) ────────────────────
 // Implement your own prompt builders here.
@@ -528,13 +476,6 @@ function summariseBrief(b: DesignBrief | null): string {
   return [b.kindLabel, b.subtype, b.lookLabel, b.audience].filter(Boolean).join(' · ')
 }
 
-function formatSpec(_kind: string | undefined): string {
-  return ''
-}
-
-function planningProtocolBlock(_brief: DesignBrief | null): string {
-  return ''
-}
 
 function buildStarterPrefix(_cwd: string, _brief: DesignBrief): string {
   return ''

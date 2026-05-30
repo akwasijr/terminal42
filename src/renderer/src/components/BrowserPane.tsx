@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as Dropdown from '@radix-ui/react-dropdown-menu'
-import { IconRefresh, IconClose, IconChevronRight, IconPlus, IconSparkle } from './icons'
+import { IconRefresh, IconChevronRight, IconPlus, IconSparkle } from './icons'
 import { VIZ_INJECT_JS, type VizSelected } from '../lib/vizInject'
 import { VizTweakPanel, type VizDiff } from './VizTweakPanel'
 
@@ -109,8 +109,8 @@ const DEVICE_PRESETS: Array<{ id: string; label: string; width: number; ua?: str
 export function BrowserPane({ initialUrl, projectId, onClose, width: _paneWidth, navTo, activeSessionId }: Props) {
   const [urlBar, setUrlBar] = useState<string>('')
   const [committedUrl, setCommittedUrl] = useState<string>('')
-  const [pageTitle, setPageTitle] = useState<string>('')
-  const [favicon, setFavicon] = useState<string>('')
+  const [, setPageTitle] = useState<string>('')
+  const [, setFavicon] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [canBack, setCanBack] = useState(false)
   const [canFwd, setCanFwd] = useState(false)
@@ -426,12 +426,6 @@ export function BrowserPane({ initialUrl, projectId, onClose, width: _paneWidth,
   }, [vtDiffs])
 
   const vtDiffCount = useMemo(() => Object.keys(vtDiffs).length, [vtDiffs])
-
-  // Pretty page-pill text: prefer title, fall back to host.
-  const host = (() => {
-    try { return new URL(committedUrl).host } catch { return '' }
-  })()
-  const pillLabel = pageTitle || host || 'New tab'
 
   // Compute the inner browser frame (for device emulation).
   const isDesktop = device.id === 'desktop'

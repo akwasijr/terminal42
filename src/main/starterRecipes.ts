@@ -13,12 +13,12 @@ export type StarterRecipe = {
   sections: string[]
 }
 
-const RECIPES: StarterRecipe[] = []
+const _RECIPES: StarterRecipe[] = []
 
-export function pickRecipes(idea: string, kind: string): StarterRecipe[] {
+export function pickRecipes(_idea: string, _kind: string): StarterRecipe[] {
   return []
 }
 
-export function formatRecipesForPrompt(recipes: StarterRecipe[]): string {
+export function formatRecipesForPrompt(_recipes: StarterRecipe[]): string {
   return ''
 }

@@ -18,7 +18,7 @@ const LS_BROWSER_WIDTH = 't42:browser:width'
 
 export function ProjectWorkspace({
   project,
-  theme,
+  theme: _theme,
   isActive = true,
   onActiveSessionChange,
   onNavigate,

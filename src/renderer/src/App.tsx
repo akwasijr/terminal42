@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, lazy, Suspense } from 'react'
 import {
   IconTerminal, IconFolder, IconSparkle, IconCode,
-  IconSearch, IconGear, IconTheme, IconPlus, IconBell, IconBrain, IconEdit, IconTrash, IconClock,
+  IconGear, IconTheme, IconPlus, IconBell, IconBrain, IconEdit, IconTrash, IconClock,
   IconChevronRight, IconWorkflow, IconChat
 } from './components/icons'
 import * as Dropdown from '@radix-ui/react-dropdown-menu'
@@ -600,7 +600,7 @@ function ConfirmDialog({
 }
 
 function TopBar({
-  theme, onToggleTheme, projectName, onOpenPalette, onOpenSettings, unread
+  theme, onToggleTheme, projectName, onOpenPalette: _onOpenPalette, onOpenSettings, unread
 }: {
   theme: 'dark' | 'light'
   onToggleTheme: () => void
@@ -786,7 +786,7 @@ function IconButton({
 void IconButton
 
 function Sidebar({
-  active, onSelect, projects, activeProjectId, onPickProject, onAddProject, onRenameProject, onRemoveProject, unread, width, onCollapse, theme, onToggleTheme
+  active, onSelect, projects, activeProjectId, onPickProject, onAddProject, onRenameProject, onRemoveProject, unread, width, onCollapse, theme: _theme, onToggleTheme: _onToggleTheme
 }: {
   active: NavId
   onSelect: (id: NavId) => void

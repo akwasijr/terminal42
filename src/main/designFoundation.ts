@@ -9,7 +9,7 @@ export type LookAnatomy = {
   signature: string
 }
 
-export function buildFoundationBlock(opts: {
+export function buildFoundationBlock(_opts: {
   look?: string | null
   designSystem?: string | null
   theme?: string | null

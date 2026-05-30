@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { Task, RunningPreview, PreviewCommand, ContextUsage } from '../../../preload/index'
-import { IconPlay, IconStop, IconExternal, IconCopy, IconPlus, IconClose } from './icons'
+import type { Task, ContextUsage } from '../../../preload/index'
+import { IconExternal } from './icons'
 
 function shortPath(p: string | null | undefined): string {
   if (!p) return ':'
@@ -772,34 +772,3 @@ function Empty({ children }: { children: React.ReactNode }) {
   return <div className="rounded-md border border-dashed border-border px-3 py-3 text-center text-[12px] text-text-muted">{children}</div>
 }
 
-function SmallBtn({ onClick, aria, children }: { onClick: () => void; aria: string; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={aria}
-      className="grid h-6 w-6 place-items-center rounded-sm border border-border bg-elevated text-text-secondary hover:bg-surface hover:text-text-primary"
-    >
-      {children}
-    </button>
-  )
-}
-
-function Field({
-  label, value, onChange, placeholder, mono
-}: {
-  label: string; value: string; onChange: (s: string) => void; placeholder?: string; mono?: boolean
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <label className="text-[11px] text-text-muted">{label}</label>
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className={['rounded-sm border border-border bg-surface px-2 py-1 text-[12px]', mono ? 'font-mono' : ''].join(' ')}
-      />
-    </div>
-  )
-}

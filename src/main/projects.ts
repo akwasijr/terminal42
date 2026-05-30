@@ -100,7 +100,6 @@ export function registerProjectIpc(getWindow: () => BrowserWindow | null): void 
     let title = args.firstInput.trim()
     // Reject titles that look like terminal escape sequences or other junk
     if (!title) return { ok: false }
-    // eslint-disable-next-line no-control-regex
     if (/[\x00-\x1f\x7f]/.test(title)) return { ok: false }
     if (/^\]?\d+;/.test(title) || /rgb:[0-9a-fA-F]/.test(title)) return { ok: false }
     if (title.length > 50) title = title.slice(0, 47) + '…'

@@ -1,12 +1,12 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
-  AUDIENCE_OPTIONS, DENSITY_OPTIONS, DESIGN_KINDS, FIDELITY_OPTIONS, FONT_PAIRS, FONT_FAMILIES, FONT_FAMILY_GROUPS, fontFamilyById, GRID_OPTIONS, GROUP_LABELS, SPACING_OPTIONS,
+  AUDIENCE_OPTIONS, DENSITY_OPTIONS, DESIGN_KINDS, FIDELITY_OPTIONS, FONT_FAMILIES, FONT_FAMILY_GROUPS, fontFamilyById, GRID_OPTIONS, GROUP_LABELS, SPACING_OPTIONS,
   ICON_LIBRARIES, ICON_STYLES,
   LOOK_OPTIONS, MOTION_OPTIONS, PAGE_TITLES, PALETTES, SURFACE_OPTIONS, THEME_OPTIONS,
   STACK_OPTIONS, RADIUS_OPTIONS, SHADOW_OPTIONS, BORDER_OPTIONS, SURFACE_SHAPE_OPTIONS, SECONDARY_BUTTON_OPTIONS, DESIGN_SYSTEMS,
   emptyDesignState, pagesForState, stateToBrief,
-  type DesignGroup, type DesignKind, type DesignWizardState, type WizardPage,
-  type IconLibraryId, type IconStyleId
+  type DesignGroup, type DesignKind, type DesignWizardState,
+  type IconLibraryId
 } from '../lib/designBrief'
 import type { DesignBrief, TemplateInfo } from '../../../preload/index'
 import { IconClose } from './icons'

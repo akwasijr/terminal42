@@ -1071,21 +1071,6 @@ function groupTools(calls: DesignToolCall[]): ToolGroup[] {
   return order.map((k) => map.get(k)!)
 }
 
-function GroupedToolPill({ group }: { group: ToolGroup }): JSX.Element {
-  const tone =
-    group.status === 'error' ? 'bg-error/10 text-error'
-    : group.status === 'running' ? 'bg-elevated/60 text-text-muted animate-pulse'
-    : 'bg-elevated/60 text-text-muted'
-  const Icon = group.status === 'error' ? IconClose : group.status === 'done' ? IconCheck : null
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-medium ${tone}`}>
-      {Icon && <Icon size={9} />}
-      <span className="truncate max-w-[180px]">{group.name}</span>
-      {group.count > 1 && <span className="opacity-70">×{group.count}</span>}
-    </span>
-  )
-}
-
 // Pull file paths out of write_file / edit / create-style tool calls.
 function extractWrittenFiles(calls: DesignToolCall[]): string[] {
   const out: string[] = []
@@ -1106,23 +1091,6 @@ function extractWrittenFiles(calls: DesignToolCall[]): string[] {
   return out
 }
 
-function FilePill({ path }: { path: string }): JSX.Element {
-  const name = path.split('/').filter(Boolean).pop() ?? path
-  const copy = async (): Promise<void> => {
-    try { await navigator.clipboard.writeText(path) } catch {}
-  }
-  return (
-    <button
-      type="button"
-      title={path}
-      onClick={() => void copy()}
-      className="inline-flex items-center gap-1 text-[11.5px] font-mono text-text-secondary hover:text-text-primary"
-    >
-      <IconCopy size={10} />
-      <span>{name}</span>
-    </button>
-  )
-}
 
 function ProgressList({ steps, fallbackLabel }: { steps: DesignProgressStep[]; fallbackLabel: string }): JSX.Element {
   const [seconds, setSeconds] = useState(0)

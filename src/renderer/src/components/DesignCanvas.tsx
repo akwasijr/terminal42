@@ -249,17 +249,14 @@ export function DesignCanvas({
 
   const activeIndex = useMemo(() => versions.findIndex((v) => v.id === activeId), [versions, activeId])
   const active = activeIndex >= 0 ? versions[activeIndex] : null
-  const canBack = activeIndex > 0
-  const canFwd = activeIndex >= 0 && activeIndex < versions.length - 1
   const empty = versions.length === 0
 
   const [activeContent, setActiveContent] = useState<string>('')
   const [annotate, setAnnotate] = useState(false)
   const [pick, setPick] = useState<{ selector: string; text: string } | null>(null)
   const [pickComment, setPickComment] = useState('')
-  const [tweakOpen, setTweakOpen] = useState(false)
-  const [tweakSpec, setTweakSpec] = useState<TweakSpec | null>(null)
-  const [tweakValues, setTweakValues] = useState<Record<string, unknown>>({})
+  const [, setTweakSpec] = useState<TweakSpec | null>(null)
+  const [, setTweakValues] = useState<Record<string, unknown>>({})
   const [editMode, setEditMode] = useState(false)
   const [editPick, setEditPick] = useState<EditPick | null>(null)
   const [editChanges, setEditChanges] = useState(0)
@@ -552,21 +549,6 @@ export function DesignCanvas({
   const slidePrev = (): void => slideJump(-1)
   const slideNext = (): void => slideJump(1)
 
-  const setTweak = (control: TweakControl, value: unknown): void => {
-    setTweakValues((v) => ({ ...v, [control.id]: value }))
-    iframeRef.current?.contentWindow?.postMessage(
-      { type: 't42-tweak-set', id: control.id, kind: control.type, value, cssVar: control.cssVar },
-      '*'
-    )
-  }
-  const resetTweaks = (): void => {
-    iframeRef.current?.contentWindow?.postMessage({ type: 't42-tweak-reset' }, '*')
-    if (!tweakSpec) return
-    const initial: Record<string, unknown> = {}
-    tweakSpec.groups?.forEach((g) => g.controls?.forEach((c) => { initial[c.id] = c.default }))
-    setTweakValues(initial)
-  }
-
   const sendComment = async (): Promise<void> => {
     if (!pick) return
     const note = pickComment.trim()
@@ -601,24 +583,8 @@ export function DesignCanvas({
     }))
   }
 
-  const goBack = (): void => {
-    if (!canBack) return
-    const v = versions[activeIndex - 1]
-    setActiveId(v.id); setStickToLatest(false); setReloadKey((k) => k + 1)
-  }
-  const goFwd = (): void => {
-    if (!canFwd) return
-    const v = versions[activeIndex + 1]
-    setActiveId(v.id); setStickToLatest(activeIndex + 1 === versions.length - 1); setReloadKey((k) => k + 1)
-  }
-  const goLatest = (): void => {
-    if (!versions.length) return
-    setActiveId(versions[versions.length - 1].id); setStickToLatest(true); setReloadKey((k) => k + 1)
-  }
-
   const reload = (): void => setReloadKey((k) => k + 1)
   const openExternal = (): void => { if (active) void window.terminal42.designs.openExternal(active.fileUrl) }
-  const revealInFinder = (): void => { void window.terminal42.designs.revealLatest(designId) }
 
   // ─── Brain Check ────────────────────────────────────────────────────────
   // Dead simple: read the brain markdown, paste it as a prompt in the chat.
@@ -1477,7 +1443,7 @@ function FigmaPill(): JSX.Element {
   )
 }
 
-function FigmaSendDialog({ designTitle, onCancel, onSend }: {
+function FigmaSendDialog({ designTitle: _designTitle, onCancel, onSend }: {
   designTitle: string
   onCancel: () => void
   onSend: (opts: { mode: 'newFile' | 'existingFile'; fileUrl?: string }) => void
@@ -1716,147 +1682,6 @@ type TweakControl =
 
 type TweakGroup = { name: string; controls: TweakControl[] }
 type TweakSpec = { groups: TweakGroup[] }
-
-function TweakPanel({ spec, values, onChange, onReset, onClose }: {
-  spec: TweakSpec
-  values: Record<string, unknown>
-  onChange: (c: TweakControl, v: unknown) => void
-  onReset: () => void
-  onClose: () => void
-}): JSX.Element {
-  return (
-    <div className="absolute right-3 top-3 bottom-3 z-30 flex w-[260px] flex-col overflow-hidden rounded-lg bg-surface shadow-xl">
-      <header className="flex items-center justify-between px-3 py-2">
-        <span className="text-[12.5px] font-medium text-text-primary">Tweak</span>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={onReset}
-            title="Reset to defaults"
-            className="rounded px-2 py-0.5 text-[11px] text-text-muted hover:bg-elevated hover:text-text-primary"
-          >Reset</button>
-          <button
-            type="button"
-            onClick={onClose}
-            title="Close"
-            className="grid h-6 w-6 place-items-center rounded text-text-muted hover:bg-elevated hover:text-text-primary"
-          >
-            <svg width="9" height="9" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
-              <path d="M3 3l8 8M11 3l-8 8" />
-            </svg>
-          </button>
-        </div>
-      </header>
-      <div className="flex-1 overflow-y-auto px-3 pb-3">
-        {spec.groups.map((g) => (
-          <section key={g.name} className="mb-3 last:mb-0">
-            <div className="mb-1.5 text-[10.5px] font-medium text-text-muted">{g.name}</div>
-            <div className="space-y-2">
-              {g.controls.map((c) => (
-                <TweakRow key={c.id} control={c} value={values[c.id]} onChange={(v) => onChange(c, v)} />
-              ))}
-            </div>
-          </section>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function TweakRow({ control, value, onChange }: {
-  control: TweakControl
-  value: unknown
-  onChange: (v: unknown) => void
-}): JSX.Element {
-  if (control.type === 'color') {
-    const v = (value as string) ?? control.default ?? '#888888'
-    return (
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[12px] text-text-secondary">{control.label}</span>
-        <div className="flex items-center gap-1.5">
-          <input
-            type="color"
-            value={v}
-            onChange={(e) => onChange(e.target.value)}
-            className="h-6 w-8 cursor-pointer rounded border-0 bg-transparent"
-          />
-          <code className="font-mono text-[10.5px] text-text-muted">{v}</code>
-        </div>
-      </div>
-    )
-  }
-  if (control.type === 'slider') {
-    const v = Number(value ?? control.default ?? control.min)
-    return (
-      <div>
-        <div className="mb-0.5 flex items-center justify-between text-[12px]">
-          <span className="text-text-secondary">{control.label}</span>
-          <span className="font-mono text-[10.5px] text-text-muted">{v}{control.unit ?? ''}</span>
-        </div>
-        <input
-          type="range"
-          min={control.min}
-          max={control.max}
-          step={control.step ?? 1}
-          value={v}
-          onChange={(e) => onChange(Number(e.target.value))}
-          className="t42-range block w-full"
-        />
-      </div>
-    )
-  }
-  if (control.type === 'number') {
-    return (
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[12px] text-text-secondary">{control.label}</span>
-        <input
-          type="number"
-          value={Number(value ?? control.default ?? 0)}
-          onChange={(e) => onChange(Number(e.target.value))}
-          className="w-20 rounded bg-elevated px-2 py-1 text-right text-[12px] text-text-primary focus:outline-none focus:ring-1 focus:ring-accent/40"
-        />
-      </div>
-    )
-  }
-  if (control.type === 'checkbox') {
-    const v = !!(value ?? control.default)
-    return (
-      <label className="flex cursor-pointer items-center justify-between gap-2">
-        <span className="text-[12px] text-text-secondary">{control.label}</span>
-        <input
-          type="checkbox"
-          checked={v}
-          onChange={(e) => onChange(e.target.checked)}
-          className="h-4 w-4 accent-[rgb(var(--accent))]"
-        />
-      </label>
-    )
-  }
-  if (control.type === 'toggle' || control.type === 'select') {
-    const v = (value as string) ?? control.default ?? control.options[0]
-    return (
-      <div>
-        <div className="mb-1 text-[12px] text-text-secondary">{control.label}</div>
-        <div className="flex overflow-hidden rounded bg-elevated">
-          {control.options.map((opt) => (
-            <button
-              key={opt}
-              type="button"
-              onClick={() => onChange(opt)}
-              className={[
-                'flex-1 px-2 py-1 text-[11px] capitalize transition-colors',
-                v === opt ? 'bg-accent text-accent-text' : 'text-text-secondary hover:text-text-primary'
-              ].join(' ')}
-            >
-              {opt}
-            </button>
-          ))}
-        </div>
-      </div>
-    )
-  }
-  return <></>
-}
 
 // ─── Edit mode ─────────────────────────────────────────────────────────────
 // VizTweak-style direct editor. When the user toggles 'Edit' on, an injected

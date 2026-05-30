@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import * as Dropdown from '@radix-ui/react-dropdown-menu'
-import { IconArrowUp, IconChevronRight, IconMic, IconPlus, IconStop } from './icons'
+import { IconArrowUp, IconMic, IconPlus, IconStop } from './icons'
 import { ModelDropdown } from './ModelDropdown'
 import { ModePicker, getDefaultMode, persistMode, type AgentMode } from './ModePicker'
 import { ContextRing } from './ContextRing'
@@ -8,12 +8,6 @@ import { useVoiceInput, formatVoiceTime, isVoiceInputSupported } from '../lib/vo
 
 // Legacy local 2-mode type kept as a no-op so old localStorage entries don't crash.
 type Mode = AgentMode
-
-// MODES list lives in ./ModePicker.tsx now; keep a no-op constant so any
-// future code that imported MODES from here doesn't 404.
-const MODES: { id: Mode; label: string; hint: string }[] = []
-
-const LS_MODE = 't42:composer:mode'
 
 export function Composer({
   sessionId,
@@ -312,41 +306,3 @@ function AttachMenu({
   )
 }
 
-function ModeDropdown({ value, onPick }: { value: Mode; onPick: (m: Mode) => void }) {
-  const current = MODES.find((m) => m.id === value) ?? MODES[0]
-  return (
-    <Dropdown.Root>
-      <Dropdown.Trigger asChild>
-        <button
-          type="button"
-          className="flex h-7 items-center gap-1 whitespace-nowrap rounded-md px-2 text-[12px] text-text-secondary outline-none hover:bg-elevated hover:text-text-primary focus:outline-none data-[state=open]:bg-elevated data-[state=open]:text-text-primary"
-          title={current.hint}
-        >
-          <span>{current.label}</span>
-          <IconChevronRight size={9} className="rotate-90 text-text-muted" />
-        </button>
-      </Dropdown.Trigger>
-      <Dropdown.Portal>
-        <Dropdown.Content
-          align="start"
-          sideOffset={6}
-          className="z-50 min-w-[220px] rounded-lg bg-elevated p-1 text-[12px] text-text-primary shadow-lg"
-        >
-          {MODES.map((m) => (
-            <Dropdown.Item
-              key={m.id}
-              onSelect={() => onPick(m.id)}
-              className="cursor-pointer rounded-md px-2 py-1.5 outline-none data-[highlighted]:bg-surface"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <span className={value === m.id ? 'text-text-primary' : 'text-text-secondary'}>{m.label}</span>
-                {value === m.id && <span className="text-[10px] text-text-muted">current</span>}
-              </div>
-              <p className="mt-0.5 text-[11px] text-text-muted">{m.hint}</p>
-            </Dropdown.Item>
-          ))}
-        </Dropdown.Content>
-      </Dropdown.Portal>
-    </Dropdown.Root>
-  )
-}
