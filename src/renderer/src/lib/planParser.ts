@@ -42,7 +42,7 @@ export type PlanState = {
   hasProgress: boolean
 }
 
-const FENCE_RE = /```(plan|plan-update)\b[^\n]*\n([\s\S]*?)(?:```|$)/g
+const FENCE_RE = /```(plan-update|plan)\b[^\n]*\n([\s\S]*?)(?:```|$)/g
 
 type ParsedFence = { kind: 'plan' | 'update'; payload: unknown }
 
