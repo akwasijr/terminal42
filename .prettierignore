@@ -1,0 +1,7 @@
+out
+dist
+node_modules
+build
+test-results
+package-lock.json
+*.md

@@ -591,7 +591,7 @@ const ACTIVITY_NOISE = [
   /total retry wait time/i,
   /commands include/i,
   /copilot uses ai/i,
-  /^[\[\]<>·•:\-_/\\\s]+$/
+  /^[[\]<>·•:\-_/\\\s]+$/
 ]
 
 function isUsefulActivity(s: string): boolean {

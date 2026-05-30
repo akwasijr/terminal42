@@ -999,7 +999,8 @@ function PageSubtype({ state, set }: PageProps): JSX.Element {
   const togglePick = (s: string): void => {
     if (multi) {
       const next = new Set(picked)
-      next.has(s) ? next.delete(s) : next.add(s)
+      if (next.has(s)) next.delete(s)
+      else next.add(s)
       const joined = Array.from(next).join(', ')
       set('subtype', joined || null)
     } else {

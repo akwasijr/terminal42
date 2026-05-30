@@ -840,7 +840,7 @@ Be ruthless. Default to archive when in doubt.`
 Run \`git log --author="$(git config user.email)" --since="yesterday" --pretty=format:'%h %s'\` across the repos in {{repo_paths}}. Collect commits and the files touched.
 
 ## Step 2
-Pull my open PRs and any PRs where I'm a reviewer (use \`gh pr list --author=@me\` and \`gh pr list --search=\"review-requested:@me\"\`).
+Pull my open PRs and any PRs where I'm a reviewer (use \`gh pr list --author=@me\` and \`gh pr list --search="review-requested:@me"\`).
 
 ## Step 3
 Write a 3-bullet standup update:

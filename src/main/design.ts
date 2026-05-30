@@ -553,7 +553,7 @@ async function createStarterTemplateVersion(designId: string, userText: string, 
   const title = `${b.starterTemplateName ?? 'Starter'} - ${b.idea || userText || 'adapted preview'}`
   html = html.replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtml(title)}</title>`)
   if (b.primaryColor || b.secondaryColor || b.accentColor) {
-    const css = `\n<style id="t42-template-fallback-theme">\n:root {\n  ${b.primaryColor ? `--t42-primary: ${b.primaryColor};` : ''}\n  ${b.secondaryColor ? `--t42-secondary: ${b.secondaryColor};` : ''}\n  ${b.accentColor ? `--t42-accent: ${b.accentColor};` : ''}\n}\n${opts.addWatermark ? `body::before {\n  content: \"${escapeCssString((b.idea || userText || '').slice(0, 120))}\";\n  position: fixed;\n  right: 16px;\n  bottom: 16px;\n  z-index: 2147483647;\n  max-width: 360px;\n  padding: 10px 12px;\n  border-radius: 12px;\n  color: #ffffff;\n  background: ${b.primaryColor ?? '#111827'};\n  font: 500 12px/1.4 system-ui, sans-serif;\n  box-shadow: 0 8px 24px rgba(0,0,0,.18);\n  pointer-events: none;\n}` : ''}\n</style>\n`
+    const css = `\n<style id="t42-template-fallback-theme">\n:root {\n  ${b.primaryColor ? `--t42-primary: ${b.primaryColor};` : ''}\n  ${b.secondaryColor ? `--t42-secondary: ${b.secondaryColor};` : ''}\n  ${b.accentColor ? `--t42-accent: ${b.accentColor};` : ''}\n}\n${opts.addWatermark ? `body::before {\n  content: "${escapeCssString((b.idea || userText || '').slice(0, 120))}";\n  position: fixed;\n  right: 16px;\n  bottom: 16px;\n  z-index: 2147483647;\n  max-width: 360px;\n  padding: 10px 12px;\n  border-radius: 12px;\n  color: #ffffff;\n  background: ${b.primaryColor ?? '#111827'};\n  font: 500 12px/1.4 system-ui, sans-serif;\n  box-shadow: 0 8px 24px rgba(0,0,0,.18);\n  pointer-events: none;\n}` : ''}\n</style>\n`
     html = html.replace(/<\/head>/i, `${css}</head>`)
   }
 
@@ -1555,7 +1555,7 @@ async function exportLatest(
   const d = getDesign(designId)
   if (!d) return { ok: false, error: 'Design not found.' }
 
-  const safeBase = (d.title || 'design').replace(/[^\w\-]+/g, '-').replace(/^-+|-+$/g, '') || 'design'
+  const safeBase = (d.title || 'design').replace(/[^\w-]+/g, '-').replace(/^-+|-+$/g, '') || 'design'
   const defaultName = `${safeBase}-${latest.id}.${extFor(format)}`
   const res = await dialog.showSaveDialog({
     title: `Export as ${format.toUpperCase()}`,

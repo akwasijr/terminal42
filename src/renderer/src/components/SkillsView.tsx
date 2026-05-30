@@ -55,7 +55,7 @@ function applyVariables(body: string, values: Record<string, string>): string {
 }
 
 function bodyPreview(body: string, max = 110): string {
-  const flat = body.replace(/^---[\s\S]*?---/, '').replace(/[#*`>_\-]/g, '').replace(/\s+/g, ' ').trim()
+  const flat = body.replace(/^---[\s\S]*?---/, '').replace(/[#*`>_-]/g, '').replace(/\s+/g, ' ').trim()
   if (flat.length <= max) return flat
   return flat.slice(0, max).trimEnd() + '…'
 }

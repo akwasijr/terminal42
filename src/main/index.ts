@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, nativeTheme, Menu, ipcMain, session } from 'electron'
+import { app, BrowserWindow, shell, nativeTheme, Menu, ipcMain, session, nativeImage } from 'electron'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
 import { registerPtyIpc, killAllSessions, listLiveSessions, killSession } from './pty'
@@ -279,7 +279,6 @@ function createWindow(opts: { safe?: boolean; replace?: BrowserWindow } = {}): v
 app.whenReady().then(() => {
   if (process.platform === 'darwin' && app.dock) {
     try {
-      const { nativeImage } = require('electron')
       app.dock.setIcon(nativeImage.createFromPath(join(__dirname, '../../resources/icon.png')))
     } catch {
       /* dock icon optional */
