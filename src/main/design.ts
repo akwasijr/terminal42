@@ -2125,6 +2125,12 @@ export function registerDesignIpc(getWin: () => BrowserWindow | null): void {
     try { shell.showItemInFolder(latest.filePath); return { ok: true } } catch { return { ok: false } }
   })
   ipcMain.handle('designs:openExternal', async (_e, fileUrl: string) => {
+    if (typeof fileUrl !== 'string') return { ok: false }
+    // Confine to the schemes this handler is actually called with (design
+    // file:// URLs and http(s) Figma links). The renderer renders untrusted
+    // srcDoc design HTML with webSecurity disabled, so reject any other scheme
+    // (javascript:, custom protocol handlers, smb:, etc.).
+    if (!/^(https?|file):/i.test(fileUrl)) return { ok: false }
     try { await shell.openExternal(fileUrl); return { ok: true } } catch { return { ok: false } }
   })
 

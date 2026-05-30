@@ -220,7 +220,11 @@ function createWindow(opts: { safe?: boolean; replace?: BrowserWindow } = {}): v
   })
 
   win.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    // The renderer can display untrusted srcDoc design HTML (webSecurity is
+    // disabled), so only hand http(s) URLs to the OS. Reject everything else
+    // (javascript:, file:, custom protocol handlers) instead of blindly
+    // forwarding to shell.openExternal.
+    if (isHttpUrl(details.url)) void shell.openExternal(details.url)
     return { action: 'deny' }
   })
 
