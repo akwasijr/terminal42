@@ -1361,7 +1361,10 @@ async function runAutoLint(win: BrowserWindow | null, designId: string): Promise
   } catch {
     return
   }
-  const violations = lintHtml(html, d.brief?.aiRules ?? null)
+  const enforcedRules = d.brief?.aiRules
+    ? Object.keys(d.brief.aiRules).filter((id) => d.brief!.aiRules![id] !== false)
+    : null
+  const violations = lintHtml(html, enforcedRules)
   if (violations.length === 0) return
 
   const nextNum = (parseInt(latest.id.slice(1), 10) || 0) + 1

@@ -233,7 +233,7 @@ export function App() {
       if (lookingHere) return
       playAttentionChime()
     })
-    return off
+    return () => { off() }
   }, [active, activeDesignId])
 
   useEffect(() => {

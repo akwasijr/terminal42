@@ -269,14 +269,33 @@ export type KickoffOptions = {
   figmaTarget?: boolean
   useFigma?: boolean
   starterTemplate?: string | null
+  inspirationBaseDir?: string
+  brandBaseDir?: string
+}
+
+// Wizard working state: a ProjectBrief without the persisted-only fields, with
+// `type` allowed to be null (unset) while the user is still choosing, and a few
+// fields promoted to required because the wizard always seeds them.
+export type WizardState = Omit<ProjectBrief, 'v' | 'type' | 'typeLabel' | 'createdAt'> & {
+  type: ProjectTypeId | null
+  look: string[]
+  surfaces: string[]
+  inspirationImages: string[]
+  theme: NonNullable<ProjectBrief['theme']>
+  radius: NonNullable<ProjectBrief['radius']>
+  shadow: NonNullable<ProjectBrief['shadow']>
+  outline: NonNullable<ProjectBrief['outline']>
+  scaffold: boolean
 }
 
 export function buildKickoffPrompt(b: ProjectBrief, opts: KickoffOptions = {}): string {
   // Build your own design prompt from the brief here.
+  void opts
   const parts: string[] = []
-  if (b.idea) parts.push(b.idea)
-  if (b.kindLabel) parts.push(`Type: ${b.kindLabel}`)
-  if (b.lookLabel) parts.push(`Look: ${b.lookLabel}`)
+  if (b.oneLiner) parts.push(b.oneLiner)
+  if (b.description) parts.push(b.description)
+  if (b.typeLabel) parts.push(`Type: ${b.typeLabel}`)
+  if (b.lookNote) parts.push(`Look: ${b.lookNote}`)
   if (b.audience) parts.push(`Audience: ${b.audience}`)
   return parts.join('\n')
 }
