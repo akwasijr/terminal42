@@ -59,6 +59,20 @@
             }
           }
           type();
+
+          // Safety net: if the renderer bundle fails to load or throws during
+          // module evaluation, main.tsx never runs and can't dismiss this
+          // splash. Force-remove it after a generous window so the user is
+          // never permanently stuck on the loader screen.
+          window.setTimeout(function () {
+            var n = document.getElementById('t42-boot-splash');
+            if (n && n.parentNode) {
+              n.classList.add('t42-fade');
+              setTimeout(function () {
+                if (n.parentNode) n.parentNode.removeChild(n);
+              }, 360);
+            }
+          }, 6000);
         })();
       </script>
     </div>
