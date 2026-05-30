@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, lazy, Suspense } from 'react'
 import {
   IconTerminal, IconFolder, IconSparkle, IconCode,
   IconSearch, IconGear, IconTheme, IconPlus, IconBell, IconBrain, IconEdit, IconTrash, IconClock,
@@ -10,19 +10,38 @@ import { TerminalPane } from './components/TerminalPane'
 import { AgentStatusWatcher } from './components/AgentStatusWatcher'
 import { playAttentionChime } from './lib/notifySound'
 import { ResizeHandle, useResizableWidth } from './components/ResizeHandle'
-import { BrainView } from './components/BrainView'
-import { BriefWizard } from './components/BriefWizard'
 import { buildKickoffPrompt } from './lib/brief'
-import { WorkbenchView } from './components/WorkbenchView'
 import type { Design, InboxEntry } from '../../preload/index'
-import { ActivityView } from './components/ActivityView'
-import { SettingsView } from './components/SettingsView'
-import { FindAnything } from './components/FindAnything'
-import { DesignsListView } from './components/DesignsListView'
-import { DesignWorkspace } from './components/DesignWorkspace'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { useProjects } from './state/store'
 import type { Project } from '../../preload/index'
+
+// Route-level views are code-split so the initial bundle (and first paint of
+// the default terminal view) stays small. Each pulls in heavy dependencies
+// (markmap, xlsx, react-markdown, cmdk) that aren't needed until the user
+// navigates to that view.
+const BrainView = lazy(() => import('./components/BrainView').then((m) => ({ default: m.BrainView })))
+const WorkbenchView = lazy(() =>
+  import('./components/WorkbenchView').then((m) => ({ default: m.WorkbenchView }))
+)
+const BriefWizard = lazy(() =>
+  import('./components/BriefWizard').then((m) => ({ default: m.BriefWizard }))
+)
+const ActivityView = lazy(() =>
+  import('./components/ActivityView').then((m) => ({ default: m.ActivityView }))
+)
+const SettingsView = lazy(() =>
+  import('./components/SettingsView').then((m) => ({ default: m.SettingsView }))
+)
+const FindAnything = lazy(() =>
+  import('./components/FindAnything').then((m) => ({ default: m.FindAnything }))
+)
+const DesignsListView = lazy(() =>
+  import('./components/DesignsListView').then((m) => ({ default: m.DesignsListView }))
+)
+const DesignWorkspace = lazy(() =>
+  import('./components/DesignWorkspace').then((m) => ({ default: m.DesignWorkspace }))
+)
 
 type NavId = 'terminal' | 'rawterm' | 'designs' | 'projects' | 'workbench' | 'brain' | 'activity' | 'settings'
 
@@ -427,15 +446,19 @@ export function App() {
           onClearDesignWizardSeed={() => setDesignWizardSeed(null)}
         />
       </div>
-      <FindAnything
-        open={paletteOpen}
-        onOpenChange={setPaletteOpen}
-        projects={projects}
-        onPickProject={handlePickProject}
-        onSetView={setActive}
-        onPickModel={handlePaletteModel}
-        onAddProject={handleAddProject}
-      />
+      {paletteOpen && (
+        <Suspense fallback={null}>
+          <FindAnything
+            open={paletteOpen}
+            onOpenChange={setPaletteOpen}
+            projects={projects}
+            onPickProject={handlePickProject}
+            onSetView={setActive}
+            onPickModel={handlePaletteModel}
+            onAddProject={handleAddProject}
+          />
+        </Suspense>
+      )}
       <RenameDialog
         target={renameTarget}
         onClose={() => setRenameTarget(null)}
@@ -448,12 +471,14 @@ export function App() {
         }}
       />
       {pendingProject && (
-        <BriefWizard
-          folderPath={pendingProject.path}
-          projectId={pendingProject.id}
-          onCancel={handleBriefCancel}
-          onComplete={handleBriefComplete}
-        />
+        <Suspense fallback={null}>
+          <BriefWizard
+            folderPath={pendingProject.path}
+            projectId={pendingProject.id}
+            onCancel={handleBriefCancel}
+            onComplete={handleBriefComplete}
+          />
+        </Suspense>
       )}
       <ConfirmDialog
         target={removeTarget}
@@ -1087,8 +1112,16 @@ function Main({
       ) : null}
 
       {/* Overlay panes: render on top of the (hidden) terminal so it stays mounted. */}
-      {overlay && <div className="relative z-10 flex flex-1 overflow-hidden bg-bg">{overlay}</div>}
+      {overlay && <div className="relative z-10 flex flex-1 overflow-hidden bg-bg"><Suspense fallback={<ViewLoading />}>{overlay}</Suspense></div>}
       {!overlay && !activeProject && !showTerminal && <EmptyHome onAddProject={onAddProject} onOpenFolder={onOpenFolder} />}
+    </div>
+  )
+}
+
+function ViewLoading(): JSX.Element {
+  return (
+    <div className="grid h-full w-full place-items-center bg-bg text-text-secondary">
+      <span className="text-[13px]">Loading…</span>
     </div>
   )
 }
