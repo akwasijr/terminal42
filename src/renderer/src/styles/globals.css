@@ -209,9 +209,25 @@ input, textarea, [contenteditable] {
 
 /* Fields read as sunken wells, and focus is expressed as a ring rather than
    a border colour change (there is no border to change any more). */
-input:not([type='color']):not([type='range']):not([type='checkbox']):not([type='radio']):focus-visible,
+input:not(:where([type='color'], [type='range'], [type='checkbox'], [type='radio'])):focus-visible,
 textarea:focus-visible,
 select:focus-visible {
+  box-shadow: 0 0 0 2px rgb(var(--accent) / 0.55);
+}
+
+/* A field with no background of its own is painted by the row, well or shell
+   that wraps it, so the wrapper carries the ring. Drawing it on the field
+   stacks a hard rectangle inside an already-rounded container — which is what
+   made the chat composer look like a box inside a box. */
+input.bg-transparent:focus-visible,
+textarea.bg-transparent:focus-visible,
+select.bg-transparent:focus-visible {
+  box-shadow: none;
+}
+
+:has(> input.bg-transparent:not([type='color']):not([type='range']):focus-visible),
+:has(> textarea.bg-transparent:focus-visible),
+:has(> select.bg-transparent:focus-visible) {
   box-shadow: 0 0 0 2px rgb(var(--accent) / 0.55);
 }
 

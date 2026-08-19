@@ -158,7 +158,6 @@ export function Composer({
           rows={1}
           placeholder={voice.recording ? 'Listening…' : voice.transcribing ? 'Transcribing…' : 'Ask anything…'}
           className="block w-full resize-none bg-transparent text-[14px] leading-relaxed text-text-primary placeholder:text-text-muted focus:outline-none"
-          style={{ caretColor: 'rgb(var(--accent))' }}
           aria-label="Message Copilot"
         />
         <div className="mt-2 flex items-center gap-1.5">
