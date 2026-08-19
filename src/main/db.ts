@@ -301,6 +301,13 @@ function migrate(d: Database.Database): void {
     if (!chatCols.some((c) => c.name === 'undone')) {
       d.exec(`ALTER TABLE chat_messages ADD COLUMN undone INTEGER NOT NULL DEFAULT 0`)
     }
+    // `snapshot_local` is the id of a local-copy manifest covering what git
+    // could not: everything, when the folder is not a repository, or just the
+    // .gitignore'd files when it is. Null on rows written before local copies
+    // existed, which still undo correctly from `snapshot_tree` alone.
+    if (!chatCols.some((c) => c.name === 'snapshot_local')) {
+      d.exec(`ALTER TABLE chat_messages ADD COLUMN snapshot_local TEXT`)
+    }
   }
 }
 

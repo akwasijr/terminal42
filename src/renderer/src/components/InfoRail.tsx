@@ -1,6 +1,7 @@
 import type { ContextUsage } from '../../../preload/index'
 import type { SessionInsights, TodoInsight } from '../../../shared/sessionInsights'
 import { HILL_GATE } from '../../../shared/sessionInsights'
+import { contextDisplay } from '../../../shared/contextUsage'
 
 export interface InfoRailProps {
   insights: SessionInsights
@@ -20,6 +21,14 @@ export function InfoRail({
   className = ''
 }: InfoRailProps): JSX.Element | null {
   if (hidden) return null
+
+  // One shared rule decides whether a context reading is trustworthy, so this
+  // panel and the Status tab never disagree about the same session.
+  const ctx = contextDisplay(contextUsage, { hasSession: true })
+  // With no goals reported there is nothing to total, score, or list. Three
+  // cards each saying "0" or "Unknown" read as broken instrumentation rather
+  // than as an empty session, so they collapse to a single line.
+  const hasGoals = insights.counts.total > 0
 
   const rootClassName = [
     'flex shrink-0 flex-col overflow-hidden rounded-panel bg-surface text-[12px] text-text-secondary shadow-panel',
@@ -59,9 +68,6 @@ export function InfoRail({
           <h2 id="session-insights-title" className="text-[13px] font-semibold text-text-primary">
             Session insights
           </h2>
-          <p className="mt-1 text-[11px] text-text-muted">
-            Live signals for this Copilot CLI session.
-          </p>
         </section>
         <button
           type="button"
@@ -84,47 +90,36 @@ export function InfoRail({
         </button>
       </header>
 
-      <section aria-labelledby="context-usage-title" className="mt-3 rounded-lg bg-sunken p-3">
-        <MetricHeader
-          id="context-usage-title"
-          title="Context usage"
-          value={
-            contextUsage && contextUsage.contextLimit > 0
-              ? `${contextPercent(contextUsage)}%`
-              : 'Not reported'
-          }
-          titleText={contextTitle(contextUsage)}
-        />
-        {contextUsage && contextUsage.contextLimit > 0 ? (
-          <>
+      {ctx ? (
+        <section aria-labelledby="context-usage-title" className="mt-3 rounded-lg bg-sunken p-3">
+          <MetricHeader
+            id="context-usage-title"
+            title="Context"
+            value={`${ctx.percent}%`}
+            titleText={`${ctx.usedTokens.toLocaleString()} of ${ctx.limitTokens.toLocaleString()} tokens`}
+          />
+          <span
+            role="meter"
+            aria-label="Context window used"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={ctx.percent}
+            className="mt-3 block h-2 overflow-hidden rounded-full bg-elevated"
+          >
             <span
-              role="meter"
-              aria-label="Context window used"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={contextPercent(contextUsage)}
-              className="mt-3 block h-2 overflow-hidden rounded-full bg-elevated"
-            >
-              <span
-                className={[
-                  'block h-full rounded-full transition-all',
-                  contextTone(contextUsage.percent)
-                ].join(' ')}
-                style={{ width: `${contextPercent(contextUsage)}%` }}
-              />
-            </span>
-            <p className="mt-2 text-[11px] text-text-muted">
-              {formatTokens(contextUsage.inputTokens)} of {formatTokens(contextUsage.contextLimit)}{' '}
-              tokens
-            </p>
-          </>
-        ) : (
-          <p className="mt-2 text-[11px] text-text-muted">
-            The CLI reports this once the session has run a turn.
-          </p>
-        )}
-      </section>
+              className={[
+                'block h-full rounded-full transition-all',
+                ctx.tone === 'critical' ? 'bg-error' : ctx.tone === 'warning' ? 'bg-warning' : 'bg-accent'
+              ].join(' ')}
+              style={{ width: `${ctx.percent}%` }}
+            />
+          </span>
+          <p className="mt-2 text-[11px] tabular-nums text-text-muted">{ctx.usedOfLimit}</p>
+        </section>
+      ) : null}
 
+      {hasGoals ? (
+        <>
       <section aria-labelledby="todo-progress-title" className="mt-3 rounded-lg bg-sunken p-3">
         <MetricHeader
           id="todo-progress-title"
@@ -202,15 +197,12 @@ export function InfoRail({
           </p>
         )}
       </section>
-
-      <section aria-labelledby="memory-title" className="mt-3 rounded-lg bg-sunken p-3">
-        <MetricHeader
-          id="memory-title"
-          title="Memory"
-          value={String(insights.memories)}
-          titleText={`${insights.memories} memories available`}
-        />
-      </section>
+        </>
+      ) : (
+        <p className="mt-3 rounded-lg bg-sunken p-3 text-[11px] text-text-muted">
+          No goals reported yet.
+        </p>
+      )}
 
       <section aria-labelledby="auto-continue-title" className="mt-3 rounded-lg bg-sunken p-3">
         <MetricHeader
@@ -404,40 +396,10 @@ function statusTone(status: TodoInsight['status']): string {
   return 'bg-text-muted'
 }
 
-function contextPercent(usage: ContextUsage): number {
-  return clampPercent(Math.round(usage.percent))
-}
 
-function contextTone(percent: number): string {
-  if (percent >= 90) return 'bg-error'
-  if (percent >= 75) return 'bg-warning'
-  return 'bg-accent'
-}
 
-function contextTitle(usage: ContextUsage | null): string {
-  if (!usage || usage.contextLimit <= 0) return 'No context usage report available'
-  const parts = [
-    `${contextPercent(usage)}% of context used`,
-    `${usage.inputTokens.toLocaleString()} of ${usage.contextLimit.toLocaleString()} tokens`,
-    usage.model ? `Model: ${usage.model}` : null,
-    usage.source ? `Source: ${sourceLabel(usage.source)}` : null
-  ]
-  return parts.filter(Boolean).join('\n')
-}
 
-function sourceLabel(source: NonNullable<ContextUsage['source']>): string {
-  if (source === 'shutdown') return 'Session shutdown'
-  if (source === 'truncation') return 'Last truncation'
-  return 'Last compaction'
-}
 
-function formatTokens(n: number): string {
-  if (n <= 0) return '0'
-  if (n < 1000) return String(n)
-  if (n < 100_000) return `${(n / 1000).toFixed(1)}k`
-  if (n < 1_000_000) return `${Math.round(n / 1000)}k`
-  return `${(n / 1_000_000).toFixed(1)}M`
-}
 
 function clampPercent(n: number): number {
   return Math.max(0, Math.min(100, n))

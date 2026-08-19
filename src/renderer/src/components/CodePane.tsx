@@ -4,12 +4,15 @@
 // because the question the pane answers is "what did that turn do here", not
 // "what does this file contain".
 //
-// There is no syntax colouring: the project carries no highlighter dependency,
-// and adding one purely for decoration is a call for the user to make. Change
-// tone does the work of drawing the eye instead.
+// Syntax colouring comes from Shiki (real TextMate grammars), loaded on demand
+// so no grammar reaches the startup bundle. It is strictly an enhancement: the
+// before/after text is rendered from the diff itself, and if highlighting is
+// unavailable or fails the same rows render as plain text. Colour must never
+// be the reason a diff cannot be read.
 
 import { useEffect, useState } from 'react'
 import { diffLines, countChanges, type DiffLine } from '../../../shared/lineDiff'
+import { highlightToLines, languageForPath, type CodeToken } from '../lib/highlight'
 import { IconClose, IconCode, IconGlobe, IconFolder } from './icons'
 import { DiffCounts } from './DiffCard'
 
@@ -31,16 +34,33 @@ export function CodePane({
   const [state, setState] = useState<
     { status: 'loading' } | { status: 'error'; error: string } | { status: 'ready'; lines: DiffLine[] }
   >({ status: 'loading' })
+  const [tokens, setTokens] = useState<{ before: CodeToken[][] | null; after: CodeToken[][] | null }>({
+    before: null,
+    after: null
+  })
 
   useEffect(() => {
     let cancelled = false
     setState({ status: 'loading' })
+    setTokens({ before: null, after: null })
     void window.terminal42.chat
       .fileDiff(messageId, path)
       .then((res) => {
         if (cancelled) return
         if (!res.ok) { setState({ status: 'error', error: res.error ?? 'Could not load this file.' }); return }
-        setState({ status: 'ready', lines: diffLines(res.before ?? '', res.after ?? '') })
+        const lines = diffLines(res.before ?? '', res.after ?? '')
+        setState({ status: 'ready', lines })
+        // Highlighting resolves after the diff is already on screen, so a slow
+        // grammar load never delays showing the change.
+        const lang = languageForPath(path)
+        if (!lang) return
+        void Promise.all([
+          highlightToLines(res.before ?? '', lang),
+          highlightToLines(res.after ?? '', lang)
+        ]).then(([before, after]) => {
+          if (cancelled || (!before && !after)) return
+          setTokens({ before, after })
+        })
       })
       .catch((e) => { if (!cancelled) setState({ status: 'error', error: String((e as Error)?.message ?? e) }) })
     return () => { cancelled = true }
@@ -97,13 +117,19 @@ export function CodePane({
         {state.status === 'error' && (
           <p className="px-3 py-6 text-[12.5px] text-text-secondary">{state.error}</p>
         )}
-        {state.status === 'ready' && <DiffBody lines={state.lines} />}
+        {state.status === 'ready' && <DiffBody lines={state.lines} tokens={tokens} />}
       </div>
     </aside>
   )
 }
 
-function DiffBody({ lines }: { lines: DiffLine[] }): JSX.Element {
+function DiffBody({
+  lines,
+  tokens
+}: {
+  lines: DiffLine[]
+  tokens: { before: CodeToken[][] | null; after: CodeToken[][] | null }
+}): JSX.Element {
   if (lines.length === 0) {
     return <p className="px-3 py-6 text-[12.5px] text-text-muted">This file is empty.</p>
   }
@@ -111,14 +137,41 @@ function DiffBody({ lines }: { lines: DiffLine[] }): JSX.Element {
     <table className="w-full border-collapse font-mono text-[12px] leading-[1.5]">
       <tbody>
         {lines.map((l, i) => (
-          <DiffRow key={i} line={l} />
+          <DiffRow key={i} line={l} tokens={tokensForLine(l, tokens)} />
         ))}
       </tbody>
     </table>
   )
 }
 
-function DiffRow({ line }: { line: DiffLine }): JSX.Element {
+/**
+ * The tokens belonging to one diff row.
+ *
+ * Each side is tokenised as a whole file, so a row is matched back by its own
+ * line number: a deleted row can only come from the "before" text, an added
+ * row only from the "after". Tokenising the interleaved diff instead would
+ * feed the grammar a file that never existed and mis-colour from the first
+ * unbalanced brace onwards.
+ *
+ * Returns null if anything fails to line up, which falls back to plain text
+ * for that row rather than showing tokens from the wrong line.
+ */
+export function tokensForLine(
+  line: DiffLine,
+  tokens: { before: CodeToken[][] | null; after: CodeToken[][] | null }
+): CodeToken[] | null {
+  const [side, no] =
+    line.kind === 'del' ? [tokens.before, line.beforeNo] : [tokens.after, line.afterNo]
+  if (!side || !no) return null
+  const row = side[no - 1]
+  if (!row) return null
+  // Guard against a highlighter that normalised the text differently from the
+  // diff; showing the wrong colours silently is worse than showing none.
+  const joined = row.map((t) => t.content).join('')
+  return joined === line.text ? row : null
+}
+
+function DiffRow({ line, tokens }: { line: DiffLine; tokens: CodeToken[] | null }): JSX.Element {
   const tone =
     line.kind === 'add' ? 'bg-success/10'
     : line.kind === 'del' ? 'bg-error/10'
@@ -135,7 +188,15 @@ function DiffRow({ line }: { line: DiffLine }): JSX.Element {
         {line.afterNo ?? ''}
       </td>
       <td className={`w-[1%] select-none pr-1 align-top ${markTone}`}>{mark}</td>
-      <td className="whitespace-pre-wrap break-words pr-3 align-top text-text-primary">{line.text || '\u00a0'}</td>
+      <td className="whitespace-pre-wrap break-words pr-3 align-top text-text-primary">
+        {tokens && tokens.length > 0
+          ? tokens.map((t, i) => (
+              <span key={i} style={t.color ? { color: t.color } : undefined}>
+                {t.content}
+              </span>
+            ))
+          : line.text || '\u00a0'}
+      </td>
     </tr>
   )
 }

@@ -11,8 +11,8 @@ import { TerminalActionsMenu } from './TerminalActionsMenu'
 import { KickoffPromptButton } from './KickoffPromptViewer'
 import { BrowserPane } from './BrowserPane'
 import { CodePane } from './CodePane'
-import { COMPOSER_FILL_EVENT } from './ChatEmptyStateFull'
-import { IconPlus, IconTerminal, IconExternal, IconEdit } from './icons'
+import { COMPOSER_FILL_EVENT } from './composerFill'
+import { IconPlus, IconTerminal, IconExternal } from './icons'
 import { useSessions } from '../state/store'
 import { classifyStatus, type AgentStatus } from '../../../shared/agentStatus'
 
@@ -267,17 +267,6 @@ export function ProjectWorkspace({
                     <IconExternal size={13} />
                   </button>
                   <KickoffPromptButton projectId={project.id} sessionId={active.id} />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const idea = `Use this project as context: "${project.name}" at ${project.path}. Read the README + key source files to understand what it does, then design accordingly.`
-                      window.dispatchEvent(new CustomEvent('t42:open-design-wizard', { detail: { idea } }))
-                    }}
-                    title="Spin off as a design: opens the Design wizard pre-filled with this project as context"
-                    className="grid h-7 w-7 place-items-center rounded-md text-text-secondary hover:bg-surface hover:text-text-primary"
-                  >
-                    <IconEdit size={12} />
-                  </button>
                   <TerminalActionsMenu sessionId={active.id} />
                 </div>
               ) : null

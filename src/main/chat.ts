@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow } from 'electron'
+import { ipcMain, BrowserWindow, app } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
@@ -9,7 +9,35 @@ import { assembleCacheStableMessages, flattenPromptCacheMessages } from '../shar
 import { buildMemoryContext } from './memoryContext'
 import { recordMemoryUse } from './sessionInsights'
 import { reframeGoal, renderGoalReframePrompt } from '../shared/goalReframe'
-import { snapshotTree, diffTrees, revertPaths, readFileAtTree, type DiffSummary } from './gitSnapshot'
+import { type DiffSummary } from './gitSnapshot'
+import {
+  takeTurnSnapshot, diffTurnSnapshot, revertTurnSnapshot, readFileAtSnapshot,
+  isEmptySnapshot, type TurnSnapshot
+} from './turnSnapshot'
+import { pruneStore, type Store } from './localSnapshot'
+
+/**
+ * Where local file copies for undo are kept.
+ *
+ * Outside the project so a snapshot never shows up in the user's own diff, and
+ * under userData so it is cleaned up with the app rather than left behind in a
+ * folder they may later delete.
+ */
+function undoStore(): Store {
+  return { dir: join(app.getPath('userData'), 'undo-snapshots') }
+}
+
+/**
+ * How long local copies survive. Undo is an immediate-regret feature — nobody
+ * reaches for it on a week-old turn — and the copies are real disk, so they are
+ * swept rather than kept forever.
+ */
+const UNDO_RETENTION_MS = 7 * 24 * 60 * 60 * 1000
+
+/** Sweep expired local copies. Called once at startup; failure is not fatal. */
+export function pruneUndoSnapshots(): void {
+  void pruneStore(undoStore(), UNDO_RETENTION_MS).catch(() => {})
+}
 
 export type ChatRole = 'user' | 'assistant' | 'system'
 export type ChatStatus = 'pending' | 'streaming' | 'done' | 'error' | 'cancelled'
@@ -49,7 +77,7 @@ type RunState = {
   cwd: string
   /** Worktree snapshot taken as the turn started. Held as a promise so
    *  starting the run is never blocked on git. */
-  snapshot: Promise<string | null>
+  snapshot: Promise<TurnSnapshot | null>
   // Retry context for transparent model fallback (one-shot --prompt mode
   // doesn't auto-fall-back on unknown --model, so we re-send without it).
   // If that hits a rate limit and is eligible for auto-switch, we retry
@@ -92,14 +120,13 @@ async function recordTurnDiff(win: BrowserWindow | null, sessionId: string, stat
     const messageId = state.assistantMsgId
     if (!messageId) return
     const before = await state.snapshot
-    if (!before) return
-    const after = await snapshotTree(state.cwd)
-    if (!after || after === before) return
-    const diff = await diffTrees(state.cwd, before, after)
+    if (isEmptySnapshot(before)) return
+    const snap = before as TurnSnapshot
+    const diff = await diffTurnSnapshot(undoStore(), snap)
     if (diff.files.length === 0) return
     getDb()
-      .prepare('UPDATE chat_messages SET snapshot_tree = ?, diff_json = ?, diff_cwd = ? WHERE id = ?')
-      .run(before, JSON.stringify(diff), state.cwd, messageId)
+      .prepare('UPDATE chat_messages SET snapshot_tree = ?, snapshot_local = ?, diff_json = ?, diff_cwd = ? WHERE id = ?')
+      .run(snap.git, snap.local, JSON.stringify(diff), state.cwd, messageId)
     emit(win, 'chat:diff', { sessionId, messageId, diff })
   } catch {
     // A diff is a convenience; never let it break the turn.
@@ -262,18 +289,23 @@ function processJsonEvent(
  */
 async function undoTurn(messageId: string): Promise<{ ok: boolean; reverted: string[]; error?: string }> {
   const row = getDb()
-    .prepare('SELECT snapshot_tree, diff_json, diff_cwd, undone FROM chat_messages WHERE id = ?')
-    .get(messageId) as { snapshot_tree: string | null; diff_json: string | null; diff_cwd: string | null; undone: number } | undefined
+    .prepare('SELECT snapshot_tree, snapshot_local, diff_json, diff_cwd, undone FROM chat_messages WHERE id = ?')
+    .get(messageId) as { snapshot_tree: string | null; snapshot_local: string | null; diff_json: string | null; diff_cwd: string | null; undone: number } | undefined
   if (!row) return { ok: false, reverted: [], error: 'Message not found.' }
   if (row.undone) return { ok: false, reverted: [], error: 'These changes were already undone.' }
-  if (!row.snapshot_tree || !row.diff_cwd || !row.diff_json) {
+  if ((!row.snapshot_tree && !row.snapshot_local) || !row.diff_cwd || !row.diff_json) {
     return { ok: false, reverted: [], error: 'No snapshot was recorded for this turn.' }
   }
+  const snap: TurnSnapshot = { cwd: row.diff_cwd, git: row.snapshot_tree, local: row.snapshot_local }
   let diff: DiffSummary
   try { diff = JSON.parse(row.diff_json) as DiffSummary }
   catch { return { ok: false, reverted: [], error: 'Recorded changes could not be read.' } }
 
-  const res = await revertPaths(row.diff_cwd, row.snapshot_tree, diff.files.map((f) => f.path))
+  // Files the snapshot could not capture are excluded rather than attempted:
+  // the card already shows them as not undoable, and asking git to restore a
+  // path it never held would delete it.
+  const paths = diff.files.filter((f) => !f.unrecoverable).map((f) => f.path)
+  const res = await revertTurnSnapshot(undoStore(), snap, paths)
   if (res.reverted.length > 0) {
     getDb().prepare('UPDATE chat_messages SET undone = 1 WHERE id = ?').run(messageId)
   }
@@ -298,9 +330,9 @@ async function loadFileDiff(
   path: string
 ): Promise<{ ok: boolean; before: string | null; after: string | null; error?: string }> {
   const row = getDb()
-    .prepare('SELECT snapshot_tree, diff_json, diff_cwd FROM chat_messages WHERE id = ?')
-    .get(messageId) as { snapshot_tree: string | null; diff_json: string | null; diff_cwd: string | null } | undefined
-  if (!row?.snapshot_tree || !row.diff_cwd || !row.diff_json) {
+    .prepare('SELECT snapshot_tree, snapshot_local, diff_json, diff_cwd FROM chat_messages WHERE id = ?')
+    .get(messageId) as { snapshot_tree: string | null; snapshot_local: string | null; diff_json: string | null; diff_cwd: string | null } | undefined
+  if (!row || (!row.snapshot_tree && !row.snapshot_local) || !row.diff_cwd || !row.diff_json) {
     return { ok: false, before: null, after: null, error: 'No snapshot for this turn.' }
   }
   let diff: DiffSummary
@@ -310,7 +342,8 @@ async function loadFileDiff(
   if (!entry) return { ok: false, before: null, after: null, error: 'That file is not part of this change.' }
   if (entry.binary) return { ok: false, before: null, after: null, error: 'Binary file.' }
 
-  const before = await readFileAtTree(row.diff_cwd, row.snapshot_tree, path)
+  const snap: TurnSnapshot = { cwd: row.diff_cwd, git: row.snapshot_tree, local: row.snapshot_local }
+  const before = await readFileAtSnapshot(undoStore(), snap, path)
   let after: string | null = null
   try { after = await readFile(join(row.diff_cwd, path), 'utf8') }
   catch { after = null }
@@ -444,7 +477,7 @@ function send(
     child, assistantMsgId: null, buffer: '', toolCalls: new Map(), cancelled: false, doneEmitted: false,
     cwd,
     // Fired here rather than awaited: the run must not wait on git.
-    snapshot: snapshotTree(cwd),
+    snapshot: takeTurnSnapshot(undoStore(), cwd),
     requestedModel: model ?? null,
     originalText: text,
     originalOpts: { cwd: opts.cwd, prefix: opts.prefix, agentMode: opts.agentMode },

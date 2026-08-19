@@ -7,7 +7,7 @@ import { ContextRing } from './ContextRing'
 import { useVoiceInput, formatVoiceTime, isVoiceInputSupported } from '../lib/voice'
 import { analyzeGoalQuality, shouldShowGoalQualityHint } from '../../../shared/goalQuality'
 import { GoalHint } from './GoalHint'
-import { COMPOSER_FILL_EVENT } from './ChatEmptyStateFull'
+import { COMPOSER_FILL_EVENT } from './composerFill'
 
 // Legacy local 2-mode type kept as a no-op so old localStorage entries don't crash.
 type Mode = AgentMode

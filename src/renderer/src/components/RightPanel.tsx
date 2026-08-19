@@ -3,6 +3,15 @@ import type { Task, ContextUsage } from '../../../preload/index'
 import { IconExternal } from './icons'
 import { InfoRail } from './InfoRail'
 import { EMPTY_INSIGHTS, type SessionInsights } from '../../../shared/sessionInsights'
+import { contextDisplay } from '../../../shared/contextUsage'
+
+/** "just now" / "4m ago" — only used in a tooltip, so it stays coarse. */
+function formatAge(ms: number): string {
+  if (!Number.isFinite(ms)) return 'at an unknown time'
+  const mins = Math.floor(ms / 60000)
+  if (mins < 1) return 'just now'
+  return `${mins}m ago`
+}
 
 function shortPath(p: string | null | undefined): string {
   if (!p) return ':'
@@ -213,28 +222,25 @@ function StatusBlock({
 }
 
 function ContextRow({ usage, hasSession }: { usage: ContextUsage | null; hasSession: boolean }) {
-  // Hide entirely until a Copilot session has produced its first usage report.
-  // Also hide when data is stale (>5 min old) to avoid misleading numbers.
-  if (!hasSession || !usage || usage.inputTokens === 0) return null
-  const ageMs = usage.sourceTimestamp ? Date.now() - new Date(usage.sourceTimestamp).getTime() : Infinity
-  if (ageMs > 5 * 60 * 1000) return null
-  const pct = usage.percent
-  const usedK = (usage.inputTokens / 1000).toFixed(usage.inputTokens > 9999 ? 0 : 1)
-  const limitK = Math.round(usage.contextLimit / 1000)
-  const remainK = Math.max(0, limitK - Math.round(usage.inputTokens / 1000))
-  const tone = pct >= 90 ? 'bg-error' : pct >= 75 ? 'bg-warning' : 'bg-text-muted'
+  // Shown only when the shared rule says the reading is trustworthy, so this
+  // and the Harness tab hide at exactly the same moment.
+  const d = contextDisplay(usage, { hasSession })
+  if (!d) return null
+  const tone = d.tone === 'critical' ? 'bg-error' : d.tone === 'warning' ? 'bg-warning' : 'bg-text-muted'
   return (
     <div className="flex flex-col gap-1.5 px-1 pt-3 pb-1 text-[12px]">
       <div className="flex items-center justify-between">
         <span className="text-text-muted">Context</span>
-        <span className="text-text-primary tabular-nums" title={`${usage.inputTokens.toLocaleString()} of ${usage.contextLimit.toLocaleString()} tokens`}>
-          {pct}% · {usedK}k / {limitK}k
+        <span
+          className="text-text-primary tabular-nums"
+          title={`${d.usedTokens.toLocaleString()} of ${d.limitTokens.toLocaleString()} tokens, as last reported by the CLI ${formatAge(d.ageMs)}`}
+        >
+          {d.percent}% · {d.usedOfLimit}
         </span>
       </div>
-      <div className="relative h-1 w-full overflow-hidden rounded-full bg-elevated" aria-label={`${pct}% of context window used`}>
-        <div className={['h-full rounded-full transition-all', tone].join(' ')} style={{ width: `${Math.max(2, pct)}%` }} />
+      <div className="relative h-1 w-full overflow-hidden rounded-full bg-elevated" aria-label={`${d.percent}% of context window used`}>
+        <div className={['h-full rounded-full transition-all', tone].join(' ')} style={{ width: `${Math.max(2, d.percent)}%` }} />
       </div>
-      <div className="text-[10.5px] text-text-muted">{remainK}k tokens left before compaction</div>
     </div>
   )
 }

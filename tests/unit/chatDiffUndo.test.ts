@@ -28,11 +28,15 @@ type Db = InstanceType<typeof DatabaseSync>
 // Driven through the real IPC handlers rather than by exporting the private
 // functions, so the registration wiring is covered too.
 
+const electronUserData = mkdtempSync(join(tmpdir(), 't42-chat-userdata-'))
 const handlers = new Map<string, (e: unknown, ...args: never[]) => unknown>()
 let db: Db
 
 vi.mock('electron', () => ({
   BrowserWindow: class {},
+  // Real path, not a stub: the local-copy undo store writes to it, and a fake
+  // would make these tests pass while the feature wrote nowhere.
+  app: { getPath: () => electronUserData },
   ipcMain: {
     handle: (channel: string, fn: (e: unknown, ...args: never[]) => unknown) => {
       handlers.set(channel, fn)
@@ -106,7 +110,7 @@ beforeEach(() => {
   db = new DatabaseSync(':memory:')
   db.exec(`CREATE TABLE chat_messages (
     id TEXT PRIMARY KEY, session_id TEXT, role TEXT, content TEXT, tool_calls TEXT,
-    status TEXT, created_at INTEGER, snapshot_tree TEXT, diff_json TEXT,
+    status TEXT, created_at INTEGER, snapshot_tree TEXT, snapshot_local TEXT, diff_json TEXT,
     diff_cwd TEXT, undone INTEGER DEFAULT 0)`)
   registerChatIpc(() => null)
   repo = makeRepo()
@@ -286,5 +290,104 @@ describe('chat:fileDiff', () => {
     const res = await fileDiff('m1', 'logo.png')
     expect(res.ok).toBe(false)
     expect(res.error).toMatch(/binary/i)
+  })
+})
+
+/**
+ * Records a turn the way chat.ts now does, via the snapshot facade, so these
+ * cases exercise the same routing the app uses rather than a git-only shortcut.
+ */
+async function recordTurnViaFacade(id: string, snap: unknown, cwd: string): Promise<void> {
+  const { diffTurnSnapshot } = await import('../../src/main/turnSnapshot')
+  const store = { dir: join(electronUserData, 'undo-snapshots') }
+  const s = snap as { git: string | null; local: string | null; cwd: string }
+  const diff = await diffTurnSnapshot(store, s)
+  db.prepare(
+    'UPDATE chat_messages SET snapshot_tree = ?, snapshot_local = ?, diff_json = ?, diff_cwd = ? WHERE id = ?'
+  ).run(s.git, s.local, JSON.stringify(diff), cwd, id)
+}
+
+const takeSnap = async (cwd: string): Promise<unknown> => {
+  const { takeTurnSnapshot } = await import('../../src/main/turnSnapshot')
+  return takeTurnSnapshot({ dir: join(electronUserData, 'undo-snapshots') }, cwd)
+}
+
+describe('undo without git', () => {
+  // The user's folder is not always a repository, and .gitignore hides files
+  // even when it is. Both were silently un-undoable before local copies.
+
+  it('restores a modified file in a plain folder', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 't42-nogit-'))
+    writeFileSync(join(dir, 'notes.txt'), 'original\n')
+    const snap = await takeSnap(dir)
+
+    writeFileSync(join(dir, 'notes.txt'), 'agent rewrote this\n')
+    const id = 'm-nogit-mod'
+    insertMessage(id)
+    await recordTurnViaFacade(id, snap, dir)
+
+    const res = await undo(id)
+    expect(res.ok).toBe(true)
+    expect(readFileSync(join(dir, 'notes.txt'), 'utf8')).toBe('original\n')
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('removes a file the turn created in a plain folder', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 't42-nogit-'))
+    writeFileSync(join(dir, 'keep.txt'), 'keep\n')
+    const snap = await takeSnap(dir)
+
+    writeFileSync(join(dir, 'created.txt'), 'new\n')
+    const id = 'm-nogit-add'
+    insertMessage(id)
+    await recordTurnViaFacade(id, snap, dir)
+
+    const res = await undo(id)
+    expect(res.ok).toBe(true)
+    expect(existsSync(join(dir, 'created.txt'))).toBe(false)
+    expect(readFileSync(join(dir, 'keep.txt'), 'utf8')).toBe('keep\n')
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('restores a .gitignore\'d file inside a repository', async () => {
+    const dir = makeRepo()
+    writeFileSync(join(dir, '.gitignore'), '.env\n')
+    writeFileSync(join(dir, '.env'), 'KEY=original\n')
+    git(dir, 'add', '-A')
+    git(dir, 'commit', '-qm', 'ignore')
+
+    const snap = await takeSnap(dir)
+    writeFileSync(join(dir, '.env'), 'KEY=clobbered\n')
+    const id = 'm-ignored'
+    insertMessage(id)
+    await recordTurnViaFacade(id, snap, dir)
+
+    const res = await undo(id)
+    expect(res.ok).toBe(true)
+    // Git alone would have deleted this file outright: it is absent from the
+    // snapshot tree, which git can only read as "created since".
+    expect(existsSync(join(dir, '.env'))).toBe(true)
+    expect(readFileSync(join(dir, '.env'), 'utf8')).toBe('KEY=original\n')
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('shows before-contents of an ignored file in the code view', async () => {
+    const dir = makeRepo()
+    writeFileSync(join(dir, '.gitignore'), '.env\n')
+    writeFileSync(join(dir, '.env'), 'KEY=original\n')
+    git(dir, 'add', '-A')
+    git(dir, 'commit', '-qm', 'ignore')
+
+    const snap = await takeSnap(dir)
+    writeFileSync(join(dir, '.env'), 'KEY=changed\n')
+    const id = 'm-ignored-diff'
+    insertMessage(id)
+    await recordTurnViaFacade(id, snap, dir)
+
+    const res = await fileDiff(id, '.env')
+    expect(res.ok).toBe(true)
+    expect(res.before).toBe('KEY=original\n')
+    expect(res.after).toBe('KEY=changed\n')
+    rmSync(dir, { recursive: true, force: true })
   })
 })

@@ -4,7 +4,7 @@ import { pathToFileURL } from 'url'
 import { registerPtyIpc, killAllSessions, listLiveSessions, killSession } from './pty'
 import { registerProjectIpc } from './projects'
 import { registerComposerIpc } from './composer'
-import { registerChatIpc, killAllChats } from './chat'
+import { registerChatIpc, killAllChats, pruneUndoSnapshots } from './chat'
 import { registerCanvasAssistIpc } from './canvasAssist'
 import { registerDesignIpc, stopAllDesignWatchers, killAllDesignRuns } from './design'
 import { registerPreviewIpc, killAllPreviews, runningPreviewCount, runningPreviewList, stopPreview } from './preview'
@@ -330,6 +330,8 @@ app.whenReady().then(() => {
   registerProjectIpc(() => mainWindow)
   registerComposerIpc()
   registerChatIpc(() => mainWindow)
+  // Sweep expired undo copies once per launch, off the critical path.
+  pruneUndoSnapshots()
   registerCanvasAssistIpc(() => mainWindow)
   registerDesignIpc(() => mainWindow)
   registerPreviewIpc(() => mainWindow)

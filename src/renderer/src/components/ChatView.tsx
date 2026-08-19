@@ -4,7 +4,8 @@ import {
   AssistantBubble, UserBubble, SystemBubble, ThinkingIndicator
 } from './ChatBubbles'
 import { DiffCard } from './DiffCard'
-import { ChatEmptyStateFull, COMPOSER_FILL_EVENT } from './ChatEmptyStateFull'
+import { ChatEmptyStateFull } from './ChatEmptyStateFull'
+import { COMPOSER_FILL_EVENT } from './composerFill'
 
 export function ChatView({
   sessionId,
@@ -132,19 +133,25 @@ export function ChatView({
 
   const isEmpty = loaded && messages.length === 0
 
+  // The empty state is centred in the whole pane, so it bypasses the
+  // max-w-3xl message column and the scroll padding entirely.
+  if (isEmpty) {
+    return (
+      <div className="h-full w-full overflow-y-auto">
+        <ChatEmptyStateFull
+          onPick={(text) => {
+            window.dispatchEvent(new CustomEvent(COMPOSER_FILL_EVENT, { detail: { sessionId, text } }))
+          }}
+        />
+      </div>
+    )
+  }
+
   return (
     <div ref={scrollRef} className="h-full w-full overflow-y-auto px-4 py-6">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
         {!loaded && (
           <div className="grid place-items-center py-16 text-text-muted">Loading…</div>
-        )}
-        {isEmpty && (
-          <ChatEmptyStateFull
-            onPick={(text) => {
-              window.dispatchEvent(new CustomEvent(COMPOSER_FILL_EVENT, { detail: { sessionId, text } }))
-            }}
-            onExploreTemplates={() => window.dispatchEvent(new CustomEvent('t42:open-templates'))}
-          />
         )}
         {messages.map((m) => (
           <MessageBubble

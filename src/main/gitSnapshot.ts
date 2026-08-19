@@ -32,6 +32,13 @@ export interface FileChange {
   deletions: number
   /** Binary files report no line counts; git prints "-" for both. */
   binary: boolean
+  /**
+   * True when the change was detected but the original contents were not
+   * captured, so it cannot be reverted. Only the local-copy store produces
+   * this, for files above its per-file size limit. The UI should show the
+   * change but not offer to undo it, rather than failing on the click.
+   */
+  unrecoverable?: boolean
 }
 
 export interface DiffSummary {
@@ -267,4 +274,28 @@ export async function readFileAtTree(cwd: string, tree: string, path: string): P
   const blob = await readBlob(cwd, tree, path)
   if (!blob) return null
   return blob.content.toString('utf8')
+}
+
+/**
+ * Individual files under `cwd` that git ignores.
+ *
+ * `snapshotTree` honours .gitignore, so anything ignored is invisible to the
+ * git snapshot and would silently not be undoable. Listing these lets the
+ * local-copy store cover exactly that gap.
+ *
+ * `--directory` collapses a wholly-ignored directory into one entry, which is
+ * the difference between 6 results and 27,000 on a project with node_modules.
+ * Those directory entries are then dropped rather than expanded: ignored
+ * directories are build output and dependencies, which are large, reproducible,
+ * and not what anyone means by "undo my last turn". Copying them would blow the
+ * local snapshot's size budget and cost the user coverage of the small ignored
+ * files — .env and friends — that they actually would want back.
+ */
+export async function listIgnoredFiles(cwd: string): Promise<string[]> {
+  const res = await runGitText(cwd, ['ls-files', '-o', '-i', '--exclude-standard', '--directory', '-z'])
+  if (!res.ok) return []
+  return res.out
+    .split('\0')
+    .filter(Boolean)
+    .filter((p) => !p.endsWith('/'))
 }
