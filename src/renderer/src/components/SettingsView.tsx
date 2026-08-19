@@ -271,6 +271,12 @@ function TerminalSettingsPane({
         <Row label="Copy on select">
           <Toggle checked={s.terminalCopyOnSelect} onChange={(v) => update('terminalCopyOnSelect', v)} />
         </Row>
+        <Row
+          label="Continue unfinished work"
+          hint="When a session goes quiet with items still on its todo list, send it a nudge. Never fires while a prompt is waiting on you or while you are typing."
+        >
+          <Toggle checked={s.autoContinueEnabled} onChange={(v) => update('autoContinueEnabled', v)} />
+        </Row>
       </Group>
     </>
   )

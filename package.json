@@ -24,7 +24,8 @@
     "package:mac": "electron-vite build && electron-builder --config electron-builder.yml --mac",
     "package:win": "electron-vite build && electron-builder --config electron-builder.yml --win",
     "package:linux": "electron-vite build && electron-builder --config electron-builder.yml --linux",
-    "package:dir": "electron-vite build && electron-builder --config electron-builder.yml --dir"
+    "package:dir": "electron-vite build && electron-builder --config electron-builder.yml --dir",
+    "bench": "electron scripts/bench.cjs"
   },
   "dependencies": {
     "@electron/rebuild": "^4.0.4",

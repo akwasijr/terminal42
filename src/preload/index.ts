@@ -524,6 +524,7 @@ export type Settings = {
   terminalCursorBlink: boolean
   terminalLineHeight: number
   terminalCopyOnSelect: boolean
+  autoContinueEnabled: boolean
 }
 
 const onChannel = <T,>(channel: string, cb: (payload: T) => void): (() => void) => {
