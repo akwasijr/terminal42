@@ -2,24 +2,68 @@ import { useEffect, useState } from 'react'
 import * as Dropdown from '@radix-ui/react-dropdown-menu'
 import { IconChevronRight, IconRefresh } from './icons'
 
-// Full model surface. The Copilot CLI silently filters this by your plan
-// at runtime — when a model isn't entitled, the shared runner detects the
-// rejection and falls back to the default. Showing all so the picker
-// reflects the full surface rather than guessing the user's auth state.
-export const MODELS: { id: string; label: string; group: string }[] = [
-  { id: 'claude-opus-4.7-1m-internal', label: 'Claude Opus 4.7 (1M)', group: 'Anthropic' },
+// Baseline shown before the live catalog (fetched from the Copilot CLI via
+// main/models.ts) loads, and used as a safety-net fallback if that fetch is
+// ever unavailable. `MODELS` itself is mutated in place once live data
+// arrives — see initModelCatalog() below — so every consumer that imports
+// MODELS directly (ModelDropdown, DesignChatRail, CanvasAssistant,
+// StatusBar, FindAnything, SettingsView) picks up new models automatically,
+// with no manual list maintenance required.
+const DEFAULT_MODELS: { id: string; label: string; group: string }[] = [
+  { id: 'claude-opus-4.8',  label: 'Claude Opus 4.8',  group: 'Anthropic' },
   { id: 'claude-opus-4.7',  label: 'Claude Opus 4.7',  group: 'Anthropic' },
   { id: 'claude-opus-4.6',  label: 'Claude Opus 4.6',  group: 'Anthropic' },
   { id: 'claude-opus-4.5',  label: 'Claude Opus 4.5',  group: 'Anthropic' },
+  { id: 'claude-sonnet-5',   label: 'Claude Sonnet 5',   group: 'Anthropic' },
   { id: 'claude-sonnet-4.6', label: 'Claude Sonnet 4.6', group: 'Anthropic' },
   { id: 'claude-sonnet-4.5', label: 'Claude Sonnet 4.5', group: 'Anthropic' },
   { id: 'claude-haiku-4.5',  label: 'Claude Haiku 4.5',  group: 'Anthropic' },
+  { id: 'gpt-5.6-sol',      label: 'GPT-5.6 Sol',      group: 'OpenAI' },
+  { id: 'gpt-5.6-terra',    label: 'GPT-5.6 Terra',    group: 'OpenAI' },
+  { id: 'gpt-5.6-luna',     label: 'GPT-5.6 Luna',     group: 'OpenAI' },
+  { id: 'gpt-5.5',          label: 'GPT-5.5',          group: 'OpenAI' },
   { id: 'gpt-5.4',          label: 'GPT-5.4',          group: 'OpenAI' },
   { id: 'gpt-5.4-mini',     label: 'GPT-5.4 mini',     group: 'OpenAI' },
   { id: 'gpt-5.3-codex',    label: 'GPT-5.3 Codex',    group: 'OpenAI' },
   { id: 'gpt-5-mini',       label: 'GPT-5 mini',       group: 'OpenAI' },
-  { id: 'gpt-4.1',          label: 'GPT-4.1',          group: 'OpenAI' }
+  { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro',   group: 'Google' },
+  { id: 'gemini-3.5-flash',       label: 'Gemini 3.5 Flash', group: 'Google' },
+  { id: 'mai-code-1-flash-picker', label: 'MAI-Code-1-Flash', group: 'Microsoft' }
 ]
+
+export const MODELS: { id: string; label: string; group: string }[] = [...DEFAULT_MODELS]
+
+const modelsListeners = new Set<() => void>()
+
+export function onModelsChanged(cb: () => void): () => void {
+  modelsListeners.add(cb)
+  return () => { modelsListeners.delete(cb) }
+}
+
+function applyModelList(list: { id: string; label: string; group: string }[]): void {
+  if (!Array.isArray(list) || list.length < 3) return
+  MODELS.splice(0, MODELS.length, ...list)
+  for (const cb of modelsListeners) {
+    try { cb() } catch {}
+  }
+}
+
+let initialized = false
+
+// Fetches the live, entitlement-filtered model list once at app start and
+// subscribes to background refreshes pushed from the main process (see
+// main/models.ts). Safe to call multiple times — only wires up once.
+export function initModelCatalog(): void {
+  if (initialized) return
+  initialized = true
+  const bridge = (window as unknown as { terminal42?: { models?: {
+    list: () => Promise<{ id: string; label: string; group: string }[]>
+    onUpdated: (cb: (models: { id: string; label: string; group: string }[]) => void) => () => void
+  } } }).terminal42
+  if (!bridge?.models) return
+  bridge.models.list().then(applyModelList).catch(() => {})
+  bridge.models.onUpdated(applyModelList)
+}
 
 function shortLabel(label: string | undefined): string | undefined {
   if (!label) return label
@@ -43,9 +87,27 @@ function OpenAILogo(): JSX.Element {
   )
 }
 
+function GoogleLogo(): JSX.Element {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 0c.45 6.36 5.64 11.55 12 12-6.36.45-11.55 5.64-12 12-.45-6.36-5.64-11.55-12-12C6.36 11.55 11.55 6.36 12 0z" />
+    </svg>
+  )
+}
+
+function MicrosoftLogo(): JSX.Element {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M11.4 11.4H0V0h11.4v11.4zM24 11.4H12.6V0H24v11.4zM11.4 24H0V12.6h11.4V24zM24 24H12.6V12.6H24V24z" />
+    </svg>
+  )
+}
+
 const PROVIDER_LOGO: Record<string, () => JSX.Element> = {
   'Anthropic': AnthropicLogo,
   'OpenAI': OpenAILogo,
+  'Google': GoogleLogo,
+  'Microsoft': MicrosoftLogo,
 }
 
 export function ProviderLogo({ provider }: { provider: string }): JSX.Element | null {
@@ -89,7 +151,7 @@ export function ModelDropdown({
         <Dropdown.Content
           align="end"
           sideOffset={6}
-          className="z-50 min-w-[220px] rounded-lg bg-elevated p-1 text-[12px] text-text-primary shadow-lg"
+          className="z-50 min-w-[220px] rounded-lg bg-raised p-1 text-[12px] text-text-primary shadow-overlay"
         >
           {groups.map((g) => (
             <div key={g}>
@@ -114,7 +176,7 @@ export function ModelDropdown({
           ))}
           {onRestart && (
             <>
-              <div className="my-1 h-px bg-surface" />
+              <div className="my-1.5" />
               <Dropdown.Item
                 onSelect={() => onRestart()}
                 className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 outline-none hover:bg-surface"

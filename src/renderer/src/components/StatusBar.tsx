@@ -73,7 +73,7 @@ export function StatusBar({
 
   if (hidden) {
     return (
-      <footer className="flex h-2 items-center justify-end border-t border-border bg-surface px-2">
+      <footer className="flex h-2 items-center justify-end bg-surface px-2">
         <button
           type="button"
           onClick={() => setHidden(false)}
@@ -88,7 +88,7 @@ export function StatusBar({
   }
 
   return (
-    <footer className="flex h-7 items-center gap-4 border-t border-border bg-surface px-4 text-[11px] text-text-muted">
+    <footer className="flex h-7 items-center gap-4 bg-surface px-4 text-[11px] text-text-muted">
       <span>Model: <span className="text-text-secondary">{modelLabel}</span></span>
       <span>Folder: <span className="text-text-secondary">{folder}</span></span>
       <span>Brain: <span className="text-text-secondary">{brainCount} rule{brainCount === 1 ? '' : 's'}</span></span>

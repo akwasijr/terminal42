@@ -119,7 +119,7 @@ export function RecipesView() {
                     {r.steps.length > 3 && <li className="text-text-muted">…and {r.steps.length - 3} more</li>}
                   </ol>
                   {sched.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1.5 border-t border-border pt-2">
+                    <div className="mt-2 flex flex-wrap gap-1.5 pt-2">
                       {sched.map((s) => (
                         <span
                           key={s.id}
@@ -281,7 +281,7 @@ function ScheduleDialog({
         </div>
 
         {existing.length > 0 && (
-          <div className="border-t border-border pt-3">
+          <div className="pt-3">
             <div className="mb-1.5 text-[11px] text-text-muted">Active</div>
             <ul className="space-y-1.5">
               {existing.map((s) => (

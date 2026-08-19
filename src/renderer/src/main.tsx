@@ -1,6 +1,7 @@
 import ReactDOM from 'react-dom/client'
 import { App } from './App'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { initModelCatalog } from './components/ModelDropdown'
 import './styles/globals.css'
 
 const stored = localStorage.getItem('t42-theme')
@@ -40,3 +41,4 @@ function Boot(): JSX.Element {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(<Boot />)
 dismissBootSplash()
+initModelCatalog()

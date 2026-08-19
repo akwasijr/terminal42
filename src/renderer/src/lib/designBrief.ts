@@ -960,6 +960,27 @@ export function pagesForState(s: {
   if (!s.kind) return ['category', 'kind']
   if (s.kind === 'blank') return ['category', 'kind']
   const def = DESIGN_KINDS.find((k) => k.id === s.kind)!
+
+  // When the user uploaded a template AND ticked "Use everything from
+  // template", the template IS the design: drop every design question.
+  const useTpl = !!s.useTemplateLook && !!s.templateFile
+
+  // Streamlined website flow: a real site does not need the surface, fidelity,
+  // stack, shape, icons, density/spacing/grid, motion or inspiration steps
+  // (responsive layout, flat surfaces and the motion engine are handled for
+  // you now). Keep only the decisions that actually shape a site: type, look,
+  // palette, fonts and theme, then the brief and the AI defaults.
+  if (!useTpl && s.category === 'web' && s.target !== 'figma') {
+    const lean: WizardPage[] = ['category', 'kind']
+    if (def.subtypes && def.subtypes.length) lean.push('subtype')
+    if (flag(def, 'hasLook')) lean.push('look')
+    if (flag(def, 'hasPalette')) lean.push('palette')
+    if (flag(def, 'hasFonts')) lean.push('fonts')
+    if (def.hasTheme) lean.push('theme')
+    lean.push('idea', 'defaults', 'summary')
+    return lean
+  }
+
   const pages: WizardPage[] = ['category', 'kind']
   if (def.subtypes && def.subtypes.length) pages.push('subtype')
   // Surface (responsive breakpoints) doesn't apply when the output is
@@ -967,11 +988,8 @@ export function pagesForState(s: {
   if (def.hasSurfaces && s.target !== 'figma') pages.push('surface')
   if (flag(def, 'hasFidelity')) pages.push('fidelity')
 
-  // When the user uploaded a template AND ticked "Use everything from
-  // template", the template IS the design: drop every design question.
-  // Audience, idea and AI defaults still matter (they affect content,
-  // not visuals), but look/palette/fonts/icons/theme/density/motion go.
-  const useTpl = !!s.useTemplateLook && !!s.templateFile
+  // (useTpl is computed above.) When the template owns the design we drop every
+  // design question; audience, idea and AI defaults still shape content not visuals.
 
   // Stack sits next to fidelity: both are engineering-level scaffold.
   if (!useTpl && flag(def, 'hasStack') && s.target !== 'figma') pages.push('stack')

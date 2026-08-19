@@ -65,9 +65,9 @@ export function ApplyBrainPrompt({
   return (
     <div
       role="status"
-      className="flex items-center gap-3 border-b border-border bg-surface px-4 py-2 text-[12px] text-text-secondary"
+      className="flex items-center gap-3 bg-surface px-4 py-2 text-[12px] text-text-secondary"
     >
-      <span className="grid h-6 w-6 place-items-center rounded-md border border-border text-text-secondary">
+      <span className="grid h-6 w-6 place-items-center rounded-md text-text-secondary">
         <IconBrain size={14} />
       </span>
       <span className="flex-1">
@@ -79,7 +79,7 @@ export function ApplyBrainPrompt({
       <button
         type="button"
         onClick={apply}
-        className="rounded-md border border-border px-2 py-1 text-text-primary hover:bg-bg"
+        className="rounded-md px-2 py-1 text-text-primary hover:bg-bg"
       >
         Send
       </button>

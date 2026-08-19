@@ -40,7 +40,7 @@ export function TerminalActionsMenu({ sessionId }: { sessionId: string | null })
         <Dropdown.Content
           align="end"
           sideOffset={6}
-          className="z-50 min-w-[240px] rounded-md border border-border bg-surface p-1 text-[12px] text-text-primary shadow-sm focus:outline-none"
+          className="z-50 min-w-[240px] rounded-md bg-surface p-1 text-[12px] text-text-primary shadow-sm focus:outline-none"
         >
           <Item
             icon={<IconCopy />}
@@ -64,14 +64,14 @@ export function TerminalActionsMenu({ sessionId }: { sessionId: string | null })
           >
             Paste
           </Item>
-          <div className="my-1 h-px bg-border" />
+          <div className="my-1.5" />
           <Item icon={<IconEraser />} shortcut="⌃U" onSelect={() => actions?.clearLine()}>
             Clear input line
           </Item>
           <Item icon={<IconTrash />} shortcut="⌘K" onSelect={() => actions?.clearScreen()}>
             Clear screen
           </Item>
-          <div className="my-1 h-px bg-border" />
+          <div className="my-1.5" />
           <Item icon={<IconPaperclip />} onSelect={() => void actions?.attachFile()}>
             Attach file…
           </Item>
@@ -79,7 +79,7 @@ export function TerminalActionsMenu({ sessionId }: { sessionId: string | null })
             Attach image…
           </Item>
           {hasSel && (
-            <p className="border-t border-border px-2 pb-1 pt-1.5 text-[10px] text-text-muted">
+            <p className="px-2 pb-1 pt-1.5 text-[10px] text-text-muted">
               Working with {selection.length} char{selection.length === 1 ? '' : 's'} selected.
             </p>
           )}

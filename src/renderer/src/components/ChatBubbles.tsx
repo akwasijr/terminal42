@@ -102,7 +102,7 @@ export function AssistantBubble({
             <span>{message.status === 'streaming' ? `Working… ${formatChatElapsed(elapsed.ms)}` : `Worked for ${formatChatElapsed(elapsed.ms)}`}</span>
           </button>
           {open && (
-            <div className="mt-2 ml-3 border-l border-border/60 pl-3 text-[12.5px] leading-relaxed text-text-secondary">
+            <div className="mt-2 ml-3 pl-3 text-[12.5px] leading-relaxed text-text-secondary">
               <p className="select-text">{summarizeChatTools(grouped)}</p>
             </div>
           )}

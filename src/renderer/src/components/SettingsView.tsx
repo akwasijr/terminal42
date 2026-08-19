@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import type { Settings } from '../../../preload/index'
-import { MODELS } from './ModelDropdown'
+import { MODELS, onModelsChanged } from './ModelDropdown'
 import { IconExternal } from './icons'
 
 type SectionId =
@@ -87,20 +87,42 @@ export function SettingsView({ theme, onToggleTheme }: { theme: 'dark' | 'light'
 }
 
 function GeneralPane({ s, update }: { s: Settings; update: <K extends keyof Settings>(k: K, v: Settings[K]) => void }) {
+  // Force a re-render when the live model catalog refreshes in the
+  // background so this list reflects new models without needing a reopen.
+  const [, bump] = useState(0)
+  const [refreshing, setRefreshing] = useState(false)
+  useEffect(() => onModelsChanged(() => bump((n) => n + 1)), [])
   return (
     <>
       <Heading title="General" />
       <Group>
         <Row label="Default model">
-          <select
-            value={s.defaultModel}
-            onChange={(e) => update('defaultModel', e.target.value)}
-            className="rounded-md bg-elevated px-2.5 py-1 text-[12px]"
-          >
-            {MODELS.map((m) => (
-              <option key={m.id} value={m.id}>{m.label}</option>
-            ))}
-          </select>
+          <div className="flex items-center gap-2">
+            <select
+              value={s.defaultModel}
+              onChange={(e) => update('defaultModel', e.target.value)}
+              className="rounded-md bg-elevated px-2.5 py-1 text-[12px]"
+            >
+              {MODELS.map((m) => (
+                <option key={m.id} value={m.id}>{m.label}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              disabled={refreshing}
+              onClick={() => {
+                setRefreshing(true)
+                window.terminal42.models
+                  .refresh()
+                  .catch(() => {})
+                  .finally(() => setRefreshing(false))
+              }}
+              className="rounded-md px-2 py-1 text-[11px] text-text-secondary hover:bg-elevated hover:text-text-primary disabled:opacity-50"
+              title="Fetch the latest model list from Copilot"
+            >
+              {refreshing ? 'Refreshing…' : 'Refresh models'}
+            </button>
+          </div>
         </Row>
         <Row label="Send Brain at session start">
           <Toggle checked={s.brainAutoApply} onChange={(v) => update('brainAutoApply', v)} />
@@ -390,7 +412,7 @@ function Group({ children }: { children: ReactNode }) {
 
 function Row({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-6 px-4 py-3 [&:not(:last-child)]:border-b [&:not(:last-child)]:border-border/60">
+    <div className="flex items-start justify-between gap-6 px-4 py-3 [&:not(:last-child)]: [&:not(:last-child)]:">
       <div className="min-w-0 flex-1">
         <div className="text-[13px] text-text-primary">{label}</div>
         {hint && <div className="text-[11.5px] text-text-muted">{hint}</div>}

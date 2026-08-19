@@ -8,6 +8,8 @@ export default {
         bg: 'rgb(var(--bg) / <alpha-value>)',
         surface: 'rgb(var(--surface) / <alpha-value>)',
         elevated: 'rgb(var(--elevated) / <alpha-value>)',
+        raised: 'rgb(var(--raised) / <alpha-value>)',
+        sunken: 'rgb(var(--sunken) / <alpha-value>)',
         border: 'rgb(var(--border) / <alpha-value>)',
         'border-strong': 'rgb(var(--border-strong) / <alpha-value>)',
         'text-primary': 'rgb(var(--text-primary) / <alpha-value>)',
@@ -26,7 +28,15 @@ export default {
       borderRadius: {
         sm: '6px',
         md: '8px',
-        lg: '12px'
+        lg: '12px',
+        row: 'var(--radius-row)',
+        panel: 'var(--radius-panel)'
+      },
+      boxShadow: {
+        row: 'var(--shadow-row)',
+        panel: 'var(--shadow-panel)',
+        float: 'var(--shadow-float)',
+        overlay: 'var(--shadow-overlay)'
       }
     }
   },

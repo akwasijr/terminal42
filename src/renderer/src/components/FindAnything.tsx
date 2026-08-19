@@ -50,14 +50,14 @@ export function FindAnything({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/30" />
-        <Dialog.Content className="fixed left-1/2 top-[18%] z-50 w-[560px] -translate-x-1/2 rounded-md border border-border bg-surface shadow-lg outline-none">
+        <Dialog.Content className="fixed left-1/2 top-[18%] z-50 w-[560px] -translate-x-1/2 rounded-md bg-raised shadow-overlay outline-none">
           <Dialog.Title className="sr-only">Find anything</Dialog.Title>
           <Command label="Find anything" shouldFilter>
             <Command.Input
               value={query}
               onValueChange={setQuery}
               placeholder="Search projects, sessions, recipes, settings…"
-              className="w-full border-b border-border bg-transparent px-3.5 py-3 text-[13px] text-text-primary placeholder:text-text-muted focus:outline-none"
+              className="w-full bg-transparent px-3.5 py-3 text-[13px] text-text-primary placeholder:text-text-muted focus:outline-none"
             />
             <Command.List className="max-h-[360px] overflow-y-auto p-1.5 text-[12px]">
               <Command.Empty className="px-3 py-6 text-center text-text-muted">No matches.</Command.Empty>

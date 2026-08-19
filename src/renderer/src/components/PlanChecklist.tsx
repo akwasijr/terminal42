@@ -124,7 +124,7 @@ function StepIcon({ status }: { status: PlanStepStatus }): JSX.Element {
       </span>
     )
   }
-  return <span className="ml-[2px] block h-2.5 w-2.5 rounded-full border border-border" />
+  return <span className="ml-[2px] block h-2.5 w-2.5 rounded-full" />
 }
 
 function PlanHeaderIcon({ active, inProgress, needsInput, done }: {
@@ -139,7 +139,7 @@ function PlanHeaderIcon({ active, inProgress, needsInput, done }: {
   if (active || inProgress) {
     return <span className="block h-3 w-3 animate-spin rounded-full border-2 border-accent/30 border-t-accent" />
   }
-  return <span className="ml-[2px] block h-2.5 w-2.5 rounded-full border border-border" />
+  return <span className="ml-[2px] block h-2.5 w-2.5 rounded-full" />
 }
 
 function Chevron({ open }: { open: boolean }): JSX.Element {

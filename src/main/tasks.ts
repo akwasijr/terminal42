@@ -273,6 +273,7 @@ const MODEL_CONTEXT_LIMITS: Record<string, number> = {
   'claude-opus-4.7-1m-internal': 1_000_000,
   'claude-opus-4.6-1m':          1_000_000,
   // Anthropic — standard 200K
+  'claude-opus-4.8':             200_000,
   'claude-opus-4.7-high':        200_000,
   'claude-opus-4.7':             200_000,
   'claude-opus-4.6':             200_000,
@@ -292,7 +293,9 @@ const MODEL_CONTEXT_LIMITS: Record<string, number> = {
   'gpt-5-mini':          272_000,
   'gpt-4o':              128_000,
   // Google
-  'gemini-3-pro-preview': 1_000_000
+  'gemini-3.1-pro-preview': 1_000_000,
+  'gemini-3.5-flash':       1_000_000,
+  'gemini-3-pro-preview':   1_000_000
 }
 
 function contextLimitForModel(model: string | null): number | null {

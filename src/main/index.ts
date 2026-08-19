@@ -5,6 +5,7 @@ import { registerPtyIpc, killAllSessions, listLiveSessions, killSession } from '
 import { registerProjectIpc } from './projects'
 import { registerComposerIpc } from './composer'
 import { registerChatIpc, killAllChats } from './chat'
+import { registerCanvasAssistIpc } from './canvasAssist'
 import { registerDesignIpc, stopAllDesignWatchers, killAllDesignRuns } from './design'
 import { registerPreviewIpc, killAllPreviews, runningPreviewCount, runningPreviewList, stopPreview } from './preview'
 import { registerSkillsIpc } from './skills'
@@ -25,6 +26,7 @@ import { registerBrowserStateIpc } from './browserState'
 import { registerTemplatesIpc } from './templates'
 import { registerTemplatePreviewsIpc } from './template-previews'
 import { purgeOldLogs, purgeLegacyLogs, shutdownLog } from './sessionLog'
+import { initModelCatalog, registerModelsIpc, stopModelCatalog } from './models'
 
 let mainWindow: BrowserWindow | null = null
 let recoveringRenderer = false
@@ -190,6 +192,9 @@ function createWindow(opts: { safe?: boolean; replace?: BrowserWindow } = {}): v
       sandbox: false,
       contextIsolation: true,
       nodeIntegration: false,
+      // Native macOS rubber-band overscroll (the scroll containers keep their own
+      // background, so the bounce never reveals a different colour behind them).
+      scrollBounce: true,
       // <webview> has repeatedly caused renderer/IPC instability in dev
       // (see repo history around "Disable webviewTag"). Keep it disabled
       // while debugging launch crashes; BrowserPane can fall back to external
@@ -280,7 +285,32 @@ function createWindow(opts: { safe?: boolean; replace?: BrowserWindow } = {}): v
   loadRenderer(win, { safe: opts.safe })
 }
 
+// Without this lock, every extra launch (double-clicking the Dock icon
+// again, Spotlight, "open -a Terminal42", a stuck launch being retried,
+// etc.) spins up an entirely separate Electron process — each with its own
+// window, PTY sessions and previews — instead of reusing the running app.
+// That's what caused Terminal42 to pile up "multiple versions" endlessly.
+// requestSingleInstanceLock() makes every extra launch hand off to the
+// first instance (via 'second-instance' below) and immediately quit.
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
+if (!gotSingleInstanceLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    // Focus (and restore, if minimized) the existing window instead of
+    // opening a new one.
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.show()
+      mainWindow.focus()
+    } else if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow()
+    }
+  })
+}
+
 app.whenReady().then(() => {
+  if (!gotSingleInstanceLock) return
   if (process.platform === 'darwin' && app.dock) {
     try {
       app.dock.setIcon(nativeImage.createFromPath(join(__dirname, '../../resources/icon.png')))
@@ -293,6 +323,7 @@ app.whenReady().then(() => {
   registerProjectIpc(() => mainWindow)
   registerComposerIpc()
   registerChatIpc(() => mainWindow)
+  registerCanvasAssistIpc(() => mainWindow)
   registerDesignIpc(() => mainWindow)
   registerPreviewIpc(() => mainWindow)
   registerSkillsIpc(() => mainWindow)
@@ -304,6 +335,8 @@ app.whenReady().then(() => {
   registerFilesIpc(() => mainWindow)
   registerVoiceIpc()
   registerSettingsIpc()
+  registerModelsIpc(() => mainWindow)
+  initModelCatalog(() => mainWindow)
   registerInsightsIpc(() => mainWindow)
   registerTasksIpc(() => mainWindow)
   registerSearchIpc()
@@ -373,6 +406,7 @@ app.on('before-quit', (event) => {
   stopAllDesignWatchers()
   stopTasksWatcher()
   stopInsightsScheduler()
+  stopModelCatalog()
   shutdownLog()
 })
 

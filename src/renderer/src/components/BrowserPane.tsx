@@ -432,12 +432,12 @@ export function BrowserPane({ initialUrl, projectId, onClose, width: _paneWidth,
 
   return (
     <aside
-      className="flex h-full flex-col border-l border-border bg-bg"
+      className="flex h-full flex-col bg-bg"
       style={{ width: `${_paneWidth}px`, minWidth: '320px' }}
       aria-label="Web browser preview"
     >
       {/* Single combined toolbar row: matches session-tabs row height (h-9) */}
-      <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border bg-bg px-1.5">
+      <div className="flex h-9 shrink-0 items-center gap-1 bg-bg px-1.5">
         <IconBtn aria="Back" disabled={!canBack} onClick={() => wvRef.current?.goBack?.()}>
           <span className="rotate-180"><IconChevronRight size={12} /></span>
         </IconBtn>
@@ -541,7 +541,7 @@ export function BrowserPane({ initialUrl, projectId, onClose, width: _paneWidth,
           onClearCache={() => void window.terminal42.browser?.clearStorage?.('cache')}
         />
 
-        <span className="mx-1 h-4 w-px bg-border" aria-hidden="true" />
+        <span className="mx-1.5" aria-hidden="true" />
         <IconBtn aria="Open in external browser" onClick={openExternal} disabled={!committedUrl}>
           <ExternalArrow />
         </IconBtn>
@@ -619,7 +619,7 @@ function SettingsMenu({
         <Dropdown.Content
           align="end"
           sideOffset={6}
-          className="z-50 min-w-[260px] rounded-md border border-border bg-surface p-1.5 text-[12px] text-text-primary shadow-md focus:outline-none"
+          className="z-50 min-w-[260px] rounded-md bg-surface p-1.5 text-[12px] text-text-primary shadow-md focus:outline-none"
         >
           <Dropdown.Item
             onSelect={onHardReload}
@@ -628,10 +628,10 @@ function SettingsMenu({
             Hard reload
           </Dropdown.Item>
           <DeviceSubmenu deviceId={deviceId} setDeviceId={setDeviceId} />
-          <div className="my-1 h-px bg-border" />
+          <div className="my-1.5" />
           <div className="flex items-center justify-between gap-2 px-2 py-1.5">
             <span>Zoom</span>
-            <div className="flex items-center gap-0.5 rounded-md border border-border bg-bg">
+            <div className="flex items-center gap-0.5 rounded-md bg-bg">
               <button
                 type="button"
                 onClick={() => setZoom(Math.max(0.5, Number((zoom - 0.1).toFixed(2))))}
@@ -654,7 +654,7 @@ function SettingsMenu({
               ><IconRefresh size={10} /></button>
             </div>
           </div>
-          <div className="my-1 h-px bg-border" />
+          <div className="my-1.5" />
           <Dropdown.Item
             onSelect={onClearCookies}
             className="flex cursor-pointer items-center rounded-sm px-2 py-1.5 outline-none hover:bg-elevated focus:bg-elevated"
@@ -668,7 +668,7 @@ function SettingsMenu({
             Clear cache
           </Dropdown.Item>
           {!isDesktop && (
-            <p className="mt-1 border-t border-border px-2 pt-1.5 text-[10.5px] text-text-muted">
+            <p className="mt-1 px-2 pt-1.5 text-[10.5px] text-text-muted">
               Mobile UA + viewport active. Switch to Desktop to disable.
             </p>
           )}
@@ -688,7 +688,7 @@ function DeviceSubmenu({ deviceId, setDeviceId }: { deviceId: string; setDeviceI
       <Dropdown.Portal>
         <Dropdown.SubContent
           sideOffset={4}
-          className="z-50 min-w-[200px] rounded-md border border-border bg-surface p-1 text-[12px] text-text-primary shadow-md focus:outline-none"
+          className="z-50 min-w-[200px] rounded-md bg-surface p-1 text-[12px] text-text-primary shadow-md focus:outline-none"
         >
           {DEVICE_PRESETS.map((d) => (
             <Dropdown.Item
@@ -747,7 +747,7 @@ function Empty({ suggestions, onPick, projectId }: { suggestions: string[]; onPi
         {suggestions.length > 0 && (
           <div className="flex flex-col items-stretch gap-1.5 text-left">
             <p className="text-[10.5px] text-text-muted">Running for this project</p>
-            <ul className="divide-y divide-border">
+            <ul className="">
               {suggestions.map((u) => (
                 <li key={u}>
                   <button
@@ -766,7 +766,7 @@ function Empty({ suggestions, onPick, projectId }: { suggestions: string[]; onPi
         {savedCommands.length > 0 && (
           <div className="flex flex-col items-stretch gap-1.5 text-left">
             <p className="text-[10.5px] text-text-muted">Saved dev servers</p>
-            <ul className="divide-y divide-border">
+            <ul className="">
               {savedCommands.map((c) => (
                 <li key={c.id} className="flex items-center justify-between gap-2 py-1.5">
                   <span className="min-w-0 flex-1 truncate text-left text-[11.5px] text-text-primary" title={c.command}>{c.name}</span>

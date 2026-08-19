@@ -588,7 +588,7 @@ export function TerminalPane({
 
       {/* Search bar (⌘F) */}
       {searchOpen && (
-        <div className="absolute right-4 top-2 z-30 flex items-center gap-1 rounded-lg bg-elevated px-2 py-1.5 shadow-lg">
+        <div className="absolute right-4 top-2 z-30 flex items-center gap-1 rounded-lg bg-raised px-2 py-1.5 shadow-overlay">
           <input
             ref={searchInputRef}
             type="text"
@@ -638,7 +638,7 @@ export function TerminalPane({
         <>
           <div className="fixed inset-0 z-40" onClick={() => setCtx(null)} onContextMenu={(e) => { e.preventDefault(); setCtx(null) }} />
           <div
-            className="fixed z-50 min-w-[180px] overflow-hidden rounded-md border border-border bg-surface py-1 text-[13px] shadow-lg"
+            className="fixed z-50 min-w-[180px] overflow-hidden rounded-md bg-raised py-1 text-[13px] shadow-overlay"
             style={{ left: ctx.x, top: ctx.y }}
           >
             <CtxItem onClick={() => { void copySelection(); setCtx(null) }} disabled={!ctx.selection}>Copy</CtxItem>
@@ -646,7 +646,7 @@ export function TerminalPane({
             <CtxItem onClick={() => { void deleteLine(); setCtx(null) }}>Clear input line</CtxItem>
             <CtxItem onClick={() => { void clearScreen(); setCtx(null) }}>Clear screen</CtxItem>
             <CtxItem onClick={() => { setSearchOpen(true); setCtx(null); setTimeout(() => searchInputRef.current?.focus(), 50) }}>Find in terminal</CtxItem>
-            <div className="my-1 border-t border-border" />
+            <div className="my-1" />
             <CtxItem onClick={() => { void captureSelection(); setCtx(null) }} disabled={!ctx.selection}>
               Capture selection to Brain
             </CtxItem>

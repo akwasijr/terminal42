@@ -528,7 +528,7 @@ export function DesignChatRail({ designId }: { designId: string }): JSX.Element 
 
       {/* Queue strip (pending prompts shown above composer when busy) */}
       {queue.length > 0 && (
-        <div className="shrink-0 border-t border-border/60 bg-surface/40 px-3 py-2">
+        <div className="shrink-0 bg-surface/40 px-3 py-2">
           <div className="mb-1 flex items-baseline gap-2 text-[10.5px] text-text-muted">
             <span>Queued</span>
             <span className="text-text-secondary">{queue.length}</span>
@@ -712,7 +712,7 @@ function ModelSelect({ value, onChange, disabled }: { value: string | null; onCh
           side="top"
           sideOffset={8}
           collisionPadding={12}
-          className="z-50 max-h-[320px] min-w-[240px] overflow-y-auto rounded-lg bg-elevated p-1 text-[12px] text-text-primary shadow-lg"
+          className="z-50 max-h-[320px] min-w-[240px] overflow-y-auto rounded-lg bg-raised p-1 text-[12px] text-text-primary shadow-overlay"
         >
           <div className="px-2 pt-2 pb-1.5 text-[11px] text-text-muted">
             Used for the next design run.
@@ -844,7 +844,7 @@ function relativeTimeShort(at: number): string {
 function SystemMessage({ message }: { message: DesignMessage }): JSX.Element {
   return (
     <div className="flex select-text items-start gap-2 text-[11.5px] leading-relaxed text-text-muted">
-      <span className="mt-2 h-px flex-shrink-0 grow-0 basis-3 bg-border/60" />
+      <span className="mt-2 flex-shrink-0 grow-0 basis-3" />
       <span className="flex-1">{message.content}</span>
     </div>
   )
@@ -973,7 +973,7 @@ function ThinkingDisclosure({
         <span>{label}</span>
       </button>
       {open && (tools.length > 0 || files.length > 0) && (
-        <div className="mt-2 ml-3 border-l border-border/60 pl-3 text-[12.5px] leading-relaxed text-text-secondary">
+        <div className="mt-2 ml-3 pl-3 text-[12.5px] leading-relaxed text-text-secondary">
           <p className="select-text">{summarizeTools(tools, files)}</p>
         </div>
       )}

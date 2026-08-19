@@ -83,7 +83,7 @@ function PersonaPicker() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 py-1 text-[12px] text-text-secondary hover:bg-elevated"
+        className="flex items-center gap-1.5 rounded-md bg-surface px-2.5 py-1 text-[12px] text-text-secondary hover:bg-elevated"
         aria-haspopup="listbox"
         aria-expanded={open}
       >
@@ -94,7 +94,7 @@ function PersonaPicker() {
       {open && (
         <div
           role="listbox"
-          className="absolute left-0 top-[calc(100%+4px)] z-20 w-[260px] overflow-hidden rounded-md border border-border bg-surface shadow-md"
+          className="absolute left-0 top-[calc(100%+4px)] z-20 w-[260px] overflow-hidden rounded-md bg-surface shadow-md"
         >
           {personas.map((p) => (
             <button
@@ -244,7 +244,7 @@ export function BrainNotes() {
         />
       )}
       {isEmpty && !onboarding && !skipped && (
-        <div className="mx-6 mt-3 flex items-center justify-between gap-4 rounded-lg border border-border bg-elevated/40 px-4 py-3 text-[12.5px]">
+        <div className="mx-6 mt-3 flex items-center justify-between gap-4 rounded-lg bg-elevated/40 px-4 py-3 text-[12.5px]">
           <div className="flex flex-col gap-0.5">
             <div className="font-medium text-text-primary">Your Brain is empty</div>
             <div className="text-text-muted">Answer a few quick questions and Terminal42 will draft your first mind map.</div>
@@ -289,7 +289,7 @@ export function BrainNotes() {
 
       <div className="flex flex-1 overflow-hidden">
         {(view === 'split' || view === 'editor') && (
-          <div className={view === 'editor' ? 'flex flex-1 flex-col' : 'flex w-1/2 min-w-0 flex-col border-r border-border'}>
+          <div className={view === 'editor' ? 'flex flex-1 flex-col' : 'flex w-1/2 min-w-0 flex-col'}>
             <textarea
               value={body}
               onChange={(e) => onChange(e.target.value)}
@@ -549,8 +549,8 @@ function BrainOnboarding({
 
   return (
     <div className="fixed inset-0 z-40 grid place-items-center bg-bg/80 px-4 backdrop-blur-sm">
-      <div className="flex w-full max-w-[640px] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl">
-        <header className="flex items-center justify-between border-b border-border px-5 py-3">
+      <div className="flex w-full max-w-[640px] flex-col overflow-hidden rounded-xl bg-raised shadow-overlay">
+        <header className="flex items-center justify-between px-5 py-3">
           <div className="flex items-center gap-3">
             <div className="text-[14px] font-semibold text-text-primary">Set up your Brain</div>
             <div className="text-[11px] text-text-muted">{isReview ? 'Review' : `Step ${step + 1} of ${total}`}</div>
@@ -591,12 +591,12 @@ function BrainOnboarding({
             <div className="flex flex-col gap-2">
               <div className="text-[14px] font-medium text-text-primary">Here's your starting Brain</div>
               <div className="text-[12px] text-text-muted">You can edit anything later: this is just the seed.</div>
-              <pre className="max-h-[320px] overflow-auto rounded-md border border-border bg-bg p-3 font-mono text-[12px] leading-relaxed text-text-primary">{preview}</pre>
+              <pre className="max-h-[320px] overflow-auto rounded-md bg-bg p-3 font-mono text-[12px] leading-relaxed text-text-primary">{preview}</pre>
             </div>
           )}
         </div>
 
-        <footer className="flex items-center justify-between border-t border-border bg-elevated/30 px-5 py-3">
+        <footer className="flex items-center justify-between bg-elevated/30 px-5 py-3">
           <button
             type="button"
             onClick={prev}
@@ -672,7 +672,7 @@ function ChipQuestion({
                 'rounded-full border px-3 py-1 text-[12.5px] transition-colors',
                 on
                   ? 'border-accent bg-accent text-accent-text'
-                  : 'border-border bg-bg text-text-secondary hover:border-border-strong hover:text-text-primary'
+                  : 'bg-bg text-text-secondary hover: hover:text-text-primary'
               ].join(' ')}
             >
               {o.label}
@@ -702,7 +702,7 @@ function TextQuestion({
         onChange={(e) => onChange(e.target.value)}
         placeholder={q.placeholder}
         rows={3}
-        className="resize-none rounded-md border border-border bg-bg p-2.5 text-[13px] text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none"
+        className="resize-none rounded-md bg-bg p-2.5 text-[13px] text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none"
       />
     </div>
   )

@@ -72,6 +72,7 @@ export type DesignKind =
   | 'infographic' | 'report' | 'chart'
   | 'social-post' | 'social-story' | 'cover-image' | 'ad-banner'
   | 'design-system' | 'wireframe' | 'mood-board' | 'style-tile' | 'user-flow' | 'sitemap'
+  | 'freeform'
   | 'blank'
   // Deprecated: old briefs only.
   | 'app-screen' | 'pricing' | 'login' | 'hero' | 'component'
@@ -653,6 +654,13 @@ const api = {
       return () => ipcRenderer.removeListener('chat:done', handler)
     }
   },
+  canvas: {
+    assist: (prompt: string, model?: string | null) =>
+      ipcRenderer.invoke('canvas:assist', { prompt, model }) as Promise<{ ok: true; text: string } | { ok: false; error: string }>,
+    assistVision: (prompt: string, images: string[], model?: string | null) =>
+      ipcRenderer.invoke('canvas:assistVision', { prompt, images, model }) as Promise<{ ok: true; text: string } | { ok: false; error: string }>,
+    readClipboardHTML: () => ipcRenderer.invoke('canvas:readClipboardHTML') as Promise<string>,
+  },
   designs: {
     list: () => ipcRenderer.invoke('designs:list') as Promise<Design[]>,
     get: (id: string) => ipcRenderer.invoke('designs:get', id) as Promise<Design | null>,
@@ -660,6 +668,10 @@ const api = {
     createStarterVersion: (designId: string, userText?: string | null) =>
       ipcRenderer.invoke('designs:createStarterVersion', { designId, userText }) as Promise<{ ok: boolean; error?: string; latest: DesignVersion | null; versions: DesignVersion[] }>,
     rename: (id: string, title: string) => ipcRenderer.invoke('designs:rename', { id, title }) as Promise<Design | null>,
+    applyEdit: (designId: string, blockId: string, css: string, tag?: 'style' | 'script') =>
+      ipcRenderer.invoke('designs:applyEdit', { designId, blockId, css, tag }) as Promise<{ ok: boolean; latest: DesignVersion | null; versions: DesignVersion[]; error?: string }>,
+    writeHtml: (designId: string, html: string) =>
+      ipcRenderer.invoke('designs:writeHtml', { designId, html }) as Promise<{ ok: boolean; latest: DesignVersion | null; versions: DesignVersion[]; error?: string }>,
     delete: (id: string) => ipcRenderer.invoke('designs:delete', id) as Promise<{ ok: boolean }>,
     importFolder: () =>
       ipcRenderer.invoke('designs:importFolder') as Promise<{ ok: boolean; design?: Design; error?: string }>,
@@ -1099,6 +1111,16 @@ const api = {
       ipcRenderer.invoke('insights:run-now'),
     onState: (cb: (s: { cadence: string; lastRunAt: number; lastStatus: string; lastSummary: string; lastError: string }) => void) =>
       onChannel<{ cadence: string; lastRunAt: number; lastStatus: string; lastSummary: string; lastError: string }>('insights:state', cb)
+  },
+  models: {
+    list: (): Promise<{ id: string; label: string; group: string }[]> =>
+      ipcRenderer.invoke('models:list'),
+    refresh: (): Promise<{ id: string; label: string; group: string }[]> =>
+      ipcRenderer.invoke('models:refresh'),
+    status: (): Promise<{ count: number; lastError: string | null; refreshing: boolean }> =>
+      ipcRenderer.invoke('models:status'),
+    onUpdated: (cb: (models: { id: string; label: string; group: string }[]) => void) =>
+      onChannel<{ id: string; label: string; group: string }[]>('models:updated', cb)
   }
 }
 

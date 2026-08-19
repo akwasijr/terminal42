@@ -347,7 +347,7 @@ function NewMenu({ onPick }: { onPick: (k: 'skill' | 'recipe') => void }) {
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-md bg-elevated py-1 shadow-lg">
+          <div className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-md bg-raised py-1 shadow-overlay">
             <button
               type="button"
               onClick={() => { onPick('skill'); setOpen(false) }}
@@ -501,7 +501,7 @@ function StarterPreview({
       <div
         role="dialog"
         aria-label={starter.name}
-        className="flex h-[78vh] w-full max-w-[760px] flex-col overflow-hidden rounded-2xl bg-elevated/95 shadow-2xl ring-1 ring-white/5"
+        className="flex h-[78vh] w-full max-w-[760px] flex-col overflow-hidden rounded-2xl bg-raised/95 shadow-overlay"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="flex shrink-0 items-center justify-between gap-3 px-6 py-4">
@@ -934,7 +934,7 @@ function ScheduleDialog({
             </div>
 
             {existing.length > 0 && (
-              <div className="mt-4 flex flex-col gap-1.5 border-t border-border pt-3">
+              <div className="mt-4 flex flex-col gap-1.5 pt-3">
                 {existing.map((s) => (
                   <div key={s.id} className="flex items-center justify-between text-[12px]">
                     <span className="text-text-primary">

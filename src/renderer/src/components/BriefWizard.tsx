@@ -655,7 +655,7 @@ function ColorPickerRow({
       </div>
       <div className="flex items-center gap-3">
         <label
-          className="relative h-12 w-12 shrink-0 cursor-pointer overflow-hidden rounded-md ring-1 ring-black/10"
+          className="relative h-12 w-12 shrink-0 cursor-pointer overflow-hidden rounded-md"
           style={{ backgroundColor: value || '#2a2a2a' }}
           title="Open color picker"
         >

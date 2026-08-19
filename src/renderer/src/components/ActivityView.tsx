@@ -239,7 +239,7 @@ function TasksSection() {
                       <li key={t.id ?? i} className="flex items-start gap-2 py-1 text-[12px]">
                         <span className={[
                           'mt-1 inline-block h-2 w-2 shrink-0 rounded-full',
-                          status === 'done' ? 'bg-success' : status === 'in_progress' ? 'animate-pulse bg-accent' : status === 'blocked' ? 'bg-error' : 'border border-border'
+                          status === 'done' ? 'bg-success' : status === 'in_progress' ? 'animate-pulse bg-accent' : status === 'blocked' ? 'bg-error' : ''
                         ].join(' ')} />
                         <span className={status === 'done' ? 'text-text-muted line-through' : 'text-text-primary'}>{t.text}</span>
                       </li>
@@ -490,7 +490,7 @@ function TokenUsageSection({ data }: { data: ActivitySummary | null }) {
               const max = Math.max(1, ...sparkline.map((x) => x.tokens))
               const pct = Math.round((d.tokens / max) * 100)
               return (
-                <tr key={d.date} className="border-t border-border/30">
+                <tr key={d.date} className="">
                   <td className="px-3 py-1.5 text-text-primary">{shortDay(d.date)} {d.date.slice(5)}</td>
                   <td className="px-3 py-1.5 tabular-nums text-right text-text-secondary">{formatTokens(d.tokens)}</td>
                   <td className="px-3 py-1.5">

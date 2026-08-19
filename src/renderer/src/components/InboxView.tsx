@@ -33,7 +33,7 @@ export function InboxView() {
         <h1 className="text-[18px] font-semibold leading-tight text-text-primary">Inbox</h1>
       </header>
       <div className="flex flex-1 overflow-hidden">
-      <div className="flex w-[280px] flex-col border-r border-border bg-surface">
+      <div className="flex w-[280px] flex-col bg-surface">
         <ul className="flex-1 overflow-y-auto">
           {items.length === 0 ? (
             <li className="px-3 py-4 text-center text-[12px] text-text-muted">Nothing here yet.</li>

@@ -48,7 +48,7 @@ export function RightPanel({
 
   return (
     <aside
-      className="flex shrink-0 flex-col bg-surface"
+      className="flex shrink-0 flex-col overflow-hidden rounded-panel bg-surface"
       style={{ width }}
     >
       <RightTabs tab={tab} onChange={setTab} />
@@ -89,7 +89,7 @@ function RightTabs({ tab, onChange }: { tab: RightTab; onChange: (t: RightTab) =
   ]
   return (
     <div className="shrink-0 px-3 pt-3 pb-2">
-      <div className="inline-flex w-full items-center gap-0.5">
+      <div className="t42-seg w-full">
         {tabs.map((t) => {
           const isActive = t.id === tab
           return (
@@ -98,12 +98,8 @@ function RightTabs({ tab, onChange }: { tab: RightTab; onChange: (t: RightTab) =
               type="button"
               onClick={() => onChange(t.id)}
               aria-pressed={isActive}
-              className={[
-                'flex-1 rounded-sm px-2 py-1 text-[11.5px] transition-colors',
-                isActive
-                  ? 'bg-elevated text-text-primary'
-                  : 'text-text-secondary hover:text-text-primary'
-              ].join(' ')}
+              data-active={isActive}
+              className="flex-1 text-[11.5px]"
             >
               {t.label}
             </button>
@@ -393,7 +389,7 @@ function QuickActions({ sessionId, cwd }: { sessionId: string | null; cwd: strin
           type="button"
           onClick={() => void initRepo()}
           disabled={busy !== null}
-          className="rounded-md border border-border bg-bg px-2 py-1.5 text-[12px] hover:bg-elevated disabled:opacity-50"
+          className="rounded-md bg-bg px-2 py-1.5 text-[12px] hover:bg-elevated disabled:opacity-50"
         >
           {busy === 'init' ? 'Setting up…' : 'Set up version control'}
         </button>
@@ -435,7 +431,7 @@ function QuickActions({ sessionId, cwd }: { sessionId: string | null; cwd: strin
             value={remoteUrl}
             onChange={(e) => setRemoteUrl(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') void addRemote() }}
-            className="rounded-md border border-border bg-bg px-2 py-1.5 font-mono text-[11px] outline-none focus:border-accent"
+            className="rounded-md bg-bg px-2 py-1.5 font-mono text-[11px] outline-none focus:border-accent"
             autoFocus
           />
           <div className="flex gap-1.5">
@@ -448,7 +444,7 @@ function QuickActions({ sessionId, cwd }: { sessionId: string | null; cwd: strin
             </button>
             <button
               onClick={() => { setShowRemoteForm(false); setRemoteUrl('') }}
-              className="rounded-md border border-border px-2 py-1 text-[11px] hover:bg-elevated"
+              className="rounded-md px-2 py-1 text-[11px] hover:bg-elevated"
             >
               Cancel
             </button>
@@ -460,7 +456,7 @@ function QuickActions({ sessionId, cwd }: { sessionId: string | null; cwd: strin
             type="button"
             onClick={() => void connectViaChat()}
             disabled={busy !== null}
-            className="rounded-md border border-border bg-bg px-2 py-1.5 text-[12px] hover:bg-elevated disabled:opacity-50"
+            className="rounded-md bg-bg px-2 py-1.5 text-[12px] hover:bg-elevated disabled:opacity-50"
           >
             {busy === 'remote' ? 'Setting up…' : 'Connect this project to GitHub'}
           </button>
@@ -496,7 +492,7 @@ function QuickActions({ sessionId, cwd }: { sessionId: string | null; cwd: strin
           type="button"
           onClick={onPrimary}
           disabled={disabled}
-          className="flex w-full items-center justify-center gap-1.5 rounded-md border border-border bg-bg px-2 py-1.5 text-[12px] hover:bg-elevated disabled:opacity-50"
+          className="flex w-full items-center justify-center gap-1.5 rounded-md bg-bg px-2 py-1.5 text-[12px] hover:bg-elevated disabled:opacity-50"
           title={`origin: ${status.remoteUrl ?? '?'}`}
         >
           {busyIcon} {primaryLabel}
@@ -507,7 +503,7 @@ function QuickActions({ sessionId, cwd }: { sessionId: string | null; cwd: strin
             type="button"
             onClick={() => void commitAll()}
             disabled={busy !== null}
-            className="rounded-md border border-dashed border-border px-2 py-1 text-[11px] text-text-secondary hover:bg-elevated disabled:opacity-50"
+            className="rounded-md border border-dashed px-2 py-1 text-[11px] text-text-secondary hover:bg-elevated disabled:opacity-50"
           >
             {busy === 'commit' ? 'Saving your changes…' : 'Save all changes (commit)'}
           </button>
@@ -521,7 +517,7 @@ function QuickActions({ sessionId, cwd }: { sessionId: string | null; cwd: strin
             <button
               type="button"
               onClick={() => void window.terminal42.shell?.openExternal?.(web)}
-              className="flex items-center justify-center gap-1.5 rounded-md border border-border bg-bg px-2 py-1 text-[11px] text-text-secondary hover:bg-elevated hover:text-text-primary"
+              className="flex items-center justify-center gap-1.5 rounded-md bg-bg px-2 py-1 text-[11px] text-text-secondary hover:bg-elevated hover:text-text-primary"
               title={web}
             >
               <IconExternal size={11} />
@@ -740,7 +736,7 @@ function TasksBlock({ sessionId, projectId, onViewSession, onNavigate }: {
             <li key={id} className="flex items-center gap-2 rounded-md bg-bg px-2 py-1.5 text-[12px]">
               <span className={[
                 'inline-block h-1.5 w-1.5 shrink-0 rounded-full',
-                status === 'in_progress' ? 'animate-pulse bg-accent' : 'border border-border'
+                status === 'in_progress' ? 'animate-pulse bg-accent' : ''
               ].join(' ')} />
               <span className="min-w-0 flex-1 truncate text-text-primary">{t.text}</span>
             </li>
@@ -769,6 +765,6 @@ function Section({ title, action, children }: { title: string; action?: React.Re
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-md border border-dashed border-border px-3 py-3 text-center text-[12px] text-text-muted">{children}</div>
+  return <div className="rounded-md border border-dashed px-3 py-3 text-center text-[12px] text-text-muted">{children}</div>
 }
 

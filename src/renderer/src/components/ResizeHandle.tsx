@@ -63,8 +63,8 @@ export function ResizeHandle({
       onPointerDown={onPointerDown}
       onDoubleClick={() => onChange(side === 'left' ? 240 : 320)}
       className={[
-        'group relative z-10 w-1 shrink-0 cursor-col-resize',
-        dragging ? 'bg-accent/60' : 'bg-transparent hover:bg-border'
+        'group relative z-10 -mx-1 w-1 shrink-0 cursor-col-resize rounded-full transition-colors',
+        dragging ? 'bg-accent/70' : 'bg-transparent hover:bg-border-strong'
       ].join(' ')}
       title="Drag to resize · double-click to reset"
     >

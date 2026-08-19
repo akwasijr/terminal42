@@ -2,14 +2,14 @@ import { useEffect, useRef, useState, lazy, Suspense } from 'react'
 import {
   IconTerminal, IconFolder, IconSparkle, IconCode,
   IconGear, IconTheme, IconPlus, IconBell, IconBrain, IconEdit, IconTrash, IconClock,
-  IconChevronRight, IconWorkflow, IconChat
+  IconChevronRight, IconWorkflow, IconChat, IconLayout
 } from './components/icons'
 import * as Dropdown from '@radix-ui/react-dropdown-menu'
 import { ProjectWorkspace } from './components/ProjectWorkspace'
 import { TerminalPane } from './components/TerminalPane'
 import { AgentStatusWatcher } from './components/AgentStatusWatcher'
 import { playAttentionChime } from './lib/notifySound'
-import { ResizeHandle, useResizableWidth } from './components/ResizeHandle'
+import { useResizableWidth } from './components/ResizeHandle'
 import { buildKickoffPrompt } from './lib/brief'
 import type { Design, InboxEntry } from '../../preload/index'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -42,8 +42,11 @@ const DesignsListView = lazy(() =>
 const DesignWorkspace = lazy(() =>
   import('./components/DesignWorkspace').then((m) => ({ default: m.DesignWorkspace }))
 )
+const FreeformCanvas = lazy(() =>
+  import('./components/FreeformCanvas').then((m) => ({ default: m.FreeformCanvas }))
+)
 
-type NavId = 'terminal' | 'rawterm' | 'designs' | 'projects' | 'workbench' | 'brain' | 'activity' | 'settings'
+type NavId = 'terminal' | 'rawterm' | 'forms' | 'designs' | 'projects' | 'workbench' | 'brain' | 'activity' | 'settings'
 
 const UI_STATE_KEY = 't42:ui:state:v1'
 
@@ -84,6 +87,7 @@ function saveUIState(state: PersistedUIState): void {
 const PRIMARY_NAV: { id: NavId; label: string; Icon: typeof IconTerminal }[] = [
   { id: 'terminal', label: 'Chat',     Icon: IconChat },
   { id: 'rawterm',  label: 'Terminal', Icon: IconTerminal },
+  { id: 'forms',    label: 'Form',     Icon: IconLayout },
   { id: 'designs',  label: 'Design',   Icon: IconSparkle },
 ]
 const SECONDARY_NAV: { id: NavId; label: string; Icon: typeof IconTerminal }[] = [
@@ -94,7 +98,7 @@ const SECONDARY_NAV: { id: NavId; label: string; Icon: typeof IconTerminal }[] =
 
 export function App() {
   const initialUI = loadUIState()
-  const validNav: NavId[] = ['terminal', 'rawterm', 'designs', 'projects', 'workbench', 'brain', 'activity', 'settings']
+  const validNav: NavId[] = ['terminal', 'rawterm', 'forms', 'designs', 'projects', 'workbench', 'brain', 'activity', 'settings']
   const [active, setActive] = useState<NavId>(
     initialUI.active && validNav.includes(initialUI.active) ? initialUI.active : 'terminal'
   )
@@ -116,7 +120,6 @@ export function App() {
   const [unread, setUnread] = useState(0)
   const [renameTarget, setRenameTarget] = useState<Project | null>(null)
   const [removeTarget, setRemoveTarget] = useState<Project | null>(null)
-  const [sidebarWidth, setSidebarWidth] = useResizableWidth('t42.sidebar.width', 240, 200, 420)
   const [sidebarHidden, setSidebarHidden] = useState<boolean>(() => {
     try { return localStorage.getItem('t42:sidebar:hidden') === '1' } catch { return false }
   })
@@ -190,7 +193,7 @@ export function App() {
   // for other tabs is preserved.
   const sidebarBeforeDesignRef = useRef<boolean | null>(null)
   useEffect(() => {
-    const enteringDesign = active === 'designs' && activeDesignId !== null
+    const enteringDesign = (active === 'designs' || active === 'forms') && activeDesignId !== null
     if (enteringDesign && sidebarBeforeDesignRef.current === null) {
       sidebarBeforeDesignRef.current = sidebarHidden
       if (!wideScreen) setSidebarHidden(true)
@@ -248,7 +251,7 @@ export function App() {
   // looking at that design (otherwise the visual update is feedback enough).
   useEffect(() => {
     const off = window.terminal42.designs.onDone((d) => {
-      const lookingHere = active === 'designs' && activeDesignId === d.designId && document.hasFocus()
+      const lookingHere = (active === 'designs' || active === 'forms') && activeDesignId === d.designId && document.hasFocus()
       if (lookingHere) return
       playAttentionChime()
     })
@@ -395,14 +398,14 @@ export function App() {
         onOpenSettings={() => setActive('settings')}
         unread={unread}
       />
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 gap-[var(--gutter)] overflow-hidden px-[var(--gutter)] pb-[var(--gutter)]">
         {sidebarHidden ? (
           <button
             type="button"
             onClick={() => setSidebarHidden(false)}
             aria-label="Show sidebar"
             title="Show sidebar"
-            className="group grid h-full w-3 shrink-0 place-items-center border-r border-border bg-surface text-text-muted hover:w-4 hover:bg-elevated hover:text-text-primary"
+            className="t42-panel group grid h-full w-3 shrink-0 place-items-center text-text-muted hover:w-4 hover:bg-elevated hover:text-text-primary"
           >
             <IconChevronRight size={11} />
           </button>
@@ -418,12 +421,10 @@ export function App() {
               onRenameProject={setRenameTarget}
               onRemoveProject={handleRemoveProject}
               unread={unread}
-              width={sidebarWidth}
               onCollapse={wideScreen ? undefined : () => setSidebarHidden(true)}
               theme={theme}
               onToggleTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
             />
-            <ResizeHandle side="left" currentWidth={sidebarWidth} onChange={setSidebarWidth} min={200} max={420} />
           </>
         )}
         <Main
@@ -508,7 +509,7 @@ function RenameDialog({
       role="presentation"
     >
       <div
-        className="w-[360px] rounded-lg border border-border bg-surface p-4 shadow-lg"
+        className="w-[360px] rounded-lg bg-raised p-4 shadow-overlay"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -524,7 +525,7 @@ function RenameDialog({
             if (e.key === 'Enter' && value.trim()) onSubmit(value.trim())
             if (e.key === 'Escape') onClose()
           }}
-          className="mt-3 w-full rounded-md border border-border bg-bg px-2.5 py-1.5 text-[13px] text-text-primary focus:border-accent focus:outline-none"
+          className="mt-3 w-full rounded-md bg-bg px-2.5 py-1.5 text-[13px] text-text-primary focus:border-accent focus:outline-none"
         />
         <div className="mt-3 flex justify-end gap-2">
           <button
@@ -563,7 +564,7 @@ function ConfirmDialog({
       role="presentation"
     >
       <div
-        className="w-[400px] rounded-lg border border-border bg-surface p-4 shadow-lg"
+        className="w-[400px] rounded-lg bg-raised p-4 shadow-overlay"
         onClick={(e) => e.stopPropagation()}
         role="alertdialog"
         aria-modal="true"
@@ -611,7 +612,7 @@ function TopBar({
 }) {
   void onOpenSettings
   return (
-    <header className="titlebar-drag flex h-12 items-center justify-between border-b border-border bg-bg px-4">
+    <header className="titlebar-drag flex h-12 items-center justify-between bg-bg px-4">
       <div className="titlebar-no-drag flex items-center gap-2.5 pl-16">
         <div className="flex h-5 w-5 items-center justify-center rounded-md bg-accent text-[10px] font-bold leading-none text-accent-text">42</div>
         <span className="text-[13px] font-semibold">Terminal42</span>
@@ -691,7 +692,7 @@ function InboxBell({ unread }: { unread: number }) {
         )}
       </button>
       {open && (
-        <div className="absolute right-0 top-9 z-30 flex w-[360px] flex-col overflow-hidden rounded-lg bg-elevated/95 shadow-2xl ring-1 ring-white/5">
+        <div className="absolute right-0 top-9 z-30 flex w-[360px] flex-col overflow-hidden rounded-lg bg-raised/95 shadow-overlay">
           <div className="flex items-center justify-between px-3 py-2">
             <span className="text-[12.5px] font-medium text-text-primary">Notifications</span>
             {entries.some((e) => !e.read) && (
@@ -786,7 +787,7 @@ function IconButton({
 void IconButton
 
 function Sidebar({
-  active, onSelect, projects, activeProjectId, onPickProject, onAddProject, onRenameProject, onRemoveProject, unread, width, onCollapse, theme: _theme, onToggleTheme: _onToggleTheme
+  active, onSelect, projects, activeProjectId, onPickProject, onAddProject, onRenameProject, onRemoveProject, unread, onCollapse, theme: _theme, onToggleTheme: _onToggleTheme
 }: {
   active: NavId
   onSelect: (id: NavId) => void
@@ -797,169 +798,227 @@ function Sidebar({
   onRenameProject: (p: Project) => void
   onRemoveProject: (p: Project) => void
   unread: number
-  width: number
   onCollapse?: () => void
   theme?: 'dark' | 'light'
   onToggleTheme?: () => void
 }) {
   void unread
   const inSecondary = SECONDARY_NAV.some((n) => n.id === active)
+  const [projectsOpen, setProjectsOpen] = useState(false)
+  const railRef = useRef<HTMLElement>(null)
+
+  // The Projects flyout is transient: any click outside it, or Escape,
+  // dismisses it. It deliberately does not become a persistent column.
+  useEffect(() => {
+    if (!projectsOpen) return
+    const onDown = (e: MouseEvent): void => {
+      const el = e.target as Node
+      if (railRef.current?.contains(el)) return
+      if ((el as HTMLElement).closest?.('[data-projects-flyout]')) return
+      setProjectsOpen(false)
+    }
+    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') setProjectsOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [projectsOpen])
+
+  const activeProject = projects.find((p) => p.id === activeProjectId) ?? null
+
   return (
-    <nav
-      className="t42-sidebar relative flex shrink-0 flex-col bg-surface px-2 py-2.5"
-      style={{ width }}
-    >
-      {/* Primary nav */}
-      <ul className="flex flex-col gap-0.5">
-        {PRIMARY_NAV.map(({ id, label, Icon }) => {
-          const isActive = id === active
-          return (
-            <li key={id}>
-              <button
-                type="button"
-                onClick={() => onSelect(id)}
-                aria-current={isActive ? 'page' : undefined}
-                className={[
-                  'flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-[13px] transition-colors',
-                  isActive
-                    ? 'bg-elevated font-medium text-text-primary'
-                    : 'text-text-secondary hover:bg-elevated/60 hover:text-text-primary'
-                ].join(' ')}
-              >
-                <Icon size={15} className={isActive ? 'text-text-primary' : ''} />
-                <span className="truncate">{label}</span>
-              </button>
-            </li>
-          )
-        })}
-
-        {/* Secondary tools: collapsed under a single "More" dropdown */}
-        <li>
-          <Dropdown.Root>
-            <Dropdown.Trigger asChild>
-              <button
-                type="button"
-                aria-current={inSecondary ? 'page' : undefined}
-                className={[
-                  'flex w-full items-center gap-3 rounded-md py-2 pl-3 pr-2.5 text-left text-[13px] transition-colors',
-                  inSecondary
-                    ? 'bg-elevated font-medium text-text-primary'
-                    : 'text-text-secondary hover:bg-elevated/60 hover:text-text-primary'
-                ].join(' ')}
-              >
-                <IconWorkflow size={15} />
-                <span className="truncate">{inSecondary ? SECONDARY_NAV.find((n) => n.id === active)!.label : 'More'}</span>
-                <span
-                  className="ml-auto grid h-5 w-5 place-items-center rounded-sm text-text-muted group-hover:text-text-secondary"
-                  aria-hidden="true"
-                >
-                  <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
-                    <circle cx="8" cy="3.5" r="1.3" />
-                    <circle cx="8" cy="8" r="1.3" />
-                    <circle cx="8" cy="12.5" r="1.3" />
-                  </svg>
-                </span>
-              </button>
-            </Dropdown.Trigger>
-            <Dropdown.Portal>
-              <Dropdown.Content
-                side="right"
-                align="start"
-                sideOffset={6}
-                className="z-50 min-w-[160px] rounded-md bg-surface p-1 text-[13px] shadow-xl"
-              >
-                {SECONDARY_NAV.map(({ id, label, Icon }) => (
-                  <Dropdown.Item
-                    key={id}
-                    onSelect={() => onSelect(id)}
-                    className={[
-                      'flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 outline-none',
-                      id === active ? 'bg-elevated font-medium text-text-primary' : 'text-text-secondary hover:bg-elevated hover:text-text-primary'
-                    ].join(' ')}
-                  >
-                    <Icon size={13} />
-                    <span>{label}</span>
-                  </Dropdown.Item>
-                ))}
-              </Dropdown.Content>
-            </Dropdown.Portal>
-          </Dropdown.Root>
-        </li>
-      </ul>
-
-      {/* Projects */}
-      <div className="mt-4 flex flex-1 flex-col overflow-hidden">
-        <div className="mb-1 flex items-center justify-between px-2.5">
-          <span className="text-[11.5px] text-text-muted">Projects</span>
-          <button
-            type="button"
-            onClick={onAddProject}
-            aria-label="Add project"
-            title="Add a project folder"
-            className="grid h-5 w-5 place-items-center rounded-sm text-text-muted hover:bg-elevated hover:text-text-primary"
+    <>
+      <nav
+        ref={railRef}
+        aria-label="Primary"
+        className="t42-sidebar t42-panel relative flex w-16 shrink-0 flex-col items-center gap-1 overflow-visible py-3"
+      >
+        {PRIMARY_NAV.map(({ id, label, Icon }) => (
+          <RailItem
+            key={id}
+            label={label}
+            active={id === active}
+            onClick={() => { setProjectsOpen(false); onSelect(id) }}
           >
-            <IconPlus size={11} />
-          </button>
+            <Icon size={18} />
+          </RailItem>
+        ))}
+
+        {/* Secondary tools stay collapsed behind one rail slot. */}
+        <Dropdown.Root>
+          <Dropdown.Trigger asChild>
+            <button
+              type="button"
+              aria-current={inSecondary ? 'page' : undefined}
+              title="More tools"
+              className="flex w-full flex-col items-center gap-1 pt-1"
+            >
+              <span
+                className={[
+                  'grid h-10 w-10 place-items-center rounded-[12px] transition-colors',
+                  inSecondary ? 'bg-elevated text-text-primary' : 'text-text-muted hover:bg-elevated/60 hover:text-text-primary'
+                ].join(' ')}
+              >
+                <IconWorkflow size={18} />
+              </span>
+              {inSecondary && (
+                <span className="max-w-full truncate px-0.5 text-[10.5px] font-medium leading-none text-text-primary">
+                  {SECONDARY_NAV.find((n) => n.id === active)!.label}
+                </span>
+              )}
+            </button>
+          </Dropdown.Trigger>
+          <Dropdown.Portal>
+            <Dropdown.Content
+              side="right"
+              align="start"
+              sideOffset={10}
+              className="z-50 min-w-[170px] rounded-panel bg-raised p-1.5 text-[13px] shadow-overlay"
+            >
+              {SECONDARY_NAV.map(({ id, label, Icon }) => (
+                <Dropdown.Item
+                  key={id}
+                  onSelect={() => onSelect(id)}
+                  className={[
+                    'flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 outline-none',
+                    id === active ? 'bg-elevated font-medium text-text-primary' : 'text-text-secondary hover:bg-elevated hover:text-text-primary'
+                  ].join(' ')}
+                >
+                  <Icon size={15} />
+                  <span>{label}</span>
+                </Dropdown.Item>
+              ))}
+            </Dropdown.Content>
+          </Dropdown.Portal>
+        </Dropdown.Root>
+
+        {/* Projects: opens a transient flyout rather than living in the rail. */}
+        <div className="mt-auto flex w-full flex-col items-center gap-1">
+          <RailItem
+            label="Projects"
+            active={projectsOpen}
+            showLabel={projectsOpen}
+            onClick={() => setProjectsOpen((o) => !o)}
+            title={activeProject ? `Projects — ${activeProject.name}` : 'Projects'}
+          >
+            <IconFolder size={18} />
+          </RailItem>
+
+          <RailItem
+            label="Settings"
+            active={active === 'settings'}
+            onClick={() => { setProjectsOpen(false); onSelect('settings') }}
+          >
+            <IconGear size={17} />
+          </RailItem>
+
+          {onCollapse && (
+            <RailItem label="Hide" active={false} onClick={onCollapse} title="Hide sidebar">
+              <svg width="17" height="17" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+                <line x1="6.5" y1="3.5" x2="6.5" y2="12.5" stroke="currentColor" strokeWidth="1.2" />
+              </svg>
+            </RailItem>
+          )}
         </div>
-        <ul className="flex flex-1 flex-col gap-0.5 overflow-y-auto pr-0.5">
-          {projects.length === 0 ? (
-            <li className="px-2.5 py-2 text-[12px] text-text-muted">
-              No projects yet. Click + to add a folder.
-            </li>
-          ) : (
-            projects.map((p) => {
-              const isActive = p.id === activeProjectId
-              return (
+      </nav>
+
+      {projectsOpen && (
+        <div
+          data-projects-flyout
+          className="fixed bottom-[var(--gutter)] left-[calc(64px+var(--gutter)*2)] z-40 flex max-h-[60vh] w-[260px] flex-col overflow-hidden rounded-panel bg-raised p-2 shadow-overlay"
+        >
+          <div className="mb-1 flex items-center justify-between px-1.5">
+            <span className="text-[11.5px] text-text-muted">Projects</span>
+            <button
+              type="button"
+              onClick={onAddProject}
+              aria-label="Add project"
+              title="Add a project folder"
+              className="grid h-6 w-6 place-items-center rounded-md text-text-muted hover:bg-elevated hover:text-text-primary"
+            >
+              <IconPlus size={12} />
+            </button>
+          </div>
+          <ul className="flex flex-col gap-0.5 overflow-y-auto">
+            {projects.length === 0 ? (
+              <li className="px-2 py-2 text-[12px] text-text-muted">
+                No projects yet. Click + to add a folder.
+              </li>
+            ) : (
+              projects.map((p) => (
                 <li key={p.id}>
                   <ProjectRow
                     project={p}
-                    isActive={isActive}
-                    onPick={() => onPickProject(p)}
+                    isActive={p.id === activeProjectId}
+                    onPick={() => { onPickProject(p); setProjectsOpen(false) }}
                     onRename={() => onRenameProject(p)}
                     onRemove={() => onRemoveProject(p)}
                   />
                 </li>
-              )
-            })
-          )}
-        </ul>
-      </div>
-
-      {/* Footer toolbar: Settings · Theme · Hide-sidebar (right) */}
-      <div className="mt-2 flex items-center gap-1 px-1 pt-1">
-        <button
-          type="button"
-          onClick={() => onSelect('settings')}
-          aria-current={active === 'settings' ? 'page' : undefined}
-          title="Settings"
-          className={[
-            'grid h-7 w-7 place-items-center rounded-md',
-            active === 'settings'
-              ? 'bg-elevated text-text-primary'
-              : 'text-text-muted hover:bg-elevated/60 hover:text-text-primary'
-          ].join(' ')}
-        >
-          <IconGear size={14} />
-        </button>
-        {onCollapse && (
-          <button
-            type="button"
-            onClick={onCollapse}
-            aria-label="Hide sidebar"
-            title="Hide sidebar"
-            className="ml-auto grid h-7 w-7 place-items-center rounded-md text-text-muted hover:bg-elevated/60 hover:text-text-primary"
-          >
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
-              <line x1="6.5" y1="3.5" x2="6.5" y2="12.5" stroke="currentColor" strokeWidth="1.2" />
-            </svg>
-          </button>
-        )}
-      </div>
-    </nav>
+              ))
+            )}
+          </ul>
+        </div>
+      )}
+    </>
   )
 }
 
+/**
+ * One slot in the icon rail: a square icon tile that fills when active, with
+ * the label revealed underneath only for the active slot (as in the reference
+ * rail) so the rail stays quiet but never unlabelled where it matters.
+ */
+function RailItem({
+  label, active, onClick, children, badge, showLabel, title, disabled
+}: {
+  label: string
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+  badge?: string
+  showLabel?: boolean
+  title?: string
+  disabled?: boolean
+}): JSX.Element {
+  const labelled = showLabel ?? active
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-current={active ? 'page' : undefined}
+      title={title ?? label}
+      className="group flex w-full flex-col items-center gap-1 pt-1 disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      <span className="relative">
+        <span
+          className={[
+            'grid h-10 w-10 place-items-center rounded-[12px] transition-colors',
+            active
+              ? 'bg-elevated text-text-primary'
+              : 'text-text-muted group-hover:bg-elevated/60 group-hover:text-text-primary'
+          ].join(' ')}
+        >
+          {children}
+        </span>
+        {badge && (
+          <span className="absolute -right-3.5 top-1/2 -translate-y-1/2 rounded-full bg-warning px-1.5 py-0.5 text-[9.5px] font-semibold leading-none text-black">
+            {badge}
+          </span>
+        )}
+      </span>
+      {labelled && (
+        <span className="max-w-full truncate px-0.5 text-[10.5px] font-medium leading-none text-text-primary">
+          {label}
+        </span>
+      )}
+    </button>
+  )
+}
 function ProjectRow({
   project, isActive, onPick, onRename, onRemove
 }: { project: Project; isActive: boolean; onPick: () => void; onRename: () => void; onRemove: () => void }) {
@@ -996,7 +1055,7 @@ function ProjectRow({
           <Dropdown.Content
             align="end"
             sideOffset={4}
-            className="z-50 min-w-[160px] rounded-md border border-border bg-surface p-1 text-[12px] text-text-primary shadow-sm"
+            className="z-50 min-w-[160px] rounded-md bg-surface p-1 text-[12px] text-text-primary shadow-sm"
           >
             <Dropdown.Item
               onSelect={onRename}
@@ -1040,13 +1099,14 @@ function Main({
 }) {
   const showTerminal = active === 'terminal'
   const [openedDesignTitle, setOpenedDesignTitle] = useState<string>('')
+  const [openedDesignKind, setOpenedDesignKind] = useState<string | null>(null)
 
   // Whenever the design id changes, refresh the title for the header.
   useEffect(() => {
     let cancelled = false
-    if (!activeDesignId) { setOpenedDesignTitle(''); return }
+    if (!activeDesignId) { setOpenedDesignTitle(''); setOpenedDesignKind(null); return }
     void window.terminal42.designs.get(activeDesignId).then((d) => {
-      if (!cancelled && d) setOpenedDesignTitle(d.title)
+      if (!cancelled && d) { setOpenedDesignTitle(d.title); setOpenedDesignKind(d.brief?.kind ?? null) }
     })
     return () => { cancelled = true }
   }, [activeDesignId])
@@ -1059,28 +1119,40 @@ function Main({
     active === 'workbench' ? <WorkbenchView activeSessionId={activeSessionId} onJumpToTerminal={() => setActive('terminal')} activeProjectId={activeProject?.id ?? null} /> :
     active === 'activity' ? <ActivityView onJumpToTerminal={(id) => { void window.terminal42.projects.touch(id).then(() => setActive('terminal')) }} /> :
     active === 'settings' ? <SettingsView theme={theme} onToggleTheme={onToggleTheme} /> :
-    active === 'designs' ? (
+    active === 'designs' || active === 'forms' ? (
       activeDesignId ? (
         <ErrorBoundary>
-          <DesignWorkspace
-            designId={activeDesignId}
-            title={openedDesignTitle || 'Untitled design'}
-            onRename={async (newTitle) => {
-              await window.terminal42.designs.rename(activeDesignId, newTitle)
-              setOpenedDesignTitle(newTitle)
-            }}
-            onClose={onCloseDesign}
-          />
+          {openedDesignKind === 'freeform' ? (
+            <FreeformCanvas
+              designId={activeDesignId}
+              title={openedDesignTitle || 'Form'}
+              onRename={async (newTitle) => {
+                await window.terminal42.designs.rename(activeDesignId, newTitle)
+                setOpenedDesignTitle(newTitle)
+              }}
+              onClose={onCloseDesign}
+            />
+          ) : (
+            <DesignWorkspace
+              designId={activeDesignId}
+              title={openedDesignTitle || 'Untitled design'}
+              onRename={async (newTitle) => {
+                await window.terminal42.designs.rename(activeDesignId, newTitle)
+                setOpenedDesignTitle(newTitle)
+              }}
+              onClose={onCloseDesign}
+            />
+          )}
         </ErrorBoundary>
       ) : (
         <ErrorBoundary>
-          <DesignsListView onOpen={onOpenDesign} seed={designWizardSeed} onSeedConsumed={onClearDesignWizardSeed} />
+          <DesignsListView scope={active === 'forms' ? 'form' : 'design'} onOpen={onOpenDesign} seed={designWizardSeed} onSeedConsumed={onClearDesignWizardSeed} />
         </ErrorBoundary>
       )
     ) : null
 
   return (
-    <div className="relative flex flex-1 overflow-hidden">
+    <div className="t42-panel relative flex flex-1 overflow-hidden">
       {/* Terminal layer: always mounted so PTY scrollback persists across tab switches. */}
       {activeProject ? (
         <div
@@ -1236,7 +1308,7 @@ function RawTerminalTabs({
                   if (e.key === 'Enter') { onRename(t.id, draft); setEditingId(null) }
                   if (e.key === 'Escape') setEditingId(null)
                 }}
-                className="w-[120px] rounded-sm border border-border bg-bg px-1 py-0.5 text-[12px] text-text-primary focus:outline-none"
+                className="w-[120px] rounded-sm bg-bg px-1 py-0.5 text-[12px] text-text-primary focus:outline-none"
               />
             ) : (
               <button

@@ -216,7 +216,11 @@ function send(
     return { ok: false, error: 'Another response is in progress.' }
   }
   const cwd = opts.cwd ?? getProjectCwd(sessionId) ?? process.env.HOME ?? process.cwd()
-  const model = opts.model ?? getSessionModel(sessionId)
+  // `opts.model === null` is an explicit "drop the model" signal used by the
+  // unknown-model/rate-limit fallback retries below. Using `??` here would
+  // treat that null the same as "not provided" and re-fetch the same stale
+  // session model, repeating the exact failure the retry was meant to fix.
+  const model = opts.model !== undefined ? opts.model : getSessionModel(sessionId)
   const resume = getCopilotResumeId(sessionId)
 
   const userMsg: ChatMessage = {

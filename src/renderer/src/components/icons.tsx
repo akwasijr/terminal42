@@ -245,8 +245,15 @@ export const IconFaq = make(
     <circle cx="8" cy="11.2" r=".6" fill="currentColor" stroke="none" />
   </>
 )
-export const IconCards = make(
+/** Form / freeform canvas: a frame split into panels. */
+export const IconLayout = make(
   <>
+    <rect x="2.5" y="3" width="11" height="10" rx="1.5" />
+    <path d="M8 3 V13" />
+    <path d="M8 8 H13.5" />
+  </>
+)
+export const IconCards = make(  <>
     <rect x="3" y="5" width="8" height="9" rx="1" />
     <path d="M5 3 H13 V12" />
   </>

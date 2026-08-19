@@ -75,10 +75,10 @@ export function VizTweakPanel({
 
   return (
     <aside
-      className="flex h-full w-[320px] shrink-0 flex-col border-l border-border bg-surface"
+      className="flex h-full w-[320px] shrink-0 flex-col bg-surface"
       aria-label="Visual edit"
     >
-      <header className="flex h-9 shrink-0 items-center justify-between border-b border-border px-3">
+      <header className="flex h-9 shrink-0 items-center justify-between px-3">
         <div className="flex min-w-0 items-center gap-2 text-[12px]">
           <span className="font-medium text-text-primary">Visual edit</span>
           {diffCount > 0 && <span className="text-text-muted">· {diffCount}</span>}
@@ -93,7 +93,7 @@ export function VizTweakPanel({
         </button>
       </header>
 
-      <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
+      <div className="flex shrink-0 items-center gap-2 px-3 py-2">
         <button
           type="button"
           onClick={onTogglePick}
@@ -583,9 +583,9 @@ function BoxRow({
 function ChangeList({ diffs }: { diffs: Record<string, VizDiff> }) {
   const entries = Object.values(diffs)
   return (
-    <div className="shrink-0 border-t border-border">
+    <div className="shrink-0">
       <div className="px-3 pb-1 pt-2 text-[11px] font-medium text-text-secondary">Changes</div>
-      <ul className="max-h-[140px] divide-y divide-border overflow-y-auto">
+      <ul className="max-h-[140px] overflow-y-auto">
         {entries.map((d) => (
           <li key={d.selector} className="px-3 py-1.5 text-[11px]">
             <div className="flex items-baseline justify-between gap-2">
@@ -649,7 +649,7 @@ function Footer({
   }
 
   return (
-    <footer className="flex shrink-0 items-center justify-between gap-2 border-t border-border px-3 py-2">
+    <footer className="flex shrink-0 items-center justify-between gap-2 px-3 py-2">
       <button
         type="button"
         onClick={onClearAll}

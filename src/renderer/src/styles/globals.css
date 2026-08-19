@@ -2,40 +2,186 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─────────────────────────────────────────────────────────────────────────
+   Surface-based visual language.
+
+   Separation between regions comes from a *tone step* plus a gutter — never
+   from a hairline rule. `--border` is therefore tuned to sit within ~1% of
+   `--surface`, so any legacy `border-border` that survives a sweep is
+   effectively invisible rather than a stray line. `--hairline` stays
+   available for the rare place a real line is unavoidable (table grids,
+   text-field underlines in dense data views).
+   ───────────────────────────────────────────────────────────────────────── */
 :root {
   /* Light tokens */
-  --bg: 250 250 250;
-  --surface: 255 255 255;
-  --elevated: 245 245 245;
-  --border: 229 229 229;
-  --border-strong: 212 212 212;
+  --bg: 240 240 241;        /* deepest: page background behind the panels */
+  --surface: 250 250 250;   /* panels, rails, inspector */
+  --elevated: 237 237 238;  /* rows, chips, hover states inside a panel */
+  --raised: 255 255 255;    /* floating toolbars, canvas sheet, menus */
+  --sunken: 232 232 234;    /* slider tracks, wells, inset fields */
+  --border: 249 249 249;    /* ~invisible: matches surface by design */
+  --border-strong: 224 224 226;
+  --hairline: 0 0 0 / 0.07; /* opt-in only, via var(--hairline-color) */
+  --hairline-color: rgba(0, 0, 0, 0.07);
   --text-primary: 23 23 23;
-  --text-secondary: 82 82 82;
-  --text-muted: 140 140 140;
+  --text-secondary: 92 92 96;
+  --text-muted: 112 112 118;
   --accent: 14 165 233;
   --accent-text: 255 255 255;
   --success: 22 163 74;
   --warning: 217 119 6;
   --error: 220 38 38;
+
+  /* Shape */
+  --radius-control: 8px;
+  --radius-row: 10px;
+  --radius-panel: 16px;
+  --radius-pill: 9999px;
+
+  /* Gutter between floating regions — the replacement for divider rules */
+  --gutter: 8px;
+
+  /* Elevation. Kept low-opacity: depth reads as a soft lift, not a drop. */
+  --shadow-row: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-float: 0 4px 16px rgba(0, 0, 0, 0.10);
+  --shadow-overlay: 0 8px 32px rgba(0, 0, 0, 0.14);
 }
 
 .dark {
-  --bg: 8 8 10;             /* deepest: canvas / page background */
-  --surface: 18 18 22;      /* one shade up: toolbars, rails, inspector */
-  --elevated: 28 28 34;     /* above surface: chips, hover states */
-  --border: 38 38 44;
-  --border-strong: 56 56 64;
-  --text-primary: 245 245 245;
-  --text-secondary: 161 161 161;
-  --text-muted: 110 110 110;
+  --bg: 5 5 6;              /* deepest: canvas / page background */
+  --surface: 17 17 19;      /* panels, rails, inspector */
+  --elevated: 30 30 33;     /* rows, chips, hover states inside a panel */
+  --raised: 38 38 42;       /* floating toolbars, menus */
+  --sunken: 12 12 14;       /* slider tracks, wells, inset fields */
+  --border: 18 18 20;       /* ~invisible: matches surface by design */
+  --border-strong: 52 52 58;
+  --hairline-color: rgba(255, 255, 255, 0.06);
+  --text-primary: 240 240 242;
+  --text-secondary: 154 154 160;
+  --text-muted: 128 128 136;
   --accent: 56 189 248;
   --accent-text: 10 10 10;
   --success: 34 197 94;
   --warning: 245 158 11;
   --error: 239 68 68;
+
+  --shadow-row: 0 1px 2px rgba(0, 0, 0, 0.30);
+  --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.40);
+  --shadow-float: 0 4px 16px rgba(0, 0, 0, 0.55);
+  --shadow-overlay: 0 8px 32px rgba(0, 0, 0, 0.65);
 }
 
 * { box-sizing: border-box; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Surface primitives
+
+   These replace divider rules across the app. A region is delimited by its
+   own fill + radius + the gutter around it, so no 1px line is needed.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* A floating region: sidebar column, inspector, panel stack. */
+.t42-panel {
+  background: rgb(var(--surface));
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-panel);
+}
+
+/* A region flush to a window edge — square off the outer corners so the
+   panel doesn't float away from the frame. */
+.t42-panel-l { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.t42-panel-r { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+
+/* A filled list row. Rows sit apart by gap, never by a divider. */
+.t42-row {
+  background: rgb(var(--elevated));
+  border-radius: var(--radius-row);
+  transition: background-color 150ms ease;
+}
+.t42-row:hover { background: rgb(var(--raised)); }
+
+/* A stack of rows: the gap *is* the separator. */
+.t42-rows { display: flex; flex-direction: column; gap: var(--gutter); }
+
+/* A toolbar that hovers over content rather than docking against it. */
+.t42-toolbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px;
+  background: rgb(var(--raised));
+  border-radius: 14px;
+  box-shadow: var(--shadow-float);
+}
+
+/* Menus / popovers / dialogs. */
+.t42-overlay {
+  background: rgb(var(--raised));
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-overlay);
+}
+
+/* Segmented control: one sunken group, active segment lifts by fill only. */
+.t42-seg {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  background: rgb(var(--sunken));
+  border-radius: var(--radius-control);
+}
+.t42-seg > * {
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: rgb(var(--text-secondary));
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.t42-seg > *:hover { color: rgb(var(--text-primary)); }
+.t42-seg > [data-active='true'] {
+  background: rgb(var(--raised));
+  color: rgb(var(--text-primary));
+  box-shadow: var(--shadow-row);
+}
+
+/* An inset well: slider tracks, numeric fields, code blocks. */
+.t42-well {
+  background: rgb(var(--sunken));
+  border-radius: var(--radius-control);
+}
+
+/* Canvas stage: a dotted work surface that follows the theme instead of a
+   hardcoded dark fill, so light mode gets a light sheet. */
+.t42-stage {
+  background-color: rgb(var(--bg));
+  background-image: radial-gradient(var(--hairline-color) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* The one sanctioned line, for grids and dense data only. */
+.t42-hairline { border-color: var(--hairline-color) !important; }
+
+/* A colour swatch defines its own edge with an inset ring, so it stays
+   legible when its fill matches the surface behind it (white on white,
+   near-black on black) without introducing an outer line. */
+.t42-swatch {
+  box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.28);
+}
+
+/* A draggable handle sitting on arbitrary artwork (gradient stops, colour
+   picker cursor). Double ring keeps it visible over any fill. */
+.t42-handle {
+  box-shadow:
+    inset 0 0 0 2px #fff,
+    0 0 0 1px rgba(0, 0, 0, 0.45),
+    0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* Unselected radio / keyframe dot: a ring, not a border, so it survives the
+   no-border sweep and can't collapse the element's box. */
+.t42-dot-empty { box-shadow: inset 0 0 0 1px rgb(var(--border-strong)); }
+.t42-dot-on { box-shadow: inset 0 0 0 1px rgb(var(--accent)); }
+
 html, body, #root { height: 100%; margin: 0; }
 body {
   font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -61,10 +207,51 @@ input, textarea, [contenteditable] {
   outline: none;
 }
 
+/* Fields read as sunken wells, and focus is expressed as a ring rather than
+   a border colour change (there is no border to change any more). */
+input:not([type='color']):not([type='range']):not([type='checkbox']):not([type='radio']):focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  box-shadow: 0 0 0 2px rgb(var(--accent) / 0.55);
+}
+
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgb(var(--border-strong)); border-radius: 6px; border: 2px solid rgb(var(--bg)); }
 ::-webkit-scrollbar-thumb:hover { background: rgb(var(--text-muted)); }
+
+/* Themed range sliders (compact, accent thumb) — replaces the native blue control */
+.t42-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 9999px;
+  background: rgb(var(--border-strong));
+  cursor: pointer;
+}
+.t42-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgb(var(--accent));
+  border: 2px solid rgb(var(--surface));
+  cursor: grab;
+  transition: transform 120ms ease;
+}
+.t42-range::-webkit-slider-thumb:hover { transform: scale(1.12); }
+.t42-range:active::-webkit-slider-thumb { cursor: grabbing; transform: scale(1.12); }
+
+/* Canvas "AI working" shimmer: a soft accent light sweeping across the stage */
+@keyframes t42-shimmer-sweep { 0% { transform: translateX(-65%) skewX(-12deg); } 100% { transform: translateX(170%) skewX(-12deg); } }
+.t42-canvas-shimmer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 35; }
+.t42-canvas-shimmer::after {
+  content: ''; position: absolute; top: -20%; bottom: -20%; left: 0; width: 45%;
+  background: linear-gradient(100deg, transparent, rgb(var(--accent) / 0.10), transparent);
+  animation: t42-shimmer-sweep 1.25s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) { .t42-canvas-shimmer::after { animation: none; } }
 
 /* xterm terminal scrollbar — thinner, subtle */
 .xterm-viewport::-webkit-scrollbar { width: 6px; }
@@ -119,15 +306,15 @@ html[data-translucent="true"] nav.t42-sidebar {
    tabs flipping, which is the desired feel. Kept fast (110ms) so a quick
    click never feels animated; just snaps. */
 @keyframes wizardPageFwd {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
 @keyframes wizardPageBack {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from { opacity: 0; transform: translateX(-20px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
-.wizard-page-fwd  { animation: wizardPageFwd  110ms ease-out both; }
-.wizard-page-back { animation: wizardPageBack 110ms ease-out both; }
+.wizard-page-fwd  { animation: wizardPageFwd  260ms cubic-bezier(.22,1,.36,1) both; }
+.wizard-page-back { animation: wizardPageBack 260ms cubic-bezier(.22,1,.36,1) both; }
 
 /* Page contents land as one block: no per-grid-item stagger. The earlier
    stagger made each step feel like it kept animating after arrival, which
@@ -212,13 +399,13 @@ html[data-translucent="true"] nav.t42-sidebar {
 }
 .t42-range::-webkit-slider-runnable-track {
   height: 3px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgb(var(--border-strong));
   border-radius: 999px;
   border: 0;
 }
 .t42-range::-moz-range-track {
   height: 3px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgb(var(--border-strong));
   border-radius: 999px;
   border: 0;
 }
@@ -247,5 +434,27 @@ html[data-translucent="true"] nav.t42-sidebar {
   outline: none;
 }
 .t42-range:focus::-webkit-slider-thumb {
-  box-shadow: 0 0 0 2px rgb(var(--surface)), 0 0 0 4px rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 0 2px rgb(var(--surface)), 0 0 0 4px rgb(var(--accent) / 0.35);
+}
+
+/* Continuous (squircle) corners for design-system previews. Only applies in
+   Chromium builds that support the `corner-shape` property; otherwise the
+   element keeps its border-radius and reads as a soft rounded rect. */
+[data-ds-corner="squircle"] [style*="border-radius"] {
+  corner-shape: squircle;
+}
+
+/* Pieces of the design-system pictogram fading in/out in a wave while generating. */
+@keyframes dsRise {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
+}
+
+/* Spinner rotation used by LoadingSpinner component previews. */
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Motion foundation demo: a bar that eases across its track. */
+@keyframes dsSlide {
+  from { transform: translateX(0); }
+  to { transform: translateX(200%); }
 }

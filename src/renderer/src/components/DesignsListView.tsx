@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Design, DesignBrief, DesignGroup, TemplateInfo } from '../../../preload/index'
 import { DesignWizard } from './DesignWizard'
 import { TemplatesGallery } from './TemplatesGallery'
+import { DesignSystemView } from './DesignSystemView'
+import { DesignSystemWizard } from './DesignSystemWizard'
+import { type DesignSystem, upsertSystem } from '../lib/designSystem'
 import { IconClose, IconEdit, IconPlus, IconSearch, IconTrash } from './icons'
 
 // Pretty labels for the kind-group filter chips at the top of the page.
@@ -11,15 +14,25 @@ const GROUP_LABEL: Record<DesignGroup, string> = {
 }
 // Display order for the chip row. Keeps the most common kinds on the left.
 const GROUP_ORDER: DesignGroup[] = ['web', 'app', 'presentation', 'content', 'print', 'data', 'social', 'figma', 'other']
+type TypeFilter = 'all' | 'form' | DesignGroup | 'system' | 'templates'
+
+/**
+ * Which family of files this list is showing. Forms (the freeform canvas) and
+ * web/app experiences are different enough tools that mixing them in one list
+ * was confusing, so each gets its own top-level rail tab and its own list.
+ */
+export type DesignScope = 'form' | 'design'
 
 export function DesignsListView({
   onOpen,
   seed,
-  onSeedConsumed
+  onSeedConsumed,
+  scope = 'design'
 }: {
   onOpen: (design: Design) => void
   seed?: { idea: string } | null
   onSeedConsumed?: () => void
+  scope?: DesignScope
 }): JSX.Element {
   const [designs, setDesigns] = useState<Design[]>([])
   const [wizardOpen, setWizardOpen] = useState(false)
@@ -30,59 +43,29 @@ export function DesignsListView({
   const [confirmDelete, setConfirmDelete] = useState<Design | null>(null)
   const [search, setSearch] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
-  const [groupFilter, setGroupFilter] = useState<DesignGroup | 'all'>('all')
-  // Top-level view mode: the user's own designs vs. the templates gallery.
-  const [view, setView] = useState<'mine' | 'templates'>('mine')
-  // Import
-  const [importMenuOpen, setImportMenuOpen] = useState(false)
-  const [importingGit, setImportingGit] = useState(false)
-  const [gitUrl, setGitUrl] = useState('')
-  const importMenuRef = useRef<HTMLDivElement>(null)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => (localStorage.getItem('t42-designs-view') === 'list' ? 'list' : 'grid'))
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
+  // Project folders: client/project organisation, stored renderer-side.
+  const [folderFilter, setFolderFilter] = useState<string>('all')
+  const [folders, setFolders] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('t42-design-folders') || '[]') } catch { return [] } })
+  const [designFolders, setDesignFolders] = useState<Record<string, string>>(() => { try { return JSON.parse(localStorage.getItem('t42-design-folder-map') || '{}') } catch { return {} } })
+  const [newFolderOpen, setNewFolderOpen] = useState(false)
+  const [newFolderName, setNewFolderName] = useState('')
+  // Single "New design" menu: form sizes, other design types, and new folder.
+  const [newMenuOpen, setNewMenuOpen] = useState(false)
+  const newMenuRef = useRef<HTMLDivElement>(null)
+  const [dsWizardOpen, setDsWizardOpen] = useState(false)
+  const [pendingDsId, setPendingDsId] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!importMenuOpen) return
+    if (!newMenuOpen) return
     const handler = (e: MouseEvent): void => {
-      if (importMenuRef.current && !importMenuRef.current.contains(e.target as Node)) setImportMenuOpen(false)
+      if (newMenuRef.current && !newMenuRef.current.contains(e.target as Node)) setNewMenuOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [importMenuOpen])
+  }, [newMenuOpen])
 
-  const importFromFolder = async (): Promise<void> => {
-    setImportMenuOpen(false)
-    try {
-      const res = await window.terminal42.designs.importFolder()
-      if (res.ok && res.design) {
-        await refresh()
-        onOpen(res.design)
-      } else if (res.error && res.error !== 'Cancelled') {
-        alert(`Import failed: ${res.error}`)
-      }
-    } catch (err) {
-      alert(`Import failed: ${String(err)}`)
-    }
-  }
-
-  const importFromGit = async (): Promise<void> => {
-    const url = gitUrl.trim()
-    if (!url) return
-    setImportingGit(true)
-    try {
-      const res = await window.terminal42.designs.importGit(url)
-      if (res.ok && res.design) {
-        setImportMenuOpen(false)
-        setGitUrl('')
-        await refresh()
-        onOpen(res.design)
-      } else {
-        alert(`Import failed: ${res.error ?? 'Unknown error'}`)
-      }
-    } catch (err) {
-      alert(`Import failed: ${String(err)}`)
-    } finally {
-      setImportingGit(false)
-    }
-  }
   const searchRef = useRef<HTMLInputElement>(null)
   // Auto-focus the input the moment search is opened, and auto-collapse
   // when the user blurs it without typing anything.
@@ -190,15 +173,30 @@ export function DesignsListView({
     await refresh()
   }
 
-  const openFigmaWizard = (): void => {
-    setWizardTarget('figma')
-    setWizardInitialIdea('')
-    setWizardOpen(true)
-  }
   const openHtmlWizard = (): void => {
     setWizardTarget('html')
     setWizardInitialIdea('')
     setWizardOpen(true)
+  }
+  const createFreeform = async (preset?: { w: number; h: number }): Promise<void> => {
+    if (creating) return
+    const brief = {
+      v: 1 as const,
+      kind: 'freeform' as const,
+      kindLabel: 'Form',
+      group: 'other' as const,
+      fidelity: 'highfidelity' as const,
+      createdAt: Date.now(),
+    } as DesignBrief
+    const d = await window.terminal42.designs.create({ title: 'Untitled canvas', brief })
+    // Seed the chosen starting artboard size so the new canvas opens at that preset.
+    if (preset) {
+      try {
+        const seed = { v: 2, pages: [{ id: 'p1', name: 'Page 1' }], activePage: 'p1', perPage: { p1: { objects: [], artboards: [{ id: 'ab1', name: 'Artboard 1', x: 0, y: 0, w: preset.w, h: preset.h, bg: '#ffffff' }], activeAb: 'ab1' } } }
+        localStorage.setItem(`t42-freeform:${d.id}`, JSON.stringify(seed))
+      } catch { /* ignore quota */ }
+    }
+    onOpen(d)
   }
 
   const createFromTemplate = (t: TemplateInfo): void => {
@@ -229,31 +227,54 @@ export function DesignsListView({
     return out
   }
 
-  // Counts per group for the filter-chip badges.
-  const groupCounts = useMemo<Record<DesignGroup | 'all', number>>(() => {
-    const out: Record<string, number> = { all: designs.length }
-    for (const g of GROUP_ORDER) out[g] = 0
-    for (const d of designs) {
-      const g = (d.brief?.group ?? 'other') as DesignGroup
-      out[g] = (out[g] ?? 0) + 1
-    }
-    return out as Record<DesignGroup | 'all', number>
-  }, [designs])
+  // Persist folders + the design→folder map.
+  useEffect(() => { try { localStorage.setItem('t42-design-folders', JSON.stringify(folders)) } catch { /* quota */ } }, [folders])
+  useEffect(() => { try { localStorage.setItem('t42-design-folder-map', JSON.stringify(designFolders)) } catch { /* quota */ } }, [designFolders])
+  const createFolder = (name: string): void => {
+    const v = name.trim()
+    setNewFolderName(''); setNewFolderOpen(false)
+    if (!v || folders.includes(v)) return
+    setFolders((f) => [...f, v]); setFolderFilter(v)
+  }
+  const assignFolder = (id: string, folder: string | null): void => setDesignFolders((m) => {
+    const next = { ...m }
+    if (folder) next[id] = folder; else delete next[id]
+    return next
+  })
+  const removeFolder = (name: string): void => {
+    setFolders((f) => f.filter((x) => x !== name))
+    setDesignFolders((m) => { const next = { ...m }; for (const k of Object.keys(next)) if (next[k] === name) delete next[k]; return next })
+    if (folderFilter === name) setFolderFilter('all')
+  }
+  const folderCount = (name: string): number => Object.values(designFolders).filter((x) => x === name).length
 
-  // Apply search + group filter, then bucket by recency.
+  // Only the files belonging to this scope. Everything downstream (type pills,
+  // folder counts, buckets) works from this list, never the raw one.
+  const isForm = (d: Design): boolean => d.brief?.kind === 'freeform'
+  const scoped = useMemo(
+    () => designs.filter((d) => (scope === 'form' ? isForm(d) : !isForm(d))),
+    [designs, scope]
+  )
+
+  // Which file types are present, so the type pills only show real options.
+  const presentTypes = useMemo(() => {
+    const s = new Set<DesignGroup>()
+    for (const d of scoped) s.add((d.brief?.group ?? 'other') as DesignGroup)
+    return { groups: GROUP_ORDER.filter((g) => s.has(g)) }
+  }, [scoped])
+
+  const allLabel = scope === 'form' ? 'All forms' : 'All designs'
+  const heading = typeFilter === 'system' ? 'Design systems' : typeFilter === 'templates' ? 'Templates' : folderFilter !== 'all' ? folderFilter : allLabel
+
+  // Apply type + folder + search, then bucket by recency.
   const buckets = useMemo(() => {
     const q = search.trim().toLowerCase()
-    const visible = designs.filter((d) => {
-      if (groupFilter !== 'all' && (d.brief?.group ?? 'other') !== groupFilter) return false
+    const isGroup = typeFilter !== 'all' && typeFilter !== 'form' && typeFilter !== 'system' && typeFilter !== 'templates'
+    const visible = scoped.filter((d) => {
+      if (isGroup && (d.brief?.group ?? 'other') !== typeFilter) return false
+      if (folderFilter !== 'all' && designFolders[d.id] !== folderFilter) return false
       if (!q) return true
-      const hay = [
-        d.title,
-        d.brief?.kindLabel ?? '',
-        d.brief?.subtype ?? '',
-        d.brief?.idea ?? '',
-        d.brief?.audience ?? '',
-        d.brief?.lookLabel ?? ''
-      ].join(' ').toLowerCase()
+      const hay = [d.title, d.brief?.kindLabel ?? '', d.brief?.subtype ?? '', d.brief?.idea ?? '', d.brief?.audience ?? '', d.brief?.lookLabel ?? ''].join(' ').toLowerCase()
       return hay.includes(q)
     })
 
@@ -278,140 +299,88 @@ export function DesignsListView({
       else if (t >= thirtyDays)          out[3].items.push(d)
       else                               out[4].items.push(d)
     }
-    // Sort each bucket by lastActiveAt descending.
     for (const b of out) b.items.sort((a, c) => c.lastActiveAt - a.lastActiveAt)
     return out.filter((b) => b.items.length > 0)
-  }, [designs, search, groupFilter])
+  }, [scoped, search, typeFilter, folderFilter, designFolders])
 
   return (
     <div className="h-full w-full overflow-y-auto overflow-x-hidden bg-bg">
       <div className="mx-auto max-w-6xl px-8 pt-10">
         <div className="sticky top-0 z-10 bg-bg pb-4">
           <header className="mb-4 flex items-center justify-between gap-4">
-          <h1 className="text-[20px] font-semibold text-text-primary">Design</h1>
+          <div>
+            <h1 className="text-[20px] font-semibold text-text-primary">{heading}</h1>
+          </div>
           <div className="flex items-center gap-2">
-            <div className="relative" ref={importMenuRef}>
+            <div ref={newMenuRef} className="relative flex-shrink-0">
               <button
                 type="button"
-                onClick={() => setImportMenuOpen((o) => !o)}
-                className="inline-flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md bg-elevated px-3 py-1.5 text-[13px] font-medium text-text-primary transition-colors hover:bg-elevated/70"
+                onClick={() => setNewMenuOpen((o) => !o)}
+                disabled={creating}
+                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md bg-accent px-3 py-1.5 text-[13px] font-medium text-accent-text transition-opacity hover:opacity-90 disabled:opacity-50"
               >
-                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2v8m0 0l-3-3m3 3l3-3M3 12v1h10v-1"/></svg>
-                Import
+                <IconPlus size={13} />
+                <span>{creating ? 'Creating\u2026' : scope === 'form' ? 'New form' : 'New design'}</span>
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="-mr-0.5 ml-0.5 opacity-80"><path d="M4 6l4 4 4-4" /></svg>
               </button>
-              {importMenuOpen && (
-                <div className="absolute right-0 top-full z-30 mt-1 w-[300px] rounded-lg bg-elevated p-1.5 shadow-lg">
-                  {/* Local */}
-                  <button
-                    type="button"
-                    onClick={() => void importFromFolder()}
-                    className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left outline-none hover:bg-surface"
-                  >
-                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-bg text-text-muted">
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"><path d="M2 5.5V12a1 1 0 001 1h10a1 1 0 001-1V6.5a1 1 0 00-1-1H8L6.5 4H3a1 1 0 00-1 1.5z"/></svg>
-                    </span>
-                    <div className="flex flex-col">
-                      <span className="text-[12.5px] font-medium text-text-primary">Local folder</span>
-                      <span className="text-[11px] text-text-muted">Import from your machine</span>
-                    </div>
-                  </button>
-
-                  {/* Git */}
-                  <div className="mt-1 rounded-md px-3 py-2.5">
-                    <div className="mb-2 flex items-center gap-3">
-                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-bg text-text-muted">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M15.698 7.287L8.712.302a1.03 1.03 0 00-1.457 0l-1.45 1.45 1.84 1.84a1.223 1.223 0 011.55 1.56l1.773 1.774a1.224 1.224 0 11-.733.684L8.535 5.91v4.202a1.224 1.224 0 11-1.007-.02V5.834a1.224 1.224 0 01-.664-1.606L5.05 2.415.302 7.163a1.03 1.03 0 000 1.457l6.986 6.986a1.03 1.03 0 001.457 0l6.953-6.953a1.031 1.031 0 000-1.457z"/></svg>
-                      </span>
-                      <div className="flex flex-col">
-                        <span className="text-[12.5px] font-medium text-text-primary">Git repository</span>
-                        <span className="text-[11px] text-text-muted">Clone from a URL</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="text"
-                        value={gitUrl}
-                        onChange={(e) => setGitUrl(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') void importFromGit() }}
-                        placeholder="https://github.com/user/repo"
-                        className="flex-1 rounded-md bg-bg px-2.5 py-1.5 text-[12px] text-text-primary placeholder:text-text-muted focus:outline-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => void importFromGit()}
-                        disabled={!gitUrl.trim() || importingGit}
-                        className="shrink-0 rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-text transition-opacity hover:opacity-90 disabled:opacity-40"
-                      >
-                        {importingGit ? 'Cloning…' : 'Clone'}
+              {newMenuOpen && (
+                <div className="absolute right-0 top-full z-30 mt-1.5 w-60 overflow-hidden rounded-lg bg-raised py-1 shadow-overlay">
+                  {scope === 'form' ? (
+                    <button type="button" onClick={() => { setNewMenuOpen(false); void createFreeform() }} className="flex w-full items-center px-3 py-2 text-left text-[12.5px] font-medium text-text-primary hover:bg-elevated">Blank form</button>
+                  ) : (
+                    [
+                      { label: 'Design system', onClick: () => { setNewMenuOpen(false); setDsWizardOpen(true) } },
+                      { label: 'Web experience', onClick: () => { setNewMenuOpen(false); openHtmlWizard() } },
+                      { label: 'App', onClick: () => { setNewMenuOpen(false); openHtmlWizard() } }
+                    ].map((o) => (
+                      <button key={o.label} type="button" onClick={o.onClick} className="flex w-full items-center px-3 py-2 text-left text-[12.5px] font-medium text-text-primary hover:bg-elevated">
+                        {o.label}
                       </button>
-                    </div>
-                  </div>
+                    ))
+                  )}
+                  <div className="my-1" />
+                  <button type="button" onClick={() => { setNewMenuOpen(false); setNewFolderOpen(true) }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12.5px] font-medium text-text-primary hover:bg-elevated">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"><path d="M2 5.5V12a1 1 0 001 1h10a1 1 0 001-1V6.5a1 1 0 00-1-1H8L6.5 4H3a1 1 0 00-1 1.5z"/></svg>
+                    New folder
+                  </button>
                 </div>
               )}
             </div>
-            <button
-              type="button"
-              onClick={openFigmaWizard}
-              disabled={creating}
-              title="Build directly in Figma: full wizard, then straight to a Figma file via MCP"
-              className="inline-flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md bg-elevated px-3 py-1.5 text-[13px] font-medium text-text-primary transition-colors hover:bg-elevated/70 disabled:opacity-50"
-            >
-              <FigmaPillSm />
-              <span>Build in Figma</span>
-            </button>
-            <button
-              type="button"
-              onClick={openHtmlWizard}
-              disabled={creating}
-              className="inline-flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md bg-accent px-3 py-1.5 text-[13px] font-medium text-accent-text transition-opacity hover:opacity-90 disabled:opacity-50"
-            >
-              <IconPlus size={13} />
-              <span>{creating ? 'Creating\u2026' : 'New design'}</span>
-            </button>
           </div>
         </header>
 
-        {/* View toggle: My designs / Templates */}
-        <div className="mb-2 inline-flex items-center gap-1 rounded-lg bg-elevated p-1">
-          <ViewPill active={view === 'mine'} onClick={() => setView('mine')}>My designs</ViewPill>
-          <ViewPill active={view === 'templates'} onClick={() => setView('templates')}>Templates</ViewPill>
-        </div>
-        </div>
-
-        <div className="pb-10">
-        {view === 'templates' ? (
-          <TemplatesGallery onUse={createFromTemplate} />
-        ) : designs.length === 0 ? (
-          <EmptyState onCreate={openHtmlWizard} />
-        ) : (
-          <>
-            {/* Toolbar: search icon -> expanding pill, kind-group filter chips.
-                The chips no longer carry counts (cleaner). The search icon
-                expands smoothly to a full input on click; clicking the X
-                clears + collapses. */}
-            <div className="mb-5 flex items-center gap-2">
-              {/* Filter chips */}
-              <div className="flex flex-1 flex-wrap items-center gap-1">
-                <FilterChip
-                  label="All"
-                  active={groupFilter === 'all'}
-                  onClick={() => setGroupFilter('all')}
-                />
-                {GROUP_ORDER.filter((g) => groupCounts[g] > 0).map((g) => (
-                  <FilterChip
-                    key={g}
-                    label={GROUP_LABEL[g]}
-                    active={groupFilter === g}
-                    onClick={() => setGroupFilter(g)}
-                  />
-                ))}
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          {(scope === 'design' || presentTypes.groups.length > 0) && (
+          <div className="inline-flex shrink-0 flex-wrap items-center gap-1 rounded-lg bg-sunken p-1">
+            <ViewPill active={typeFilter === 'all'} onClick={() => setTypeFilter('all')}>{allLabel}</ViewPill>
+            {presentTypes.groups.map((g) => (
+              <ViewPill key={g} active={typeFilter === g} onClick={() => setTypeFilter(g)}>{GROUP_LABEL[g]}</ViewPill>
+            ))}
+            {scope === 'design' && (
+              <>
+                <span className="mx-1.5" />
+                <ViewPill active={typeFilter === 'system'} onClick={() => setTypeFilter('system')}>Design systems</ViewPill>
+                <ViewPill active={typeFilter === 'templates'} onClick={() => setTypeFilter('templates')}>Templates</ViewPill>
+              </>
+            )}
+          </div>
+          )}
+          <div className="ml-auto flex items-center gap-2">
+              {/* grid / list view toggle */}
+              <div className="inline-flex items-center gap-0.5 rounded-md bg-elevated p-0.5">
+                <button type="button" onClick={() => { setViewMode('grid'); localStorage.setItem('t42-designs-view', 'grid') }} title="Grid view" aria-label="Grid view"
+                  className={['grid h-7 w-7 place-items-center rounded transition-colors', viewMode === 'grid' ? 'bg-bg text-text-primary shadow-sm' : 'text-text-muted hover:text-text-primary'].join(' ')}>
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4"><rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1" /><rect x="9" y="2.5" width="4.5" height="4.5" rx="1" /><rect x="2.5" y="9" width="4.5" height="4.5" rx="1" /><rect x="9" y="9" width="4.5" height="4.5" rx="1" /></svg>
+                </button>
+                <button type="button" onClick={() => { setViewMode('list'); localStorage.setItem('t42-designs-view', 'list') }} title="List view" aria-label="List view"
+                  className={['grid h-7 w-7 place-items-center rounded transition-colors', viewMode === 'list' ? 'bg-bg text-text-primary shadow-sm' : 'text-text-muted hover:text-text-primary'].join(' ')}>
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M5 4h9M5 8h9M5 12h9" /><circle cx="2.5" cy="4" r="0.9" fill="currentColor" stroke="none" /><circle cx="2.5" cy="8" r="0.9" fill="currentColor" stroke="none" /><circle cx="2.5" cy="12" r="0.9" fill="currentColor" stroke="none" /></svg>
+                </button>
               </div>
-
-              {/* Search: collapsed = icon button, expanded = animated pill */}
               <div
                 className={[
                   'flex items-center overflow-hidden rounded-md bg-elevated transition-[width,background-color] duration-300 ease-out',
-                  searchOpen ? 'w-[280px]' : 'w-8 hover:bg-elevated/70'
+                  searchOpen ? 'w-[260px]' : 'w-8 hover:bg-elevated/70'
                 ].join(' ')}
               >
                 <button
@@ -435,7 +404,7 @@ export function DesignsListView({
                   onKeyDown={(e) => {
                     if (e.key === 'Escape') { setSearch(''); setSearchOpen(false); searchRef.current?.blur() }
                   }}
-                  placeholder={'Search by title, idea, audience\u2026'}
+                  placeholder={'Search'}
                   tabIndex={searchOpen ? 0 : -1}
                   className={[
                     'min-w-0 flex-1 bg-transparent py-1.5 pr-1 text-[12.5px] text-text-primary caret-text-primary placeholder:text-text-muted/70 outline-none transition-opacity duration-200 focus:outline-none focus-visible:outline-none',
@@ -453,11 +422,47 @@ export function DesignsListView({
                   </button>
                 )}
               </div>
-            </div>
+          </div>
+        </div>
+        {typeFilter !== 'system' && typeFilter !== 'templates' && (folders.length > 0 || newFolderOpen) && (
+          <div className="-mt-1 mb-3 flex flex-wrap items-center gap-1.5">
+            <span className="mr-1 text-[11px] font-medium text-text-muted">Folders</span>
+            <FolderChip active={folderFilter === 'all'} onClick={() => setFolderFilter('all')} label="All" />
+            {folders.map((f) => (
+              <FolderChip key={f} active={folderFilter === f} onClick={() => setFolderFilter(f)} label={f} count={folderCount(f)} onRemove={() => removeFolder(f)} />
+            ))}
+            {newFolderOpen && (
+              <input autoFocus value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') createFolder(newFolderName); if (e.key === 'Escape') { setNewFolderOpen(false); setNewFolderName('') } }}
+                onBlur={() => createFolder(newFolderName)} placeholder="Folder name…"
+                className="w-36 rounded-md bg-elevated px-2 py-1 text-[12px] text-text-primary focus:outline-none" />
+            )}
+          </div>
+        )}
+        </div>
 
+        <div className="pb-10">
+        {typeFilter === 'system' ? (
+          <DesignSystemView openSystemId={pendingDsId} onConsumeOpen={() => setPendingDsId(null)} />
+        ) : typeFilter === 'templates' ? (
+          <TemplatesGallery onUse={createFromTemplate} />
+        ) : designs.length === 0 ? (
+          <EmptyState noun={scope === 'form' ? 'form' : 'design'} onCreate={() => { if (scope === 'form') void createFreeform(); else openHtmlWizard() }} />
+        ) : (
+          <>
             {buckets.length === 0 ? (
               <div className="rounded-xl bg-surface/40 px-6 py-10 text-center text-[13px] text-text-muted">
-                No designs match.
+                No {scope === 'form' ? 'forms' : 'designs'} match.
+              </div>
+            ) : viewMode === 'list' ? (
+              <div className="overflow-hidden">
+                {/* table header */}
+                <div className="grid grid-cols-[minmax(0,1fr)_140px_140px_160px] items-center gap-4 px-3 pb-2 text-[11.5px] font-medium text-text-muted">
+                  <span>Name</span><span>Edited</span><span>Created</span><span>Created by</span>
+                </div>
+                {buckets.flatMap((b) => b.items).map((d) => (
+                  <DesignRow key={d.id} design={d} onOpen={() => onOpen(d)} onDelete={() => setConfirmDelete(d)} folders={folders} folder={designFolders[d.id] ?? null} onAssign={assignFolder} />
+                ))}
               </div>
             ) : (
               <div className="space-y-7">
@@ -473,6 +478,9 @@ export function DesignsListView({
                           design={d}
                           onOpen={() => onOpen(d)}
                           onDelete={() => setConfirmDelete(d)}
+                          folders={folders}
+                          folder={designFolders[d.id] ?? null}
+                          onAssign={assignFolder}
                         />
                       ))}
                     </div>
@@ -502,25 +510,77 @@ export function DesignsListView({
             onComplete={(brief, kickoff) => void handleWizardComplete(brief, kickoff)}
           />
         )}
+        {dsWizardOpen && (
+          <DesignSystemWizard
+            onCancel={() => setDsWizardOpen(false)}
+            onComplete={(gen: DesignSystem) => { upsertSystem(gen); setDsWizardOpen(false); setTypeFilter('system'); setPendingDsId(gen.id) }}
+          />
+        )}
       </div>
     </div>
   )
 }
 
-function EmptyState({ onCreate }: { onCreate: () => void }): JSX.Element {
+function FolderChip({ active, onClick, label, count, onRemove }: { active: boolean; onClick: () => void; label: string; count?: number; onRemove?: () => void }): JSX.Element {
+  return (
+    <span className={['group inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12px] transition-colors', active ? 'bg-elevated text-text-primary' : 'text-text-secondary hover:bg-elevated/60 hover:text-text-primary'].join(' ')}>
+      <button type="button" onClick={onClick} className="inline-flex items-center gap-1.5">
+        {onRemove
+          ? <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4"><path d="M2 4.5a1 1 0 0 1 1-1h3l1.2 1.2H13a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z" /></svg>
+          : <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4"><path d="M2 4h5l1 1.5h6v7a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z" opacity="0.0" /><rect x="2" y="3.5" width="12" height="9.5" rx="1.2" /></svg>}
+        <span>{label}</span>
+        {count != null && count > 0 && <span className="text-[10px] text-text-muted">{count}</span>}
+      </button>
+      {onRemove && <button type="button" onClick={onRemove} title="Delete folder" className="grid h-3.5 w-3.5 place-items-center rounded text-text-muted opacity-0 hover:text-error group-hover:opacity-100"><IconClose size={8} /></button>}
+    </span>
+  )
+}
+
+/** A small folder-assignment menu shared by the grid card and list row. */
+function FolderAssign({ id, current, folders, onAssign }: { id: string; current: string | null; folders: string[]; onAssign: (id: string, folder: string | null) => void }): JSX.Element {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const h = (e: MouseEvent): void => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h)
+  }, [open])
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" onClick={(e) => { e.stopPropagation(); setOpen((o) => !o) }} title={current ? `In folder: ${current}` : 'Move to folder'}
+        className={['grid h-7 w-7 place-items-center rounded-md hover:bg-bg', current ? 'text-text-secondary' : 'text-text-muted'].join(' ')}>
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4"><rect x="2" y="3.5" width="12" height="9.5" rx="1.2" /><path d="M2 6h12" /></svg>
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full z-30 mt-1 w-44 overflow-hidden rounded-lg bg-raised py-1 shadow-overlay">
+          <div className="px-3 py-1 text-[10.5px] font-medium uppercase tracking-wide text-text-muted">Move to folder</div>
+          <button type="button" onClick={(e) => { e.stopPropagation(); onAssign(id, null); setOpen(false) }} className={['flex w-full items-center px-3 py-1.5 text-left text-[12px] hover:bg-elevated', !current ? 'text-text-primary' : 'text-text-secondary'].join(' ')}>No folder</button>
+          {folders.map((f) => (
+            <button key={f} type="button" onClick={(e) => { e.stopPropagation(); onAssign(id, f); setOpen(false) }} className={['flex w-full items-center justify-between px-3 py-1.5 text-left text-[12px] hover:bg-elevated', current === f ? 'text-text-primary' : 'text-text-secondary'].join(' ')}>
+              <span className="truncate">{f}</span>{current === f && <span>✓</span>}
+            </button>
+          ))}
+          {folders.length === 0 && <div className="px-3 py-1.5 text-[11.5px] text-text-muted">No folders yet</div>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function EmptyState({ noun, onCreate }: { noun: 'form' | 'design'; onCreate: () => void }): JSX.Element {
   return (
     <div className="flex flex-col items-center gap-4 rounded-2xl bg-surface px-6 py-16 text-center">
       <div className="grid h-14 w-14 place-items-center rounded-full bg-elevated text-accent">
         <IconEdit size={20} />
       </div>
-      <h2 className="text-[15px] font-medium text-text-primary">No designs yet</h2>
+      <h2 className="text-[15px] font-medium text-text-primary">No {noun}s yet</h2>
       <button
         type="button"
         onClick={onCreate}
         className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md bg-accent px-3 py-1.5 text-[13px] font-medium text-accent-text transition-opacity hover:opacity-90"
       >
         <IconPlus size={13} />
-        <span>Create your first design</span>
+        <span>Create your first {noun}</span>
       </button>
     </div>
   )
@@ -533,7 +593,7 @@ function ViewPill({ active, onClick, children }: { active: boolean; onClick: () 
       onClick={onClick}
       className={[
         'rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors',
-        active ? 'bg-bg text-text-primary shadow-sm' : 'text-text-secondary hover:text-text-primary'
+        active ? 'bg-raised text-text-primary shadow-row' : 'text-text-secondary hover:text-text-primary'
       ].join(' ')}
     >
       {children}
@@ -541,10 +601,13 @@ function ViewPill({ active, onClick, children }: { active: boolean; onClick: () 
   )
 }
 
-function DesignCard({ design, onOpen, onDelete }: {
+function DesignCard({ design, onOpen, onDelete, folders, folder, onAssign }: {
   design: Design
   onOpen: () => void
   onDelete: () => void
+  folders: string[]
+  folder: string | null
+  onAssign: (id: string, folder: string | null) => void
 }): JSX.Element {
   const ageLabel = formatAge(design.lastActiveAt)
   // Lazily fetch the latest version so the card can render a real preview
@@ -617,18 +680,61 @@ function DesignCard({ design, onOpen, onDelete }: {
           </div>
           <div className="mt-0.5 flex items-center gap-2 text-[11.5px] text-text-muted">
             <span>{ageLabel}</span>
-            {design.currentVersion && <><span>·</span><span>{design.currentVersion}</span></>}
+            {folder && <><span>·</span><span className="truncate text-text-secondary">{folder}</span></>}
           </div>
         </div>
       </button>
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); onDelete() }}
-        title="Delete design"
-        className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-md text-text-muted opacity-0 transition-opacity hover:bg-elevated hover:text-error group-hover:opacity-100"
-      >
-        <IconTrash size={11} />
+      <div className="absolute right-2 top-2 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+        <FolderAssign id={design.id} current={folder} folders={folders} onAssign={onAssign} />
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onDelete() }}
+          title="Delete design"
+          className="grid h-7 w-7 place-items-center rounded-md text-text-muted hover:bg-elevated hover:text-error"
+        >
+          <IconTrash size={11} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/** A single design as a table row (list view): thumbnail + name, edited, created, author. */
+function DesignRow({ design, onOpen, onDelete, folders, folder, onAssign }: { design: Design; onOpen: () => void; onDelete: () => void; folders: string[]; folder: string | null; onAssign: (id: string, folder: string | null) => void }): JSX.Element {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    void window.terminal42.designs.listVersions(design.id).then((vs) => {
+      if (cancelled) return
+      const latest = vs[vs.length - 1]
+      setPreviewUrl(latest && latest.kind !== 'pptx' ? latest.fileUrl : latest?.previewUrl ?? null)
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [design.id, design.currentVersion, design.lastActiveAt])
+  return (
+    <div className="group grid grid-cols-[minmax(0,1fr)_140px_140px_160px] items-center gap-4 rounded-lg px-3 py-2 transition-colors hover:bg-elevated">
+      <button type="button" onClick={onOpen} className="flex min-w-0 items-center gap-3 text-left">
+        <span className="relative grid h-10 w-14 shrink-0 place-items-center overflow-hidden rounded-md bg-elevated text-text-muted">
+          {previewUrl
+            ? <div className="pointer-events-none absolute left-0 top-0 origin-top-left bg-white" style={{ width: 1280, height: 800, transform: 'scale(0.044)', transformOrigin: 'top left' }}><iframe src={previewUrl} title={design.title} scrolling="no" className="block h-full w-full border-0 bg-white" /></div>
+            : <IconEdit size={14} />}
+        </span>
+        <span className="min-w-0 truncate text-[13.5px] font-medium text-text-primary">{design.title}</span>
       </button>
+      <span className="truncate text-[12px] text-text-muted">{formatAge(design.lastActiveAt)}</span>
+      <span className="truncate text-[12px] text-text-muted">{formatAge(design.createdAt)}</span>
+      <div className="flex items-center justify-between gap-2">
+        <span className="flex min-w-0 items-center gap-1.5 text-[12px] text-text-muted">
+          <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-elevated text-[9px] font-semibold text-text-secondary">You</span>
+          {folder && <span className="truncate text-text-secondary">{folder}</span>}
+        </span>
+        <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+          <FolderAssign id={design.id} current={folder} folders={folders} onAssign={onAssign} />
+          <button type="button" onClick={(e) => { e.stopPropagation(); onDelete() }} title="Delete design" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-text-muted hover:bg-bg hover:text-error">
+            <IconTrash size={11} />
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -640,7 +746,7 @@ function ConfirmDelete({ design, onCancel, onConfirm }: {
 }): JSX.Element {
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 px-4">
-      <div className="w-full max-w-md rounded-xl bg-surface p-5 shadow-xl">
+      <div className="w-full max-w-md rounded-xl bg-raised p-5 shadow-overlay">
         <h3 className="text-[15px] font-medium text-text-primary">Delete this design?</h3>
         <p className="mt-1.5 text-[13px] text-text-muted">
           “{design.title}” and all its versions will be removed permanently.
@@ -676,37 +782,4 @@ function formatAge(ts: number): string {
   const d = Math.floor(h / 24)
   if (d < 7) return `${d}d ago`
   return new Date(ts).toLocaleDateString()
-}
-
-function FilterChip({ label, active, onClick }: {
-  label: string
-  active: boolean
-  onClick: () => void
-}): JSX.Element {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        'inline-flex items-center rounded-md px-2.5 py-1 text-[11.5px] transition-colors',
-        active
-          ? 'bg-accent/15 text-accent'
-          : 'bg-elevated/60 text-text-secondary hover:bg-elevated hover:text-text-primary'
-      ].join(' ')}
-    >
-      {label}
-    </button>
-  )
-}
-
-function FigmaPillSm(): JSX.Element {
-  return (
-    <svg width="11" height="13" viewBox="0 0 24 32" aria-hidden="true">
-      <path fill="#F24E1E" d="M8 0a4 4 0 0 0 0 8h4V0H8z" />
-      <path fill="#A259FF" d="M8 8a4 4 0 0 0 0 8h4V8H8z" />
-      <path fill="#0ACF83" d="M8 16a4 4 0 0 0 0 8h4v-8H8z" />
-      <path fill="#FF7262" d="M12 0h4a4 4 0 0 1 0 8h-4V0z" />
-      <circle fill="#1ABCFE" cx="16" cy="12" r="4" />
-    </svg>
-  )
 }

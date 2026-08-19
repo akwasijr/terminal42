@@ -197,10 +197,10 @@ function KickoffPromptModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="kickoff-modal-title"
-        className="flex h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-border bg-bg shadow-2xl"
+        className="flex h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-bg shadow-2xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-border px-5 py-3">
+        <div className="flex items-center justify-between px-5 py-3">
           <div>
             <div id="kickoff-modal-title" className="text-sm font-semibold text-text-primary">
               Kickoff prompt
@@ -267,7 +267,7 @@ function KickoffPromptModal({
            `Could not load brief: ${load.message}`}
         </pre>
 
-        <div className="border-t border-border px-5 py-2 text-[11px] text-text-secondary">
+        <div className="px-5 py-2 text-[11px] text-text-secondary">
           Tip: paste inserts the prompt into the active terminal but does not press Enter.
           Review it, then hit Return when you're ready.
         </div>

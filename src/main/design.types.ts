@@ -31,6 +31,7 @@ export type DesignKind =
   | 'infographic' | 'report' | 'chart'
   | 'social-post' | 'social-story' | 'cover-image' | 'ad-banner'
   | 'design-system' | 'component-library' | 'wireframe' | 'mood-board' | 'style-tile' | 'user-flow' | 'sitemap'
+  | 'freeform'
   | 'blank'
 
 export type DesignGroup = 'web' | 'presentation' | 'content' | 'print' | 'data' | 'social' | 'figma' | 'other'

@@ -284,7 +284,7 @@ function AttachMenu({
         <Dropdown.Content
           align="start"
           sideOffset={6}
-          className="z-50 min-w-[180px] rounded-lg bg-elevated p-1 text-[12px] text-text-primary shadow-lg"
+          className="z-50 min-w-[180px] rounded-lg bg-raised p-1 text-[12px] text-text-primary shadow-overlay"
         >
           <Dropdown.Item
             onSelect={() => onAttachFile?.()}

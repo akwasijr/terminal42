@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import type { Design, DesignVersion } from '../../../preload/index'
 import { IconBrain, IconChat, IconChevronRight, IconClose, IconDesktop, IconDownload, IconEdit, IconExternal, IconFluid, IconMobile, IconRefresh, IconSparkle, IconTablet } from './icons'
 import { PencilThinking, pickAnimationForKind } from './PencilThinking'
+import { MotionTimeline } from './MotionTimeline'
+import { MOTION_PRESETS, presetSpec, generateMotionCss, type MotionSpec } from '../lib/motionCss'
+import { SHADER_PRESETS, buildShaderScript, type ShaderConfig, type ShaderId } from '../lib/shaderAssets'
 
 // ─── Viewport profiles per design kind ──────────────────────────────────────
 
@@ -191,6 +194,9 @@ export function DesignCanvas({
   const [busy, setBusy] = useState(false)
   const [phase, setPhase] = useState('Working…')
   const iframeRef = useRef<HTMLIFrameElement>(null)
+  // Scroll position to restore after a live-reload remount, so a streaming new
+  // version keeps the user's place instead of jumping back to the top.
+  const pendingScrollRef = useRef<number | null>(null)
 
   // Brain check state
   const [brainCheckRunning, setBrainCheckRunning] = useState(false)
@@ -232,7 +238,11 @@ export function DesignCanvas({
       setVersions(vs)
       if (latest) {
         setActiveId((prev) => (stickToLatest ? latest.id : (prev ?? latest.id)))
-        if (stickToLatest) setReloadKey((k) => k + 1)
+        if (stickToLatest) {
+          try { pendingScrollRef.current = iframeRef.current?.contentWindow?.scrollY ?? null }
+          catch { pendingScrollRef.current = null }
+          setReloadKey((k) => k + 1)
+        }
       }
     })
     const offStart = window.terminal42.designs.onStart((d) => { if (d.designId === designId) { setBusy(true); setPhase('Starting…') } })
@@ -264,6 +274,27 @@ export function DesignCanvas({
   const [slideCount, setSlideCount] = useState(0)
   const [projectTokens, setProjectTokens] = useState<ProjectToken[]>([])
   const [versionsOpen, setVersionsOpen] = useState(false)
+  // Side-by-side compare: when on, the stage shows two versions next to each
+  // other (read-only). Lazy: the second iframe only mounts while comparing.
+  const [compareMode, setCompareMode] = useState(false)
+  const [compareLeftId, setCompareLeftId] = useState<string | null>(null)
+  // Motion mode: click an element, pick an animation preset that maps to the
+  // page's motion engine. Mutually exclusive with annotate/edit/compare.
+  const [motionMode, setMotionMode] = useState(false)
+  const [motionPick, setMotionPick] = useState<{ selector: string; tag: string } | null>(null)
+  // Baked motion: per-element specs that are written into the design file via the
+  // direct-edit engine (no AI round-trip). `timelineFor` opens the full editor.
+  const [motionMap, setMotionMap] = useState<Record<string, MotionSpec>>({})
+  const [timelineFor, setTimelineFor] = useState<string | null>(null)
+  // Custom shader effects (opt-in): per-element WebGL background, baked as a script.
+  const [shaderMode, setShaderMode] = useState(false)
+  const [shaderPick, setShaderPick] = useState<{ selector: string; shader: ShaderId; color: string; intensity: number } | null>(null)
+  const [shaderMap, setShaderMap] = useState<Record<string, { shader: ShaderId; color: string; intensity: number }>>({})
+  // Motion + shader edits are per-design; clear them when the open design changes.
+  useEffect(() => {
+    setMotionMap({}); setTimelineFor(null); setMotionMode(false)
+    setShaderMap({}); setShaderPick(null); setShaderMode(false)
+  }, [designId])
 
   useEffect(() => {
     let cancelled = false
@@ -307,12 +338,12 @@ export function DesignCanvas({
     const doc = iframeDoc()
     if (!doc) return
     doc.documentElement.classList.toggle('t42-anno', annotate)
-    doc.documentElement.classList.toggle('t42-edit', editMode)
+    doc.documentElement.classList.toggle('t42-edit', editMode || motionMode || shaderMode)
     if (handlersRef.current.click) {
       doc.removeEventListener('click', handlersRef.current.click, true)
     }
     const click = (e: Event): void => {
-      if (!annotate && !editMode) return
+      if (!annotate && !editMode && !motionMode && !shaderMode) return
       const el = e.target as HTMLElement | null
       if (!el || el === doc.documentElement || el === doc.body) return
       e.preventDefault()
@@ -326,11 +357,32 @@ export function DesignCanvas({
         // Mark as selected for visual ring
         doc.querySelectorAll('.t42-selected').forEach((n) => n.classList.remove('t42-selected'))
         el.classList.add('t42-selected')
-        setEditPick({ selector: sel, tag: el.tagName.toLowerCase(), styles: readStyles(el) })
+        setEditPick({ selector: sel, tag: el.tagName.toLowerCase(), styles: readStyles(el), html: el.outerHTML.slice(0, 1000) })
+      } else if (motionMode) {
+        doc.querySelectorAll('.t42-selected').forEach((n) => n.classList.remove('t42-selected'))
+        el.classList.add('t42-selected')
+        setMotionPick({ selector: sel, tag: el.tagName.toLowerCase() })
+      } else if (shaderMode) {
+        doc.querySelectorAll('.t42-selected').forEach((n) => n.classList.remove('t42-selected'))
+        el.classList.add('t42-selected')
+        setShaderPick({ selector: sel, shader: 'grain', color: '#888888', intensity: 0.6 })
       }
     }
     doc.addEventListener('click', click, true)
     handlersRef.current.click = click
+  }
+
+  // Iframe onLoad: rebind our click handlers and restore the pre-reload scroll
+  // position so live updates feel in-place rather than snapping to the top.
+  const onIframeLoad = (): void => {
+    refreshIframeBindings()
+    if (pendingScrollRef.current != null) {
+      const y = pendingScrollRef.current
+      pendingScrollRef.current = null
+      requestAnimationFrame(() => {
+        try { iframeRef.current?.contentWindow?.scrollTo(0, y) } catch { /* cross-origin or gone */ }
+      })
+    }
   }
 
   // Keep DOM in sync with React state. Polls a few times because the
@@ -347,9 +399,11 @@ export function DesignCanvas({
     })
     if (!annotate) { setPick(null); setPickComment('') }
     if (!editMode) { setEditPick(null) }
+    if (!motionMode) { setMotionPick(null) }
+    if (!shaderMode) { setShaderPick(null) }
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [annotate, editMode, activeContent])
+  }, [annotate, editMode, motionMode, shaderMode, activeContent])
 
   // Slide nav: read directly from iframe DOM. Same polling treatment so
   // count populates even if onLoad fires before contentDocument is ready.
@@ -430,8 +484,18 @@ export function DesignCanvas({
   }, [])
 
   // Mutually exclusive overlays
-  const enterAnnotate = (): void => { setEditMode(false); setAnnotate((a) => !a) }
-  const enterEdit     = (): void => { setAnnotate(false); setEditMode((e) => !e) }
+  const enterAnnotate = (): void => { setEditMode(false); setCompareMode(false); setMotionMode(false); setShaderMode(false); setAnnotate((a) => !a) }
+  const enterEdit     = (): void => { setAnnotate(false); setCompareMode(false); setMotionMode(false); setShaderMode(false); setEditMode((e) => !e) }
+  const enterMotion   = (): void => { setAnnotate(false); setEditMode(false); setCompareMode(false); setShaderMode(false); setMotionMode((m) => !m) }
+  const enterShader   = (): void => { setAnnotate(false); setEditMode(false); setCompareMode(false); setMotionMode(false); setShaderMode((s) => !s) }
+  const enterCompare  = (): void => {
+    setAnnotate(false); setEditMode(false); setMotionMode(false); setShaderMode(false)
+    if (!compareMode && !compareLeftId) {
+      const prev = versions[activeIndex - 1] ?? versions[0]
+      if (prev) setCompareLeftId(prev.id)
+    }
+    setCompareMode((c) => !c)
+  }
 
   // Apply a style change to the currently selected element directly.
   const setEditStyle = (prop: string, value: string | number, unit?: string): void => {
@@ -586,6 +650,53 @@ export function DesignCanvas({
   const reload = (): void => setReloadKey((k) => k + 1)
   const openExternal = (): void => { if (active) void window.terminal42.designs.openExternal(active.fileUrl) }
 
+  // ── Motion engine: bake animations straight into the design file ──────────
+  const uniqueName = (sel: string): string => {
+    let h = 0
+    for (let i = 0; i < sel.length; i++) h = (Math.imul(31, h) + sel.charCodeAt(i)) | 0
+    return `t42m_${sel.replace(/[^a-z0-9]/gi, '').slice(0, 16) || 'el'}_${Math.abs(h).toString(36)}`
+  }
+  const bakeMotion = (map: Record<string, MotionSpec>): void => {
+    const css = Object.entries(map)
+      .map(([sel, spec]) => generateMotionCss(sel, spec, { playback: 'once' }))
+      .join('\n\n')
+    void window.terminal42.designs.applyEdit(designId, 't42-motion', css)
+  }
+  const applyMotionPreset = (presetId: string): void => {
+    if (!motionPick) return
+    const sel = motionPick.selector
+    const spec: MotionSpec = { ...presetSpec(presetId), name: uniqueName(sel) }
+    const map = { ...motionMap, [sel]: spec }
+    setMotionPick(null)
+    setMotionMap(map)
+    bakeMotion(map)
+  }
+  const openTimeline = (): void => {
+    if (!motionPick) return
+    setTimelineFor(motionPick.selector)
+    setMotionPick(null)
+  }
+  const applyTimeline = (sel: string, spec: MotionSpec): void => {
+    const named: MotionSpec = { ...spec, name: uniqueName(sel) }
+    const map = { ...motionMap, [sel]: named }
+    setMotionMap(map)
+    bakeMotion(map)
+  }
+
+  // ── Shader engine: bake a WebGL background effect into the design file ─────
+  const bakeShaders = (map: Record<string, { shader: ShaderId; color: string; intensity: number }>): void => {
+    const configs: ShaderConfig[] = Object.entries(map).map(([selector, v]) => ({ selector, ...v }))
+    void window.terminal42.designs.applyEdit(designId, 't42-shader', buildShaderScript(configs), 'script')
+  }
+  const applyShader = (): void => {
+    if (!shaderPick) return
+    const { selector, shader, color, intensity } = shaderPick
+    const map = { ...shaderMap, [selector]: { shader, color, intensity } }
+    setShaderPick(null)
+    setShaderMap(map)
+    bakeShaders(map)
+  }
+
   // ─── Brain Check ────────────────────────────────────────────────────────
   // Dead simple: read the brain markdown, paste it as a prompt in the chat.
   // Same as if the user copied their brain notes and pasted them.
@@ -714,7 +825,7 @@ export function DesignCanvas({
   }
 
   return (
-    <div className="flex h-full w-full flex-col bg-bg">
+    <div className="flex h-full w-full flex-col bg-surface">
       {/* Toolbar — single row containing back, title, reload, version
           picker, viewport tabs, slide nav, zoom, annotate/edit/export
           /figma/open, and close. Replaces the old two-row layout. */}
@@ -912,6 +1023,58 @@ export function DesignCanvas({
             <IconEdit size={12} />
             <span>{editMode ? 'Editing' : 'Edit'}</span>
           </button>
+          <button
+            type="button"
+            onClick={enterCompare}
+            disabled={empty || versions.length < 2 || active?.kind === 'pptx'}
+            title={compareMode ? 'Exit compare' : 'Compare two versions side by side'}
+            className={[
+              'flex h-7 items-center gap-1.5 rounded-md px-2 text-[11.5px] transition-colors disabled:opacity-40',
+              compareMode
+                ? 'bg-accent text-accent-text'
+                : 'text-text-secondary hover:bg-elevated hover:text-text-primary'
+            ].join(' ')}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3" y="4" width="7" height="16" rx="1" />
+              <rect x="14" y="4" width="7" height="16" rx="1" />
+            </svg>
+            <span>{compareMode ? 'Comparing' : 'Compare'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={enterMotion}
+            disabled={empty || active?.kind === 'pptx'}
+            title={motionMode ? 'Exit motion mode' : 'Click an element to add an animation'}
+            className={[
+              'flex h-7 items-center gap-1.5 rounded-md px-2 text-[11.5px] transition-colors disabled:opacity-40',
+              motionMode
+                ? 'bg-accent text-accent-text'
+                : 'text-text-secondary hover:bg-elevated hover:text-text-primary'
+            ].join(' ')}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M5 12h4l2-6 3 14 2-8h3" />
+            </svg>
+            <span>{motionMode ? 'Motion on' : 'Motion'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={enterShader}
+            disabled={empty || active?.kind === 'pptx'}
+            title={shaderMode ? 'Exit shader mode' : 'Click an element to add a shader background'}
+            className={[
+              'flex h-7 items-center gap-1.5 rounded-md px-2 text-[11.5px] transition-colors disabled:opacity-40',
+              shaderMode
+                ? 'bg-accent text-accent-text'
+                : 'text-text-secondary hover:bg-elevated hover:text-text-primary'
+            ].join(' ')}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" /><path d="M12 3a9 9 0 0 0 0 18M5 9h14M5 15h14" />
+            </svg>
+            <span>{shaderMode ? 'Shader on' : 'Shader'}</span>
+          </button>
           {brainCheckRunning ? (
             <button
               type="button"
@@ -973,7 +1136,7 @@ export function DesignCanvas({
       </div>
 
       {/* Stage */}
-      <div ref={stageRef} className="relative flex flex-1 items-center justify-center overflow-auto bg-bg p-4">
+      <div ref={stageRef} className="relative flex flex-1 items-center justify-center overflow-auto rounded-panel bg-bg p-4">
         {editMode && (
           <EditInspector
             pick={editPick}
@@ -986,8 +1149,75 @@ export function DesignCanvas({
             onTokenChange={setProjectToken}
           />
         )}
+        {shaderPick && (
+          <div className="absolute right-4 top-4 z-30 w-[260px] rounded-lg bg-raised p-3 shadow-overlay">
+            <div className="mb-2 flex items-center gap-2 text-[11.5px] text-text-muted">
+              <span className="truncate rounded bg-elevated px-1.5 py-0.5 font-mono text-text-secondary">{shaderPick.selector}</span>
+            </div>
+            <div className="mb-1.5 text-[11px] text-text-muted">Shader effect</div>
+            <div className="mb-2 grid grid-cols-3 gap-1">
+              {SHADER_PRESETS.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setShaderPick((s) => (s ? { ...s, shader: p.id } : s))}
+                  className={[
+                    'rounded-md px-2 py-1.5 text-[11px] transition-colors',
+                    shaderPick.shader === p.id ? 'bg-accent text-accent-text' : 'bg-elevated text-text-primary hover:bg-elevated/70'
+                  ].join(' ')}
+                >{p.label}</button>
+              ))}
+            </div>
+            <label className="mb-2 flex items-center justify-between gap-2 text-[11.5px] text-text-muted">
+              <span>Tint</span>
+              <input type="color" value={shaderPick.color} onChange={(e) => setShaderPick((s) => (s ? { ...s, color: e.target.value } : s))} className="h-6 w-10 cursor-pointer rounded bg-transparent" />
+            </label>
+            <label className="mb-2 flex items-center justify-between gap-2 text-[11.5px] text-text-muted">
+              <span>Intensity</span>
+              <input type="range" min={0.1} max={1} step={0.05} value={shaderPick.intensity} onChange={(e) => setShaderPick((s) => (s ? { ...s, intensity: parseFloat(e.target.value) } : s))} className="w-28" />
+            </label>
+            <div className="mt-1 flex justify-end gap-2">
+              <button type="button" onClick={() => setShaderPick(null)} className="rounded-md px-2 py-1 text-[11.5px] text-text-secondary hover:bg-elevated hover:text-text-primary">Cancel</button>
+              <button type="button" onClick={applyShader} className="rounded-md bg-accent px-2.5 py-1 text-[11.5px] font-medium text-accent-text hover:opacity-90">Apply</button>
+            </div>
+          </div>
+        )}
+        {motionPick && (
+          <div className="absolute right-4 top-4 z-30 w-[260px] rounded-lg bg-raised p-3 shadow-overlay">
+            <div className="mb-2 flex items-center gap-2 text-[11.5px] text-text-muted">
+              <span className="truncate rounded bg-elevated px-1.5 py-0.5 font-mono text-text-secondary">{motionPick.selector}</span>
+            </div>
+            <div className="mb-1.5 text-[11px] text-text-muted">Add an animation</div>
+            <div className="flex flex-col gap-1">
+              {MOTION_PRESETS.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => applyMotionPreset(p.id)}
+                  className="flex items-center justify-between rounded-md bg-elevated px-2.5 py-1.5 text-left text-[12px] text-text-primary transition-colors hover:bg-accent hover:text-accent-text"
+                >
+                  <span>{p.label}</span>
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={openTimeline}
+                className="mt-1 flex items-center justify-between rounded-md border border-accent/40 px-2.5 py-1.5 text-left text-[12px] text-accent transition-colors hover:bg-accent hover:text-accent-text"
+              >
+                <span>Custom timeline…</span>
+              </button>
+            </div>
+            <div className="mt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setMotionPick(null)}
+                className="rounded-md px-2 py-1 text-[11.5px] text-text-secondary hover:bg-elevated hover:text-text-primary"
+              >Close</button>
+            </div>
+          </div>
+        )}
         {pick && (
-          <div className="absolute right-4 top-4 z-30 w-[300px] rounded-lg bg-surface p-3 shadow-xl">
+          <div className="absolute right-4 top-4 z-30 w-[300px] rounded-lg bg-raised p-3 shadow-overlay">
             <div className="mb-2 flex items-center gap-2 text-[11.5px] text-text-muted">
               <span className="rounded bg-elevated px-1.5 py-0.5 font-mono text-text-secondary">{pick.selector}</span>
             </div>
@@ -1020,6 +1250,16 @@ export function DesignCanvas({
         )}
         {empty
           ? (busy ? <CanvasGenerating phase={phase} variant={pickAnimationForKind(design?.brief?.kind)} /> : <CanvasEmpty />)
+          : compareMode && active && active.kind !== 'pptx' && versions.length >= 2
+            ? (
+              <DesignCompare
+                designId={designId}
+                versions={versions}
+                leftId={compareLeftId ?? versions[Math.max(0, activeIndex - 1)]?.id ?? active.id}
+                rightId={active.id}
+                onLeftChange={setCompareLeftId}
+              />
+            )
           : active
             ? active.kind === 'pptx'
               ? (
@@ -1058,7 +1298,7 @@ export function DesignCanvas({
                     ref={iframeRef}
                     srcDoc={activeContent}
                     title="Design preview"
-                    onLoad={refreshIframeBindings}
+                    onLoad={onIframeLoad}
                     className="block border-0 bg-white"
                     style={{
                       width:  viewport.width,
@@ -1076,7 +1316,7 @@ export function DesignCanvas({
                     ref={iframeRef}
                     srcDoc={activeContent}
                     title="Design preview"
-                    onLoad={refreshIframeBindings}
+                    onLoad={onIframeLoad}
                     className="block border-0 bg-white"
                     style={{
                       width:  typeof zoom === 'number' ? `${100 / zoom}%` : '100%',
@@ -1088,6 +1328,15 @@ export function DesignCanvas({
                 </div>
               )
             : null}
+        {timelineFor && (
+          <MotionTimeline
+            selector={timelineFor}
+            initial={motionMap[timelineFor] ?? null}
+            getDoc={iframeDoc}
+            onApply={(spec) => applyTimeline(timelineFor, spec)}
+            onClose={() => setTimelineFor(null)}
+          />
+        )}
       </div>
       {figmaDialogOpen && (
         <FigmaSendDialog
@@ -1214,7 +1463,7 @@ function ExportMenu({ designId, disabled }: { designId: string; disabled: boolea
         {formats.length > 1 && <span className="text-[9px] opacity-70">▾</span>}
       </button>
       {open && formats.length > 0 && (
-        <div className="absolute right-0 top-full z-30 mt-1 min-w-[180px] overflow-hidden rounded-md bg-surface shadow-lg">
+        <div className="absolute right-0 top-full z-30 mt-1 min-w-[180px] overflow-hidden rounded-md bg-raised shadow-overlay">
           {formats.map((f) => (
             <button
               key={f}
@@ -1428,7 +1677,7 @@ function classifyToken(value: string): 'color' | 'number' | 'text' {
 }
 
 function ToolbarDivider(): JSX.Element {
-  return <span aria-hidden="true" className="mx-2 h-4 w-px bg-border/60" />
+  return <span aria-hidden="true" className="mx-2" />
 }
 
 function FigmaPill(): JSX.Element {
@@ -1470,7 +1719,7 @@ function FigmaSendDialog({ designTitle: _designTitle, onCancel, onSend }: {
       className="fixed inset-0 z-[150] grid place-items-center bg-black/50 p-6"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel() }}
     >
-      <div className="w-[440px] max-w-full overflow-hidden rounded-xl bg-surface shadow-2xl">
+      <div className="w-[440px] max-w-full overflow-hidden rounded-xl bg-raised shadow-overlay">
         <header className="flex items-center justify-between gap-3 px-5 pb-1 pt-4">
           <div className="flex items-center gap-2">
             <FigmaPill />
@@ -1561,8 +1810,8 @@ function ModeRow({ id, label, selected, onSelect }: {
     >
       <span
         className={[
-          'grid h-3.5 w-3.5 flex-shrink-0 place-items-center rounded-full border',
-          selected ? 'border-accent' : 'border-text-muted/50'
+          'grid h-3.5 w-3.5 flex-shrink-0 place-items-center rounded-full',
+          selected ? 't42-dot-on' : 't42-dot-empty'
         ].join(' ')}
       >
         {selected && <span className="h-1.5 w-1.5 rounded-full bg-accent" />}
@@ -1583,6 +1832,64 @@ function ModeRow({ id, label, selected, onSelect }: {
 // CSS-only injector: paints the hover/selected outlines for Annotate and
 // Edit modes. Click handling now happens in the parent via direct
 // contentDocument access (much more reliable than postMessage).
+function DesignCompare({ designId, versions, leftId, rightId, onLeftChange }: {
+  designId: string
+  versions: DesignVersion[]
+  leftId: string
+  rightId: string
+  onLeftChange: (id: string) => void
+}): JSX.Element {
+  const [leftHtml, setLeftHtml] = useState('')
+  const [rightHtml, setRightHtml] = useState('')
+  const left = versions.find((v) => v.id === leftId) ?? null
+  const right = versions.find((v) => v.id === rightId) ?? null
+
+  useEffect(() => {
+    let cancelled = false
+    const load = async (v: DesignVersion | null, set: (s: string) => void): Promise<void> => {
+      if (!v || v.kind === 'pptx') { set(''); return }
+      const res = await window.terminal42.designs.readVersion(designId, v.fileName)
+      if (!cancelled) set(res.ok ? res.content : `<!doctype html><pre style="padding:24px;font:13px ui-monospace">Failed to load: ${res.error}</pre>`)
+    }
+    void load(left, setLeftHtml)
+    void load(right, setRightHtml)
+    return () => { cancelled = true }
+  }, [designId, leftId, rightId])
+
+  const cell = (v: DesignVersion | null, html: string, header: JSX.Element): JSX.Element => (
+    <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg bg-white shadow-md">
+      <div className="flex items-center justify-between gap-2 bg-elevated/60 px-2.5 py-1.5 text-[11.5px] text-text-secondary">
+        {header}
+        <span className="shrink-0 text-text-muted">{v ? new Date(v.modifiedAt).toLocaleTimeString() : ''}</span>
+      </div>
+      <iframe
+        srcDoc={html}
+        title={`Compare ${v?.fileName ?? ''}`}
+        sandbox="allow-same-origin allow-scripts"
+        className="block w-full flex-1 border-0 bg-white"
+      />
+    </div>
+  )
+
+  return (
+    <div className="absolute inset-0 flex gap-3 p-4">
+      {cell(left, leftHtml, (
+        <select
+          value={leftId}
+          onChange={(e) => onLeftChange(e.target.value)}
+          className="max-w-[60%] truncate rounded bg-elevated px-1.5 py-0.5 text-[11.5px] text-text-primary focus:outline-none"
+          title="Compare against"
+        >
+          {versions.filter((v) => v.kind !== 'pptx').map((v) => (
+            <option key={v.id} value={v.id}>{v.fileName}</option>
+          ))}
+        </select>
+      ))}
+      {cell(right, rightHtml, <span className="font-medium text-text-primary">Latest · {right?.fileName}</span>)}
+    </div>
+  )
+}
+
 function injectAnnotator(html: string): string {
   const css = `
 <style>
@@ -1712,6 +2019,7 @@ type EditPick = {
   selector: string
   tag: string
   styles: ElementStyles
+  html?: string
 }
 
 function injectEditor(html: string): string {
@@ -1734,7 +2042,7 @@ function EditInspector({ pick, onChange, onChangeText, onClose, onSync, hasChang
   useEffect(() => { if (pick) setTab('element') }, [pick?.selector])
 
   return (
-    <div className="absolute right-3 top-3 bottom-3 z-30 flex w-[280px] flex-col overflow-hidden rounded-lg bg-surface shadow-xl">
+    <div className="absolute right-3 top-3 bottom-3 z-30 flex w-[280px] flex-col overflow-hidden rounded-lg bg-raised shadow-overlay">
       {/* Tab strip */}
       <div className="flex items-center gap-1 px-3 pt-2.5">
         <button
@@ -1798,6 +2106,12 @@ function ElementInspector({ pick, onChange, onChangeText }: {
         <span className="rounded bg-elevated px-1.5 py-0.5 text-[10.5px] font-mono text-text-secondary">{pick.tag}</span>
         <span className="truncate text-[11.5px] text-text-muted" title={pick.selector}>{pick.selector}</span>
       </div>
+
+      {pick.html && (
+        <Section title="Code">
+          <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-all rounded-md bg-elevated px-2 py-1.5 font-mono text-[10.5px] leading-relaxed text-text-secondary">{pick.html}</pre>
+        </Section>
+      )}
 
       {s.isText && (
         <Section title="Text">
@@ -2209,7 +2523,7 @@ function VersionPicker({ versions, activeId, onPick, open, setOpen }: {
         <span className="text-[8px] opacity-70">▾</span>
       </button>
       {open && (
-        <div className="absolute left-0 top-full z-30 mt-1 max-h-[260px] min-w-[140px] overflow-y-auto rounded-md bg-surface py-1 shadow-lg">
+        <div className="absolute left-0 top-full z-30 mt-1 max-h-[260px] min-w-[140px] overflow-y-auto rounded-md bg-raised py-1 shadow-overlay">
           {[...versions].reverse().map((v) => (
             <button
               key={v.id}

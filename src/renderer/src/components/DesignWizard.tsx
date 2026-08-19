@@ -123,7 +123,7 @@ function DecideForMe({ state, set, field, onPick }: {
     >
       <span className={[
         'grid h-3.5 w-3.5 place-items-center rounded-sm border transition-colors',
-        on ? 'border-accent bg-accent text-accent-text' : 'border-text-muted/40 bg-transparent'
+        on ? 'border-accent bg-accent text-accent-text' : 'bg-transparent'
       ].join(' ')}>
         {on && (
           <svg viewBox="0 0 12 12" width="9" height="9" aria-hidden="true">
@@ -1021,7 +1021,7 @@ function PageSubtype({ state, set }: PageProps): JSX.Element {
               {multi && (
                 <span className={[
                   'grid h-3.5 w-3.5 flex-shrink-0 place-items-center rounded-sm border transition-colors',
-                  selected ? 'border-accent bg-accent text-accent-text' : 'border-text-muted/40 bg-transparent'
+                  selected ? 'border-accent bg-accent text-accent-text' : 'bg-transparent'
                 ].join(' ')}>
                   {selected && (
                     <svg viewBox="0 0 12 12" width="9" height="9" aria-hidden="true">
@@ -1556,7 +1556,7 @@ function PageFonts({ state, set }: PageProps): JSX.Element {
       >
         <span className={[
           'mt-0.5 grid h-4 w-4 flex-shrink-0 place-items-center rounded-sm border transition-colors',
-          customActive ? 'border-accent bg-accent text-accent-text' : 'border-text-muted/40 bg-transparent'
+          customActive ? 'border-accent bg-accent text-accent-text' : 'bg-transparent'
         ].join(' ')}>
           {customActive && (
             <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true">
@@ -2529,7 +2529,7 @@ function PageInspiration({ state, set }: PageProps): JSX.Element {
               'mt-0.5 grid h-4 w-4 flex-shrink-0 place-items-center rounded-sm border transition-colors',
               state.useTemplateLook
                 ? 'border-accent bg-accent text-accent-text'
-                : 'border-text-muted/40 bg-transparent'
+                : 'bg-transparent'
             ].join(' ')}>
               {state.useTemplateLook && (
                 <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true">
@@ -2751,7 +2751,7 @@ function PageDefaults({ state, set }: PageProps): JSX.Element {
                     onClick={() => toggle(r.id)}
                     className={[
                       'flex w-full items-start justify-between gap-3 px-3 py-2.5 text-left transition-colors',
-                      i > 0 ? 'border-t border-bg/40' : '',
+                      i > 0 ? '' : '',
                       on ? 'hover:bg-elevated/70' : 'opacity-60 hover:opacity-90'
                     ].join(' ')}
                   >
@@ -2865,7 +2865,7 @@ function FigmaModeRow({ label, hint, selected, onSelect }: {
         selected ? 'bg-accent/15 ring-1 ring-accent/40' : 'bg-elevated/40 hover:bg-elevated/70'
       ].join(' ')}
     >
-      <span className={['mt-1 grid h-3.5 w-3.5 flex-shrink-0 place-items-center rounded-full border', selected ? 'border-accent' : 'border-text-muted/50'].join(' ')}>
+      <span className={['mt-1 grid h-3.5 w-3.5 flex-shrink-0 place-items-center rounded-full', selected ? 't42-dot-on' : 't42-dot-empty'].join(' ')}>
         {selected && <span className="h-1.5 w-1.5 rounded-full bg-accent" />}
       </span>
       <span className="min-w-0 flex-1">
@@ -2966,7 +2966,7 @@ function PageSummary({ state, set }: { state: DesignWizardState; set: <K extends
         />
       </div>
 
-      <div className="rounded-md border border-border/30 bg-elevated/30 px-3 py-3">
+      <div className="rounded-md bg-elevated/30 px-3 py-3">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="text-[12.5px] font-medium text-text-primary">Preview the full prompt</div>
@@ -2975,7 +2975,7 @@ function PageSummary({ state, set }: { state: DesignWizardState; set: <K extends
           <button
             type="button"
             onClick={() => setShowPrompt(true)}
-            className="shrink-0 rounded-md border border-border/50 bg-bg px-3 py-1.5 text-[12px] font-medium text-text-primary hover:bg-elevated"
+            className="shrink-0 rounded-md bg-bg px-3 py-1.5 text-[12px] font-medium text-text-primary hover:bg-elevated"
           >
             View prompt
           </button>

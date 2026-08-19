@@ -328,7 +328,7 @@ export function SkillsView({
             activeProjectId={activeProjectId ?? null}
             onChange={setDraftScope}
           />
-          <span className="h-4 w-px bg-border" />
+          <span className="w-1" />
           <div className="flex flex-1 flex-wrap items-center gap-1.5 min-w-0">
             <span className="text-text-muted">Tags</span>
             {draftTags.map((t) => (
@@ -398,7 +398,7 @@ export function SkillsView({
         {varDialog && (
           <div className="absolute inset-0 z-50 grid place-items-center bg-black/40" onClick={() => setVarDialog(null)}>
             <div
-              className="w-[420px] rounded-md bg-surface p-5 shadow-lg"
+              className="w-[420px] rounded-md bg-raised p-5 shadow-overlay"
               onClick={(e) => e.stopPropagation()}
               role="dialog"
               aria-label="Fill in variables"
@@ -581,7 +581,7 @@ export function SkillsView({
             </div>
 
             {allTags.length > 0 && (
-              <div className="mt-10 border-t border-border pt-5">
+              <div className="mt-10 pt-5">
                 <div className="mb-2 text-[10px] font-semibold text-text-muted">Tags</div>
                 <div className="flex flex-wrap gap-1.5">
                   {allTags.map((t) => (
@@ -647,7 +647,7 @@ function FormatTab({ label, count, active, onClick }: { label: string; count: nu
         'flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ' +
         (active
           ? 'border-accent/40 bg-accent/10 text-text-primary'
-          : 'border-border bg-transparent text-text-secondary hover:bg-elevated hover:text-text-primary')
+          : 'bg-transparent text-text-secondary hover:bg-elevated hover:text-text-primary')
       }
     >
       <span>{label}</span>

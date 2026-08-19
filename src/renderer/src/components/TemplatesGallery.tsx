@@ -136,7 +136,7 @@ export function TemplatesGallery({ onUse }: { onUse: (t: TemplateInfo) => void }
                   type="button"
                   onClick={(e) => { e.stopPropagation(); void generate(t.id) }}
                   title={ps.status === 'error' ? 'Retry preview' : 'Generate preview'}
-                  className="absolute right-2 top-2 rounded-md bg-bg/85 px-2 py-1 text-[10.5px] font-medium text-text-primary opacity-0 shadow-sm ring-1 ring-border-default transition-opacity hover:bg-elevated group-hover:opacity-100"
+                  className="absolute right-2 top-2 rounded-md bg-bg/85 px-2 py-1 text-[10.5px] font-medium text-text-primary opacity-0 shadow-sm -default transition-opacity hover:bg-elevated group-hover:opacity-100"
                 >
                   {ps.status === 'error' ? 'Retry' : 'Generate'}
                 </button>
@@ -176,7 +176,7 @@ function PreviewModal({
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-bg/80 p-6 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-surface shadow-xl"
+        className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-raised shadow-overlay"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="flex items-start justify-between px-5 py-3">

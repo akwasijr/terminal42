@@ -9,6 +9,11 @@ import { extractPptxFacts, pptxFactsToPrompt, type PptxFacts } from './pptx'
 import { pptxToPdf } from './render'
 import { getSettings } from './settings'
 import { lintHtml, buildFixPrompt } from './lintHtml'
+import { buildFoundationBlock } from './designFoundation'
+import { AI_RULES, formatRulesForPrompt } from '../renderer/src/lib/aiRules'
+import { upsertManagedBlock } from './htmlBlocks'
+import { buildEngineBaseBlock, ENGINE_USAGE, ENGINE_BASE_ID, ENGINE_MOTION_ID } from './designAssets'
+import { pickVariety } from './designVariety'
 import {
   type ExportFormat,
   extFor,
@@ -154,6 +159,40 @@ async function buildTemplatePreviewFallback(designId: string, userText: string):
   return createStarterTemplateVersion(designId, userText, { addWatermark: true })
 }
 
+// Write a full HTML document as a new version directly (used by the freeform
+// canvas export). Unlike applyDesignEdit this does not require a prior version.
+async function writeDesignHtml(designId: string, html: string): Promise<DesignVersion | null> {
+  const d = getDesign(designId)
+  if (!d) return null
+  await fs.mkdir(d.cwd, { recursive: true })
+  const nextFile = `v${String(nextVersionNumber(designId)).padStart(3, '0')}.html`
+  await fs.writeFile(join(d.cwd, nextFile), html, 'utf8')
+  setCurrentVersion(designId, nextFile.replace(/\.html$/i, ''))
+  return listVersions(designId).find((v) => v.fileName === nextFile) ?? null
+}
+
+// Direct "bake" engine: write an edit straight into the design file as a new
+// version, with NO AI round-trip. Used by the in-app Motion editor and inspector
+// so changes are real, deterministic, and instantly versioned. The edit lives in
+// a managed <style data-t42-block="..."> block that is replaced on each apply.
+async function applyDesignEdit(designId: string, blockId: string, content: string, tag: 'style' | 'script' = 'style'): Promise<DesignVersion | null> {
+  const d = getDesign(designId)
+  if (!d) return null
+  const versions = listVersions(designId)
+  const latest = versions[versions.length - 1]
+  if (!latest || latest.kind !== 'html') return null
+
+  let html = ''
+  try { html = await fs.readFile(latest.filePath, 'utf8') } catch { return null }
+
+  html = upsertManagedBlock(html, blockId, content, tag)
+
+  const nextFile = `v${String(nextVersionNumber(designId)).padStart(3, '0')}.html`
+  await fs.writeFile(join(d.cwd, nextFile), html, 'utf8')
+  setCurrentVersion(designId, nextFile.replace(/\.html$/i, ''))
+  return listVersions(designId).find((v) => v.fileName === nextFile) ?? null
+}
+
 function escapeHtml(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
@@ -174,22 +213,132 @@ function summariseBrief(b: DesignBrief | null): string {
 }
 
 
-function buildStarterPrefix(_cwd: string, _brief: DesignBrief): string {
-  return ''
+/** The rule ids the user is enforcing for this design (all rules if unset). */
+function enabledRuleIds(brief: DesignBrief | null): string[] {
+  if (brief?.aiRules) {
+    return Object.keys(brief.aiRules).filter((id) => brief.aiRules![id] !== false)
+  }
+  return AI_RULES.map((r) => r.id)
+}
+
+function buildStarterPrefix(cwd: string, brief: DesignBrief): string {
+  const blocks: string[] = []
+  blocks.push(
+    buildFoundationBlock({ look: brief.look ?? null, designSystem: brief.designSystem ?? null, theme: brief.theme ?? null }),
+  )
+  blocks.push(
+    `You are adapting the ${brief.starterTemplateName ?? 'starter'} template whose files already live in this folder (${cwd}). Read them first, keep their structure and engineering quality, and adapt the content, copy, palette, fonts and imagery to the brief below. Do not rebuild from scratch and do not regress the existing quality.`,
+  )
+  const briefLines = summariseBriefForPrompt(brief)
+  if (briefLines.length) blocks.push(['BRIEF', ...briefLines].join('\n'))
+  const rules = formatRulesForPrompt(enabledRuleIds(brief))
+  if (rules) blocks.push(rules)
+  return blocks.filter(Boolean).join('\n\n')
 }
 
 function buildPrefix(
-  _versionFileName: string,
-  _brief: DesignBrief | null,
-  _previousVersionFileName: string | null = null,
-  _pptxFacts: PptxFacts | null = null
+  versionFileName: string,
+  brief: DesignBrief | null,
+  previousVersionFileName: string | null = null,
+  pptxFacts: PptxFacts | null = null,
 ): string {
-  // Build your own design system prompt here.
-  return ''
+  const blocks: string[] = []
+  blocks.push(
+    buildFoundationBlock({ look: brief?.look ?? null, designSystem: brief?.designSystem ?? null, theme: brief?.theme ?? null }),
+  )
+
+  const briefLines = summariseBriefForPrompt(brief)
+  if (briefLines.length) blocks.push(['BRIEF', ...briefLines].join('\n'))
+
+  const rules = formatRulesForPrompt(enabledRuleIds(brief))
+  if (rules) blocks.push(rules)
+
+  if (pptxFacts) {
+    blocks.push('A reference template has been analyzed; its facts live in _tpl/_facts.md in this folder. Match its structure where it is relevant.')
+  }
+
+  // Web pages get the variety direction (so we do not churn out the same look)
+  // and the engine base (so motion, tokens, spacing and reduced-motion are real
+  // code the page builds on, not re-derived). Email and non-web kinds skip both.
+  const isWeb = !!brief && brief.group === 'web' && brief.kind !== 'email'
+  if (isWeb) {
+    blocks.push(pickVariety(brief).text)
+    blocks.push(
+      `ENGINE BASE (use exactly this, do not modify it)\n` +
+        `The page must include this engine base: put the <style id="${ENGINE_BASE_ID}"> in <head> and the <script id="${ENGINE_MOTION_ID}"> just before </body>. If a previous version already contains them, keep them byte-for-byte. Build the page using their tokens, classes and data-attributes.\n\n` +
+        `${buildEngineBaseBlock()}\n\n${ENGINE_USAGE}`,
+    )
+  }
+
+  const out: string[] = ['OUTPUT']
+  if (previousVersionFileName) {
+    out.push(
+      `This is an iteration. Read ${previousVersionFileName} in this folder, apply the request and the rules above, and save the result as a single self-contained HTML file named ${versionFileName}.`,
+    )
+  } else {
+    out.push(
+      `Produce the design as a single, self-contained HTML file named ${versionFileName}: all CSS inline in a <style> block, no build step and no external JS dependencies. Web fonts and images loaded by URL are fine.`,
+    )
+  }
+  out.push('It must be responsive, accessible, and follow every rule above.')
+  blocks.push(out.join('\n'))
+
+  return blocks.filter(Boolean).join('\n\n')
 }
 
-function summariseBriefForPrompt(_b: DesignBrief | null): string[] {
-  return []
+function summariseBriefForPrompt(b: DesignBrief | null): string[] {
+  if (!b) return []
+  const lines: string[] = []
+  const add = (label: string, value?: string | null): void => {
+    if (value != null && String(value).trim()) lines.push(`- ${label}: ${String(value).trim()}`)
+  }
+
+  add('What', b.kindLabel || b.kind)
+  add('Subtype', b.subtype)
+  add('Surface', b.surface)
+  add('Fidelity', b.fidelity === 'wireframe' ? 'wireframe' : 'high fidelity')
+  add('Audience', b.audience)
+
+  if (b.paletteColors && b.paletteColors.length) add('Palette', b.paletteColors.join(', '))
+  else {
+    const cols = [b.primaryColor, b.secondaryColor, b.accentColor].filter(Boolean) as string[]
+    if (cols.length) add('Colors', cols.join(', '))
+    else add('Palette', b.paletteLabel)
+  }
+
+  const fonts = [b.fontHeading || b.fontPrimary, b.fontBody || b.fontSecondary].filter(Boolean) as string[]
+  if (fonts.length) add('Fonts', fonts.join(' + '))
+  else if (b.fontPrimaryLabel || b.fontPairId) add('Fonts', b.fontPrimaryLabel || b.fontPairId)
+  add('Custom fonts', b.customFonts)
+
+  add('Theme', b.theme)
+  add('Density', b.density)
+  add('Spacing', b.spacing)
+  add('Grid', b.grid)
+  add('Motion', b.customMotion || b.motion)
+
+  const shape = [
+    b.shapeRadiusLabel || b.shapeRadius,
+    b.shapeShadowLabel || b.shapeShadow,
+    b.shapeBordersLabel || b.shapeBorders,
+    b.shapeSurfaceLabel || b.shapeSurface,
+  ].filter(Boolean) as string[]
+  if (shape.length) add('Shape', shape.join(', '))
+  add('Secondary button', b.secondaryButtonLabel || b.secondaryButton)
+  add('Icons', b.iconStyleLabel || b.iconLibraryLabel)
+  add('Stack', b.customStack || b.stackLabel || b.stack)
+
+  add('Idea', b.idea)
+  add('Description', b.contextDescription)
+  add('Problem', b.contextProblem)
+  add('Goal', b.contextGoal)
+  add('Key features', b.contextKeyFeatures)
+  add('Success', b.contextSuccess)
+  add('Inspiration', b.inspiration)
+  if (b.decisions && b.decisions.length) add('Decisions', b.decisions.join('; '))
+  add('Also avoid', b.customAvoid)
+
+  return lines
 }
 
 function emit(win: BrowserWindow | null, channel: string, payload: unknown): void {
@@ -1179,7 +1328,27 @@ export function registerDesignIpc(getWin: () => BrowserWindow | null): void {
     }
   })
   ipcMain.handle('designs:rename', (_e, args: { id: string; title: string }) => renameDesign(args.id, args.title))
+  ipcMain.handle('designs:applyEdit', async (_e, args: { designId: string; blockId: string; css: string; tag?: 'style' | 'script' }) => {    try {
+      const latest = await applyDesignEdit(args.designId, args.blockId, args.css, args.tag ?? 'style')
+      const versions = listVersions(args.designId)
+      if (latest) getWin()?.webContents.send('design:version', { designId: args.designId, latest, versions })
+      return { ok: !!latest, latest, versions }
+    } catch (e) {
+      return { ok: false, error: String((e as Error).message || e), latest: null, versions: [] }
+    }
+  })
   ipcMain.handle('designs:delete', async (_e, id: string) => deleteDesign(id))
+
+  ipcMain.handle('designs:writeHtml', async (_e, args: { designId: string; html: string }) => {
+    try {
+      const latest = await writeDesignHtml(args.designId, args.html)
+      const versions = listVersions(args.designId)
+      if (latest) getWin()?.webContents.send('design:version', { designId: args.designId, latest, versions })
+      return { ok: !!latest, latest, versions }
+    } catch (e) {
+      return { ok: false, error: String((e as Error).message || e), latest: null, versions: [] }
+    }
+  })
 
   ipcMain.handle('designs:importFolder', async () => {
     const result = await dialog.showOpenDialog({ properties: ['openDirectory'] })

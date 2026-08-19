@@ -205,9 +205,9 @@ export function ProjectWorkspace({
   if (!project) return <NoProject />
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden bg-bg">
-      <div className="flex flex-1 overflow-hidden">
-        <main className="flex flex-1 flex-col overflow-hidden bg-bg">
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex flex-1 gap-[var(--gutter)] overflow-hidden p-[var(--gutter)]">
+        <main className="flex flex-1 flex-col overflow-hidden rounded-panel bg-bg">
           <SessionTabs
             sessions={sessions}
             activeId={active?.id ?? null}
@@ -376,7 +376,7 @@ function SessionTabs({
                   }
                   if (e.key === 'Escape') setEditingId(null)
                 }}
-                className="w-[140px] rounded-sm border border-border bg-bg px-1 py-0.5 text-[12px] text-text-primary focus:outline-none"
+                className="w-[140px] rounded-sm bg-bg px-1 py-0.5 text-[12px] text-text-primary focus:outline-none"
               />
             ) : (
               <button
@@ -418,7 +418,7 @@ function SessionTabs({
 function NoProject() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-3 bg-bg text-center">
-      <div className="grid h-12 w-12 place-items-center rounded-md border border-border bg-surface text-text-secondary">
+      <div className="grid h-12 w-12 place-items-center rounded-md bg-surface text-text-secondary">
         <IconTerminal size={20} />
       </div>
       <h1 className="text-[16px] font-semibold text-text-primary">No project open</h1>

@@ -92,13 +92,13 @@ export function StarterPackModal({
   return (
     <div className="fixed inset-0 z-[100] grid place-items-center bg-black/50 p-6" onClick={onClose} role="presentation">
       <div
-        className="flex h-[82vh] w-[1000px] max-w-full flex-col overflow-hidden rounded-lg border border-border bg-bg shadow-xl"
+        className="flex h-[82vh] w-[1000px] max-w-full flex-col overflow-hidden rounded-lg bg-bg shadow-xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-labelledby="starter-pack-title"
       >
         {/* Header */}
-        <div className="flex items-start justify-between gap-3 border-b border-border px-6 py-4">
+        <div className="flex items-start justify-between gap-3 px-6 py-4">
           <div>
             <h2 id="starter-pack-title" className="text-[16px] font-semibold text-text-primary">
               Starter pack
@@ -120,14 +120,14 @@ export function StarterPackModal({
 
         {/* Body: domain list + preview */}
         <div className="flex flex-1 overflow-hidden">
-          <div className="flex w-[440px] shrink-0 flex-col overflow-y-auto border-r border-border">
+          <div className="flex w-[440px] shrink-0 flex-col overflow-y-auto">
             {groupedByDomain.map(([domain, items]) => {
               const isCollapsed = collapsed.has(domain)
               const eligible = items.filter((it) => !existingNames.has(it.name.toLowerCase()))
               const allOn = eligible.length > 0 && eligible.every((it) => selected.has(it.name))
               const someOn = eligible.some((it) => selected.has(it.name))
               return (
-                <div key={domain} className="border-b border-border last:border-0">
+                <div key={domain} className="last:border-0">
                   <div className="flex items-center justify-between gap-2 bg-surface/50 px-4 py-2.5">
                     <button
                       type="button"
@@ -217,7 +217,7 @@ export function StarterPackModal({
           <div className="flex flex-1 flex-col overflow-hidden">
             {preview ? (
               <>
-                <div className="border-b border-border px-5 py-3">
+                <div className="px-5 py-3">
                   <div className="flex items-center gap-2">
                     <span className="rounded-sm bg-elevated px-1.5 py-0.5 text-[10px] text-text-muted">
                       {FORMAT_LABEL[preview.format]}
@@ -249,7 +249,7 @@ export function StarterPackModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between gap-3 border-t border-border px-6 py-3">
+        <div className="flex items-center justify-between gap-3 px-6 py-3">
           <span className="text-[12px] text-text-muted">
             {selectedNew} new selected · {selected.size} total selected
           </span>
@@ -257,7 +257,7 @@ export function StarterPackModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md border border-border px-3 py-1.5 text-[12px] text-text-secondary hover:bg-elevated hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="rounded-md px-3 py-1.5 text-[12px] text-text-secondary hover:bg-elevated hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
               Cancel
             </button>
