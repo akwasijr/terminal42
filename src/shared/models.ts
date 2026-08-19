@@ -105,3 +105,91 @@ export function resolveModelAgainst(
 
   return null
 }
+
+/**
+ * Splits a model ID into the family it belongs to and its version.
+ *
+ * The version is whichever dotted number appears in the ID; everything else,
+ * in order, is the family. That keeps `gpt-5.6-sol` and `gpt-5.4-mini` in
+ * different families while making `gemini-3.7-flash` a strictly newer
+ * `gemini-flash` than `gemini-3.5-flash`.
+ *
+ * Deriving this from the ID rather than a maintained table is the point: the
+ * catalog is fetched live, so a model that ships tomorrow has to rank
+ * correctly without anyone editing this file.
+ */
+export function parseModelVersion(id: string): { family: string; version: number[] } {
+  const parts = id.split('-')
+  const version: number[] = []
+  const family: string[] = []
+  for (const part of parts) {
+    // Only the first numeric token is the version. A trailing "1m" or similar
+    // is a variant marker, not a newer release.
+    if (!version.length && /^\d+(\.\d+)*$/.test(part)) {
+      version.push(...part.split('.').map(Number))
+    } else {
+      family.push(part)
+    }
+  }
+  return { family: family.join('-'), version }
+}
+
+/** Newest first. Compares version components numerically, not as text. */
+export function compareModelRecency(a: string, b: string): number {
+  const va = parseModelVersion(a).version
+  const vb = parseModelVersion(b).version
+  const len = Math.max(va.length, vb.length)
+  for (let i = 0; i < len; i++) {
+    const d = (vb[i] ?? 0) - (va[i] ?? 0)
+    if (d !== 0) return d
+  }
+  return a.localeCompare(b)
+}
+
+/**
+ * Trims the catalog to the few models per provider anyone actually picks.
+ *
+ * The full entitlement list runs past twenty entries, most of them older
+ * revisions of something already in the list. Selecting the newest of each
+ * family first (rather than simply the newest N) is what stops Anthropic's
+ * slots being spent on three generations of Opus while Sonnet and Haiku fall
+ * off the end.
+ *
+ * `keepId` pins the current selection so a session on an older model never
+ * shows an empty picker.
+ */
+export function shortlistModels(
+  models: DisplayModel[],
+  perGroup = 3,
+  keepId?: string | null
+): DisplayModel[] {
+  const byGroup = new Map<string, DisplayModel[]>()
+  for (const m of models) {
+    const list = byGroup.get(m.group) ?? []
+    list.push(m)
+    byGroup.set(m.group, list)
+  }
+
+  const picked: DisplayModel[] = []
+  for (const [, list] of byGroup) {
+    const newestPerFamily = new Map<string, DisplayModel>()
+    for (const m of [...list].sort((a, b) => compareModelRecency(a.id, b.id))) {
+      const { family } = parseModelVersion(m.id)
+      if (!newestPerFamily.has(family)) newestPerFamily.set(family, m)
+    }
+    picked.push(
+      ...[...newestPerFamily.values()]
+        .sort((a, b) => compareModelRecency(a.id, b.id))
+        .slice(0, perGroup)
+    )
+  }
+
+  if (keepId && !picked.some((m) => m.id === keepId)) {
+    const pinned = models.find((m) => m.id === keepId)
+    if (pinned) picked.push(pinned)
+  }
+
+  return picked.sort(
+    (a, b) => compareGroups(a.group, b.group) || compareModelRecency(a.id, b.id)
+  )
+}

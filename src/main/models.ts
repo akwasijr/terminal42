@@ -14,6 +14,7 @@ import { ipcMain, app, type BrowserWindow } from 'electron'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { FALLBACK_MODELS, inferGroup, resolveModelAgainst, type DisplayModel } from '../shared/models'
+import { resolveCopilotLauncher } from './copilotCli'
 
 export type { DisplayModel }
 
@@ -55,11 +56,17 @@ function looksSane(models: DisplayModel[]): boolean {
 async function fetchLiveModels(): Promise<DisplayModel[]> {
   // Imported lazily so a missing/broken optional dependency never breaks
   // app startup — only the (already backgrounded) refresh call fails.
-  const { CopilotClient } = await import('@github/copilot-sdk')
-  // No explicit connection: the SDK spawns its bundled runtime. An earlier
-  // `cliPath: 'copilot'` option here was silently ignored (the SDK dropped
-  // that field), so this is the transport that has actually been in use.
-  const client = new CopilotClient()
+  const { CopilotClient, RuntimeConnection } = await import('@github/copilot-sdk')
+  // Point the SDK at the `copilot` shim rather than letting it default to the
+  // bundled .js runtime. The default makes it spawn process.execPath — the
+  // Electron binary — which the macOS keychain then treats as the process
+  // asking for the stored credential. An ad-hoc signed dev build has no
+  // stable identity to pin an ACL to, so "Always Allow" never sticks and the
+  // prompt returns on every refresh. The shim runs under real node instead.
+  const launcher = resolveCopilotLauncher()
+  const client = launcher
+    ? new CopilotClient({ connection: RuntimeConnection.forStdio({ path: launcher }) })
+    : new CopilotClient()
   try {
     await client.start()
     const models = await client.listModels()

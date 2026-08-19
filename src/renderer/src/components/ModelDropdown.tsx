@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import * as Dropdown from '@radix-ui/react-dropdown-menu'
 import { IconChevronRight, IconRefresh } from './icons'
-import { FALLBACK_MODELS, compareGroups, type DisplayModel } from '../../../shared/models'
+import { FALLBACK_MODELS, compareGroups, shortlistModels, type DisplayModel } from '../../../shared/models'
 
 // Baseline shown before the live catalog (fetched from the Copilot CLI via
 // main/models.ts) loads, and used as a safety-net fallback if that fetch is
@@ -119,10 +119,24 @@ export function ModelDropdown({
 }) {
   const current = MODELS.find((m) => m.id === value)
   const [open, setOpen] = useState(false)
-  const groups = Array.from(new Set(MODELS.map((m) => m.group))).sort(compareGroups)
+  // The full entitlement list runs past twenty entries, most of them older
+  // revisions of a model already shown. Default to the current few per
+  // provider and let the rest be revealed on request.
+  const [showAll, setShowAll] = useState(false)
+  const visible = showAll ? MODELS : shortlistModels(MODELS, 3, value)
+  const hiddenCount = MODELS.length - visible.length
+  const groups = Array.from(new Set(visible.map((m) => m.group))).sort(compareGroups)
 
   return (
-    <Dropdown.Root open={open} onOpenChange={setOpen}>
+    <Dropdown.Root
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next)
+        // Reopening should start from the short list again rather than
+        // remembering a one-off look at everything.
+        if (!next) setShowAll(false)
+      }}
+    >
       <Dropdown.Trigger asChild>
         <button
           type="button"
@@ -148,7 +162,7 @@ export function ModelDropdown({
                 <ProviderLogo provider={g} />
                 <span>{g}</span>
               </div>
-              {MODELS.filter((m) => m.group === g).map((m) => (
+              {visible.filter((m) => m.group === g).map((m) => (
                 <Dropdown.Item
                   key={m.id}
                   onSelect={() => onPick(m.id)}
@@ -163,6 +177,20 @@ export function ModelDropdown({
               ))}
             </div>
           ))}
+          {hiddenCount > 0 && (
+            <Dropdown.Item
+              // Radix menus use roving focus across items, so this has to be
+              // an Item to be arrow-key reachable. preventDefault stops the
+              // menu closing on what is really an in-place expand.
+              onSelect={(e) => {
+                e.preventDefault()
+                setShowAll(true)
+              }}
+              className="mt-1 flex cursor-pointer items-center rounded-md px-2 py-1.5 text-[11px] text-text-muted outline-none transition-colors hover:bg-surface hover:text-text-secondary data-[highlighted]:bg-surface data-[highlighted]:text-text-secondary"
+            >
+              Show {hiddenCount} older {hiddenCount === 1 ? 'model' : 'models'}
+            </Dropdown.Item>
+          )}
           {onRestart && (
             <>
               <div className="my-1.5" />
