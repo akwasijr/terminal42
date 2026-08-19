@@ -200,6 +200,26 @@ export async function writeMemory(body: string): Promise<void> {
   indexQuietly(getActivePersonaId(), body)
 }
 
+/**
+ * Indexes every persona's Brain on startup.
+ *
+ * The recall index was only ever written on save, so Brain content that
+ * predates the index simply was not in it: recall returned nothing and the
+ * whole feature looked broken while appearing wired up. Indexing is a diff
+ * against stored content hashes, so re-running it each launch is cheap and
+ * also self-heals an index deleted or corrupted out from under us.
+ */
+export async function backfillMemoryIndex(): Promise<void> {
+  for (const persona of PERSONAS) {
+    try {
+      const body = await fs.readFile(personaMemoryPath(persona.id), 'utf8')
+      if (body.trim()) indexQuietly(persona.id, body)
+    } catch {
+      // A persona with no Brain file yet is normal, not an error.
+    }
+  }
+}
+
 export function recallBrain(query: string, options: MemoryRecallOptions = {}): MemoryRecallResult[] {
   if (!query.trim()) return []
   return recallMemory(query, options)

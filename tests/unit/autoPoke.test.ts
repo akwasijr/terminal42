@@ -133,3 +133,47 @@ describe('auto-poke bookkeeping', () => {
     expect(writeAgentPoke).toHaveBeenCalled()
   })
 })
+
+describe('error-aware continuation', () => {
+  it('stops when the session ended on an unrecoverable error', () => {
+    snapshotSessions.mockReturnValue([
+      session({ scrollbackTail: 'Error: 401 Unauthorized - authentication failed\n> ' })
+    ])
+    runAutoPokeTick(noWindow)
+    expect(writeAgentPoke).not.toHaveBeenCalled()
+  })
+
+  it('continues when the session ended on a transient network failure', () => {
+    snapshotSessions.mockReturnValue([
+      session({ scrollbackTail: 'Error: ECONNRESET, please try again\n> ' })
+    ])
+    runAutoPokeTick(noWindow)
+    expect(writeAgentPoke).toHaveBeenCalled()
+  })
+
+  // The window matters: without it, one auth failure early in a long session
+  // would suppress auto-continue for the rest of that session's life.
+  it('ignores an old error that has scrolled out of the recent window', () => {
+    const stale = `401 Unauthorized${'\n'.repeat(50)}${'x'.repeat(4000)}\nall done here\n> `
+    snapshotSessions.mockReturnValue([session({ scrollbackTail: stale })])
+    runAutoPokeTick(noWindow)
+    expect(writeAgentPoke).toHaveBeenCalled()
+  })
+
+  it('reports why it declined, so a quiet feature is still observable', async () => {
+    const { getAutoPokeStatus } = await import('../../src/main/autoPoke')
+    snapshotSessions.mockReturnValue([
+      session({ scrollbackTail: 'Error: quota exceeded\n> ' })
+    ])
+    runAutoPokeTick(noWindow)
+    expect(getAutoPokeStatus('s1').lastReason).toMatch(/\S/)
+    expect(getAutoPokeStatus('s1').pokes).toBe(0)
+  })
+
+  it('counts pokes it actually made', async () => {
+    const { getAutoPokeStatus } = await import('../../src/main/autoPoke')
+    runAutoPokeTick(noWindow)
+    expect(getAutoPokeStatus('s1').pokes).toBe(1)
+    expect(getAutoPokeStatus('s1').lastReason).toBeNull()
+  })
+})

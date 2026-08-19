@@ -4,7 +4,8 @@ import { snapshotSessions, writeAgentPoke } from './pty'
 import { readTodoCounts, SESSION_STATE_DIR } from './tasks'
 import { getSettings } from './settings'
 import { classifyStatus } from '../shared/agentStatus'
-import { shouldPoke, type PokeRecord, type PokeDecision } from '../shared/pokePolicy'
+import { classifyCliError } from '../shared/cliErrors'
+import { shouldPoke, describeSkip, type PokeRecord, type PokeDecision } from '../shared/pokePolicy'
 
 // Resumes agent sessions that stopped with work still on their todo list.
 //
@@ -21,7 +22,13 @@ import { shouldPoke, type PokeRecord, type PokeDecision } from '../shared/pokePo
 // notice silence, so a plain interval is simpler and no less responsive.
 const POLL_MS = 5000
 
-type SessionHistory = { history: PokeRecord[] }
+// Errors are judged on a much shorter window than the status tail. An
+// authentication failure from an hour ago that the user has since fixed must
+// not pin the session as fatal for the rest of its life, so only the end of
+// the most recent turn is considered.
+const ERROR_WINDOW_CHARS = 2000
+
+type SessionHistory = { history: PokeRecord[]; lastReason: string | null }
 
 const state = new Map<string, SessionHistory>()
 let timer: NodeJS.Timeout | null = null
@@ -49,9 +56,21 @@ export function evaluateSession(
     lastOutputAt: session.lastOutputAt,
     lastUserInputAt: session.lastInputAt,
     status: classifyStatus(session.scrollbackTail),
+    errorKind: classifyCliError(session.scrollbackTail.slice(-ERROR_WINDOW_CHARS)),
     counts,
     history: state.get(session.id)?.history ?? []
   })
+}
+
+/**
+ * What auto-continue is currently doing, for display.
+ *
+ * A feature that silently declines to act is indistinguishable from one that
+ * is broken, so the reason it last stood down has to be observable.
+ */
+export function getAutoPokeStatus(sessionId: string): { pokes: number; lastReason: string | null } {
+  const entry = state.get(sessionId)
+  return { pokes: entry?.history.length ?? 0, lastReason: entry?.lastReason ?? null }
 }
 
 /** Exported so the wiring can be tested without a real PTY or timers. */
@@ -80,7 +99,14 @@ export function runAutoPokeTick(getWindow: () => BrowserWindow | null): void {
       // A locked or half-written session.db must never take down the loop.
       continue
     }
-    if (!decision.poke) continue
+    if (!decision.poke) {
+      // Remember why, so the UI can explain a quiet auto-continue instead of
+      // leaving the user to guess whether it is working.
+      const entry = state.get(session.id)
+      if (entry) entry.lastReason = describeSkip(decision.reason)
+      else state.set(session.id, { history: [], lastReason: describeSkip(decision.reason) })
+      continue
+    }
 
     const counts = readTodoCounts(join(SESSION_STATE_DIR, session.copilotSessionId, 'session.db'))
     // Send the text and the newline separately: some prompts submit on the
@@ -89,8 +115,9 @@ export function runAutoPokeTick(getWindow: () => BrowserWindow | null): void {
     if (!writeAgentPoke(session.id, decision.message)) continue
     writeAgentPoke(session.id, '\r')
 
-    const entry = state.get(session.id) ?? { history: [] }
+    const entry = state.get(session.id) ?? { history: [], lastReason: null }
     entry.history.push({ at: now, doneAtPoke: counts.done })
+    entry.lastReason = null
     // Only the recent tail informs the progress check; unbounded growth would
     // leak for long-lived sessions.
     if (entry.history.length > 10) entry.history.shift()

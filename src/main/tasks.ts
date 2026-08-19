@@ -151,7 +151,7 @@ function readTasksFromDB(dbPath: string): Task[] {
   }
 }
 
-async function readTasksFor(copilotSessionId?: string | null): Promise<Task[]> {
+export async function readTasksFor(copilotSessionId?: string | null): Promise<Task[]> {
   // Strict per-session: only return tasks for the CURRENT linked Copilot session.
   // No global "freshest" fallback: that leaked tasks from unrelated sessions and confused users.
   if (!copilotSessionId) return []

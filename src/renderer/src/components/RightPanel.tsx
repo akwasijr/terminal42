@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Task, ContextUsage } from '../../../preload/index'
 import { IconExternal } from './icons'
+import { InfoRail } from './InfoRail'
+import { EMPTY_INSIGHTS, type SessionInsights } from '../../../shared/sessionInsights'
 
 function shortPath(p: string | null | undefined): string {
   if (!p) return ':'
@@ -16,7 +18,7 @@ function shortModel(m: string | null | undefined): string {
     .replace(/-internal$/, '')
 }
 
-type RightTab = 'status' | 'actions' | 'activity'
+type RightTab = 'status' | 'actions' | 'activity' | 'harness'
 const LS_RIGHT_TAB = 't42:rightpanel:tab'
 
 export function RightPanel({
@@ -40,7 +42,7 @@ export function RightPanel({
   const [tab, setTab] = useState<RightTab>(() => {
     try {
       const v = localStorage.getItem(LS_RIGHT_TAB)
-      if (v === 'status' || v === 'actions' || v === 'activity') return v
+      if (v === 'status' || v === 'actions' || v === 'activity' || v === 'harness') return v
     } catch {}
     return 'status'
   })
@@ -76,6 +78,7 @@ export function RightPanel({
         {tab === 'activity' && (
           <ActivityBlock sessionId={viewedSessionId} isOtherSession={viewedSessionId !== sessionId} />
         )}
+        {tab === 'harness' && <SessionInsightsBlock sessionId={sessionId} />}
       </div>
     </aside>
   )
@@ -85,7 +88,8 @@ function RightTabs({ tab, onChange }: { tab: RightTab; onChange: (t: RightTab) =
   const tabs: { id: RightTab; label: string }[] = [
     { id: 'status', label: 'Status' },
     { id: 'actions', label: 'Actions' },
-    { id: 'activity', label: 'Activity' }
+    { id: 'activity', label: 'Activity' },
+    { id: 'harness', label: 'Harness' }
   ]
   return (
     <div className="shrink-0 px-3 pt-3 pb-2">
@@ -768,3 +772,49 @@ function Empty({ children }: { children: React.ReactNode }) {
   return <div className="rounded-md border border-dashed px-3 py-3 text-center text-[12px] text-text-muted">{children}</div>
 }
 
+
+/**
+ * Live view of the agent harness for the active session.
+ *
+ * Polled rather than pushed: the underlying numbers come from three
+ * independent subsystems (the CLI's todo database, auto-continue's in-memory
+ * state, and the last message's memory recall), and none of them share a
+ * change event. A short interval is simpler than inventing one.
+ */
+function SessionInsightsBlock({ sessionId }: { sessionId: string | null }): JSX.Element {
+  const [copilotId, setCopilotId] = useState<string | null>(null)
+  const [insights, setInsights] = useState<SessionInsights>(EMPTY_INSIGHTS)
+  const [usage, setUsage] = useState<ContextUsage | null>(null)
+
+  useEffect(() => {
+    if (!sessionId) { setCopilotId(null); return }
+    void window.terminal42.sessions.get(sessionId).then((s) => setCopilotId(s?.copilot_session_id ?? null))
+    const off = window.terminal42.pty.onLinked((p) => {
+      if (p.id === sessionId) setCopilotId(p.copilotSessionId)
+    })
+    return off
+  }, [sessionId])
+
+  useEffect(() => {
+    let cancelled = false
+    const load = (): void => {
+      void window.terminal42.sessionInsights
+        .get(copilotId, sessionId)
+        .then((next) => { if (!cancelled) setInsights(next) })
+        .catch(() => {})
+      void window.terminal42.copilot
+        .contextUsage(copilotId)
+        .then((u) => { if (!cancelled) setUsage(u) })
+        .catch(() => {})
+    }
+    load()
+    const t = setInterval(load, 5000)
+    return () => { cancelled = true; clearInterval(t) }
+  }, [copilotId, sessionId])
+
+  if (!sessionId) {
+    return <p className="px-1 py-2 text-[12px] text-text-muted">Open a session to see its harness.</p>
+  }
+
+  return <InfoRail insights={insights} contextUsage={usage} />
+}

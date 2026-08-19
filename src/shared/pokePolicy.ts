@@ -18,6 +18,7 @@
 // something they never saw.
 
 import type { AgentStatus } from './agentStatus'
+import { pokeAllowedForError, type CliErrorKind } from './cliErrors'
 
 export type TodoCounts = {
   in_progress: number
@@ -45,6 +46,13 @@ export type PokeSignals = {
   status: AgentStatus
   counts: TodoCounts
   history: PokeRecord[]
+  /**
+   * What the session's recent output says about why it stopped.
+   *
+   * Optional because absence of information is genuinely 'unknown', which is
+   * also the normal case: most turns end with no error text at all.
+   */
+  errorKind?: CliErrorKind
 }
 
 export type PokeDecision =
@@ -60,6 +68,7 @@ export type PokeSkipReason =
   | 'user-active'
   | 'cooldown'
   | 'no-progress'
+  | 'fatal-error'
 
 // A turn's output can pause while the model thinks or a tool runs, so the
 // quiet period has to be long enough not to mistake a pause for an ending.
@@ -104,6 +113,14 @@ export function shouldPoke(signals: PokeSignals): PokeDecision {
 
   if (!signals.enabled) return { poke: false, reason: 'disabled' }
 
+  // Checked before anything else because a fatal error makes every other
+  // signal irrelevant: an expired token or an exhausted quota will fail
+  // identically on every retry, so continuing spends money to reproduce the
+  // same error. This is the difference between persistence and a runaway loop.
+  if (!pokeAllowedForError(signals.errorKind ?? 'unknown')) {
+    return { poke: false, reason: 'fatal-error' }
+  }
+
   // With no todo list there is no evidence of unfinished work, and a poke
   // would just be nagging.
   if (counts.total === 0) return { poke: false, reason: 'no-todos' }
@@ -145,5 +162,6 @@ export function describeSkip(reason: PokeSkipReason): string {
     case 'user-active': return 'You are using this session'
     case 'cooldown': return 'Waiting after the last nudge'
     case 'no-progress': return 'Nudging stopped: no progress was made'
+    case 'fatal-error': return 'Stopped: the session hit an error that retrying will not fix'
   }
 }

@@ -162,3 +162,34 @@ describe('describeSkip', () => {
     }
   })
 })
+
+describe('fatal error handling', () => {
+  it('pokes normally when no error is present', () => {
+    expect(shouldPoke(signals({ errorKind: 'unknown' })).poke).toBe(true)
+  })
+
+  it('still pokes after a transient failure, which is the case worth retrying', () => {
+    expect(shouldPoke(signals({ errorKind: 'transient' })).poke).toBe(true)
+  })
+
+  it('refuses to poke after a fatal error', () => {
+    expect(skipReason({ errorKind: 'fatal' })).toBe('fatal-error')
+  })
+
+  // Being off is the more fundamental fact, and reporting 'fatal-error' for a
+  // feature the user never enabled would be actively confusing.
+  it('reports disabled ahead of a fatal error', () => {
+    expect(skipReason({ enabled: false, errorKind: 'fatal' })).toBe('disabled')
+  })
+
+  it('treats a missing errorKind as unknown rather than blocking', () => {
+    const s = signals()
+    delete s.errorKind
+    expect(shouldPoke(s).poke).toBe(true)
+  })
+
+  it('explains the fatal skip in human terms', () => {
+    expect(describeSkip('fatal-error')).toMatch(/\S/)
+    expect(describeSkip('fatal-error')).not.toBe(describeSkip('no-progress'))
+  })
+})

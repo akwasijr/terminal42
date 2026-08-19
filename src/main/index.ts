@@ -13,11 +13,12 @@ import { registerRecipesIpc } from './recipes'
 import { registerBrainIpc } from './brain'
 import { registerBriefIpc } from './brief'
 import { registerGitIpc } from './git'
-import { registerMemoryIpc } from './memory'
+import { registerMemoryIpc, backfillMemoryIndex } from './memory'
 import { registerFilesIpc } from './files'
 import { registerVoiceIpc } from './voice'
 import { registerSettingsIpc } from './settings'
 import { registerInsightsIpc, stopInsightsScheduler } from './insights'
+import { registerSessionInsightsIpc } from './sessionInsights'
 import { registerTasksIpc, stopTasksWatcher } from './tasks'
 import { startAutoPoke, stopAutoPoke } from './autoPoke'
 import { registerActivityIpc } from './activity'
@@ -321,6 +322,10 @@ app.whenReady().then(() => {
   }
   buildAppMenu()
   registerPtyIpc(() => mainWindow)
+  registerSessionInsightsIpc()
+  // Fire and forget: recall is an enhancement, and blocking window creation on
+  // it would trade a visible startup delay for an invisible benefit.
+  void backfillMemoryIndex()
   registerProjectIpc(() => mainWindow)
   registerComposerIpc()
   registerChatIpc(() => mainWindow)

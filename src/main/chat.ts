@@ -4,6 +4,9 @@ import { randomUUID } from 'node:crypto'
 import { getDb } from './db'
 import { resolveModel } from './models'
 import { assembleCacheStableMessages, flattenPromptCacheMessages } from '../shared/promptCache'
+import { buildMemoryContext } from './memoryContext'
+import { recordMemoryUse } from './sessionInsights'
+import { reframeGoal, renderGoalReframePrompt } from '../shared/goalReframe'
 
 export type ChatRole = 'user' | 'assistant' | 'system'
 export type ChatStatus = 'pending' | 'streaming' | 'done' | 'error' | 'cancelled'
@@ -262,6 +265,18 @@ function send(
     ].join('\n')
   }
 
+  // Recalled Brain notes. This is background the agent would otherwise have to
+  // be told again every session, so it belongs in the stable prefix ahead of
+  // the request. buildMemoryContext returns a null block when nothing clears
+  // its relevance floor, which is the common case and must stay silent.
+  const memory = buildMemoryContext(text)
+  recordMemoryUse(resume ?? sessionId, memory.used.length)
+
+  // When the goal has nothing measurable in it, say so before the request
+  // rather than after: the model should read the request already knowing it
+  // needs a metric. Returns '' for goals that already pass the gate.
+  const reframe = renderGoalReframePrompt(reframeGoal(text))
+
   // Ordered from most stable to most volatile so the longest possible prefix
   // is byte-identical between turns. The user's text stays last: this is
   // flattened into a single --prompt string, so anything appended after it
@@ -270,7 +285,9 @@ function send(
     stablePrefix: [
       { role: 'system', content: modePrefix },
       ...(figmaPrefix ? [{ role: 'system' as const, content: figmaPrefix }] : []),
-      ...(opts.prefix ? [{ role: 'system' as const, content: opts.prefix }] : [])
+      ...(opts.prefix ? [{ role: 'system' as const, content: opts.prefix }] : []),
+      ...(memory.block ? [{ role: 'system' as const, content: memory.block }] : []),
+      ...(reframe ? [{ role: 'system' as const, content: reframe }] : [])
     ],
     history: [],
     currentTurn: { role: 'user', content: text }

@@ -1,4 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
+import type { SessionInsights } from '../shared/sessionInsights'
+
+export type { SessionInsights }
 
 export type Project = {
   id: string
@@ -983,6 +986,13 @@ const api = {
       onChannel(`tasks:update:${copilotSessionId}`, cb),
     onSessionsChanged: (cb: (sessions: CopilotSessionInfo[]) => void) =>
       onChannel('tasks:sessionsChanged', cb)
+  },
+  sessionInsights: {
+    get: (
+      copilotSessionId: string | null,
+      terminalSessionId?: string | null
+    ): Promise<SessionInsights> =>
+      ipcRenderer.invoke('sessionInsights:get', copilotSessionId, terminalSessionId ?? null)
   },
   copilot: {
     contextUsage: (copilotSessionId: string | null): Promise<ContextUsage | null> =>
