@@ -5,7 +5,7 @@ import { join } from 'path'
 import * as os from 'os'
 import Database from 'better-sqlite3'
 
-const SESSION_STATE_DIR = join(os.homedir(), '.copilot', 'session-state')
+export const SESSION_STATE_DIR = join(os.homedir(), '.copilot', 'session-state')
 
 export type TaskStatus = 'pending' | 'in_progress' | 'done' | 'blocked'
 export type Task = {
@@ -43,7 +43,7 @@ function parseWorkspaceYaml(body: string): { name?: string; cwd?: string; update
   return out
 }
 
-function readTodoCounts(dbPath: string): CopilotSessionInfo['counts'] {
+export function readTodoCounts(dbPath: string): CopilotSessionInfo['counts'] {
   const empty = { in_progress: 0, pending: 0, done: 0, blocked: 0, total: 0 }
   try {
     const db = new Database(dbPath, { readonly: true, fileMustExist: true })

@@ -18,6 +18,7 @@ type Session = {
   command: string
   startedAt: number
   lastInputAt: number
+  lastOutputAt: number
   lastNotifiedAt: number
   label: string
   copilotSessionId: string | null
@@ -190,6 +191,54 @@ export function writeToSession(id: string, data: string): boolean {
   return true
 }
 
+/**
+ * Everything the auto-continue policy needs about a live session.
+ *
+ * Exposed as one snapshot rather than a set of getters so the policy always
+ * sees a self-consistent view: sampling `lastOutputAt` and the scrollback at
+ * different moments could report a session as quiet while its own tail shows
+ * it mid-turn.
+ */
+export function snapshotSessions(): {
+  id: string
+  copilotSessionId: string | null
+  lastInputAt: number
+  lastOutputAt: number
+  scrollbackTail: string
+}[] {
+  const out: ReturnType<typeof snapshotSessions> = []
+  for (const s of sessions.values()) {
+    out.push({
+      id: s.id,
+      copilotSessionId: s.copilotSessionId,
+      lastInputAt: s.lastInputAt,
+      lastOutputAt: s.lastOutputAt,
+      // Only the tail matters and the buffer can be megabytes, so avoid
+      // copying it all on every poll.
+      scrollbackTail: (scrollback.get(s.id) || '').slice(-8000)
+    })
+  }
+  return out
+}
+
+/**
+ * Writes on behalf of the auto-continue policy.
+ *
+ * Deliberately separate from writeToSession: this must NOT count as user
+ * input. Treating our own nudge as the user typing would suppress the very
+ * "user is active" guard that stops us typing over someone's work.
+ */
+export function writeAgentPoke(id: string, data: string): boolean {
+  const s = sessions.get(id)
+  if (!s) return false
+  try {
+    s.proc.write(data)
+    return true
+  } catch {
+    return false
+  }
+}
+
 function maybeNotify(s: Session, getWindow: () => BrowserWindow | null): void {
   const settings = getSettings()
   if (!settings.notificationsEnabled) return
@@ -264,6 +313,7 @@ export function registerPtyIpc(getWindow: () => BrowserWindow | null): void {
       command: cmd,
       startedAt: now,
       lastInputAt: now,
+      lastOutputAt: now,
       lastNotifiedAt: 0,
       label: args.label || 'Session',
       copilotSessionId: null,
@@ -290,6 +340,7 @@ export function registerPtyIpc(getWindow: () => BrowserWindow | null): void {
       safeSend(win, `pty:activityHistory:${args.id}`, session.activityHistory)
     }
     proc.onData((data) => {
+      session.lastOutputAt = Date.now()
       appendLog(args.id, data)
       appendScrollback(args.id, data)
       safeSend(getWindow(), `pty:data:${args.id}`, data)

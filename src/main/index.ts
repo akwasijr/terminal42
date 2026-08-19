@@ -19,6 +19,7 @@ import { registerVoiceIpc } from './voice'
 import { registerSettingsIpc } from './settings'
 import { registerInsightsIpc, stopInsightsScheduler } from './insights'
 import { registerTasksIpc, stopTasksWatcher } from './tasks'
+import { startAutoPoke, stopAutoPoke } from './autoPoke'
 import { registerActivityIpc } from './activity'
 import { registerSearchIpc } from './search'
 import { registerVizTweakIpc } from './viztweak'
@@ -339,6 +340,7 @@ app.whenReady().then(() => {
   initModelCatalog(() => mainWindow)
   registerInsightsIpc(() => mainWindow)
   registerTasksIpc(() => mainWindow)
+  startAutoPoke(() => mainWindow)
   registerSearchIpc()
   registerVizTweakIpc()
   registerBrowserStateIpc()
@@ -405,6 +407,7 @@ app.on('before-quit', (event) => {
   killAllDesignRuns()
   stopAllDesignWatchers()
   stopTasksWatcher()
+  stopAutoPoke()
   stopInsightsScheduler()
   stopModelCatalog()
   shutdownLog()

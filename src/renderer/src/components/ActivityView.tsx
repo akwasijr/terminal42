@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ActivitySummary, CopilotSessionInfo, Design, Task } from '../../../preload/index'
 import { IconRefresh, IconArrowUp, IconStop, IconSparkle } from './icons'
-import { classifyStatus, lastAssistantLine, tailLines, type AgentStatus } from '../lib/agentStatus'
+import { classifyStatus, lastAssistantLine, tailLines, type AgentStatus } from '../../../shared/agentStatus'
 
 type ContentTab = 'sessions' | 'designs' | 'tasks' | 'usage'
 

@@ -2,6 +2,7 @@ import { ipcMain, app, shell, BrowserWindow } from 'electron'
 import { promises as fs, watch as fsWatch, type FSWatcher } from 'fs'
 import { join } from 'path'
 import { getDb } from './db'
+import { indexMemoryMarkdown, recallMemory, type MemoryRecallOptions, type MemoryRecallResult } from './memoryRecall'
 
 export type PersonaId = string
 
@@ -169,12 +170,23 @@ async function ensureExists(): Promise<void> {
     try {
       const body = await fs.readFile(legacyMemoryPath(), 'utf8')
       await fs.writeFile(p, body, 'utf8')
+      indexQuietly(id, body)
       // Leave legacy file in place for safety; future writes go to persona path
       return
     } catch {}
   }
 
-  await fs.writeFile(p, SEEDS[id] ?? SEEDS.me, 'utf8')
+  const seed = SEEDS[id] ?? SEEDS.me
+  await fs.writeFile(p, seed, 'utf8')
+  indexQuietly(id, seed)
+}
+
+// Indexing is an enhancement on top of the Brain file. The file is always
+// written first, so a failure here must never surface as a failed save.
+function indexQuietly(personaId: string, body: string): void {
+  try {
+    indexMemoryMarkdown(personaId, body)
+  } catch {}
 }
 
 export async function readMemory(): Promise<string> {
@@ -185,6 +197,26 @@ export async function readMemory(): Promise<string> {
 export async function writeMemory(body: string): Promise<void> {
   await ensureExists()
   await fs.writeFile(memoryPath(), body, 'utf8')
+  indexQuietly(getActivePersonaId(), body)
+}
+
+export function recallBrain(query: string, options: MemoryRecallOptions = {}): MemoryRecallResult[] {
+  if (!query.trim()) return []
+  return recallMemory(query, options)
+}
+
+function parseRecallArgs(args: unknown): ({ query: string } & MemoryRecallOptions) | null {
+  if (!args || typeof args !== 'object') return null
+  const candidate = args as { query?: unknown; limit?: unknown; minScore?: unknown; personaIds?: unknown }
+  if (typeof candidate.query !== 'string') return null
+  return {
+    query: candidate.query,
+    limit: typeof candidate.limit === 'number' ? candidate.limit : undefined,
+    minScore: typeof candidate.minScore === 'number' ? candidate.minScore : undefined,
+    personaIds: Array.isArray(candidate.personaIds)
+      ? candidate.personaIds.filter((id): id is string => typeof id === 'string')
+      : undefined
+  }
 }
 
 export async function captureToMemory(text: string, source?: string): Promise<void> {
@@ -224,7 +256,12 @@ function startWatching(): void {
     try {
       watcher = fsWatch(memoryPath(), { persistent: false }, () => {
         if (watchTimer) clearTimeout(watchTimer)
-        watchTimer = setTimeout(() => notifyChanged('memory:changed'), 150)
+        watchTimer = setTimeout(() => {
+          void fs.readFile(memoryPath(), 'utf8')
+            .then((body) => indexQuietly(getActivePersonaId(), body))
+            .catch(() => {})
+            .finally(() => notifyChanged('memory:changed'))
+        }, 150)
       })
     } catch {}
   })
@@ -244,6 +281,10 @@ export function registerMemoryIpc(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle('memory:capture', (_e, args: { text: string; source?: string }) =>
     captureToMemory(args.text, args.source)
   )
+  ipcMain.handle('memory:recall', (_e, args: unknown) => {
+    const parsed = parseRecallArgs(args)
+    return parsed ? recallBrain(parsed.query, parsed) : []
+  })
   ipcMain.handle('memory:reveal', async () => {
     await ensureExists()
     shell.showItemInFolder(memoryPath())
@@ -264,4 +305,3 @@ export function registerMemoryIpc(getWindow: () => BrowserWindow | null): void {
 
   startWatching()
 }
-

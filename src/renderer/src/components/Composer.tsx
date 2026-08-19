@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as Dropdown from '@radix-ui/react-dropdown-menu'
 import { IconArrowUp, IconMic, IconPlus, IconStop } from './icons'
 import { ModelDropdown } from './ModelDropdown'
 import { ModePicker, getDefaultMode, persistMode, type AgentMode } from './ModePicker'
 import { ContextRing } from './ContextRing'
 import { useVoiceInput, formatVoiceTime, isVoiceInputSupported } from '../lib/voice'
+import { analyzeGoalQuality, shouldShowGoalQualityHint } from '../../../shared/goalQuality'
+import { GoalHint } from './GoalHint'
 
 // Legacy local 2-mode type kept as a no-op so old localStorage entries don't crash.
 type Mode = AgentMode
@@ -40,6 +42,7 @@ export function Composer({
   const [savedDraft, setSavedDraft] = useState('')
   const [mode, setMode] = useState<Mode>(() => getDefaultMode())
   const [copilotSessionId, setCopilotSessionId] = useState<string | null>(null)
+  const [dismissedGoalHintFor, setDismissedGoalHintFor] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -141,6 +144,8 @@ export function Composer({
   }
 
   const canSend = body.trim().length > 0
+  const goalQuality = useMemo(() => analyzeGoalQuality(body), [body])
+  const showGoalHint = shouldShowGoalQualityHint(body, goalQuality) && dismissedGoalHintFor !== body
 
   // Voice input: local whisper.cpp via main IPC.
   const voice = useVoiceInput({
@@ -150,6 +155,7 @@ export function Composer({
   return (
     <div className="px-4 pt-3 pb-2">
       <div className="rounded-2xl bg-surface px-3.5 pt-3 pb-2 transition-colors focus-within:bg-elevated">
+        {showGoalHint && <GoalHint analysis={goalQuality} onDismiss={() => setDismissedGoalHintFor(body)} />}
         <textarea
           ref={taRef}
           value={body}

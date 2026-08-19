@@ -3,6 +3,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { getDb } from './db'
 import { resolveModel } from './models'
+import { assembleCacheStableMessages, flattenPromptCacheMessages } from '../shared/promptCache'
 
 export type ChatRole = 'user' | 'assistant' | 'system'
 export type ChatStatus = 'pending' | 'streaming' | 'done' | 'error' | 'cancelled'
@@ -261,7 +262,19 @@ function send(
     ].join('\n')
   }
 
-  const promptText = (opts.prefix ? `${opts.prefix}\n\n` : '') + figmaPrefix + modePrefix + text
+  // Ordered from most stable to most volatile so the longest possible prefix
+  // is byte-identical between turns. The user's text stays last: this is
+  // flattened into a single --prompt string, so anything appended after it
+  // would read as instructions trailing the request rather than framing it.
+  const promptText = flattenPromptCacheMessages(assembleCacheStableMessages({
+    stablePrefix: [
+      { role: 'system', content: modePrefix },
+      ...(figmaPrefix ? [{ role: 'system' as const, content: figmaPrefix }] : []),
+      ...(opts.prefix ? [{ role: 'system' as const, content: opts.prefix }] : [])
+    ],
+    history: [],
+    currentTurn: { role: 'user', content: text }
+  }))
   const args: string[] = [
     '--prompt', promptText,
     '--allow-all-tools',

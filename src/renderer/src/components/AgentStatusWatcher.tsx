@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { LiveSession } from '../../../preload/index'
-import { classifyStatus, type AgentStatus } from '../lib/agentStatus'
+import { classifyStatus, type AgentStatus } from '../../../shared/agentStatus'
 import { playAttentionChime } from '../lib/notifySound'
 
 // Watches every live PTY session and fires a system notification the

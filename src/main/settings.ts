@@ -22,6 +22,9 @@ const DEFAULTS = {
   terminalCursorBlink: true,
   terminalLineHeight: 1.35,
   terminalCopyOnSelect: false,
+  // Auto-continue writes into a live PTY, which can answer a prompt or type
+  // over the user's input line, so it stays opt-in however good the guards are.
+  autoContinueEnabled: false,
   // Default Figma file every export forks into. Set to a fileKey or full
   // figma.com URL of a file you've claimed and (optionally) seeded with
   // your design system. When set, "newFile" exports become "existingFile"

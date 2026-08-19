@@ -4,7 +4,7 @@ import {
   classifyStatus,
   lastAssistantLine,
   tailLines
-} from '../../src/renderer/src/lib/agentStatus'
+} from '../../src/shared/agentStatus'
 
 describe('stripAnsi', () => {
   it('removes SGR color codes', () => {

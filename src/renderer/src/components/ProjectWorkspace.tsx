@@ -11,7 +11,7 @@ import { KickoffPromptButton } from './KickoffPromptViewer'
 import { BrowserPane } from './BrowserPane'
 import { IconPlus, IconTerminal, IconExternal, IconEdit } from './icons'
 import { useSessions } from '../state/store'
-import { classifyStatus, type AgentStatus } from '../lib/agentStatus'
+import { classifyStatus, type AgentStatus } from '../../../shared/agentStatus'
 
 const DEFAULT_MODEL = 'claude-sonnet-4.6'
 const LS_BROWSER_WIDTH = 't42:browser:width'
