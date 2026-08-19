@@ -529,7 +529,7 @@ function friendlyToolLabel(toolName: string, args?: unknown): string {
   }
   if (lower === 'glob' || lower === 'find' || lower === 'list') return 'Listing files'
   if (lower.startsWith('figma')) {
-    // figma-create_new_file → "Figma · create new file"
+    // figma-write-figma_auto_layout → "Figma · write figma auto layout"
     const stripped = toolName.replace(/^figma[-_]/i, '').replace(/[-_]/g, ' ')
     return `Figma · ${stripped}`
   }
@@ -756,10 +756,10 @@ async function send(
   let figmaPrefix = ''
   if (!opts.skipPrefix && /\bfigma\b/i.test(text)) {
     figmaPrefix = [
-      'FIGMA AVAILABLE. Two MCP servers can write to Figma. Pick the best path:',
-      '  1. figma-write-* (custom server, requires the "MCP WebSocket Client" plugin running in Figma Desktop). Highest fidelity. Probe with figma-write-figma_plugin_status (5s timeout). If it responds, use figma-write-figma_pages / figma_nodes / figma_auto_layout / figma_text / figma_fills / figma_strokes / figma_effects / figma_fonts. For icons use figma-write-figma_svg with SVG fetched from a CDN (Phosphor / Tabler / Lucide / Remix); replace currentColor with the right hex first.',
-      '  2. figma-* (official Anthropic + Figma MCP, same backend Claude Code uses, no plugin needed). If the figma-write probe fails, fall back to: figma-whoami → figma-create_new_file → figma-use_figma to run a Plugin API script that builds the design. Inside that script, await figma.loadFontAsync before text, use auto-layout with HUG/FILL sizing, use figma.createNodeFromSvg for icons.',
-      'Quality rules either way: real auto-layout frames, real text nodes, real vector icons. Never substitute icons with basic shapes. Never use FIXED sizing on auto-layout frames. No em-dashes (U+2014) in any layer/text — use ASCII "-".',
+      'FIGMA AVAILABLE via the figma-write MCP server.',
+      '  Requires the "MCP WebSocket Client" plugin running in Figma Desktop. Probe with figma-write-figma_plugin_status (5s timeout). If it responds, use figma-write-figma_pages / figma_nodes / figma_auto_layout / figma_text / figma_fills / figma_strokes / figma_effects / figma_fonts. For icons use figma-write-figma_svg with SVG fetched from a CDN (Phosphor / Tabler / Lucide / Remix); replace currentColor with the right hex first.',
+      '  If the probe fails, say so and stop. Do not call figma-* tools: the hosted Figma MCP is not configured, so those tool names do not exist.',
+      'Quality rules: real auto-layout frames, real text nodes, real vector icons. Never substitute icons with basic shapes. Never use FIXED sizing on auto-layout frames. No em-dashes (U+2014) in any layer/text — use ASCII "-".',
       ''
     ].join('\n')
   }
@@ -1453,23 +1453,21 @@ export function registerDesignIpc(getWin: () => BrowserWindow | null): void {
       return { ok: false, error: 'Could not extract a Figma file key from that URL. Expected something like https://www.figma.com/design/ABC123…/MyFile' }
     }
 
-    // Two Figma MCP servers are available. The agent picks the best path:
-    //   1. `figma` — the official Anthropic + Figma MCP (same backend Claude
-    //      Code's official Figma plugin uses). No separate Figma plugin
-    //      install needed; uses your Figma account auth.
-    //   2. `figma-write` — your custom MCP that runs against the "MCP
-    //      WebSocket Client" plugin in Figma Desktop. Higher fidelity for
-    //      icons + tokens but requires the plugin to be open.
+    // Only `figma-write` is configured: the custom MCP that drives the "MCP
+    // WebSocket Client" plugin in Figma Desktop. The hosted `figma` server was
+    // removed because its OAuth token expired with no refresh token, so it
+    // nagged for re-authentication on every CLI start. Nothing here may name
+    // figma-* tools any more -- instructing the model to call tools that are
+    // not registered wastes a turn and produces a confusing failure.
     const lines: string[] = []
-    lines.push(`You are exporting an HTML design (./${latest.fileName}) into Figma. You have TWO MCP servers available — use the best one for the job:`)
-    lines.push(`  - figma-* (official): figma-whoami, figma-create_new_file, figma-use_figma (Plugin API runner), figma-search_design_system, figma-get_screenshot, figma-get_metadata. Same backend Claude Code's official Figma plugin uses.`)
+    lines.push(`You are exporting an HTML design (./${latest.fileName}) into Figma via the figma-write MCP server:`)
     lines.push(`  - figma-write-* (custom): figma-write-figma_plugin_status, figma-write-figma_svg, figma-write-figma_pages, figma-write-figma_nodes, figma-write-figma_auto_layout, figma-write-figma_text, figma-write-figma_fills, figma-write-figma_strokes, figma-write-figma_effects, figma-write-figma_fonts, figma-write-figma_get_design_state. Requires the "MCP WebSocket Client" plugin running in Figma Desktop.`)
     lines.push('')
 
-    lines.push(`PRECHECK — Pick the path.`)
+    lines.push(`PRECHECK — Confirm the plugin is running.`)
     lines.push(`  Call figma-write-figma_plugin_status with a 5s timeout.`)
-    lines.push(`  - If it responds → use the figma-write-* path (higher fidelity, real SVG icons).`)
-    lines.push(`  - If it does NOT respond → fall back to the official figma-* path. Do NOT bother the user — both paths can produce the design.`)
+    lines.push(`  - If it responds → continue.`)
+    lines.push(`  - If it does NOT respond → stop and tell the user to open the "MCP WebSocket Client" plugin in Figma Desktop. There is no second path; do not invent one.`)
     lines.push('')
 
     lines.push(`PASS 0 — Read the source.`)
@@ -1479,22 +1477,18 @@ export function registerDesignIpc(getWin: () => BrowserWindow | null): void {
 
     lines.push(`PASS 1 — Set up the file or page.`)
     lines.push(`  figma-write path: figma-write-figma_pages create + name "${d.title}", then activate.`)
-    lines.push(`  official path: figma-whoami → get planKey → figma-create_new_file with planKey, editorType "design", fileName "${d.title}". Capture fileKey.`)
     lines.push('')
 
     lines.push(`PASS 2 — Build the scaffold (auto-layout frames per major section).`)
     lines.push(`  figma-write path: figma-write-figma_nodes (or figma-write-figma_build_page) for one top-level auto-layout frame named "${d.title}" sized to the HTML viewport (1280 wide for app/dashboard, 600 for email). Inside, one auto-layout frame per HTML section. Use figma-write-figma_auto_layout for layoutMode + itemSpacing + padding. Sizing HUG or FILL, never FIXED (except top frame width). clipsContent = false.`)
-    lines.push(`  official path: one figma-use_figma call with a Plugin API script that creates the same scaffold via figma.createFrame() + layoutMode/itemSpacing/padding + layoutSizingHorizontal/Vertical = "HUG" or "FILL" + clipsContent = false.`)
     lines.push('')
 
     lines.push(`PASS 3 — Fonts and text.`)
     lines.push(`  figma-write path: figma-write-figma_fonts to load every font BEFORE creating text. figma-write-figma_text to add headings + body. layoutSizingHorizontal = HUG inside auto-layout parents.`)
-    lines.push(`  official path: in your Plugin API script, await figma.loadFontAsync({ family, style }) BEFORE setting characters. Use "Semi Bold" / "Extra Bold" (with the space) for Inter.`)
     lines.push('')
 
     lines.push(`PASS 4 — Fills, strokes, effects.`)
     lines.push(`  figma-write: figma-write-figma_fills (solid hex from HTML), figma-write-figma_strokes, figma-write-figma_effects (subtle shadows; respect noHeavyShadow).`)
-    lines.push(`  official: set fills/strokes/effects directly on nodes inside the same Plugin API script.`)
     lines.push('')
 
     lines.push(`PASS 5 — Icons (THIS is what makes icons look right).`)
@@ -1507,13 +1501,12 @@ export function registerDesignIpc(getWin: () => BrowserWindow | null): void {
     lines.push(`        Remix:            https://unpkg.com/remixicon@4/icons/System/<name>-line.svg`)
     lines.push(`    - Replace currentColor with the icon's CSS hex BEFORE inserting.`)
     lines.push(`  figma-write path: pass to figma-write-figma_svg with operation "import" + parent + position + size.`)
-    lines.push(`  official path: in figma-use_figma, call figma.createNodeFromSvg(svgString); set name "Icon - <name>"; resize; appendChild.`)
     lines.push(`  Real editable vector icons. Do NOT skip and do NOT substitute basic shapes. If a fetch fails, same-sized rectangle in the icon's colour as last resort.`)
     lines.push('')
 
     lines.push(`PASS 6 — Charts and graphics (REQUIRED if the HTML has any).`)
     lines.push(`  Bar charts → rectangles in an auto-layout row, heights matching source values.`)
-    lines.push(`  Line / area → figma-write-figma_vectors (or figma.createVector in official) with the SVG path data already in the HTML.`)
+    lines.push(`  Line / area → figma-write-figma_vectors with the SVG path data already in the HTML.`)
     lines.push(`  Donut / pie → ellipses with arcData per segment.`)
     lines.push(`  Progress bars + status badges → primitive frames with tinted fills.`)
     lines.push(`  Do NOT replace a chart with a single grey rectangle.`)
@@ -1521,12 +1514,10 @@ export function registerDesignIpc(getWin: () => BrowserWindow | null): void {
 
     lines.push(`PASS 7 — Images.`)
     lines.push(`  figma-write: figma-write-figma_images to download + apply as image fill.`)
-    lines.push(`  official: figma.createImageAsync(url) → use the imageHash. On fetch failure, same-sized rectangle in the brand secondary colour.`)
     lines.push('')
 
     lines.push(`PASS 8 — Final check.`)
     lines.push(`  figma-write: figma-write-figma_get_design_state on the new page.`)
-    lines.push(`  official: figma-get_screenshot on the top frame.`)
     lines.push(`  Confirm: top frame exists, all sections present, icons rendered (not blanks). If anything wrong, fix and re-check.`)
     lines.push('')
 

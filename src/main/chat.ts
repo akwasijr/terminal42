@@ -257,10 +257,10 @@ function send(
   let figmaPrefix = ''
   if (/\bfigma\b/i.test(text)) {
     figmaPrefix = [
-      'FIGMA AVAILABLE. Two MCP servers can write to Figma. Pick the best path:',
-      '  1. figma-write-* (custom server, requires the "MCP WebSocket Client" plugin running in Figma Desktop). Highest fidelity. Probe with figma-write-figma_plugin_status (5s timeout). If it responds, use figma-write-figma_pages / figma_nodes / figma_auto_layout / figma_text / figma_fills / figma_strokes / figma_effects / figma_fonts. For icons use figma-write-figma_svg with SVG fetched from a CDN (Phosphor / Tabler / Lucide / Remix); replace currentColor with the right hex first.',
-      '  2. figma-* (official Anthropic + Figma MCP, same backend Claude Code uses, no plugin needed). If the figma-write probe fails, fall back to: figma-whoami → figma-create_new_file → figma-use_figma to run a Plugin API script that builds the design. Inside that script, await figma.loadFontAsync before text, use auto-layout with HUG/FILL sizing, use figma.createNodeFromSvg for icons.',
-      'Quality rules either way: real auto-layout frames, real text nodes, real vector icons. Never substitute icons with basic shapes. Never use FIXED sizing on auto-layout frames. No em-dashes (U+2014) in any layer/text — use ASCII "-".',
+      'FIGMA AVAILABLE via the figma-write MCP server.',
+      '  Requires the "MCP WebSocket Client" plugin running in Figma Desktop. Probe with figma-write-figma_plugin_status (5s timeout). If it responds, use figma-write-figma_pages / figma_nodes / figma_auto_layout / figma_text / figma_fills / figma_strokes / figma_effects / figma_fonts. For icons use figma-write-figma_svg with SVG fetched from a CDN (Phosphor / Tabler / Lucide / Remix); replace currentColor with the right hex first.',
+      '  If the probe fails, say so and stop. Do not call figma-* tools: the hosted Figma MCP is not configured, so those tool names do not exist.',
+      'Quality rules: real auto-layout frames, real text nodes, real vector icons. Never substitute icons with basic shapes. Never use FIXED sizing on auto-layout frames. No em-dashes (U+2014) in any layer/text — use ASCII "-".',
       ''
     ].join('\n')
   }
@@ -305,9 +305,8 @@ function send(
   if (resolvedModel) args.push('--model', resolvedModel)
   if (resume) args.push('--resume', resume)
 
-  // Both Figma MCPs (official `figma` and custom `figma-write`) are loaded
-  // from ~/.copilot/mcp-config.json. The figmaPrefix above tells the agent
-  // which to prefer. Nothing to disable here.
+  // The `figma-write` MCP is loaded from ~/.copilot/mcp-config.json. The
+  // figmaPrefix above tells the agent how to use it. Nothing to disable here.
 
   let child: ChildProcess
   try {
