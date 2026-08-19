@@ -10,6 +10,7 @@ import { appendLog, dropSessionLog, markSessionBoundary } from './sessionLog'
 import { getSettings } from './settings'
 import { getDb } from './db'
 import { stripAnsi } from './ansi'
+import { copilotEnvSync } from './copilotAuth'
 
 type Session = {
   id: string
@@ -285,7 +286,9 @@ export function registerPtyIpc(getWindow: () => BrowserWindow | null): void {
     const cmd = args.command || defaultShell
     const cmdArgs = args.commandArgs || []
     const cwd = args.cwd || os.homedir()
-    const env = { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor' } as Record<string, string>
+    // Terminal sessions run the CLI too, so they hit the same keychain prompt
+    // unless a token is already in the environment.
+    const env = { ...copilotEnvSync(), TERM: 'xterm-256color', COLORTERM: 'truecolor' } as Record<string, string>
     // Shell integration has to be appended after the user's own rc file rather
     // than injected before it; otherwise prompt frameworks can overwrite our
     // hooks, or our setup can perturb aliases and startup state. The helper

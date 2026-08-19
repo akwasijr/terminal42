@@ -5,6 +5,7 @@ import { registerPtyIpc, killAllSessions, listLiveSessions, killSession } from '
 import { registerProjectIpc } from './projects'
 import { registerComposerIpc } from './composer'
 import { registerChatIpc, killAllChats, pruneUndoSnapshots } from './chat'
+import { primeCopilotToken } from './copilotAuth'
 import { registerCanvasAssistIpc } from './canvasAssist'
 import { registerDesignIpc, stopAllDesignWatchers, killAllDesignRuns } from './design'
 import { registerPreviewIpc, killAllPreviews, runningPreviewCount, runningPreviewList, stopPreview } from './preview'
@@ -332,6 +333,9 @@ app.whenReady().then(() => {
   registerChatIpc(() => mainWindow)
   // Sweep expired undo copies once per launch, off the critical path.
   pruneUndoSnapshots()
+  // Look up an auth token now, so the first CLI launch does not trigger the
+  // macOS keychain dialog.
+  primeCopilotToken()
   registerCanvasAssistIpc(() => mainWindow)
   registerDesignIpc(() => mainWindow)
   registerPreviewIpc(() => mainWindow)

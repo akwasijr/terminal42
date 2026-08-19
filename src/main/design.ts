@@ -43,6 +43,7 @@ import {
 // ─── Types ────────────────────────────────────────────────────────────────
 
 import { resolveModel } from './models'
+import { copilotEnv } from './copilotAuth'
 import type {
   DesignToolCall,
   DesignMessage,
@@ -806,7 +807,7 @@ async function send(
   try {
     child = spawn('copilot', args, {
       cwd: d.cwd,
-      env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
+      env: { ...(await copilotEnv()), FORCE_COLOR: '0', NO_COLOR: '1' },
       stdio: ['ignore', 'pipe', 'pipe'],
       // Run copilot in its own process group so we can kill the WHOLE
       // tree (copilot + MCP child processes) on cancel via process.kill(-pid).

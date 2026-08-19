@@ -12,6 +12,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { resolveModel } from './models'
+import { copilotEnvSync } from './copilotAuth'
 
 export type CopilotToolCall = {
   id: string
@@ -109,7 +110,7 @@ export function runCopilot(opts: CopilotRunOptions): CopilotRunHandle {
     try {
       child = spawn('copilot', args, {
         cwd: opts.cwd,
-        env: { ...process.env, ...(opts.env ?? {}), FORCE_COLOR: '0', NO_COLOR: '1' },
+        env: { ...copilotEnvSync(), ...(opts.env ?? {}), FORCE_COLOR: '0', NO_COLOR: '1' },
         stdio: ['ignore', 'pipe', 'pipe']
       })
     } catch (err) {

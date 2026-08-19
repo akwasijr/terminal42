@@ -15,6 +15,7 @@ import {
   isEmptySnapshot, type TurnSnapshot
 } from './turnSnapshot'
 import { pruneStore, type Store } from './localSnapshot'
+import { copilotEnvSync } from './copilotAuth'
 
 /**
  * Where local file copies for undo are kept.
@@ -454,11 +455,16 @@ function send(
   // The `figma-write` MCP is loaded from ~/.copilot/mcp-config.json. The
   // figmaPrefix above tells the agent how to use it. Nothing to disable here.
 
+  // Resolved before spawning so the CLI finds a token in its environment and
+  // never reaches for the keychain, which prompts once per launch when the
+  // caller is this app rather than the user's own terminal.
+  const copilotSpawnEnv = copilotEnvSync()
+
   let child: ChildProcess
   try {
     child = spawn('copilot', args, {
       cwd,
-      env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
+      env: { ...copilotSpawnEnv, FORCE_COLOR: '0', NO_COLOR: '1' },
       stdio: ['ignore', 'pipe', 'pipe']
     })
   } catch (err) {

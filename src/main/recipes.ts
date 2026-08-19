@@ -7,6 +7,7 @@ import * as os from 'os'
 import { getDb, type InboxEntryRow, type RecipeScheduleRow } from './db'
 import { stripAnsi } from './ansi'
 import { resolveModel } from './models'
+import { copilotEnvSync } from './copilotAuth'
 
 export type RecipeStep = { prompt: string }
 export type Recipe = {
@@ -105,7 +106,7 @@ function runStep(
     if (resolved) args.push('--model', resolved)
     const child = spawn('copilot', args, {
       cwd,
-      env: { ...process.env, COPILOT_ALLOW_ALL: '1' } as Record<string, string>
+      env: { ...copilotEnvSync(), COPILOT_ALLOW_ALL: '1' } as Record<string, string>
     })
     let out = ''
     let err = ''

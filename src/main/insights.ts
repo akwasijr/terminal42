@@ -7,6 +7,7 @@ import { getSettings } from './settings'
 import { stripAnsi } from './ansi'
 import { readMemory, writeMemory } from './memory'
 import { resolveModel } from './models'
+import { copilotEnv } from './copilotAuth'
 
 export type InsightsCadence = 'off' | 'daily' | '3d' | 'weekly'
 
@@ -190,7 +191,7 @@ ${evidence}`
     if (resolved) args.push('--model', resolved)
     const child = spawn('copilot', args, {
       cwd: app.getPath('home'),
-      env: { ...process.env, NO_COLOR: '1', TERM: 'dumb' },
+      env: { ...(await copilotEnv()), NO_COLOR: '1', TERM: 'dumb' },
       stdio: ['ignore', 'pipe', 'pipe']
     })
 

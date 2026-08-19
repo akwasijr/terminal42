@@ -6,18 +6,14 @@ import { contextDisplay } from '../../../shared/contextUsage'
 export interface InfoRailProps {
   insights: SessionInsights
   contextUsage?: ContextUsage | null
-  collapsed?: boolean
   hidden?: boolean
-  onCollapsedChange?: (collapsed: boolean) => void
   className?: string
 }
 
 export function InfoRail({
   insights,
   contextUsage = null,
-  collapsed = false,
   hidden = false,
-  onCollapsedChange,
   className = ''
 }: InfoRailProps): JSX.Element | null {
   if (hidden) return null
@@ -31,63 +27,18 @@ export function InfoRail({
   const hasGoals = insights.counts.total > 0
 
   const rootClassName = [
-    'flex shrink-0 flex-col overflow-hidden rounded-panel bg-surface text-[12px] text-text-secondary shadow-panel',
-    collapsed ? 'w-14 p-2' : 'w-[300px] p-3',
+    'flex min-w-0 flex-col overflow-hidden rounded-panel bg-surface p-3 text-[12px] text-text-secondary shadow-panel',
     className
   ]
     .filter(Boolean)
     .join(' ')
 
-  if (collapsed) {
-    return (
-      <aside className={rootClassName} aria-label="Session insights">
-        <button
-          type="button"
-          onClick={() => onCollapsedChange?.(false)}
-          disabled={!onCollapsedChange}
-          aria-label="Expand session insights"
-          title="Expand session insights"
-          className="grid h-10 w-10 place-items-center rounded-md bg-elevated text-text-primary transition-colors hover:bg-raised focus-visible:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface active:bg-sunken disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-elevated"
-        >
-          <span aria-hidden="true" className="h-5 w-2 rounded-full bg-accent" />
-        </button>
-        <p
-          className="mt-3 text-center text-[11px] tabular-nums text-text-muted"
-          title={`${insights.counts.done} of ${insights.counts.total} todos done`}
-        >
-          {insights.counts.done}/{insights.counts.total}
-        </p>
-      </aside>
-    )
-  }
-
   return (
-    <aside className={rootClassName} aria-label="Session insights">
-      <header className="flex items-start justify-between gap-3 p-1">
-        <section aria-labelledby="session-insights-title" className="min-w-0">
-          <h2 id="session-insights-title" className="text-[13px] font-semibold text-text-primary">
-            Session insights
-          </h2>
-        </section>
-        <button
-          type="button"
-          onClick={() => onCollapsedChange?.(true)}
-          disabled={!onCollapsedChange}
-          aria-label="Collapse session insights"
-          title="Collapse session insights"
-          className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-elevated text-text-muted transition-colors hover:bg-raised hover:text-text-primary focus-visible:bg-raised focus-visible:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface active:bg-sunken disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-elevated disabled:hover:text-text-muted"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-            <path
-              d="M10.5 3.5 6 8l4.5 4.5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
+    <aside className={rootClassName} aria-labelledby="session-insights-title">
+      <header className="p-1">
+        <h2 id="session-insights-title" className="text-[13px] font-semibold text-text-primary">
+          Session insights
+        </h2>
       </header>
 
       {ctx ? (

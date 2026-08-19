@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { resolveModel } from './models'
+import { copilotEnvSync } from './copilotAuth'
 
 // An empty, isolated working directory for the assistant's Copilot process. Using
 // the user's HOME made the agent scan personal folders on startup (Documents,
@@ -51,7 +52,7 @@ function runOnce(prompt: string, model: string | null, cwd: string, attachments:
 
     let child: ChildProcess
     try {
-      child = spawn('copilot', args, { cwd, env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' }, stdio: ['ignore', 'pipe', 'pipe'] })
+      child = spawn('copilot', args, { cwd, env: { ...copilotEnvSync(), FORCE_COLOR: '0', NO_COLOR: '1' }, stdio: ['ignore', 'pipe', 'pipe'] })
     } catch (err) {
       resolve({ ok: false, error: `Failed to start copilot: ${String(err)}` })
       return
