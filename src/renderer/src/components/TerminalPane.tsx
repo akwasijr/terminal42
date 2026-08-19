@@ -624,7 +624,14 @@ export function TerminalPane({
 
   return (
     <div className="relative h-full w-full" onMouseDown={(e) => { if (e.button === 0 && !searchOpen) termRef.current?.focus() }}>
-      <div ref={containerRef} className="h-full w-full px-4 pt-3" data-testid="terminal-pane" />
+      {/* The padding lives on this wrapper, never on the element xterm opens
+          into. FitAddon sizes the terminal from getComputedStyle(host).height,
+          which under border-box reports the padded height while the usable box
+          is smaller, so padding here would be counted as space that does not
+          exist and the last row would render half off the bottom edge. */}
+      <div className="h-full w-full px-4 pt-3 pb-2">
+        <div ref={containerRef} className="h-full w-full" data-testid="terminal-pane" />
+      </div>
 
       <ShellStatus state={shellState} />
 
