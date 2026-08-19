@@ -6,6 +6,7 @@ import { getDb } from './db'
 import { getSettings } from './settings'
 import { stripAnsi } from './ansi'
 import { readMemory, writeMemory } from './memory'
+import { resolveModel } from './models'
 
 export type InsightsCadence = 'off' | 'daily' | '3d' | 'weekly'
 
@@ -184,7 +185,9 @@ Rules:
 EVIDENCE:
 ${evidence}`
 
-    const args = ['-p', prompt, '--allow-all-tools', '--no-color', '--model', model]
+    const args = ['-p', prompt, '--allow-all-tools', '--no-color']
+    const resolved = resolveModel(model)
+    if (resolved) args.push('--model', resolved)
     const child = spawn('copilot', args, {
       cwd: app.getPath('home'),
       env: { ...process.env, NO_COLOR: '1', TERM: 'dumb' },

@@ -11,6 +11,7 @@
 
 import { spawn, type ChildProcess } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
+import { resolveModel } from './models'
 
 export type CopilotToolCall = {
   id: string
@@ -85,7 +86,10 @@ export function runCopilot(opts: CopilotRunOptions): CopilotRunHandle {
   const handle: { current: InternalState | null } = { current: null }
   const cancelledRef = { value: false }
 
-  const spawnAttempt = (model: string | null | undefined, attemptKind: 'initial' | 'unknown-model' | 'rate-limit-auto'): void => {
+  const spawnAttempt = (requestedModel: string | null | undefined, attemptKind: 'initial' | 'unknown-model' | 'rate-limit-auto'): void => {
+    // Resolve retired/internal IDs up front so an old saved selection does not
+    // burn the first attempt on a name the CLI will reject.
+    const model = resolveModel(requestedModel)
     const args: string[] = [
       '--prompt', opts.prompt,
       '--allow-all-tools',

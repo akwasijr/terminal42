@@ -13,34 +13,10 @@
 import { ipcMain, app, type BrowserWindow } from 'electron'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { FALLBACK_MODELS, inferGroup, resolveModelAgainst, type DisplayModel } from '../shared/models'
 
-export type DisplayModel = { id: string; label: string; group: string }
+export type { DisplayModel }
 
-// Baseline shown before the first live fetch completes (and used forever if
-// the CLI/SDK path never works in a given environment). Kept in sync with
-// ModelDropdown.tsx's DEFAULT_MODELS by copy — this is just the safety net,
-// not the source of truth once live data arrives.
-const FALLBACK_MODELS: DisplayModel[] = [
-  { id: 'claude-opus-4.8', label: 'Claude Opus 4.8', group: 'Anthropic' },
-  { id: 'claude-opus-4.7', label: 'Claude Opus 4.7', group: 'Anthropic' },
-  { id: 'claude-opus-4.6', label: 'Claude Opus 4.6', group: 'Anthropic' },
-  { id: 'claude-opus-4.5', label: 'Claude Opus 4.5', group: 'Anthropic' },
-  { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', group: 'Anthropic' },
-  { id: 'claude-sonnet-4.6', label: 'Claude Sonnet 4.6', group: 'Anthropic' },
-  { id: 'claude-sonnet-4.5', label: 'Claude Sonnet 4.5', group: 'Anthropic' },
-  { id: 'claude-haiku-4.5', label: 'Claude Haiku 4.5', group: 'Anthropic' },
-  { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', group: 'OpenAI' },
-  { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', group: 'OpenAI' },
-  { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', group: 'OpenAI' },
-  { id: 'gpt-5.5', label: 'GPT-5.5', group: 'OpenAI' },
-  { id: 'gpt-5.4', label: 'GPT-5.4', group: 'OpenAI' },
-  { id: 'gpt-5.4-mini', label: 'GPT-5.4 mini', group: 'OpenAI' },
-  { id: 'gpt-5.3-codex', label: 'GPT-5.3 Codex', group: 'OpenAI' },
-  { id: 'gpt-5-mini', label: 'GPT-5 mini', group: 'OpenAI' },
-  { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', group: 'Google' },
-  { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash', group: 'Google' },
-  { id: 'mai-code-1-flash-picker', label: 'MAI-Code-1-Flash', group: 'Microsoft' }
-]
 
 function cachePath(): string {
   return join(app.getPath('userData'), 'models-cache.json')
@@ -67,21 +43,6 @@ let currentModels: DisplayModel[] = loadCache() ?? FALLBACK_MODELS
 let lastError: string | null = null
 let refreshing = false
 
-const KNOWN_PREFIXES: Array<{ test: RegExp; group: string }> = [
-  { test: /^claude-/i, group: 'Anthropic' },
-  { test: /^gpt-/i, group: 'OpenAI' },
-  { test: /^o[0-9]/i, group: 'OpenAI' },
-  { test: /^gemini-/i, group: 'Google' },
-  { test: /^mai-/i, group: 'Microsoft' },
-  { test: /^phi-/i, group: 'Microsoft' }
-]
-
-function inferGroup(id: string): string {
-  for (const { test, group } of KNOWN_PREFIXES) {
-    if (test.test(id)) return group
-  }
-  return 'Other'
-}
 
 // A fetched list is only trusted if it clearly reflects a real entitlement
 // response rather than a degenerate/auth-limited stub (e.g. just "auto").
@@ -95,7 +56,10 @@ async function fetchLiveModels(): Promise<DisplayModel[]> {
   // Imported lazily so a missing/broken optional dependency never breaks
   // app startup — only the (already backgrounded) refresh call fails.
   const { CopilotClient } = await import('@github/copilot-sdk')
-  const client = new CopilotClient({ cliPath: 'copilot' })
+  // No explicit connection: the SDK spawns its bundled runtime. An earlier
+  // `cliPath: 'copilot'` option here was silently ignored (the SDK dropped
+  // that field), so this is the transport that has actually been in use.
+  const client = new CopilotClient()
   try {
     await client.start()
     const models = await client.listModels()
@@ -142,6 +106,22 @@ async function refresh(win: BrowserWindow | null): Promise<void> {
 
 const REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1000 // 12h
 let intervalHandle: ReturnType<typeof setInterval> | null = null
+
+/**
+ * Maps a requested model onto one the CLI will actually accept.
+ *
+ * Model IDs outlive the entitlements behind them: a session, design or recipe
+ * saved months ago still carries whatever was selected at the time, and the
+ * CLI emits internal IDs (`claude-opus-4.7-1m-internal`) that never appear in
+ * the catalog at all. Passing a retired ID straight through to `--model`
+ * fails the whole run, so resolve it here instead.
+ *
+ * Returns null when the flag should simply be omitted, letting the CLI pick
+ * its own default — always better than failing on a name.
+ */
+export function resolveModel(requested: string | null | undefined): string | null {
+  return resolveModelAgainst(currentModels, requested)
+}
 
 export function initModelCatalog(getWin: () => BrowserWindow | null): void {
   // Kick off an initial refresh shortly after launch (don't block startup),

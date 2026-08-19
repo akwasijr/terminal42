@@ -2,6 +2,7 @@ import { ipcMain, BrowserWindow } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { getDb } from './db'
+import { resolveModel } from './models'
 
 export type ChatRole = 'user' | 'assistant' | 'system'
 export type ChatStatus = 'pending' | 'streaming' | 'done' | 'error' | 'cancelled'
@@ -270,7 +271,8 @@ function send(
     '-C', cwd
   ]
   if (mode !== 'plan') args.push('--no-ask-user')
-  if (model) args.push('--model', model)
+  const resolvedModel = resolveModel(model)
+  if (resolvedModel) args.push('--model', resolvedModel)
   if (resume) args.push('--resume', resume)
 
   // Both Figma MCPs (official `figma` and custom `figma-write`) are loaded

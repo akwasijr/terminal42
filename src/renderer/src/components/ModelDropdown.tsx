@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import * as Dropdown from '@radix-ui/react-dropdown-menu'
 import { IconChevronRight, IconRefresh } from './icons'
+import { FALLBACK_MODELS, compareGroups, type DisplayModel } from '../../../shared/models'
 
 // Baseline shown before the live catalog (fetched from the Copilot CLI via
 // main/models.ts) loads, and used as a safety-net fallback if that fetch is
@@ -9,29 +10,8 @@ import { IconChevronRight, IconRefresh } from './icons'
 // MODELS directly (ModelDropdown, DesignChatRail, CanvasAssistant,
 // StatusBar, FindAnything, SettingsView) picks up new models automatically,
 // with no manual list maintenance required.
-const DEFAULT_MODELS: { id: string; label: string; group: string }[] = [
-  { id: 'claude-opus-4.8',  label: 'Claude Opus 4.8',  group: 'Anthropic' },
-  { id: 'claude-opus-4.7',  label: 'Claude Opus 4.7',  group: 'Anthropic' },
-  { id: 'claude-opus-4.6',  label: 'Claude Opus 4.6',  group: 'Anthropic' },
-  { id: 'claude-opus-4.5',  label: 'Claude Opus 4.5',  group: 'Anthropic' },
-  { id: 'claude-sonnet-5',   label: 'Claude Sonnet 5',   group: 'Anthropic' },
-  { id: 'claude-sonnet-4.6', label: 'Claude Sonnet 4.6', group: 'Anthropic' },
-  { id: 'claude-sonnet-4.5', label: 'Claude Sonnet 4.5', group: 'Anthropic' },
-  { id: 'claude-haiku-4.5',  label: 'Claude Haiku 4.5',  group: 'Anthropic' },
-  { id: 'gpt-5.6-sol',      label: 'GPT-5.6 Sol',      group: 'OpenAI' },
-  { id: 'gpt-5.6-terra',    label: 'GPT-5.6 Terra',    group: 'OpenAI' },
-  { id: 'gpt-5.6-luna',     label: 'GPT-5.6 Luna',     group: 'OpenAI' },
-  { id: 'gpt-5.5',          label: 'GPT-5.5',          group: 'OpenAI' },
-  { id: 'gpt-5.4',          label: 'GPT-5.4',          group: 'OpenAI' },
-  { id: 'gpt-5.4-mini',     label: 'GPT-5.4 mini',     group: 'OpenAI' },
-  { id: 'gpt-5.3-codex',    label: 'GPT-5.3 Codex',    group: 'OpenAI' },
-  { id: 'gpt-5-mini',       label: 'GPT-5 mini',       group: 'OpenAI' },
-  { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro',   group: 'Google' },
-  { id: 'gemini-3.5-flash',       label: 'Gemini 3.5 Flash', group: 'Google' },
-  { id: 'mai-code-1-flash-picker', label: 'MAI-Code-1-Flash', group: 'Microsoft' }
-]
 
-export const MODELS: { id: string; label: string; group: string }[] = [...DEFAULT_MODELS]
+export const MODELS: DisplayModel[] = [...FALLBACK_MODELS]
 
 const modelsListeners = new Set<() => void>()
 
@@ -40,7 +20,7 @@ export function onModelsChanged(cb: () => void): () => void {
   return () => { modelsListeners.delete(cb) }
 }
 
-function applyModelList(list: { id: string; label: string; group: string }[]): void {
+function applyModelList(list: DisplayModel[]): void {
   if (!Array.isArray(list) || list.length < 3) return
   MODELS.splice(0, MODELS.length, ...list)
   for (const cb of modelsListeners) {
@@ -57,8 +37,8 @@ export function initModelCatalog(): void {
   if (initialized) return
   initialized = true
   const bridge = (window as unknown as { terminal42?: { models?: {
-    list: () => Promise<{ id: string; label: string; group: string }[]>
-    onUpdated: (cb: (models: { id: string; label: string; group: string }[]) => void) => () => void
+    list: () => Promise<DisplayModel[]>
+    onUpdated: (cb: (models: DisplayModel[]) => void) => () => void
   } } }).terminal42
   if (!bridge?.models) return
   bridge.models.list().then(applyModelList).catch(() => {})
@@ -103,10 +83,19 @@ function MicrosoftLogo(): JSX.Element {
   )
 }
 
+function XaiLogo(): JSX.Element {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M2.4 21.6L14.16 8.4l1.92 2.16-9.84 11.04H2.4zm5.28-8.64L2.4 6.96h3.84l3.36 3.84-1.92 2.16zM15.6 21.6L9.36 14.4l1.92-2.16 7.2 8.16H15.6zm.72-9.36L21.6 2.4h-3.84l-5.28 9.84 1.92 2.16-.08-2.16z" />
+    </svg>
+  )
+}
+
 const PROVIDER_LOGO: Record<string, () => JSX.Element> = {
   'Anthropic': AnthropicLogo,
   'OpenAI': OpenAILogo,
   'Google': GoogleLogo,
+  'xAI': XaiLogo,
   'Microsoft': MicrosoftLogo,
 }
 
@@ -130,7 +119,7 @@ export function ModelDropdown({
 }) {
   const current = MODELS.find((m) => m.id === value)
   const [open, setOpen] = useState(false)
-  const groups = Array.from(new Set(MODELS.map((m) => m.group)))
+  const groups = Array.from(new Set(MODELS.map((m) => m.group))).sort(compareGroups)
 
   return (
     <Dropdown.Root open={open} onOpenChange={setOpen}>

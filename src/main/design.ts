@@ -42,6 +42,7 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
+import { resolveModel } from './models'
 import type {
   DesignToolCall,
   DesignMessage,
@@ -781,7 +782,8 @@ async function send(
   // quirks. For regular HTML/template runs, omit --effort entirely: some model
   // router choices (especially "auto") reject effort configuration and exit 1.
   if (opts.useFigma && opts.model !== 'auto') args.push('--effort', 'medium')
-  if (opts.model) args.push('--model', opts.model)
+  const resolvedModel = resolveModel(opts.model)
+  if (resolvedModel) args.push('--model', resolvedModel)
   if (d.copilotSessionId && !opts.freshSession) args.push('--resume', d.copilotSessionId)
 
   // Disable MCP servers that aren't needed for THIS run. Each enabled

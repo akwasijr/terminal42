@@ -4,6 +4,7 @@ import { mkdirSync, writeFileSync, unlinkSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { resolveModel } from './models'
 
 // An empty, isolated working directory for the assistant's Copilot process. Using
 // the user's HOME made the agent scan personal folders on startup (Documents,
@@ -45,7 +46,8 @@ function runOnce(prompt: string, model: string | null, cwd: string, attachments:
       '-C', cwd,
     ]
     for (const p of attachments) args.push('--attachment', p)
-    if (model) args.push('--model', model)
+    const resolved = resolveModel(model)
+    if (resolved) args.push('--model', resolved)
 
     let child: ChildProcess
     try {

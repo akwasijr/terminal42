@@ -6,6 +6,7 @@ import { readMemory, writeMemory } from './memory'
 import { gatherEvidence, onInsightsRunComplete } from './insights'
 import { getSettings } from './settings'
 import { stripAnsi } from './ansi'
+import { resolveModel } from './models'
 
 export type SkillFormat = 'prompt' | 'persona' | 'clip' | 'recipe'
 export type SkillScope = { kind: 'always' } | { kind: 'manual' } | { kind: 'project'; projectId: string }
@@ -406,7 +407,9 @@ async function runProposalScan(getWindow: () => BrowserWindow | null): Promise<{
     const model = settings.defaultModel
     const prompt = PROPOSE_PROMPT.replace('__EVIDENCE__', evidence)
 
-    const args = ['-p', prompt, '--allow-all-tools', '--no-color', '--model', model]
+    const args = ['-p', prompt, '--allow-all-tools', '--no-color']
+    const resolved = resolveModel(model)
+    if (resolved) args.push('--model', resolved)
     const child = spawn('copilot', args, {
       cwd: app.getPath('home'),
       env: { ...process.env, NO_COLOR: '1', TERM: 'dumb' },

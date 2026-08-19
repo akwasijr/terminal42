@@ -6,6 +6,7 @@ import { spawn } from 'child_process'
 import * as os from 'os'
 import { getDb, type InboxEntryRow, type RecipeScheduleRow } from './db'
 import { stripAnsi } from './ansi'
+import { resolveModel } from './models'
 
 export type RecipeStep = { prompt: string }
 export type Recipe = {
@@ -100,7 +101,8 @@ function runStep(
 ): Promise<{ ok: boolean; output: string }> {
   return new Promise((resolve) => {
     const args = ['-p', prompt, '--allow-all-tools']
-    if (model) args.push('--model', model)
+    const resolved = resolveModel(model)
+    if (resolved) args.push('--model', resolved)
     const child = spawn('copilot', args, {
       cwd,
       env: { ...process.env, COPILOT_ALLOW_ALL: '1' } as Record<string, string>
