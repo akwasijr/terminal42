@@ -193,3 +193,35 @@ export function shortlistModels(
     (a, b) => compareGroups(a.group, b.group) || compareModelRecency(a.id, b.id)
   )
 }
+
+/** How long a cached catalog stays good before we spawn the CLI to refresh it. */
+export const MODEL_REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1000
+
+/** Delay before the first refresh when there is nothing usable cached. */
+export const STARTUP_REFRESH_DELAY_MS = 3000
+
+/**
+ * How long to wait before the first catalog refresh of a launch.
+ *
+ * Refreshing spawns the CLI, and the CLI reads its credential from the macOS
+ * keychain, which can surface a system password dialog. Doing that on every
+ * launch interrupts the user with a prompt they never asked for, to fetch a
+ * list that changes a few times a year. A cache still inside its refresh
+ * window therefore defers the spawn rather than repeating it.
+ *
+ * A timestamp in the future means the clock moved, not that the cache is
+ * impossibly fresh. That defers a full cycle as well: guessing wrong costs a
+ * slightly stale model list, while spawning costs the dialog this exists to
+ * remove.
+ */
+export function refreshDelayMs(
+  fetchedAt: number | null,
+  now: number,
+  interval: number = MODEL_REFRESH_INTERVAL_MS
+): number {
+  if (fetchedAt === null || !Number.isFinite(fetchedAt)) return STARTUP_REFRESH_DELAY_MS
+  const age = now - fetchedAt
+  if (age < 0) return interval
+  if (age >= interval) return STARTUP_REFRESH_DELAY_MS
+  return interval - age
+}

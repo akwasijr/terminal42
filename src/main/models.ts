@@ -13,7 +13,7 @@
 import { ipcMain, app, type BrowserWindow } from 'electron'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { FALLBACK_MODELS, inferGroup, resolveModelAgainst, type DisplayModel } from '../shared/models'
+import { FALLBACK_MODELS, inferGroup, resolveModelAgainst, refreshDelayMs, MODEL_REFRESH_INTERVAL_MS, type DisplayModel } from '../shared/models'
 import { resolveCopilotLauncher } from './copilotCli'
 
 export type { DisplayModel }
@@ -27,6 +27,27 @@ function loadCache(): DisplayModel[] | null {
   try {
     const raw = JSON.parse(readFileSync(cachePath(), 'utf8')) as { models?: DisplayModel[] }
     return Array.isArray(raw.models) && raw.models.length ? raw.models : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * When the cached catalog was last fetched, or null if there is no usable cache.
+ *
+ * Read separately from the models themselves because the age decides whether
+ * we may skip a refresh, and skipping is the whole point: a refresh spawns the
+ * CLI, which reads the GitHub credential from the macOS keychain, which can
+ * raise a system password dialog the user never asked for.
+ */
+function loadCacheFetchedAt(): number | null {
+  try {
+    const raw = JSON.parse(readFileSync(cachePath(), 'utf8')) as {
+      models?: DisplayModel[]
+      fetchedAt?: number
+    }
+    if (!Array.isArray(raw.models) || !raw.models.length) return null
+    return typeof raw.fetchedAt === 'number' ? raw.fetchedAt : null
   } catch {
     return null
   }
@@ -111,8 +132,9 @@ async function refresh(win: BrowserWindow | null): Promise<void> {
   }
 }
 
-const REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1000 // 12h
+const REFRESH_INTERVAL_MS = MODEL_REFRESH_INTERVAL_MS
 let intervalHandle: ReturnType<typeof setInterval> | null = null
+let startupHandle: ReturnType<typeof setTimeout> | null = null
 
 /**
  * Maps a requested model onto one the CLI will actually accept.
@@ -131,15 +153,22 @@ export function resolveModel(requested: string | null | undefined): string | nul
 }
 
 export function initModelCatalog(getWin: () => BrowserWindow | null): void {
-  // Kick off an initial refresh shortly after launch (don't block startup),
-  // then keep it fresh in the background without any manual action.
-  setTimeout(() => { void refresh(getWin()) }, 3000)
-  intervalHandle = setInterval(() => { void refresh(getWin()) }, REFRESH_INTERVAL_MS)
+  // Wait out whatever is left of the cache's refresh window before spawning the
+  // CLI, so a relaunch with a fresh catalog stays silent instead of raising a
+  // keychain dialog. Once the first refresh runs, resume the plain cadence.
+  const delay = refreshDelayMs(loadCacheFetchedAt(), Date.now())
+  startupHandle = setTimeout(() => {
+    startupHandle = null
+    void refresh(getWin())
+    intervalHandle = setInterval(() => { void refresh(getWin()) }, REFRESH_INTERVAL_MS)
+  }, delay)
 }
 
 export function stopModelCatalog(): void {
   if (intervalHandle) clearInterval(intervalHandle)
   intervalHandle = null
+  if (startupHandle) clearTimeout(startupHandle)
+  startupHandle = null
 }
 
 export function registerModelsIpc(getWin: () => BrowserWindow | null): void {

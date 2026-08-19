@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { FALLBACK_MODELS, inferGroup, compareGroups, resolveModelAgainst, GROUP_ORDER } from '../../src/shared/models'
+import { FALLBACK_MODELS, inferGroup, compareGroups, resolveModelAgainst, GROUP_ORDER, refreshDelayMs, MODEL_REFRESH_INTERVAL_MS, STARTUP_REFRESH_DELAY_MS } from '../../src/shared/models'
 
 // The fallback catalog used to exist twice, kept in sync by hand, and drifted
 // — which is how retired models kept showing up in the picker. These guard the
@@ -100,6 +100,60 @@ describe('resolveModelAgainst', () => {
     for (const probe of ['claude-opus-4.5', 'gpt-4o', 'gemini-2.0-pro', 'grok-3', 'mai-code-0']) {
       const resolved = resolveModelAgainst(catalog, probe)
       if (resolved !== null) expect(ids.has(resolved)).toBe(true)
+    }
+  })
+})
+
+// A catalog refresh spawns the CLI, which reads the GitHub credential from the
+// macOS keychain and can raise a system password dialog. The old code did that
+// three seconds into every launch, so the user was interrupted on every start
+// to refetch a list that changes a few times a year.
+describe('catalog refresh scheduling', () => {
+  const HOUR = 60 * 60 * 1000
+  const INTERVAL = MODEL_REFRESH_INTERVAL_MS
+
+  it('refreshes promptly when nothing is cached', () => {
+    expect(refreshDelayMs(null, Date.now())).toBe(STARTUP_REFRESH_DELAY_MS)
+  })
+
+  it('stays silent on a relaunch with a fresh cache', () => {
+    const now = Date.now()
+    expect(refreshDelayMs(now - HOUR, now)).toBe(INTERVAL - HOUR)
+  })
+
+  it('defers by exactly the remaining window, not a full cycle', () => {
+    const now = Date.now()
+    expect(refreshDelayMs(now - 11 * HOUR, now)).toBe(INTERVAL - 11 * HOUR)
+  })
+
+  it('refreshes promptly once the cache is stale', () => {
+    const now = Date.now()
+    expect(refreshDelayMs(now - INTERVAL - 1, now)).toBe(STARTUP_REFRESH_DELAY_MS)
+  })
+
+  it('treats an exactly-expired cache as stale', () => {
+    const now = Date.now()
+    expect(refreshDelayMs(now - INTERVAL, now)).toBe(STARTUP_REFRESH_DELAY_MS)
+  })
+
+  // A future timestamp means the clock moved. Spawning would reintroduce the
+  // dialog, and a stale list costs almost nothing, so defer rather than guess.
+  it('defers rather than spawning when the timestamp is in the future', () => {
+    const now = Date.now()
+    expect(refreshDelayMs(now + 5 * HOUR, now)).toBe(INTERVAL)
+  })
+
+  it('treats a corrupt timestamp as no cache at all', () => {
+    expect(refreshDelayMs(NaN, Date.now())).toBe(STARTUP_REFRESH_DELAY_MS)
+    expect(refreshDelayMs(Infinity, Date.now())).toBe(STARTUP_REFRESH_DELAY_MS)
+  })
+
+  it('never returns a delay Node cannot schedule', () => {
+    const now = Date.now()
+    for (const t of [null, now, now - HOUR, now - INTERVAL, now + HOUR, NaN]) {
+      const d = refreshDelayMs(t, now)
+      expect(d).toBeGreaterThanOrEqual(0)
+      expect(d).toBeLessThanOrEqual(2 ** 31 - 1)
     }
   })
 })
