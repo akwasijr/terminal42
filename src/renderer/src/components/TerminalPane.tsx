@@ -5,6 +5,13 @@ import { WebLinksAddon } from '@xterm/addon-web-links'
 import { SearchAddon } from '@xterm/addon-search'
 import '@xterm/xterm/css/xterm.css'
 import { registerTerminalActions, notifyTerminalSelectionChanged } from '../state/terminalActions'
+import { loadPerformanceAddons, type AddonHandle } from '../lib/terminalAddons'
+import {
+  ShellEventParser,
+  applyShellEvent,
+  EMPTY_TERMINAL_STATE,
+  type TerminalState
+} from '../../../shared/terminalProtocol'
 
 const brainAppliedSet = new Set<string>()
 
@@ -93,6 +100,8 @@ export function TerminalPane({
   const [toast, setToast] = useState<string | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [shellState, setShellState] = useState<TerminalState>(EMPTY_TERMINAL_STATE)
+  const addonsRef = useRef<AddonHandle | null>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -145,6 +154,9 @@ export function TerminalPane({
     term.loadAddon(new WebLinksAddon())
     term.loadAddon(search)
     term.open(containerRef.current)
+    // Must come after open(): the WebGL renderer needs the terminal attached
+    // to the DOM before it can acquire a context.
+    addonsRef.current = loadPerformanceAddons(term)
     termRef.current = term
     fitRef.current = fit
     searchRef.current = search
@@ -184,6 +196,24 @@ export function TerminalPane({
       if (cancelled) return
 
       let liveBuffer: string[] | null = []
+      // The parser is stateful across chunks because escape sequences and
+      // progress lines routinely straddle PTY chunk boundaries, so one
+      // instance has to span the whole session.
+      const parser = new ShellEventParser()
+      let shell = EMPTY_TERMINAL_STATE
+      let publishQueued = false
+      let blockSeq = 0
+      const publishShellState = (): void => {
+        if (publishQueued) return
+        publishQueued = true
+        // A redrawing progress bar emits events far faster than the screen
+        // refreshes; repainting React on each one would cost more than the
+        // rendering we just accelerated.
+        requestAnimationFrame(() => {
+          publishQueued = false
+          if (!cancelled) setShellState(shell)
+        })
+      }
       // Clean-view state: only auto-confirms the "Confirm folder trust" prompt
       // for freshly-spawned PTYs. We deliberately do NOT clear xterm here :
       // clearing the buffer while Copilot's Ink UI is mid-render breaks input.
@@ -195,6 +225,14 @@ export function TerminalPane({
       disposeData = window.terminal42.pty.onData(sessionId, (data) => {
         if (liveBuffer) liveBuffer.push(data)
         else { try { term.write(data) } catch {} }
+        const events = parser.write(data)
+        if (events.length > 0) {
+          const now = Date.now()
+          for (const event of events) {
+            shell = applyShellEvent(shell, event, now, () => `${sessionId}:${++blockSeq}`)
+          }
+          publishShellState()
+        }
         if (cleanView.enabled && !cleanView.folderTrustHandled) {
           cleanView.stripped = (cleanView.stripped + stripAnsiLite(data)).slice(-4096)
           if (/Confirm folder trust/i.test(cleanView.stripped)) {
@@ -414,6 +452,8 @@ export function TerminalPane({
       window.removeEventListener('t42:restart-session', onRestartEvt as EventListener)
       window.removeEventListener('t42:settings-changed', onSettingsChanged)
       containerEl.removeEventListener('contextmenu', onContext)
+      addonsRef.current?.dispose()
+      addonsRef.current = null
       term.dispose()
     }
   }, [sessionId])
@@ -586,6 +626,8 @@ export function TerminalPane({
     <div className="relative h-full w-full" onMouseDown={(e) => { if (e.button === 0 && !searchOpen) termRef.current?.focus() }}>
       <div ref={containerRef} className="h-full w-full px-4 pt-3" data-testid="terminal-pane" />
 
+      <ShellStatus state={shellState} />
+
       {/* Search bar (⌘F) */}
       {searchOpen && (
         <div className="absolute right-4 top-2 z-30 flex items-center gap-1 rounded-lg bg-raised px-2 py-1.5 shadow-overlay">
@@ -657,6 +699,79 @@ export function TerminalPane({
       )}
     </div>
   )
+}
+
+function ShellStatus({ state }: { state: TerminalState }) {
+  const last = state.blocks[state.blocks.length - 1]
+  const progress = state.progress
+  // Nothing to say until the shell reports something, which also keeps the
+  // strip invisible on shells without integration rather than showing an
+  // empty chrome bar for ever.
+  if (!last && !progress) return null
+
+  const running = last?.status === 'running'
+  const tone =
+    running ? 'text-text-secondary'
+    : last?.status === 'succeeded' ? 'text-success'
+    : last?.status === 'failed' ? 'text-error'
+    : 'text-text-muted'
+
+  return (
+    <div
+      data-testid="shell-status"
+      className="pointer-events-none absolute bottom-2 left-4 right-4 z-20 flex items-center gap-3 text-[11.5px]"
+    >
+      {last && (
+        <span className={`flex min-w-0 items-center gap-1.5 ${tone}`}>
+          <span
+            aria-hidden
+            className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+              running ? 'animate-pulse bg-text-muted'
+              : last.status === 'succeeded' ? 'bg-success'
+              : last.status === 'failed' ? 'bg-error'
+              : 'bg-text-muted'
+            }`}
+          />
+          <span className="truncate font-mono">{last.command ?? (running ? 'running' : 'command')}</span>
+          {last.status === 'failed' && last.exitCode !== null && (
+            <span className="shrink-0 tabular-nums">exit {last.exitCode}</span>
+          )}
+          {!running && last.endedAt !== null && (
+            <span className="shrink-0 text-text-muted tabular-nums">{formatDuration(last.endedAt - last.startedAt)}</span>
+          )}
+        </span>
+      )}
+
+      {progress && (
+        <span className="ml-auto flex shrink-0 items-center gap-2 text-text-secondary">
+          {progress.message && <span>{progress.message}</span>}
+          {progress.current !== null && progress.total !== null && (
+            <span className="tabular-nums">{progress.current}/{progress.total}{progress.unit ?? ''}</span>
+          )}
+          {progress.percent !== null && (
+            <>
+              <span className="h-1 w-24 overflow-hidden rounded-full bg-elevated">
+                <span
+                  className="block h-full rounded-full bg-accent transition-[width] duration-200"
+                  style={{ width: `${Math.min(100, Math.max(0, progress.percent))}%` }}
+                />
+              </span>
+              <span className="w-9 text-right tabular-nums">{Math.round(progress.percent)}%</span>
+            </>
+          )}
+        </span>
+      )}
+    </div>
+  )
+}
+
+function formatDuration(ms: number): string {
+  // Sub-second commands are the common case, so keep them terse; anything
+  // long enough to notice gets a unit the eye can parse at a glance.
+  if (ms < 1000) return `${ms}ms`
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`
+  const mins = Math.floor(ms / 60_000)
+  return `${mins}m ${Math.round((ms % 60_000) / 1000)}s`
 }
 
 function CtxItem({ children, onClick, disabled }: { children: React.ReactNode; onClick: () => void; disabled?: boolean }) {

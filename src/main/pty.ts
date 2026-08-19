@@ -4,6 +4,7 @@ import { spawn as cpSpawn } from 'child_process'
 import * as os from 'os'
 import * as chokidar from 'chokidar'
 import { basename, join } from 'path'
+import { prepareShellIntegration } from './shellIntegration'
 import { promises as fs, readdirSync, readFileSync, writeFileSync, unlinkSync, mkdirSync } from 'fs'
 import { appendLog, dropSessionLog, markSessionBoundary } from './sessionLog'
 import { getSettings } from './settings'
@@ -235,12 +236,25 @@ export function registerPtyIpc(getWindow: () => BrowserWindow | null): void {
     const cmd = args.command || defaultShell
     const cmdArgs = args.commandArgs || []
     const cwd = args.cwd || os.homedir()
-    const proc = pty.spawn(cmd, cmdArgs, {
+    const env = { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor' } as Record<string, string>
+    // Shell integration has to be appended after the user's own rc file rather
+    // than injected before it; otherwise prompt frameworks can overwrite our
+    // hooks, or our setup can perturb aliases and startup state. The helper
+    // writes tiny per-shell rc wrappers under userData and silently falls back
+    // to the unmodified shell if anything about that setup fails.
+    const launch = prepareShellIntegration({
+      shellPath: cmd,
+      shellArgs: cmdArgs,
+      env,
+      integrationDir: join(app.getPath('userData'), 'shell-integration'),
+      homeDir: os.homedir()
+    })
+    const proc = pty.spawn(launch.command, launch.args, {
       name: 'xterm-256color',
       cols: args.cols ?? 100,
       rows: args.rows ?? 30,
       cwd,
-      env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor' } as Record<string, string>
+      env: launch.env
     })
     const now = Date.now()
     const session: Session = {
