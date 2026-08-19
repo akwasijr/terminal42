@@ -121,7 +121,11 @@ export function reframeGoal(text: string): GoalReframe {
     gate: HILL_GATE,
     canScore: scorable,
     meetsGate: passesGate,
-    shouldPushBack: !passesGate && missing.length > 0,
+    // Only a goal we could actually judge, and which actually failed, earns a
+    // push back. Treating "not proven good" as "proven bad" would lecture
+    // every "run the tests" and "commit this", which is how a useful nudge
+    // becomes something the user learns to ignore.
+    shouldPushBack: credibleScore !== null && credibleScore < HILL_GATE && missing.length > 0,
     missing,
     fields: buildFields(originalText, missing, feedbackLoop),
     feedbackLoop

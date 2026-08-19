@@ -20,6 +20,7 @@ function shortModel(m: string | null | undefined): string {
 
 type RightTab = 'status' | 'actions' | 'activity' | 'harness'
 const LS_RIGHT_TAB = 't42:rightpanel:tab'
+const LS_HARNESS_COLLAPSED = 't42:rightpanel:harnessCollapsed'
 
 export function RightPanel({
   sessionId,
@@ -785,6 +786,12 @@ function SessionInsightsBlock({ sessionId }: { sessionId: string | null }): JSX.
   const [copilotId, setCopilotId] = useState<string | null>(null)
   const [insights, setInsights] = useState<SessionInsights>(EMPTY_INSIGHTS)
   const [usage, setUsage] = useState<ContextUsage | null>(null)
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem(LS_HARNESS_COLLAPSED) === '1' } catch { return false }
+  })
+  useEffect(() => {
+    try { localStorage.setItem(LS_HARNESS_COLLAPSED, collapsed ? '1' : '0') } catch {}
+  }, [collapsed])
 
   useEffect(() => {
     if (!sessionId) { setCopilotId(null); return }
@@ -816,5 +823,12 @@ function SessionInsightsBlock({ sessionId }: { sessionId: string | null }): JSX.
     return <p className="px-1 py-2 text-[12px] text-text-muted">Open a session to see its harness.</p>
   }
 
-  return <InfoRail insights={insights} contextUsage={usage} />
+  return (
+    <InfoRail
+      insights={insights}
+      contextUsage={usage}
+      collapsed={collapsed}
+      onCollapsedChange={setCollapsed}
+    />
+  )
 }

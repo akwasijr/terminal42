@@ -52,12 +52,16 @@ describe('goal reframing', () => {
     expect(reframe.rawScore).toBe(100)
     expect(reframe.credibleScore).toBeNull()
     expect(reframe.meetsGate).toBe(false)
-    expect(reframe.shouldPushBack).toBe(true)
+    // Unjudgeable is not the same as bad: a short title earns no score, and
+    // so it also earns no lecture.
+    expect(reframe.shouldPushBack).toBe(false)
     expect(kindsOf(reframe)).toContain('objective')
   })
 
   it('renders a terse prompt-injectable reframe string', () => {
-    const prompt = renderGoalReframePrompt(reframeGoal('make the terminal faster without breaking tests'))
+    const prompt = renderGoalReframePrompt(
+      reframeGoal('make the terminal faster and improve the whole experience for everyone')
+    )
 
     // Asserts behaviour rather than exact wording: it must ask for a
     // measurable restatement and stay short enough to spend on a live message.
@@ -95,4 +99,42 @@ describe('renderGoalReframePrompt restraint', () => {
     const out = renderGoalReframePrompt(reframeGoal('clean up the codebase and make everything better and more maintainable'))
     expect(out.length).toBeLessThan(400)
   })
+})
+
+describe('push-back restraint on everyday messages', () => {
+  // The injection runs on every chat message, so anything that is not clearly
+  // a weak goal has to stay silent. Lecturing "commit this" about metrics is
+  // how a useful nudge becomes noise the user learns to ignore.
+  const EVERYDAY = [
+    'fix the login bug',
+    'whats in this file?',
+    'run the tests',
+    'add a dark mode toggle',
+    'why is this failing?',
+    'commit this',
+    'make the button blue',
+    'thanks!',
+    'explain how pty.ts works',
+    'add a hero section to the landing page'
+  ]
+  for (const message of EVERYDAY) {
+    it(`stays quiet for: ${message}`, () => {
+      expect(renderGoalReframePrompt(reframeGoal(message))).toBe('')
+    })
+  }
+
+  it('does not push back on text too short to judge', () => {
+    expect(reframeGoal('Validate schema').shouldPushBack).toBe(false)
+  })
+
+  const VAGUE_GOALS = [
+    'make the terminal faster and improve the whole experience',
+    'clean up the codebase and make everything better and more maintainable',
+    'make the app faster and improve the user experience across the board'
+  ]
+  for (const goal of VAGUE_GOALS) {
+    it(`still pushes back on: ${goal}`, () => {
+      expect(renderGoalReframePrompt(reframeGoal(goal))).not.toBe('')
+    })
+  }
 })

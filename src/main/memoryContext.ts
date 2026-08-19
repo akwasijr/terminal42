@@ -34,6 +34,10 @@ type Candidate = MemoryRecallResult & {
 
 const CHARS_PER_TOKEN = 4
 const MIN_LONG_QUERY_MATCHES = 2
+// A query carrying fewer than this many content words has too little signal to
+// recall against: "what is 2+2" would otherwise match a Brain note on the
+// strength of the word "what" alone.
+const MIN_QUERY_TERMS = 2
 const TOKEN_PATTERN = /[\p{L}\p{N}][\p{L}\p{N}'_-]*/gu
 const STOP_WORDS = new Set([
   'a',
@@ -63,7 +67,78 @@ const STOP_WORDS = new Set([
   'were',
   'with',
   'you',
-  'your'
+  'your',
+  // Interrogatives, modals and pleasantries carry no topic. Without these a
+  // question word is enough to drag in an unrelated note.
+  'what',
+  'when',
+  'where',
+  'which',
+  'who',
+  'whom',
+  'whose',
+  'why',
+  'how',
+  'can',
+  'could',
+  'should',
+  'would',
+  'will',
+  'shall',
+  'may',
+  'might',
+  'must',
+  'do',
+  'does',
+  'did',
+  'done',
+  'am',
+  'been',
+  'being',
+  'me',
+  'my',
+  'mine',
+  'we',
+  'us',
+  'our',
+  'they',
+  'them',
+  'their',
+  'he',
+  'she',
+  'him',
+  'her',
+  'his',
+  'its',
+  'so',
+  'if',
+  'then',
+  'than',
+  'but',
+  'not',
+  'no',
+  'yes',
+  'please',
+  'thanks',
+  'thank',
+  'ok',
+  'okay',
+  'just',
+  'now',
+  'here',
+  'there',
+  'about',
+  'into',
+  'over',
+  'out',
+  'up',
+  'down',
+  'all',
+  'any',
+  'some',
+  'more',
+  'most',
+  'very'
 ])
 
 export function buildMemoryContext(userMessage: string, options: BuildMemoryContextOptions = {}): MemoryContextResult {
@@ -72,7 +147,9 @@ export function buildMemoryContext(userMessage: string, options: BuildMemoryCont
     if (!recallResults.length) return emptyResult('no recall results', 0)
 
     const queryTerms = tokenize(userMessage)
-    if (!queryTerms.length) return emptyResult('message has no searchable terms', recallResults.length)
+    if (queryTerms.length < MIN_QUERY_TERMS) {
+      return emptyResult('message has too little topical signal to recall against', recallResults.length)
+    }
 
     const candidates = relevantCandidates(recallResults, queryTerms)
     if (!candidates.length) return emptyResult('recall results were below the relevance floor', recallResults.length)
@@ -158,9 +235,26 @@ function relevantCandidates(
     .filter((result) => result.matchedTerms > 0)
 }
 
+/**
+ * Collapses a term to a plural-insensitive form for matching only.
+ *
+ * The BM25 index is left untouched; this is purely so that a note about
+ * "hero sections" is reachable from a request to "add a hero section".
+ * Deliberately crude rather than a real stemmer: an aggressive stemmer
+ * conflates unrelated words, and a false match here costs prompt tokens.
+ */
+function matchKey(term: string): string {
+  if (term.length > 4 && term.endsWith('ies')) return `${term.slice(0, -3)}y`
+  if (term.length > 4 && (term.endsWith('ses') || term.endsWith('xes') || term.endsWith('hes'))) {
+    return term.slice(0, -2)
+  }
+  if (term.length > 3 && term.endsWith('s') && !term.endsWith('ss')) return term.slice(0, -1)
+  return term
+}
+
 function countMatchedTerms(text: string, queryTerms: readonly string[]): number {
-  const textTerms = new Set(tokenize(text))
-  return queryTerms.reduce((count, term) => count + (textTerms.has(term) ? 1 : 0), 0)
+  const textTerms = new Set(tokenize(text).map(matchKey))
+  return queryTerms.reduce((count, term) => count + (textTerms.has(matchKey(term)) ? 1 : 0), 0)
 }
 
 function normalizeForDedupe(text: string): string {

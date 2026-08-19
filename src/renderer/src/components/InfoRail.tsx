@@ -120,7 +120,7 @@ export function InfoRail({
           </>
         ) : (
           <p className="mt-2 text-[11px] text-text-muted">
-            Pass contextUsage when a session report is available.
+            The CLI reports this once the session has run a turn.
           </p>
         )}
       </section>
