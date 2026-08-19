@@ -77,3 +77,49 @@ describe('tailLines', () => {
     expect(tailLines('')).toBe('')
   })
 })
+
+// Auto-poke's worst failure is typing into a live permission prompt, so these
+// cases are transcribed from real Copilot CLI screen states rather than
+// invented. The idle case is the exact pane the strip used to sit on.
+describe('classifyStatus on real CLI screen states', () => {
+  it('treats a bare prompt after an MCP notice as idle', () => {
+    expect(
+      classifyStatus(
+        "! MCP server 'figma' requires authentication. Use /mcp auth figma to connect.\n\n~/Desktop [ main%]\n> "
+      )
+    ).toBe('idle')
+  })
+
+  it('treats the numbered approval menu as waiting', () => {
+    expect(
+      classifyStatus(
+        ' ● Allow Copilot to run this command?\n   > 1. Yes\n     2. Yes, and approve bash for the rest of the session\n     3. No, and tell Copilot what to do differently'
+      )
+    ).toBe('waiting')
+  })
+
+  it('treats folder trust as waiting', () => {
+    expect(
+      classifyStatus('Confirm folder trust\nDo you trust the files in this folder?\n(1) Yes  (2) No')
+    ).toBe('waiting')
+  })
+
+  it('treats an inline y/N prompt as waiting', () => {
+    expect(classifyStatus('Approve this edit? [y/N]')).toBe('waiting')
+  })
+
+  // A question from the agent is a request for input even without a menu.
+  it('treats an unanswered question as waiting', () => {
+    expect(classifyStatus('Should I also update the README?\n\n> ')).toBe('waiting')
+  })
+
+  it('treats a running tool call as working', () => {
+    expect(classifyStatus(' ● bash(npm run test)\n   Running tests...')).toBe('working')
+  })
+
+  it('treats a completed turn at the prompt as idle', () => {
+    expect(
+      classifyStatus('I have updated the three files as requested.\n\n~/terminal42 [main]\n> ')
+    ).toBe('idle')
+  })
+})
