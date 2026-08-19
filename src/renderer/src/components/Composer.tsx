@@ -7,6 +7,7 @@ import { ContextRing } from './ContextRing'
 import { useVoiceInput, formatVoiceTime, isVoiceInputSupported } from '../lib/voice'
 import { analyzeGoalQuality, shouldShowGoalQualityHint } from '../../../shared/goalQuality'
 import { GoalHint } from './GoalHint'
+import { COMPOSER_FILL_EVENT } from './ChatEmptyStateFull'
 
 // Legacy local 2-mode type kept as a no-op so old localStorage entries don't crash.
 type Mode = AgentMode
@@ -19,6 +20,7 @@ export function Composer({
   onModelRestart,
   modelPendingRestart,
   busy = false,
+  hasMessages = false,
   onSend,
   onCancel,
   onAttachFile,
@@ -31,6 +33,8 @@ export function Composer({
   onModelRestart?: () => void
   modelPendingRestart?: boolean
   busy?: boolean
+  /** Switches the placeholder to a follow-up prompt once a turn has happened. */
+  hasMessages?: boolean
   onSend: (text: string, mode: AgentMode) => void
   onCancel?: () => void
   onAttachFile?: () => void
@@ -92,6 +96,31 @@ export function Composer({
   useEffect(() => {
     persistMode(mode)
   }, [mode])
+
+  // Starter cards in the empty state fill the composer rather than sending, so
+  // the user can adjust the specifics first; attachments append their paths to
+  // whatever is already typed. Scoped by session id, since several composers
+  // are mounted at once — one per open session.
+  useEffect(() => {
+    const onFill = (e: Event): void => {
+      const detail = (e as CustomEvent<{ sessionId?: string; text?: string; mode?: 'replace' | 'append' }>).detail
+      if (!detail?.text || detail.sessionId !== sessionId) return
+      initialLoad.current = false
+      setBody((prev) => {
+        if (detail.mode !== 'append') return detail.text!
+        if (!prev.trim()) return detail.text!
+        return prev.replace(/\s*$/, '') + ' ' + detail.text!
+      })
+      requestAnimationFrame(() => {
+        const ta = taRef.current
+        if (!ta) return
+        ta.focus()
+        ta.setSelectionRange(ta.value.length, ta.value.length)
+      })
+    }
+    window.addEventListener(COMPOSER_FILL_EVENT, onFill)
+    return () => window.removeEventListener(COMPOSER_FILL_EVENT, onFill)
+  }, [sessionId])
 
   const send = async () => {
     const trimmed = body.trim()
@@ -162,7 +191,11 @@ export function Composer({
           onChange={(e) => setBody(e.target.value)}
           onKeyDown={onKeyDown}
           rows={1}
-          placeholder={voice.recording ? 'Listening…' : voice.transcribing ? 'Transcribing…' : 'Ask anything…'}
+          placeholder={
+            voice.recording ? 'Listening…'
+            : voice.transcribing ? 'Transcribing…'
+            : hasMessages ? 'Follow up' : 'Ask anything…'
+          }
           className="block w-full resize-none bg-transparent text-[14px] leading-relaxed text-text-primary placeholder:text-text-muted focus:outline-none"
           aria-label="Message Copilot"
         />
@@ -245,6 +278,7 @@ export function Composer({
           )}
         </div>
       </div>
+      <p className="mt-1.5 text-center text-[11px] text-text-muted">AI-generated content may be incorrect</p>
     </div>
   )
 }
@@ -296,14 +330,14 @@ function AttachMenu({
             disabled={!onAttachFile}
             className="cursor-pointer rounded-md px-2 py-1.5 outline-none data-[highlighted]:bg-surface data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40"
           >
-            Attach file…
+            Upload files…
           </Dropdown.Item>
           <Dropdown.Item
             onSelect={() => onAttachImage?.()}
             disabled={!onAttachImage}
             className="cursor-pointer rounded-md px-2 py-1.5 outline-none data-[highlighted]:bg-surface data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40"
           >
-            Attach image…
+            Upload images…
           </Dropdown.Item>
         </Dropdown.Content>
       </Dropdown.Portal>

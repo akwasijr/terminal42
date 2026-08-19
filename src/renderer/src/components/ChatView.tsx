@@ -1,15 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ChatMessage } from '../../../preload/index'
 import {
-  AssistantBubble, UserBubble, SystemBubble, ThinkingIndicator, ChatEmptyState
+  AssistantBubble, UserBubble, SystemBubble, ThinkingIndicator
 } from './ChatBubbles'
+import { DiffCard } from './DiffCard'
+import { ChatEmptyStateFull, COMPOSER_FILL_EVENT } from './ChatEmptyStateFull'
 
 export function ChatView({
   sessionId,
-  onBusyChange
+  onBusyChange,
+  onHasMessagesChange,
+  onOpenFile
 }: {
   sessionId: string
   onBusyChange?: (busy: boolean) => void
+  onHasMessagesChange?: (has: boolean) => void
+  onOpenFile?: (messageId: string, path: string) => void
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [busy, setBusy] = useState(false)
@@ -37,6 +43,7 @@ export function ChatView({
   }, [sessionId])
 
   useEffect(() => { onBusyChange?.(busy) }, [busy, onBusyChange])
+  useEffect(() => { onHasMessagesChange?.(messages.length > 0) }, [messages.length, onHasMessagesChange])
 
   // Subscribe to streaming events
   useEffect(() => {
@@ -89,7 +96,19 @@ export function ChatView({
       if (d.sessionId !== sessionId) return
       setBusy(false)
     })
-    return () => { offMessage(); offDelta(); offTool(); offStart(); offDone() }
+    // Diffs arrive shortly after `done`: computing them is detached from the
+    // turn so the response is never held up waiting on git.
+    const offDiff = window.terminal42.chat.onDiff((d) => {
+      if (d.sessionId !== sessionId) return
+      setMessages((prev) => {
+        const idx = prev.findIndex((p) => p.id === d.messageId)
+        if (idx === -1) return prev
+        const next = prev.slice()
+        next[idx] = { ...next[idx], diff: d.diff, undone: false }
+        return next
+      })
+    })
+    return () => { offMessage(); offDelta(); offTool(); offStart(); offDone(); offDiff() }
   }, [sessionId])
 
   // Scroll-to-bottom handling
@@ -119,9 +138,21 @@ export function ChatView({
         {!loaded && (
           <div className="grid place-items-center py-16 text-text-muted">Loading…</div>
         )}
-        {isEmpty && <ChatEmptyState />}
+        {isEmpty && (
+          <ChatEmptyStateFull
+            onPick={(text) => {
+              window.dispatchEvent(new CustomEvent(COMPOSER_FILL_EVENT, { detail: { sessionId, text } }))
+            }}
+            onExploreTemplates={() => window.dispatchEvent(new CustomEvent('t42:open-templates'))}
+          />
+        )}
         {messages.map((m) => (
-          <MessageBubble key={m.id} message={m} />
+          <MessageBubble
+            key={m.id}
+            message={m}
+            onUndone={() => setMessages((prev) => prev.map((p) => (p.id === m.id ? { ...p, undone: true } : p)))}
+            onOpenFile={onOpenFile ? (path) => onOpenFile(m.id, path) : undefined}
+          />
         ))}
         {busy && <ThinkingIndicator />}
       </div>
@@ -129,10 +160,31 @@ export function ChatView({
   )
 }
 
-function MessageBubble({ message }: { message: ChatMessage }): JSX.Element {
+function MessageBubble({
+  message,
+  onUndone,
+  onOpenFile
+}: {
+  message: ChatMessage
+  onUndone?: () => void
+  onOpenFile?: (path: string) => void
+}): JSX.Element {
   if (message.role === 'user') return <UserBubble message={message} />
   if (message.role === 'system') return <SystemBubble message={message} />
-  return <AssistantBubble message={message} />
+  return (
+    <div className="flex flex-col gap-2">
+      <AssistantBubble message={message} />
+      {message.diff && message.diff.files.length > 0 && (
+        <DiffCard
+          messageId={message.id}
+          diff={message.diff}
+          undone={message.undone}
+          onUndone={onUndone}
+          onOpenFile={onOpenFile}
+        />
+      )}
+    </div>
+  )
 }
 
 

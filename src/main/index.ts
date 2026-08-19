@@ -13,6 +13,7 @@ import { registerRecipesIpc } from './recipes'
 import { registerBrainIpc } from './brain'
 import { registerBriefIpc } from './brief'
 import { registerGitIpc } from './git'
+import { registerIdentityIpc } from './identity'
 import { registerMemoryIpc, backfillMemoryIndex } from './memory'
 import { registerFilesIpc } from './files'
 import { registerVoiceIpc } from './voice'
@@ -337,6 +338,7 @@ app.whenReady().then(() => {
   registerBrainIpc()
   registerBriefIpc()
   registerGitIpc()
+  registerIdentityIpc()
   registerMemoryIpc(() => mainWindow)
   registerFilesIpc(() => mainWindow)
   registerVoiceIpc()

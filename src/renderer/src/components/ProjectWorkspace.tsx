@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Project, Session } from '../../../preload/index'
 import { ChatView } from './ChatView'
+import { ChipsRow } from './ChipsRow'
 import { RightPanel } from './RightPanel'
 import { Composer } from './Composer'
 import { ResizeHandle } from './ResizeHandle'
@@ -9,6 +10,8 @@ import { ApplyBrainPrompt } from './ApplyBrainPrompt'
 import { TerminalActionsMenu } from './TerminalActionsMenu'
 import { KickoffPromptButton } from './KickoffPromptViewer'
 import { BrowserPane } from './BrowserPane'
+import { CodePane } from './CodePane'
+import { COMPOSER_FILL_EVENT } from './ChatEmptyStateFull'
 import { IconPlus, IconTerminal, IconExternal, IconEdit } from './icons'
 import { useSessions } from '../state/store'
 import { classifyStatus, type AgentStatus } from '../../../shared/agentStatus'
@@ -77,6 +80,27 @@ export function ProjectWorkspace({
   const active = sessions.find((s) => s.id === activeId) ?? null
   const { model, pending, pick, restart, pendingRestart } = useSessionModel(active?.id ?? null, DEFAULT_MODEL)
   const [busy, setBusy] = useState(false)
+  const [hasMessages, setHasMessages] = useState(false)
+  // Which file the code pane is showing, and which turn's snapshot to diff it
+  // against. Cleared when the pane closes.
+  const [codeFile, setCodeFile] = useState<{ messageId: string; path: string } | null>(null)
+
+  /**
+   * Attach files by appending their paths to the draft.
+   *
+   * The agent runs as a CLI with filesystem access, so a path is the whole
+   * payload — there is nothing to upload. Appending rather than replacing
+   * keeps whatever the user already typed.
+   */
+  const attach = async (sessionId: string, images: boolean): Promise<void> => {
+    try {
+      const paths = await window.terminal42.files.pick({ multi: true, images })
+      if (!paths?.length) return
+      window.dispatchEvent(new CustomEvent(COMPOSER_FILL_EVENT, {
+        detail: { sessionId, mode: 'append', text: paths.map((p) => JSON.stringify(p)).join(' ') }
+      }))
+    } catch {}
+  }
 
   // Reset busy when active session changes; ChatView will re-emit current state.
   useEffect(() => { setBusy(false) }, [active?.id])
@@ -276,13 +300,23 @@ export function ProjectWorkspace({
                     style={{ visibility: s.id === active?.id && isActive ? 'visible' : 'hidden' }}
                     aria-hidden={s.id !== active?.id || !isActive}
                   >
-                    <ChatView sessionId={s.id} onBusyChange={s.id === active?.id ? setBusy : undefined} />
+                    <ChatView
+                      sessionId={s.id}
+                      onBusyChange={s.id === active?.id ? setBusy : undefined}
+                      onHasMessagesChange={s.id === active?.id ? setHasMessages : undefined}
+                      onOpenFile={(messageId, path) => setCodeFile({ messageId, path })}
+                    />
                   </div>
                 ))
               )}
             </div>
             {active && (
-              <Composer
+              <>
+                <ChipsRow
+                  cwd={project.path}
+                  onOpenFolder={() => { void window.terminal42.system.revealFolder(project.path) }}
+                />
+                <Composer
                 key={active.id}
                 sessionId={active.id}
                 model={model}
@@ -291,15 +325,32 @@ export function ProjectWorkspace({
                 onModelRestart={restart}
                 modelPendingRestart={pendingRestart}
                 busy={busy}
+                hasMessages={hasMessages}
                 onCancel={() => { void window.terminal42.chat.cancel(active.id) }}
                 onSend={(text, agentMode) => { void window.terminal42.chat.send(active.id, text, model, null, agentMode) }}
+                onAttachFile={() => void attach(active.id, false)}
+                onAttachImage={() => void attach(active.id, true)}
               />
+              </>
             )}
-            {/* ChipsRow (folder · worktree · branch) removed: chips were
-                non-functional. Branch + cwd are visible in the right panel. */}
+            {/* ChipsRow sits above the composer: only chips wired to real
+                actions are shown, which is why the old "New worktree"
+                placeholder is gone rather than restored. */}
           </div>
         </main>
-        {browserOpen ? (
+        {codeFile ? (
+          <>
+            <ResizeHandle side="right" currentWidth={browserWidth} onChange={setBrowserWidth} min={320} max={1200} />
+            <CodePane
+              messageId={codeFile.messageId}
+              path={codeFile.path}
+              width={browserWidth}
+              onClose={() => setCodeFile(null)}
+              onShowPreview={() => { setCodeFile(null); setBrowserOpen(true) }}
+              onOpenFolder={() => { void window.terminal42.system.revealFolder(project.path) }}
+            />
+          </>
+        ) : browserOpen ? (
           <>
             <ResizeHandle side="right" currentWidth={browserWidth} onChange={setBrowserWidth} min={320} max={1200} />
             <BrowserPane

@@ -35,6 +35,20 @@ export type ChatToolCall = {
   summary?: string
 }
 
+export type ChatFileChange = {
+  path: string
+  status: 'added' | 'modified' | 'deleted'
+  additions: number
+  deletions: number
+  binary: boolean
+}
+
+export type ChatDiff = {
+  files: ChatFileChange[]
+  additions: number
+  deletions: number
+}
+
 export type ChatMessage = {
   id: string
   sessionId: string
@@ -43,6 +57,8 @@ export type ChatMessage = {
   toolCalls: ChatToolCall[]
   status: 'pending' | 'streaming' | 'done' | 'error' | 'cancelled'
   createdAt: number
+  diff?: ChatDiff | null
+  undone?: boolean
 }
 
 export type DesignVersion = {
@@ -625,6 +641,9 @@ const api = {
     history: (sessionId: string): Promise<ComposerEntry[]> =>
       ipcRenderer.invoke('composer:history', sessionId)
   },
+  identity: {
+    greetingName: () => ipcRenderer.invoke('identity:greetingName') as Promise<string | null>
+  },
   chat: {
     send: (sessionId: string, text: string, model?: string | null, prefix?: string | null, agentMode?: 'interactive' | 'plan' | 'autopilot') =>
       ipcRenderer.invoke('chat:send', { sessionId, text, model, prefix, agentMode }) as Promise<{ ok: boolean; error?: string }>,
@@ -632,6 +651,15 @@ const api = {
     history: (sessionId: string) => ipcRenderer.invoke('chat:history', sessionId) as Promise<ChatMessage[]>,
     clear: (sessionId: string) => ipcRenderer.invoke('chat:clear', sessionId) as Promise<{ ok: boolean }>,
     isBusy: (sessionId: string) => ipcRenderer.invoke('chat:isBusy', sessionId) as Promise<boolean>,
+    undo: (messageId: string) =>
+      ipcRenderer.invoke('chat:undo', messageId) as Promise<{ ok: boolean; reverted: string[]; error?: string }>,
+    fileDiff: (messageId: string, path: string) =>
+      ipcRenderer.invoke('chat:fileDiff', { messageId, path }) as Promise<{ ok: boolean; before: string | null; after: string | null; error?: string }>,
+    onDiff: (cb: (d: { sessionId: string; messageId: string; diff: ChatDiff }) => void) => {
+      const handler = (_e: unknown, d: { sessionId: string; messageId: string; diff: ChatDiff }): void => cb(d)
+      ipcRenderer.on('chat:diff', handler)
+      return () => ipcRenderer.removeListener('chat:diff', handler)
+    },
     onMessage: (cb: (m: ChatMessage) => void) => {
       const handler = (_e: unknown, m: ChatMessage): void => cb(m)
       ipcRenderer.on('chat:message', handler)

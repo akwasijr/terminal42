@@ -1,12 +1,15 @@
 import { ipcMain, BrowserWindow } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { getDb } from './db'
 import { resolveModel } from './models'
 import { assembleCacheStableMessages, flattenPromptCacheMessages } from '../shared/promptCache'
 import { buildMemoryContext } from './memoryContext'
 import { recordMemoryUse } from './sessionInsights'
 import { reframeGoal, renderGoalReframePrompt } from '../shared/goalReframe'
+import { snapshotTree, diffTrees, revertPaths, readFileAtTree, type DiffSummary } from './gitSnapshot'
 
 export type ChatRole = 'user' | 'assistant' | 'system'
 export type ChatStatus = 'pending' | 'streaming' | 'done' | 'error' | 'cancelled'
@@ -27,6 +30,11 @@ export type ChatMessage = {
   toolCalls: ToolCall[]
   status: ChatStatus
   createdAt: number
+  /** Files this turn changed. Absent until the turn finishes, or when the
+   *  session isn't running inside a git repository. */
+  diff?: DiffSummary | null
+  /** True once the user has reverted this turn, so Undo isn't offered twice. */
+  undone?: boolean
 }
 
 type RunState = {
@@ -36,6 +44,12 @@ type RunState = {
   toolCalls: Map<string, ToolCall>
   cancelled: boolean
   doneEmitted: boolean
+  /** Working directory the turn ran in, kept so the diff and any later undo
+   *  resolve against the same repo even if the project is re-pointed. */
+  cwd: string
+  /** Worktree snapshot taken as the turn started. Held as a promise so
+   *  starting the run is never blocked on git. */
+  snapshot: Promise<string | null>
   // Retry context for transparent model fallback (one-shot --prompt mode
   // doesn't auto-fall-back on unknown --model, so we re-send without it).
   // If that hits a rate limit and is eligible for auto-switch, we retry
@@ -60,26 +74,61 @@ function finalizeRun(win: BrowserWindow | null, sessionId: string, state: RunSta
   running.delete(sessionId)
   if (state.doneEmitted) return
   state.doneEmitted = true
+  void recordTurnDiff(win, sessionId, state)
   emit(win, 'chat:done', { sessionId, exitCode })
+}
+
+/**
+ * Work out what the finished turn changed on disk and attach it to the
+ * assistant message.
+ *
+ * Runs detached from the done event on purpose: taking the closing snapshot
+ * costs a couple of git invocations, and making the user wait for the diff
+ * before the response is marked complete would be a regression in the common
+ * case where nothing changed at all. The card simply appears a moment later.
+ */
+async function recordTurnDiff(win: BrowserWindow | null, sessionId: string, state: RunState): Promise<void> {
+  try {
+    const messageId = state.assistantMsgId
+    if (!messageId) return
+    const before = await state.snapshot
+    if (!before) return
+    const after = await snapshotTree(state.cwd)
+    if (!after || after === before) return
+    const diff = await diffTrees(state.cwd, before, after)
+    if (diff.files.length === 0) return
+    getDb()
+      .prepare('UPDATE chat_messages SET snapshot_tree = ?, diff_json = ?, diff_cwd = ? WHERE id = ?')
+      .run(before, JSON.stringify(diff), state.cwd, messageId)
+    emit(win, 'chat:diff', { sessionId, messageId, diff })
+  } catch {
+    // A diff is a convenience; never let it break the turn.
+  }
 }
 
 function rowToMessage(row: {
   id: string; session_id: string; role: ChatRole; content: string;
-  tool_calls: string | null; status: ChatStatus; created_at: number
+  tool_calls: string | null; status: ChatStatus; created_at: number;
+  diff_json?: string | null; undone?: number | null
 }): ChatMessage {
   let toolCalls: ToolCall[] = []
   if (row.tool_calls) {
     try { toolCalls = JSON.parse(row.tool_calls) } catch {}
   }
+  let diff: DiffSummary | null = null
+  if (row.diff_json) {
+    try { diff = JSON.parse(row.diff_json) as DiffSummary } catch {}
+  }
   return {
     id: row.id, sessionId: row.session_id, role: row.role, content: row.content,
-    toolCalls, status: row.status, createdAt: row.created_at
+    toolCalls, status: row.status, createdAt: row.created_at,
+    diff, undone: !!row.undone
   }
 }
 
 function loadHistory(sessionId: string): ChatMessage[] {
   const rows = getDb()
-    .prepare(`SELECT id, session_id, role, content, tool_calls, status, created_at
+    .prepare(`SELECT id, session_id, role, content, tool_calls, status, created_at, diff_json, undone
               FROM chat_messages WHERE session_id = ? ORDER BY created_at ASC, id ASC`)
     .all(sessionId) as Array<Parameters<typeof rowToMessage>[0]>
   return rows.map(rowToMessage)
@@ -202,6 +251,70 @@ function processJsonEvent(
     emit(win, 'chat:done', { sessionId, exitCode: (evt as { exitCode?: number }).exitCode ?? 0 })
     return
   }
+}
+
+/**
+ * Revert every file a turn changed, back to the snapshot taken before it ran.
+ *
+ * Scoped to that turn's file list, so edits the user made by hand while the
+ * agent worked survive. Marked `undone` afterwards so the card stops offering
+ * a second revert against a now-stale snapshot.
+ */
+async function undoTurn(messageId: string): Promise<{ ok: boolean; reverted: string[]; error?: string }> {
+  const row = getDb()
+    .prepare('SELECT snapshot_tree, diff_json, diff_cwd, undone FROM chat_messages WHERE id = ?')
+    .get(messageId) as { snapshot_tree: string | null; diff_json: string | null; diff_cwd: string | null; undone: number } | undefined
+  if (!row) return { ok: false, reverted: [], error: 'Message not found.' }
+  if (row.undone) return { ok: false, reverted: [], error: 'These changes were already undone.' }
+  if (!row.snapshot_tree || !row.diff_cwd || !row.diff_json) {
+    return { ok: false, reverted: [], error: 'No snapshot was recorded for this turn.' }
+  }
+  let diff: DiffSummary
+  try { diff = JSON.parse(row.diff_json) as DiffSummary }
+  catch { return { ok: false, reverted: [], error: 'Recorded changes could not be read.' } }
+
+  const res = await revertPaths(row.diff_cwd, row.snapshot_tree, diff.files.map((f) => f.path))
+  if (res.reverted.length > 0) {
+    getDb().prepare('UPDATE chat_messages SET undone = 1 WHERE id = ?').run(messageId)
+  }
+  if (!res.ok) {
+    return {
+      ok: false,
+      reverted: res.reverted,
+      error: `Could not restore ${res.failed.length} file(s): ${res.failed.map((f) => f.path).join(', ')}`
+    }
+  }
+  return { ok: true, reverted: res.reverted }
+}
+
+/**
+ * Before/after contents of one file the turn touched, for the Code view.
+ *
+ * `path` is checked against that turn's recorded file list, so this can only
+ * ever read files the turn actually changed.
+ */
+async function loadFileDiff(
+  messageId: string,
+  path: string
+): Promise<{ ok: boolean; before: string | null; after: string | null; error?: string }> {
+  const row = getDb()
+    .prepare('SELECT snapshot_tree, diff_json, diff_cwd FROM chat_messages WHERE id = ?')
+    .get(messageId) as { snapshot_tree: string | null; diff_json: string | null; diff_cwd: string | null } | undefined
+  if (!row?.snapshot_tree || !row.diff_cwd || !row.diff_json) {
+    return { ok: false, before: null, after: null, error: 'No snapshot for this turn.' }
+  }
+  let diff: DiffSummary
+  try { diff = JSON.parse(row.diff_json) as DiffSummary }
+  catch { return { ok: false, before: null, after: null, error: 'Recorded changes could not be read.' } }
+  const entry = diff.files.find((f) => f.path === path)
+  if (!entry) return { ok: false, before: null, after: null, error: 'That file is not part of this change.' }
+  if (entry.binary) return { ok: false, before: null, after: null, error: 'Binary file.' }
+
+  const before = await readFileAtTree(row.diff_cwd, row.snapshot_tree, path)
+  let after: string | null = null
+  try { after = await readFile(join(row.diff_cwd, path), 'utf8') }
+  catch { after = null }
+  return { ok: true, before, after }
 }
 
 function parseLine(line: string): Record<string, unknown> | null {
@@ -329,6 +442,9 @@ function send(
 
   const state: RunState = {
     child, assistantMsgId: null, buffer: '', toolCalls: new Map(), cancelled: false, doneEmitted: false,
+    cwd,
+    // Fired here rather than awaited: the run must not wait on git.
+    snapshot: snapshotTree(cwd),
     requestedModel: model ?? null,
     originalText: text,
     originalOpts: { cwd: opts.cwd, prefix: opts.prefix, agentMode: opts.agentMode },
@@ -513,4 +629,7 @@ export function registerChatIpc(getWin: () => BrowserWindow | null): void {
   ipcMain.handle('chat:history', (_e, sessionId: string) => loadHistory(sessionId))
   ipcMain.handle('chat:clear', (_e, sessionId: string) => { clearHistory(sessionId); return { ok: true } })
   ipcMain.handle('chat:isBusy', (_e, sessionId: string) => isBusy(sessionId))
+  ipcMain.handle('chat:undo', async (_e, messageId: string) => undoTurn(messageId))
+  ipcMain.handle('chat:fileDiff', async (_e, args: { messageId: string; path: string }) =>
+    loadFileDiff(args.messageId, args.path))
 }

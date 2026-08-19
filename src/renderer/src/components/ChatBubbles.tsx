@@ -7,6 +7,7 @@
 // The components accept a structural message type so both `ChatMessage`
 // (project) and `LoomMessage` (loom) satisfy it without adapters.
 
+import { chatActivityLabel, summarizeChatTools, type ChatToolGroup } from './chatActivity'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { IconBolt, IconCheck, IconChevronRight, IconClose, IconCopy } from './icons'
@@ -63,6 +64,7 @@ export function UserBubble({ message }: { message: ChatLikeMessage }): JSX.Eleme
   )
 }
 
+
 export function AssistantBubble({
   message,
   extraFooter
@@ -99,7 +101,11 @@ export function AssistantBubble({
             className="inline-flex items-center gap-1 text-[12px] text-text-muted hover:text-text-secondary"
           >
             <IconChevronRight size={9} className={['shrink-0 transition-transform', open ? 'rotate-90' : ''].join(' ')} />
-            <span>{message.status === 'streaming' ? `Working… ${formatChatElapsed(elapsed.ms)}` : `Worked for ${formatChatElapsed(elapsed.ms)}`}</span>
+            <span title={`Took ${formatChatElapsed(elapsed.ms)}`}>
+              {message.status === 'streaming'
+                ? `Working… ${formatChatElapsed(elapsed.ms)}`
+                : (chatActivityLabel(grouped) ?? `Worked for ${formatChatElapsed(elapsed.ms)}`)}
+            </span>
           </button>
           {open && (
             <div className="mt-2 ml-3 pl-3 text-[12.5px] leading-relaxed text-text-secondary">
@@ -162,8 +168,6 @@ export function ChatEmptyState({
 
 // ----- Internals ----------------------------------------------------------
 
-type ChatToolGroup = { name: string; status: 'running' | 'done' | 'error'; count: number }
-
 function groupChatTools(calls: ChatLikeToolCall[]): ChatToolGroup[] {
   const order: string[] = []
   const map = new Map<string, ChatToolGroup>()
@@ -208,25 +212,6 @@ function formatChatElapsed(ms: number): string {
   return `${h}h ${m % 60}m`
 }
 
-function summarizeChatTools(tools: ChatToolGroup[]): string {
-  const verbs: string[] = []
-  for (const t of tools) {
-    const n = t.name.toLowerCase()
-    if (n === 'view' || n === 'read' || n === 'read_file' || n.includes('view')) verbs.push(`read ${t.count} file${t.count === 1 ? '' : 's'}`)
-    else if (n === 'edit' || n === 'edit_file' || n.startsWith('apply_patch')) verbs.push(`made ${t.count} edit${t.count === 1 ? '' : 's'}`)
-    else if (n === 'create' || n === 'write' || n === 'write_file') verbs.push(`created ${t.count} file${t.count === 1 ? '' : 's'}`)
-    else if (n === 'bash' || n === 'shell' || n.includes('exec')) verbs.push(`ran ${t.count} command${t.count === 1 ? '' : 's'}`)
-    else if (n.includes('grep') || n.includes('search') || n.includes('rg')) verbs.push(`searched ${t.count} time${t.count === 1 ? '' : 's'}`)
-    else if (n.includes('glob') || n.includes('list')) verbs.push(`listed files`)
-    else if (n.startsWith('figma-')) verbs.push(`called Figma ${t.count > 1 ? `×${t.count}` : ''}`.trim())
-    else verbs.push(`used ${t.name}${t.count > 1 ? ` ×${t.count}` : ''}`)
-  }
-  if (verbs.length === 0) return 'No tool activity recorded.'
-  if (verbs.length === 1) return verbs[0][0].toUpperCase() + verbs[0].slice(1) + '.'
-  const last = verbs.pop()!
-  const head = verbs.join(', ')
-  return head[0].toUpperCase() + head.slice(1) + `, and ${last}.`
-}
 
 function relativeTimeShort(at: number): string {
   if (!at) return ''

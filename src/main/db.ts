@@ -282,6 +282,26 @@ function migrate(d: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_loom_artifacts ON loom_artifacts(loom_id, created_at);
   `)
+
+  // chat_messages pre-dates turn-scoped diffs. `snapshot_tree` is the git tree
+  // frozen just before the turn ran, `diff_cwd` the repo it was taken in
+  // (stored rather than re-derived, so undo still works if the project is
+  // later re-pointed), and `undone` stops a card offering Undo twice.
+  const chatCols = d.prepare(`PRAGMA table_info(chat_messages)`).all() as { name: string }[]
+  if (chatCols.length > 0) {
+    if (!chatCols.some((c) => c.name === 'snapshot_tree')) {
+      d.exec(`ALTER TABLE chat_messages ADD COLUMN snapshot_tree TEXT`)
+    }
+    if (!chatCols.some((c) => c.name === 'diff_json')) {
+      d.exec(`ALTER TABLE chat_messages ADD COLUMN diff_json TEXT`)
+    }
+    if (!chatCols.some((c) => c.name === 'diff_cwd')) {
+      d.exec(`ALTER TABLE chat_messages ADD COLUMN diff_cwd TEXT`)
+    }
+    if (!chatCols.some((c) => c.name === 'undone')) {
+      d.exec(`ALTER TABLE chat_messages ADD COLUMN undone INTEGER NOT NULL DEFAULT 0`)
+    }
+  }
 }
 
 export type ProjectRow = {

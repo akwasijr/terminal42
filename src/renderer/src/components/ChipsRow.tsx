@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react'
-import { IconBranch, IconChevronRight, IconFolder, IconWorktree } from './icons'
+import { IconBranch, IconFolder } from './icons'
 
 export function ChipsRow({
   cwd,
-  onOpenFolder,
-  onNewWorktree
+  onOpenFolder
 }: {
   cwd: string | null
   onOpenFolder?: () => void
-  onNewWorktree?: () => void
 }) {
   const [branch, setBranch] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
   const [isRepo, setIsRepo] = useState(false)
+  const [ahead, setAhead] = useState(0)
+  const [behind, setBehind] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -26,6 +26,8 @@ export function ChipsRow({
         setIsRepo(!!s.isRepo)
         setBranch(s.branch ?? null)
         setDirty(!!s.dirty)
+        setAhead(s.ahead ?? 0)
+        setBehind(s.behind ?? 0)
       }).catch(() => {})
     }
     refresh()
@@ -33,30 +35,28 @@ export function ChipsRow({
     return () => { cancelled = true; clearInterval(t) }
   }, [cwd])
 
-  const folderLabel = cwd ? (cwd.split('/').filter(Boolean).pop() ?? cwd) : ':'
+  if (!cwd) return null
+
+  const folderLabel = cwd.split('/').filter(Boolean).pop() ?? cwd
+  const branchTitle = [
+    dirty ? 'Uncommitted changes' : 'Working tree clean',
+    ahead ? `${ahead} ahead` : '',
+    behind ? `${behind} behind` : ''
+  ].filter(Boolean).join(' · ')
 
   return (
-    <div className="flex items-center gap-2 px-5 pb-2 text-[12px] text-text-secondary">
+    <div className="flex items-center gap-1 px-4 pb-1 text-[12px] text-text-secondary">
       <Chip
         icon={<IconFolder size={12} />}
         label={folderLabel}
-        title={cwd ?? undefined}
+        title={onOpenFolder ? `${cwd} — click to reveal in Finder` : cwd}
         onClick={onOpenFolder}
-        hasMenu={!!onOpenFolder}
-      />
-      <Chip
-        icon={<IconWorktree size={12} />}
-        label="New worktree"
-        title="Create a git worktree (coming soon)"
-        onClick={onNewWorktree}
-        hasMenu={!!onNewWorktree}
-        muted
       />
       {isRepo && (
         <Chip
           icon={<IconBranch size={12} />}
           label={branch ?? 'detached'}
-          title={dirty ? 'Working tree has uncommitted changes' : 'Working tree clean'}
+          title={branchTitle}
           dot={dirty ? 'amber' : 'green'}
         />
       )}
@@ -69,7 +69,6 @@ function Chip({
   label,
   title,
   onClick,
-  hasMenu,
   muted,
   dot
 }: {
@@ -77,13 +76,12 @@ function Chip({
   label: string
   title?: string
   onClick?: () => void
-  hasMenu?: boolean
   muted?: boolean
   dot?: 'green' | 'amber'
 }) {
   const interactive = !!onClick
   const className = [
-    'flex h-7 items-center gap-1.5 rounded-md px-2 outline-none focus:outline-none',
+    'flex h-7 items-center gap-1.5 rounded-md px-2 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent',
     interactive ? 'cursor-pointer hover:bg-surface hover:text-text-primary' : 'cursor-default',
     muted ? 'text-text-muted' : ''
   ].filter(Boolean).join(' ')
@@ -97,7 +95,6 @@ function Chip({
           aria-hidden="true"
         />
       )}
-      {hasMenu && <IconChevronRight size={9} className="rotate-90 text-text-muted" />}
     </>
   )
   if (interactive) {
