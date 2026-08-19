@@ -16,7 +16,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import { buildGreeting } from '../../../shared/greeting'
-import { STARTER_PROMPT_TEXTS, type StarterPromptText } from './starterPrompts'
+import { STARTER_PROMPT_TEXTS, type StarterPromptText, type StarterId } from './starterPrompts'
 
 
 // Same palette the design wizard's thumbnails use, redeclared rather than
@@ -31,8 +31,8 @@ const COL = {
 type StarterPrompt = StarterPromptText & { art: ReactNode }
 
 /** Artwork keyed by prompt id; the text itself lives in starterPrompts.ts. */
-const ART: Record<string, ReactNode> = {
-  orient: (
+const ART: Record<StarterId, ReactNode> = {
+  tool: (
       <>
         <rect x="8" y="6" width="30" height="52" rx="2" fill={COL.ink} opacity="0.85" />
         <rect x="12" y="12" width="16" height="2" rx="0.5" fill={COL.paper} opacity="0.6" />
@@ -48,7 +48,7 @@ const ART: Record<string, ReactNode> = {
         <rect x="48" y="46" width="20" height="4" rx="1" fill="currentColor" />
       </>
   ),
-  measure: (
+  dashboard: (
       <>
         <rect x="6" y="8" width="88" height="48" rx="3" fill={COL.paper} />
         <line x1="16" y1="48" x2="86" y2="48" stroke={COL.muted} strokeWidth="0.5" />
@@ -60,7 +60,7 @@ const ART: Record<string, ReactNode> = {
         <circle cx="80" cy="18" r="3" fill="currentColor" />
       </>
   ),
-  ship: (
+  site: (
       <>
         <rect x="8" y="6" width="84" height="52" rx="3" fill={COL.paper} />
         <line x1="8" y1="14" x2="92" y2="14" stroke={COL.muted} strokeWidth="0.5" />

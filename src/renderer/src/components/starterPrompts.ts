@@ -6,30 +6,44 @@
 // to measure" hint teaches people that the warning is noise to dismiss. So the
 // wording is held to the same bar the harness asks of the user: a stated
 // target, and a named way to check it.
+//
+// They are build-oriented on purpose. Someone opening a fresh session wants to
+// make a thing, not commission a report about their own codebase; "map this
+// repo" is a second-session task. Each names an artefact, leaves the subject
+// blank for the user to fill in, and ends with a condition the result can be
+// held against.
+
+/**
+ * Ids are a closed set so the artwork map in ChatEmptyStateFull is checked at
+ * compile time. A mistyped key there would otherwise render a blank tile with
+ * no error anywhere.
+ */
+export const STARTER_IDS = ['dashboard', 'tool', 'site'] as const
+export type StarterId = (typeof STARTER_IDS)[number]
 
 export type StarterPromptText = {
-  id: string
+  id: StarterId
   title: string
   prompt: string
 }
 
 export const STARTER_PROMPT_TEXTS: StarterPromptText[] = [
   {
-    id: 'orient',
-    title: 'Map this codebase',
+    id: 'dashboard',
+    title: 'Build a living dashboard',
     prompt:
-      'Give me a tour of this codebase, verified by opening every file you cite: what it does, how the pieces fit together, and the three files I should read first. Success is 100% of cited paths existing, 0 invented file names.'
+      'Build a dashboard page from a data file or API I point you at, charting at least 3 numbers that matter. Verify it by loading the real data and running the page. Success is 0 errors and no placeholder values.'
   },
   {
-    id: 'measure',
-    title: 'Set a target to beat',
+    id: 'tool',
+    title: 'Build an internal tool',
     prompt:
-      'Find the slowest part of this project, measure it with a repeatable benchmark, and report the current number. Then make it at least 20% faster and prove it by re-running the same benchmark.'
+      'Build an internal tool: a form that writes to a local database and a list page that reads it back. Verify by adding, editing and deleting a record. Success is 0 errors across all 3 operations.'
   },
   {
-    id: 'ship',
-    title: 'Build a page from a brief',
+    id: 'site',
+    title: 'Create a launch website',
     prompt:
-      'Build a landing page for this project using semantic HTML and CSS custom properties for every colour and spacing value. Follow my design rules, then list what you would check before shipping it.'
+      'Build a launch page for a product I describe: headline, what it does, and one call-to-action button. Use semantic HTML and design tokens for colour and spacing. Verify with an accessibility check. Success is 0 errors and 0 hardcoded hex values.'
   }
 ]
