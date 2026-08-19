@@ -704,12 +704,15 @@ export function TerminalPane({
 function ShellStatus({ state }: { state: TerminalState }) {
   const last = state.blocks[state.blocks.length - 1]
   const progress = state.progress
-  // Nothing to say until the shell reports something, which also keeps the
-  // strip invisible on shells without integration rather than showing an
-  // empty chrome bar for ever.
-  if (!last && !progress) return null
-
   const running = last?.status === 'running'
+  // A block with no command name has nothing worth saying: it renders as a bare
+  // dot plus the word "running", which duplicates what the terminal already
+  // shows and collides with the CLI's own footer. Long-lived foreground
+  // processes like the Copilot CLI never emit a command mark, so this was
+  // pinned on screen permanently. Named commands still report exit and duration.
+  const named = last?.command != null && last.command !== ''
+  if (!named && !progress) return null
+
   const tone =
     running ? 'text-text-secondary'
     : last?.status === 'succeeded' ? 'text-success'
@@ -721,7 +724,7 @@ function ShellStatus({ state }: { state: TerminalState }) {
       data-testid="shell-status"
       className="pointer-events-none absolute bottom-2 left-4 right-4 z-20 flex items-center gap-3 text-[11.5px]"
     >
-      {last && (
+      {named && last && (
         <span className={`flex min-w-0 items-center gap-1.5 ${tone}`}>
           <span
             aria-hidden
@@ -732,7 +735,7 @@ function ShellStatus({ state }: { state: TerminalState }) {
               : 'bg-text-muted'
             }`}
           />
-          <span className="truncate font-mono">{last.command ?? (running ? 'running' : 'command')}</span>
+          <span className="truncate font-mono">{last.command}</span>
           {last.status === 'failed' && last.exitCode !== null && (
             <span className="shrink-0 tabular-nums">exit {last.exitCode}</span>
           )}
