@@ -67,3 +67,22 @@ export function fileUrlFor(basePath: string, path: string): string {
     : `${basePath.replace(/\/+$/, '')}/${path.replace(/^\.\//, '')}`
   return `file://${abs.split('/').map(encodeURIComponent).join('/')}`
 }
+
+/**
+ * Whether a preview URL should be handed to the pane, given what we have
+ * already shown and whether the pane is open.
+ *
+ * The rule exists because "have we shown this before?" is the wrong question
+ * on its own. A second turn that edits the page currently on screen produces
+ * the same URL as the first, and skipping it left the pane rendering the old
+ * version while the browser the agent opened separately showed the new one.
+ *
+ * So a repeat is a refresh when the pane is open, and is ignored only when
+ * the pane is closed — because a closed pane means the user closed it, and
+ * reopening it under them would be the more annoying bug.
+ */
+export function shouldShowPreview(
+  { seen, paneOpen }: { seen: boolean; paneOpen: boolean }
+): boolean {
+  return !seen || paneOpen
+}

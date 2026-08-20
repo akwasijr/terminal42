@@ -145,6 +145,33 @@ export function BrowserPane({ initialUrl, projectId, onClose, width: _paneWidth,
   const [vtDiffs, setVtDiffs] = useState<Record<string, VizDiff>>({})
   const wvRef = useRef<any>(null)
   const frameRef = useRef<HTMLIFrameElement | null>(null)
+
+  /**
+   * Reload whatever is showing, without changing the address.
+   *
+   * A second turn that edits the page already on screen re-requests the same
+   * URL, and assigning an unchanged `src` does nothing — so the pane kept
+   * showing the old render while the user's browser, which the agent opened
+   * separately, showed the new one. Bouncing through about:blank forces the
+   * fetch to happen again.
+   */
+  const reloadFrame = useCallback((): void => {
+    if (!WEBVIEW_SUPPORTED) {
+      const frame = frameRef.current
+      const src = frame?.getAttribute('src')
+      if (!frame || !src || src === 'about:blank') return
+      frame.setAttribute('src', 'about:blank')
+      setTimeout(() => { frame.setAttribute('src', src) }, 0)
+      return
+    }
+    try {
+      const wv = wvRef.current
+      // Ignoring the cache matters here: the point of the reload is that the
+      // file on disk just changed.
+      if (typeof wv?.reloadIgnoringCache === 'function') wv.reloadIgnoringCache()
+      else if (typeof wv?.reload === 'function') wv.reload()
+    } catch {}
+  }, [])
   const urlInputRef = useRef<HTMLInputElement | null>(null)
 
   const device = DEVICE_PRESETS.find((d) => d.id === deviceId) ?? DEVICE_PRESETS[0]
@@ -207,13 +234,18 @@ export function BrowserPane({ initialUrl, projectId, onClose, width: _paneWidth,
   // External navigation request (e.g. preview just started → load its URL).
   useEffect(() => {
     if (!navTo?.url) return
+    // Already showing this page: the request is a refresh, not a navigation.
+    const shown = WEBVIEW_SUPPORTED
+      ? (() => { try { return wvRef.current?.getURL?.() || '' } catch { return '' } })()
+      : frameRef.current?.getAttribute('src') || ''
+    if (shown === navTo.url) reloadFrame()
     setCommittedUrl(navTo.url)
     setUrlBar(navTo.url)
     if (projectId) {
       const ipc = getBrowserIpc()
       if (ipc) { try { void ipc.setUrl({ projectId, sessionId: activeSessionId ?? null, url: navTo.url }) } catch {} }
     }
-  }, [navTo?.nonce, navTo?.url, projectId, activeSessionId])
+  }, [navTo?.nonce, navTo?.url, projectId, activeSessionId, reloadFrame])
 
   // Suggest running preview URLs: scoped to THIS project. We don't want
   // a sibling project's dev server to show up in this project's empty

@@ -104,6 +104,12 @@ type RunState = {
   isFreshContextRetry: boolean
   rateLimitMessage: string | null
   rateLimitAutoEligible: boolean
+  /**
+   * The window to report to. Held on the run because cancellation finalizes
+   * from a timer that has no window in scope: emitting to null there dropped
+   * the done event, so the turn ended but the composer stayed busy forever.
+   */
+  win: BrowserWindow | null
 }
 
 const running = new Map<string, RunState>()
@@ -509,7 +515,11 @@ function send(
     child = spawn('copilot', args, {
       cwd,
       env: { ...copilotSpawnEnv, FORCE_COLOR: '0', NO_COLOR: '1' },
-      stdio: ['ignore', 'pipe', 'pipe']
+      stdio: ['ignore', 'pipe', 'pipe'],
+      // Its own process group. `copilot` is a wrapper that execs the real
+      // binary, and signalling only the wrapper left that binary running —
+      // visible as orphaned copilot processes after every stop.
+      detached: true
     })
   } catch (err) {
     const errMsg: ChatMessage = {
@@ -538,7 +548,8 @@ function send(
     turnText: '',
     isFreshContextRetry: !!opts.isFreshContextRetry,
     rateLimitMessage: null,
-    rateLimitAutoEligible: false
+    rateLimitAutoEligible: false,
+    win
   }
   running.set(sessionId, state)
   emit(win, 'chat:start', { sessionId })
@@ -569,7 +580,13 @@ function send(
     emit(win, 'chat:message', errMsg)
     finalizeRun(win, sessionId, state, -1)
   })
-  child.on('close', (code) => {
+  // `close` waits for stdio to reach EOF, and the real copilot binary
+  // inherits these pipes. When it outlives the wrapper — which is exactly
+  // what happens on a stop — the pipes stay open and `close` never fires, so
+  // the turn was never finalized and the composer stayed busy. `exit` always
+  // fires, so it acts as the backstop: `close` is still preferred because it
+  // means the output is fully drained.
+  const onChildEnd = (code: number) => {
     // Drain any remaining buffered line
     if (stdoutBuf.trim()) {
       const evt = parseLine(stdoutBuf)
@@ -696,21 +713,54 @@ function send(
       }
     }
     finalizeRun(win, sessionId, state, code ?? -1)
+  }
+  child.on('close', (code) => onChildEnd(code ?? -1))
+  child.on('exit', (code) => {
+    // Give `close` a moment to arrive with fully drained output; finalize
+    // ourselves only if it never does.
+    setTimeout(() => {
+      if (running.get(sessionId) === state) onChildEnd(code ?? -1)
+    }, 1500)
   })
+
   return { ok: true }
+}
+
+/**
+ * Signal a run's whole process tree.
+ *
+ * Negating the pid targets the process group, which is why runs are spawned
+ * detached: signalling the pid alone hit the `copilot` wrapper and left the
+ * binary it exec'd running, which is what orphaned a copilot process on every
+ * stop.
+ */
+function signalRun(state: RunState, signal: NodeJS.Signals): void {
+  const pid = state.child.pid
+  if (pid) {
+    try {
+      process.kill(-pid, signal)
+      return
+    } catch {
+      // No process group, or it is already gone: fall through to the direct
+      // kill rather than leaving the child running.
+    }
+  }
+  try { state.child.kill(signal) } catch {}
 }
 
 function cancel(sessionId: string): boolean {
   const state = running.get(sessionId)
   if (!state) return false
   state.cancelled = true
-  try { state.child.kill('SIGTERM') } catch {}
+  signalRun(state, 'SIGTERM')
   setTimeout(() => {
     const s = running.get(sessionId)
     if (!s) return
-    try { s.child.kill('SIGKILL') } catch {}
+    signalRun(s, 'SIGKILL')
     setTimeout(() => {
-      if (running.get(sessionId) === state) finalizeRun(null, sessionId, state, -1)
+      // Finalize through the run's own window: this path passed null, which
+      // silently dropped the done event and left the composer busy for good.
+      if (running.get(sessionId) === state) finalizeRun(state.win, sessionId, state, -1)
     }, 2000)
   }, 1500)
   return true

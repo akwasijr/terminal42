@@ -16,7 +16,7 @@ import * as Dropdown from '@radix-ui/react-dropdown-menu'
 import { IconPlus, IconTerminal, IconExternal, IconChevronRight } from './icons'
 import { useSessions } from '../state/store'
 import { classifyStatus, type AgentStatus } from '../../../shared/agentStatus'
-import { pickPreviewArtifact, fileUrlFor } from '../../../shared/previewArtifact'
+import { pickPreviewArtifact, fileUrlFor, shouldShowPreview } from '../../../shared/previewArtifact'
 import { resolveServerUrl } from '../../../shared/localServer'
 import { clampChatWidth, CHAT_DEFAULT_WIDTH, CHAT_MIN_WIDTH, CHAT_MAX_WIDTH } from './paneWidth'
 
@@ -121,6 +121,9 @@ export function ProjectWorkspace({
   })
   const [browserNavTo, setBrowserNavTo] = useState<{ url: string; nonce: number } | null>(null)
   const seenPreviewUrlsRef = useRef<Set<string>>(new Set())
+  // Read inside the artifact listener, which is registered once and would
+  // otherwise close over the value of `browserOpen` at registration time.
+  const browserOpenRef = useRef(false)
   // Race-guard: every project switch bumps this token. Async hydration
   // results are ignored if the token has changed by the time they resolve.
   const openTokenRef = useRef(0)
@@ -174,6 +177,7 @@ export function ProjectWorkspace({
   }, [project?.id])
 
   useEffect(() => { try { localStorage.setItem(LS_CHAT_WIDTH, String(chatWidth)) } catch {} }, [chatWidth])
+  useEffect(() => { browserOpenRef.current = browserOpen }, [browserOpen])
 
   // Auto-pop the browser pane whenever a NEW preview server becomes ready
   // for THIS project (it appears in `running` with a URL we hadn't seen
@@ -216,13 +220,18 @@ export function ProjectWorkspace({
     const off = window.terminal42.chat.onArtifact(({ path, cwd, serverOrigin }) => {
       const base = cwd || project.path
       const url = fileUrlFor(base, path)
-      if (seenPreviewUrlsRef.current.has(url)) return
+      // A page we have shown before is not necessarily a page to ignore: when
+      // a later turn edits the page currently on screen, the pane has to be
+      // told again or it keeps rendering the previous version. Only skip when
+      // the pane is closed, which means the user closed it and should not
+      // have it reopened under them.
+      if (!shouldShowPreview({ seen: seenPreviewUrlsRef.current.has(url), paneOpen: browserOpenRef.current })) return
       void window.terminal42.preview
         .running()
         .then(async (list) => {
           if (!alive) return
           if (list.some((r) => r.projectId === project.id && r.url)) return
-          if (seenPreviewUrlsRef.current.has(url)) return
+          if (!shouldShowPreview({ seen: seenPreviewUrlsRef.current.has(url), paneOpen: browserOpenRef.current })) return
           // If the turn started a server for this page, that server is the
           // real page: opening the file instead gives the user a broken copy
           // next to a message saying it works.
@@ -231,9 +240,11 @@ export function ProjectWorkspace({
             : null
           if (!alive) return
           const target = served ?? url
-          if (seenPreviewUrlsRef.current.has(target)) return
+          if (!shouldShowPreview({ seen: seenPreviewUrlsRef.current.has(target), paneOpen: browserOpenRef.current })) return
           seenPreviewUrlsRef.current.add(url)
           seenPreviewUrlsRef.current.add(target)
+          // Same URL as last time re-fires with a fresh nonce on purpose:
+          // that is what the pane treats as "reload what you are showing".
           autoOpenBrowser(target)
         })
         .catch(() => {})

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { pickPreviewArtifact, fileUrlFor, type PreviewCandidate } from '../../src/shared/previewArtifact'
+import { pickPreviewArtifact, fileUrlFor, type PreviewCandidate, shouldShowPreview } from '../../src/shared/previewArtifact'
 
 const f = (path: string, status: PreviewCandidate['status'] = 'added', binary = false): PreviewCandidate => ({
   path,
@@ -82,5 +82,25 @@ describe('fileUrlFor', () => {
 
   it('encodes characters a URL would otherwise read as syntax', () => {
     expect(fileUrlFor('/tmp/a#b', 'c?d.html')).toBe('file:///tmp/a%23b/c%3Fd.html')
+  })
+})
+
+describe('shouldShowPreview', () => {
+  it('shows a page it has never shown before', () => {
+    expect(shouldShowPreview({ seen: false, paneOpen: false })).toBe(true)
+  })
+
+  // The bug: a later turn edits the page on screen, and the pane kept the
+  // old render because the URL had been seen already.
+  it('refreshes a page already on screen when the pane is open', () => {
+    expect(shouldShowPreview({ seen: true, paneOpen: true })).toBe(true)
+  })
+
+  it('does not reopen a pane the user closed for a page already seen', () => {
+    expect(shouldShowPreview({ seen: true, paneOpen: false })).toBe(false)
+  })
+
+  it('still shows a new page while the pane is open', () => {
+    expect(shouldShowPreview({ seen: false, paneOpen: true })).toBe(true)
   })
 })
