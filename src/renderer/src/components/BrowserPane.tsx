@@ -84,6 +84,22 @@ function ensureMigrated(): Promise<void> {
 const LS_ZOOM = 't42:browser:zoom'
 const LS_DEVICE = 't42:browser:device'
 
+/**
+ * Whether Electron's <webview> tag is actually active in this window.
+ *
+ * With webviewTag disabled the element still parses, so a feature test on the
+ * tag name is not enough: it has to check for a method the real tag adds.
+ * Evaluated once, because the answer cannot change while the window lives.
+ */
+const WEBVIEW_SUPPORTED: boolean = (() => {
+  try {
+    const probe = document.createElement('webview') as unknown as { getWebContentsId?: unknown }
+    return typeof probe.getWebContentsId === 'function'
+  } catch {
+    return false
+  }
+})()
+
 const DEVICE_PRESETS: Array<{ id: string; label: string; width: number; ua?: string }> = [
   { id: 'desktop', label: 'Desktop', width: 0 },
   {
@@ -127,6 +143,7 @@ export function BrowserPane({ initialUrl, projectId, onClose, width: _paneWidth,
   const [vtSelected, setVtSelected] = useState<VizSelected | null>(null)
   const [vtDiffs, setVtDiffs] = useState<Record<string, VizDiff>>({})
   const wvRef = useRef<any>(null)
+  const frameRef = useRef<HTMLIFrameElement | null>(null)
   const urlInputRef = useRef<HTMLInputElement | null>(null)
 
   const device = DEVICE_PRESETS.find((d) => d.id === deviceId) ?? DEVICE_PRESETS[0]
@@ -310,6 +327,11 @@ export function BrowserPane({ initialUrl, projectId, onClose, width: _paneWidth,
   // so we call loadURL when the current URL doesn't match the desired one.
   useEffect(() => {
     if (!committedUrl) return
+    if (!WEBVIEW_SUPPORTED) {
+      const frame = frameRef.current
+      if (frame && frame.getAttribute('src') !== committedUrl) frame.setAttribute('src', committedUrl)
+      return
+    }
     const wv = wvRef.current
     if (!wv) return
     try {
@@ -560,6 +582,22 @@ export function BrowserPane({ initialUrl, projectId, onClose, width: _paneWidth,
           const innerStyle = isDesktop
             ? { width: '100%', height: '100%', display: 'flex', backgroundColor: 'white' }
             : { width: `${device.width}px`, height: '100%', display: 'flex', backgroundColor: 'white', border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }
+          // <webview> only renders when the window enables webviewTag. It is
+          // disabled here (it destabilised the renderer), which left the tag as
+          // an inert unknown element: the pane opened but stayed blank, and the
+          // only way to see a page was to send it to an external browser. An
+          // iframe renders in-place and is enough for what this pane shows,
+          // local files and dev servers.
+          if (!WEBVIEW_SUPPORTED) {
+            return (
+              <iframe
+                ref={frameRef}
+                src={committedUrl}
+                title="Preview"
+                style={innerStyle}
+              />
+            )
+          }
           return (
             <WebviewAny
               ref={wvRef}

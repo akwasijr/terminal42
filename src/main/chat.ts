@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { getDb } from './db'
 import { writtenPathFrom, toolArgumentsOf } from '../shared/toolArtifacts'
+import { isUnexecutedToolCall } from '../shared/textToolCall'
 import { pickPreviewArtifact } from '../shared/previewArtifact'
 import { resolveModel } from './models'
 import { assembleCacheStableMessages, flattenPromptCacheMessages } from '../shared/promptCache'
@@ -94,6 +95,10 @@ type RunState = {
   originalOpts: { cwd?: string | null; prefix?: string | null; agentMode?: 'interactive' | 'plan' | 'autopilot' }
   isModelFallback: boolean
   isAutoFallback: boolean
+  /** Last assistant content of the turn, kept to spot a tool call written as text. */
+  lastAssistantContent: string
+  /** True when this run is already the retry that drops --resume. */
+  isFreshContextRetry: boolean
   rateLimitMessage: string | null
   rateLimitAutoEligible: boolean
 }
@@ -261,6 +266,7 @@ function processJsonEvent(
   }
   if (t === 'assistant.message') {
     const content = String((evt.data as Record<string, unknown>)?.content ?? state.buffer)
+    state.lastAssistantContent = content
     if (!state.assistantMsgId) return
     const msg: ChatMessage = {
       id: state.assistantMsgId, sessionId, role: 'assistant', content,
@@ -389,9 +395,9 @@ function send(
   win: BrowserWindow | null,
   sessionId: string,
   text: string,
-  opts: { model?: string | null; cwd?: string | null; prefix?: string | null; agentMode?: 'interactive' | 'plan' | 'autopilot'; isModelFallback?: boolean; isAutoFallback?: boolean }
+  opts: { model?: string | null; cwd?: string | null; prefix?: string | null; agentMode?: 'interactive' | 'plan' | 'autopilot'; isModelFallback?: boolean; isAutoFallback?: boolean; isFreshContextRetry?: boolean }
 ): { ok: true } | { ok: false; error: string } {
-  if (running.has(sessionId) && !opts.isModelFallback && !opts.isAutoFallback) {
+  if (running.has(sessionId) && !opts.isModelFallback && !opts.isAutoFallback && !opts.isFreshContextRetry) {
     return { ok: false, error: 'Another response is in progress.' }
   }
   const cwd = opts.cwd ?? getProjectCwd(sessionId) ?? process.env.HOME ?? process.cwd()
@@ -400,7 +406,10 @@ function send(
   // treat that null the same as "not provided" and re-fetch the same stale
   // session model, repeating the exact failure the retry was meant to fix.
   const model = opts.model !== undefined ? opts.model : getSessionModel(sessionId)
-  const resume = getCopilotResumeId(sessionId)
+  // A resumed session whose history contains a malformed turn makes the model
+  // keep writing tool calls as text instead of running them. The retry starts
+  // a clean context, which is the only thing that reliably breaks the loop.
+  const resume = opts.isFreshContextRetry ? null : getCopilotResumeId(sessionId)
 
   const userMsg: ChatMessage = {
     id: randomUUID(),
@@ -517,6 +526,8 @@ function send(
     originalOpts: { cwd: opts.cwd, prefix: opts.prefix, agentMode: opts.agentMode },
     isModelFallback: !!opts.isModelFallback,
     isAutoFallback: !!opts.isAutoFallback,
+    lastAssistantContent: '',
+    isFreshContextRetry: !!opts.isFreshContextRetry,
     rateLimitMessage: null,
     rateLimitAutoEligible: false
   }
@@ -596,6 +607,28 @@ function send(
       insertMessage(errMsg)
       emit(win, 'chat:message', errMsg)
       finalizeRun(win, sessionId, state, code ?? -1)
+      return
+    }
+
+    // The model sometimes writes a tool call out as text instead of running
+    // it: nothing executes, no file appears, and the raw markup is shown as
+    // the answer. Seen only in resumed sessions whose history already holds
+    // one of these turns, so the recovery is to re-run once on a clean
+    // context. Verified against a live session that reproduced the fault.
+    const wroteToolCallAsText = !state.cancelled
+      && !state.isFreshContextRetry
+      && isUnexecutedToolCall(state.lastAssistantContent, state.toolCalls.size)
+    if (wroteToolCallAsText) {
+      // Drop the markup rather than leave it on screen; the retry replaces it.
+      const replaced: ChatMessage = {
+        id: state.assistantMsgId ?? randomUUID(), sessionId, role: 'assistant',
+        content: '', toolCalls: [], status: 'cancelled', createdAt: Date.now()
+      }
+      updateMessage(replaced)
+      emit(win, 'chat:message', replaced)
+      state.assistantMsgId = null
+      finalizeRun(win, sessionId, state, code ?? 0)
+      send(win, sessionId, state.originalText, { ...state.originalOpts, model: state.requestedModel, isFreshContextRetry: true })
       return
     }
 
