@@ -2,8 +2,10 @@ import { describe, it, expect } from 'vitest'
 import {
   STARTER_POOL,
   STARTER_IDS,
+  TRIO_IDS,
   STARTER_ROTATION_LENGTH,
-  starterTrio
+  starterTrio,
+  allStarterPrompts
 } from '../../src/renderer/src/components/starterPrompts'
 import { readAndAdvanceRotation } from '../../src/renderer/src/components/starterRotation'
 import { analyzeGoalQuality, shouldShowGoalQualityHint } from '../../src/shared/goalQuality'
@@ -26,10 +28,26 @@ describe('starter prompts', () => {
     })
   }
 
-  it('keeps starters short enough to read at a glance', () => {
+  it('keeps starters short enough to send as written', () => {
     for (const p of ALL) {
-      expect(p.prompt.split(/\s+/).length, p.title).toBeLessThanOrEqual(60)
-      expect(p.title.split(/\s+/).length, p.title).toBeLessThanOrEqual(6)
+      expect(p.prompt.split(/\s+/).length, p.title).toBeLessThanOrEqual(30)
+      expect(p.title.split(/\s+/).length, p.title).toBeLessThanOrEqual(5)
+    }
+  })
+
+  // The old set read like an acceptance spec rather than a request. Those
+  // phrasings are what made them unusable as written, so they stay out.
+  it('reads like a request, not a specification', () => {
+    for (const p of ALL) {
+      expect(p.prompt, p.title).not.toMatch(/success is/i)
+      expect(p.prompt, p.title).not.toMatch(/\bverify by\b/i)
+    }
+  })
+
+  it('is one sentence, so nothing needs trimming before sending', () => {
+    for (const p of ALL) {
+      const sentences = p.prompt.split(/[.!?]\s+/).filter(Boolean)
+      expect(sentences.length, p.title).toBe(1)
     }
   })
 
@@ -46,21 +64,22 @@ describe('starter prompts', () => {
 })
 
 describe('starterTrio', () => {
-  it('shows one prompt of each kind', () => {
+  it('shows one prompt of each trio kind', () => {
     const trio = starterTrio(0)
-    expect(trio.map((p) => p.id)).toEqual([...STARTER_IDS])
+    expect(trio.map((p) => p.id)).toEqual([...TRIO_IDS])
   })
 
   it('shows a different set on the next rotation', () => {
     expect(starterTrio(1).map((p) => p.title)).not.toEqual(starterTrio(0).map((p) => p.title))
   })
 
-  it('reaches every prompt in the pool across a full cycle', () => {
+  it('reaches every prompt of its own kinds across a full cycle', () => {
     const seen = new Set<string>()
     for (let i = 0; i < STARTER_ROTATION_LENGTH; i++) {
       for (const p of starterTrio(i)) seen.add(p.title)
     }
-    expect(seen.size).toBe(ALL.length)
+    const trioTotal = TRIO_IDS.reduce((n, id) => n + STARTER_POOL[id].length, 0)
+    expect(seen.size).toBe(trioTotal)
   })
 
   it('wraps rather than running off the end of the pool', () => {
@@ -134,5 +153,20 @@ describe('rotation counter', () => {
       setItem: () => { throw new Error('quota') }
     }
     expect(readAndAdvanceRotation(readOnly, STARTER_ROTATION_LENGTH)).toBe(1)
+  })
+})
+
+describe('allStarterPrompts', () => {
+  it('returns every prompt in the library, for the modal', () => {
+    expect(allStarterPrompts().map((p) => p.title)).toEqual(ALL.map((p) => p.title))
+  })
+
+  it('covers every kind, so no group renders empty', () => {
+    const kinds = new Set(allStarterPrompts().map((p) => p.id))
+    expect([...kinds].sort()).toEqual([...STARTER_IDS].sort())
+  })
+
+  it('offers more than the empty state shows, which is the point of the modal', () => {
+    expect(allStarterPrompts().length).toBeGreaterThan(starterTrio(0).length)
   })
 })

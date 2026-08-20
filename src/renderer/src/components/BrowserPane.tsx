@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as Dropdown from '@radix-ui/react-dropdown-menu'
 import { IconRefresh, IconChevronRight, IconPlus, IconSparkle } from './icons'
 import { VIZ_INJECT_JS, type VizSelected } from '../lib/vizInject'
+import { paneWidthStyle } from './paneWidth'
 import { VizTweakPanel, type VizDiff } from './VizTweakPanel'
 
 type Props = {
@@ -455,7 +456,7 @@ export function BrowserPane({ initialUrl, projectId, onClose, width: _paneWidth,
   return (
     <aside
       className="flex h-full flex-col bg-bg"
-      style={{ width: `${_paneWidth}px`, minWidth: '320px' }}
+      style={paneWidthStyle(_paneWidth)}
       aria-label="Web browser preview"
     >
       {/* Single combined toolbar row: matches session-tabs row height (h-9) */}

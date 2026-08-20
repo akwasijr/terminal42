@@ -41,6 +41,9 @@ export type ChatArtifact = {
   sessionId: string
   path: string
   cwd: string
+  // Set when the turn started a local server for this page. The page must be
+  // opened through it: loaded from disk, its own requests fail.
+  serverOrigin?: string | null
 }
 
 export type ChatFileChange = {

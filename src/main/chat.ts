@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { getDb } from './db'
 import { writtenPathFrom, toolArgumentsOf } from '../shared/toolArtifacts'
 import { isUnexecutedToolCall } from '../shared/textToolCall'
+import { pickLocalServerOrigin } from '../shared/localServer'
 import { pickPreviewArtifact } from '../shared/previewArtifact'
 import { resolveModel } from './models'
 import { assembleCacheStableMessages, flattenPromptCacheMessages } from '../shared/promptCache'
@@ -97,6 +98,8 @@ type RunState = {
   isAutoFallback: boolean
   /** Last assistant content of the turn, kept to spot a tool call written as text. */
   lastAssistantContent: string
+  // Everything the turn said or ran, scanned for a server it started.
+  turnText: string
   /** True when this run is already the retry that drops --resume. */
   isFreshContextRetry: boolean
   rateLimitMessage: string | null
@@ -130,7 +133,10 @@ function finalizeRun(win: BrowserWindow | null, sessionId: string, state: RunSta
 function emitTurnArtifact(win: BrowserWindow | null, sessionId: string, state: RunState): void {
   const page = pickPreviewArtifact(state.written.map((path) => ({ path, status: 'added' })))
   if (!page) return
-  emit(win, 'chat:artifact', { sessionId, path: page, cwd: state.cwd })
+  // A page whose backend the turn started must be opened through that server,
+  // not from disk: the file:// copy loads but every request it makes fails.
+  const serverOrigin = pickLocalServerOrigin(state.turnText)
+  emit(win, 'chat:artifact', { sessionId, path: page, cwd: state.cwd, serverOrigin })
 }
 
 /**
@@ -267,6 +273,7 @@ function processJsonEvent(
   if (t === 'assistant.message') {
     const content = String((evt.data as Record<string, unknown>)?.content ?? state.buffer)
     state.lastAssistantContent = content
+    state.turnText += `\n${content}`
     if (!state.assistantMsgId) return
     const msg: ChatMessage = {
       id: state.assistantMsgId, sessionId, role: 'assistant', content,
@@ -288,6 +295,7 @@ function processJsonEvent(
     // arguments were silently always empty.
     const args = toolArgumentsOf(data)
     const input = args ? JSON.stringify(args).slice(0, 280) : undefined
+    if (input) state.turnText += `\n${input}`
     const written = writtenPathFrom(name, args)
     if (written && !state.written.includes(written)) state.written.push(written)
     state.toolCalls.set(id, { id, name, input, status: 'running' })
@@ -527,6 +535,7 @@ function send(
     isModelFallback: !!opts.isModelFallback,
     isAutoFallback: !!opts.isAutoFallback,
     lastAssistantContent: '',
+    turnText: '',
     isFreshContextRetry: !!opts.isFreshContextRetry,
     rateLimitMessage: null,
     rateLimitAutoEligible: false

@@ -12,13 +12,16 @@ import { KickoffPromptButton } from './KickoffPromptViewer'
 import { BrowserPane } from './BrowserPane'
 import { CodePane } from './CodePane'
 import { COMPOSER_FILL_EVENT } from './composerFill'
-import { IconPlus, IconTerminal, IconExternal } from './icons'
+import * as Dropdown from '@radix-ui/react-dropdown-menu'
+import { IconPlus, IconTerminal, IconExternal, IconChevronRight } from './icons'
 import { useSessions } from '../state/store'
 import { classifyStatus, type AgentStatus } from '../../../shared/agentStatus'
 import { pickPreviewArtifact, fileUrlFor } from '../../../shared/previewArtifact'
+import { resolveServerUrl } from '../../../shared/localServer'
+import { clampChatWidth, CHAT_DEFAULT_WIDTH, CHAT_MIN_WIDTH, CHAT_MAX_WIDTH } from './paneWidth'
 
 const DEFAULT_MODEL = 'claude-sonnet-4.6'
-const LS_BROWSER_WIDTH = 't42:browser:width'
+const LS_CHAT_WIDTH = 't42:chat:width'
 
 export function ProjectWorkspace({
   project,
@@ -111,8 +114,10 @@ export function ProjectWorkspace({
   // Persistence ONLY changes from a user-driven toggle. Auto-opens from
   // a detected preview do NOT persist, so closing the pane sticks.
   const [browserOpen, setBrowserOpenState] = useState<boolean>(false)
-  const [browserWidth, setBrowserWidth] = useState<number>(() => {
-    try { return Math.max(320, Math.min(1200, Number(localStorage.getItem(LS_BROWSER_WIDTH)) || 480)) } catch { return 480 }
+  // With a pane open the chat is the fixed column and the pane fills the
+  // rest, so this is the width the resize handle now drives.
+  const [chatWidth, setChatWidth] = useState<number>(() => {
+    try { return clampChatWidth(Number(localStorage.getItem(LS_CHAT_WIDTH)) || CHAT_DEFAULT_WIDTH) } catch { return CHAT_DEFAULT_WIDTH }
   })
   const [browserNavTo, setBrowserNavTo] = useState<{ url: string; nonce: number } | null>(null)
   const seenPreviewUrlsRef = useRef<Set<string>>(new Set())
@@ -168,7 +173,7 @@ export function ProjectWorkspace({
     }
   }, [project?.id])
 
-  useEffect(() => { try { localStorage.setItem(LS_BROWSER_WIDTH, String(browserWidth)) } catch {} }, [browserWidth])
+  useEffect(() => { try { localStorage.setItem(LS_CHAT_WIDTH, String(chatWidth)) } catch {} }, [chatWidth])
 
   // Auto-pop the browser pane whenever a NEW preview server becomes ready
   // for THIS project (it appears in `running` with a URL we hadn't seen
@@ -208,17 +213,28 @@ export function ProjectWorkspace({
   useEffect(() => {
     if (!project?.id) return
     let alive = true
-    const off = window.terminal42.chat.onArtifact(({ path, cwd }) => {
-      const url = fileUrlFor(cwd || project.path, path)
+    const off = window.terminal42.chat.onArtifact(({ path, cwd, serverOrigin }) => {
+      const base = cwd || project.path
+      const url = fileUrlFor(base, path)
       if (seenPreviewUrlsRef.current.has(url)) return
       void window.terminal42.preview
         .running()
-        .then((list) => {
+        .then(async (list) => {
           if (!alive) return
           if (list.some((r) => r.projectId === project.id && r.url)) return
           if (seenPreviewUrlsRef.current.has(url)) return
+          // If the turn started a server for this page, that server is the
+          // real page: opening the file instead gives the user a broken copy
+          // next to a message saying it works.
+          const served = serverOrigin
+            ? await resolveServerUrl(serverOrigin, base, path, isReachable)
+            : null
+          if (!alive) return
+          const target = served ?? url
+          if (seenPreviewUrlsRef.current.has(target)) return
           seenPreviewUrlsRef.current.add(url)
-          autoOpenBrowser(url)
+          seenPreviewUrlsRef.current.add(target)
+          autoOpenBrowser(target)
         })
         .catch(() => {})
     })
@@ -257,11 +273,22 @@ export function ProjectWorkspace({
 
   if (!project) return <NoProject />
 
+  // One pane at a time. When either is up the chat goes compact: tabs collapse
+  // into a dropdown and the column stops growing with the window.
+  const paneOpen = Boolean(codeFile) || browserOpen
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <div className="flex flex-1 gap-[var(--gutter)] overflow-hidden p-[var(--gutter)]">
-        <main className="flex flex-1 flex-col overflow-hidden rounded-panel bg-bg">
+        <main
+          className={[
+            'flex flex-col overflow-hidden rounded-panel bg-bg',
+            paneOpen ? 'shrink-0' : 'flex-1'
+          ].join(' ')}
+          style={paneOpen ? { width: `${chatWidth}px` } : undefined}
+        >
           <SessionTabs
+            compact={paneOpen}
             sessions={sessions}
             activeId={active?.id ?? null}
             onPick={(id) => {
@@ -358,11 +385,11 @@ export function ProjectWorkspace({
         </main>
         {codeFile ? (
           <>
-            <ResizeHandle side="right" currentWidth={browserWidth} onChange={setBrowserWidth} min={320} max={1200} />
+            <ResizeHandle side="left" currentWidth={chatWidth} onChange={(w) => setChatWidth(clampChatWidth(w))} min={CHAT_MIN_WIDTH} max={CHAT_MAX_WIDTH} />
             <CodePane
               messageId={codeFile.messageId}
               path={codeFile.path}
-              width={browserWidth}
+              width={0}
               onClose={() => setCodeFile(null)}
               onShowPreview={() => {
                 const page = pickPreviewArtifact([{ path: codeFile.path, status: 'modified' }])
@@ -375,10 +402,10 @@ export function ProjectWorkspace({
           </>
         ) : browserOpen ? (
           <>
-            <ResizeHandle side="right" currentWidth={browserWidth} onChange={setBrowserWidth} min={320} max={1200} />
+            <ResizeHandle side="left" currentWidth={chatWidth} onChange={(w) => setChatWidth(clampChatWidth(w))} min={CHAT_MIN_WIDTH} max={CHAT_MAX_WIDTH} />
             <BrowserPane
               projectId={project.id}
-              width={browserWidth}
+              width={0}
               onClose={() => setBrowserOpen(false)}
               navTo={browserNavTo}
               activeSessionId={active?.id ?? null}
@@ -404,7 +431,8 @@ function SessionTabs({
   onNew,
   onClose,
   onRename,
-  modelControl
+  modelControl,
+  compact = false
 }: {
   sessions: Session[]
   activeId: string | null
@@ -413,10 +441,31 @@ function SessionTabs({
   onClose: (id: string) => void
   onRename: (id: string, title: string) => void
   modelControl: React.ReactNode
+  compact?: boolean
 }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
   const status = useSessionStatuses(sessions.map((s) => s.id))
+
+  // Narrow column: a row of tabs plus a new-session button does not fit
+  // without truncating every title to nothing, so they collapse into one
+  // dropdown that names the session you are actually in.
+  if (compact) {
+    return (
+      <div className="flex h-9 items-center gap-1 bg-bg px-2">
+        <SessionMenu
+          sessions={sessions}
+          activeId={activeId}
+          status={status}
+          onPick={onPick}
+          onNew={onNew}
+          onClose={onClose}
+        />
+        <div className="ml-auto flex shrink-0 items-center whitespace-nowrap pr-1">{modelControl}</div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex h-9 items-stretch bg-bg px-2">
       {sessions.map((s) => {
@@ -486,6 +535,99 @@ function SessionTabs({
       </button>
       <div className="ml-auto flex shrink-0 items-center whitespace-nowrap pr-1">{modelControl}</div>
     </div>
+  )
+}
+
+/**
+ * Whether a local server answers for this URL.
+ *
+ * The status is read rather than probed with `no-cors`, because a `no-cors`
+ * request resolves for a 404 too — which would make the first candidate
+ * always win and defeat the point of having an ordered list. The renderer
+ * runs with web security off, so the real status is available here.
+ *
+ * A short timeout stops a hung server holding the preview back, and any
+ * failure falls back to the file on disk, which is the older behaviour.
+ */
+async function isReachable(url: string): Promise<boolean> {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 1500)
+  try {
+    const res = await fetch(url, { method: 'GET', signal: ctrl.signal, cache: 'no-store' })
+    return res.ok
+  } catch {
+    return false
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+function SessionMenu({
+  sessions,
+  activeId,
+  status,
+  onPick,
+  onNew,
+  onClose
+}: {
+  sessions: Session[]
+  activeId: string | null
+  status: Record<string, AgentStatus>
+  onPick: (id: string) => void
+  onNew: () => void
+  onClose: (id: string) => void
+}) {
+  const active = sessions.find((s) => s.id === activeId) ?? sessions[0]
+  return (
+    <Dropdown.Root>
+      <Dropdown.Trigger asChild>
+        <button
+          type="button"
+          className="flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1 text-[12px] text-text-primary outline-none transition-colors hover:bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+          title="Switch session"
+        >
+          <SessionStatusDot status={(active && status[active.id]) ?? 'idle'} />
+          <span className="truncate">{active?.title ?? 'Session'}</span>
+          <span className="rotate-90 text-text-muted"><IconChevronRight size={11} /></span>
+        </button>
+      </Dropdown.Trigger>
+      <Dropdown.Portal>
+        <Dropdown.Content
+          align="start"
+          sideOffset={4}
+          className="z-50 min-w-[200px] rounded-lg bg-elevated p-1 shadow-lg"
+        >
+          {sessions.map((s) => (
+            <Dropdown.Item
+              key={s.id}
+              onSelect={() => onPick(s.id)}
+              className="group flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-[12px] text-text-secondary outline-none data-[highlighted]:bg-surface data-[highlighted]:text-text-primary"
+            >
+              <SessionStatusDot status={status[s.id] ?? 'idle'} />
+              <span className="truncate">{s.title}</span>
+              {sessions.length > 1 && (
+                <button
+                  type="button"
+                  aria-label={`Close ${s.title}`}
+                  onClick={(e) => { e.stopPropagation(); e.preventDefault(); onClose(s.id) }}
+                  className="ml-auto text-text-muted opacity-0 transition group-data-[highlighted]:opacity-100 hover:text-text-primary"
+                >
+                  ×
+                </button>
+              )}
+            </Dropdown.Item>
+          ))}
+          <Dropdown.Separator className="my-1 h-px bg-surface" />
+          <Dropdown.Item
+            onSelect={onNew}
+            className="flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-[12px] text-text-secondary outline-none data-[highlighted]:bg-surface data-[highlighted]:text-text-primary"
+          >
+            <IconPlus size={12} />
+            New session
+          </Dropdown.Item>
+        </Dropdown.Content>
+      </Dropdown.Portal>
+    </Dropdown.Root>
   )
 }
 

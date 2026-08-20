@@ -1,31 +1,46 @@
-// The prompts offered on an empty chat.
+// The prompts offered on an empty chat, and the full template library behind
+// the "More templates" button.
 //
-// Text lives here rather than beside the artwork so it can be tested. These
-// are the first thing a new user ever sends, and the harness scores every goal
-// for hill-climbability — a starter that trips its own "this goal may be hard
-// to measure" hint teaches people that the warning is noise to dismiss. So the
-// wording is held to the same bar the harness asks of the user: a stated
-// target, and a named way to check it.
+// Text lives here rather than beside the artwork so it can be tested.
 //
-// They are build-oriented on purpose. Someone opening a fresh session wants to
-// make a thing, not commission a report about their own codebase; "map this
-// repo" is a second-session task. Each names an artefact, leaves the subject
-// blank for the user to fill in, and ends with a condition the result can be
-// held against.
+// Wording rule: say the thing plainly, the way a person would ask for it.
+// An earlier set spelled out its own acceptance criteria ("Verify by ... .
+// Success is 0 errors and 0 hardcoded rows"), which read like a specification
+// and was too stiff to send as written. Each prompt now names the artefact,
+// leaves the subject for the user to fill in, and carries one natural quantity
+// ("at least 3 project cards") — enough for the harness's measurability check
+// without a tacked-on success clause. A test holds every prompt to that bar.
 //
-// Three tiles show at a time, one of each kind, and the set rotates between
-// chats. Showing all nine would turn a first impression into a menu; showing
-// the same three forever makes the feature look like decoration once you have
-// read it twice.
+// Three tiles show at a time, one of each trio kind, and the set rotates
+// between chats. The rest live in the modal, which is where breadth belongs:
+// showing fifteen tiles up front turns a first impression into a menu.
 
 /**
- * Kinds are a closed set so the artwork map in ChatEmptyStateFull is checked
- * at compile time. A mistyped key there would otherwise render a blank tile
- * with no error anywhere. Every prompt of a kind shares that kind's artwork,
- * which is why the pool can grow without new drawings.
+ * Kinds are a closed set so the artwork map in starterArt is checked at
+ * compile time. A mistyped key there would otherwise render a blank tile with
+ * no error anywhere. Every prompt of a kind shares that kind's artwork, which
+ * is why the library can grow without new drawings.
  */
-export const STARTER_IDS = ['dashboard', 'tool', 'site'] as const
+export const STARTER_IDS = ['dashboard', 'tool', 'site', 'api', 'docs'] as const
 export type StarterId = (typeof STARTER_IDS)[number]
+
+/**
+ * The kinds shown on the empty state itself.
+ *
+ * A subset of the full set: three tiles fit the space, and these three cover
+ * what people most often open a fresh session to build. The rest are one
+ * click away in the modal.
+ */
+export const TRIO_IDS = ['dashboard', 'tool', 'site'] as const satisfies readonly StarterId[]
+
+/** Human label for each kind, used as the modal's group headings. */
+export const STARTER_GROUP_LABELS: Record<StarterId, string> = {
+  dashboard: 'Data and dashboards',
+  tool: 'Tools and automation',
+  site: 'Pages and sites',
+  api: 'APIs and services',
+  docs: 'Docs and writing'
+}
 
 export type StarterPromptText = {
   id: StarterId
@@ -38,70 +53,100 @@ export const STARTER_POOL: Record<StarterId, StarterPromptText[]> = {
   dashboard: [
     {
       id: 'dashboard',
-      title: 'Build a living dashboard',
-      prompt:
-        'Build a dashboard page from a data file or API I point you at, charting at least 3 numbers that matter. Verify it by loading the real data and running the page. Success is 0 errors and no placeholder values.'
+      title: 'Build a dashboard',
+      prompt: 'Build a dashboard from a data file I point you at, with at least 3 charts of the numbers that matter.'
     },
     {
       id: 'dashboard',
       title: 'Chart a spreadsheet',
-      prompt:
-        'Turn a spreadsheet I give you into a page with at least 2 charts and a filter. Verify by loading the real file and checking the totals match the source. Success is 0 errors and 0 hardcoded rows.'
+      prompt: 'Turn a spreadsheet I give you into a page with at least 2 charts and a filter.'
     },
     {
       id: 'dashboard',
-      title: 'Build a status board',
-      prompt:
-        'Build a status board that polls at least 2 endpoints I name and shows whether each is up, with the last check time. Verify by running it against the real endpoints. Success is 0 errors and 0 fake results.'
+      title: 'Watch some services',
+      prompt: 'Build a status page that checks at least 2 services I name and shows whether each one is up.'
     }
   ],
   tool: [
     {
       id: 'tool',
       title: 'Build an internal tool',
-      prompt:
-        'Build an internal tool: a form that writes to a local database and a list page that reads it back. Verify by adding, editing and deleting a record. Success is 0 errors across all 3 operations.'
+      prompt: 'Build a small internal tool: a form that saves records and a list page to browse them, with at least 3 actions (add, edit, delete).'
     },
     {
       id: 'tool',
       title: 'Automate a chore',
-      prompt:
-        'Write a script for a repetitive task I describe, with a dry-run mode that changes 0 files. Verify by running the dry run and then the real thing on a copy. Success is 0 errors and 0 surprises between the 2 runs.'
+      prompt: 'Write a script that automates a chore I describe, with a dry run that changes 0 files.'
     },
     {
       id: 'tool',
-      title: 'Build a command-line tool',
-      prompt:
-        'Build a command-line tool for a job I describe, with --help and at least 2 subcommands. Verify by running every subcommand end to end. Success is 0 errors and 0 undocumented flags.'
+      title: 'Make a command-line tool',
+      prompt: 'Build a command-line tool for a job I describe, with --help and at least 2 subcommands.'
     }
   ],
   site: [
     {
       id: 'site',
-      title: 'Create a launch website',
-      prompt:
-        'Build a launch page for a product I describe: headline, what it does, and one call-to-action button. Use semantic HTML and design tokens for colour and spacing. Verify with an accessibility check. Success is 0 errors and 0 hardcoded hex values.'
+      title: 'Build a landing page',
+      prompt: 'Build a landing page for something I describe, with a headline, what it does, and at least 1 call to action.'
     },
     {
       id: 'site',
       title: 'Build a portfolio',
-      prompt:
-        'Build a portfolio page for work I describe, with an intro and at least 3 project cards. Use semantic HTML and design tokens throughout. Verify with an accessibility check. Success is 0 errors and 0 hardcoded hex values.'
+      prompt: 'Build a portfolio page for work I describe, with a short intro and at least 3 project cards.'
     },
     {
       id: 'site',
-      title: 'Publish documentation',
-      prompt:
-        'Build a documentation page for something I describe, with a contents list linking to at least 4 sections. Use semantic HTML and design tokens. Verify every link resolves. Success is 0 errors and 0 dead links.'
+      title: 'Make a form that works',
+      prompt: 'Build a form for something I describe, with at least 4 fields, inline validation and a clear success state.'
+    }
+  ],
+  api: [
+    {
+      id: 'api',
+      title: 'Build a small API',
+      prompt: 'Build a small API for something I describe, with at least 3 endpoints and an example request for each.'
+    },
+    {
+      id: 'api',
+      title: 'Add an endpoint',
+      prompt: 'Add an endpoint to my project and cover it with at least 2 tests.'
+    },
+    {
+      id: 'api',
+      title: 'Wrap a service',
+      prompt: 'Wrap a service I name in a typed client with at least 3 methods and handled errors.'
+    }
+  ],
+  docs: [
+    {
+      id: 'docs',
+      title: 'Write a README',
+      prompt: 'Write a README for this project with setup steps anyone can follow and at least 3 worked examples.'
+    },
+    {
+      id: 'docs',
+      title: 'Document a feature',
+      prompt: 'Document a feature I describe, with a contents list linking to at least 4 sections.'
+    },
+    {
+      id: 'docs',
+      title: 'Explain this code',
+      prompt: 'Walk me through how this project fits together, in at least 5 steps from entry file to output.'
     }
   ]
 }
 
-/** Longest group, so a full cycle shows every prompt in the pool. */
-export const STARTER_ROTATION_LENGTH = Math.max(...STARTER_IDS.map((id) => STARTER_POOL[id].length))
+/** Every template, flattened, in kind order. Used by the templates modal. */
+export function allStarterPrompts(): StarterPromptText[] {
+  return STARTER_IDS.flatMap((id) => STARTER_POOL[id])
+}
+
+/** Longest trio group, so a full cycle shows every prompt those kinds hold. */
+export const STARTER_ROTATION_LENGTH = Math.max(...TRIO_IDS.map((id) => STARTER_POOL[id].length))
 
 /**
- * The three prompts to show, one per kind.
+ * The three prompts to show, one per trio kind.
  *
  * `rotation` is any integer — a counter the caller persists across chats.
  * Negative and out-of-range values wrap rather than throwing, because a
@@ -110,7 +155,7 @@ export const STARTER_ROTATION_LENGTH = Math.max(...STARTER_IDS.map((id) => START
  */
 export function starterTrio(rotation: number): StarterPromptText[] {
   const n = Number.isFinite(rotation) ? Math.trunc(rotation) : 0
-  return STARTER_IDS.map((id) => {
+  return TRIO_IDS.map((id) => {
     const group = STARTER_POOL[id]
     return group[((n % group.length) + group.length) % group.length]
   })

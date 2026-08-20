@@ -15,6 +15,7 @@ import { diffLines, countChanges, type DiffLine } from '../../../shared/lineDiff
 import { highlightToLines, languageForPath, type CodeToken } from '../lib/highlight'
 import { IconClose, IconCode, IconGlobe, IconFolder } from './icons'
 import { DiffCounts } from './DiffCard'
+import { paneWidthStyle } from './paneWidth'
 
 export function CodePane({
   messageId,
@@ -71,7 +72,7 @@ export function CodePane({
   return (
     <aside
       className="flex shrink-0 flex-col overflow-hidden rounded-panel bg-bg"
-      style={{ width }}
+      style={paneWidthStyle(width)}
       aria-label={`Changes to ${path}`}
     >
       <header className="flex h-9 shrink-0 items-center gap-1 px-2">
