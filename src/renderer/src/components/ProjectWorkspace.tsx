@@ -15,6 +15,7 @@ import { COMPOSER_FILL_EVENT } from './composerFill'
 import { IconPlus, IconTerminal, IconExternal } from './icons'
 import { useSessions } from '../state/store'
 import { classifyStatus, type AgentStatus } from '../../../shared/agentStatus'
+import { pickPreviewArtifact, fileUrlFor } from '../../../shared/previewArtifact'
 
 const DEFAULT_MODEL = 'claude-sonnet-4.6'
 const LS_BROWSER_WIDTH = 't42:browser:width'
@@ -195,8 +196,34 @@ export function ProjectWorkspace({
     return () => { alive = false; off() }
   }, [project?.id])
 
-  // Sniff terminal output across all sessions for local server URLs that
-  // Copilot (or any tool) prints inline: e.g. "Server is running at
+  // Show a page the turn just wrote, instead of telling the user where it
+  // landed. Only fires for a path we haven't already shown, and never while a
+  // dev server is serving this project: that server is the real preview, and
+  // a file:// copy of one of its pages would load without the assets it
+  // serves. Uses the non-persisting open so closing the pane still sticks.
+  useEffect(() => {
+    if (!project?.id || !project.path) return
+    let alive = true
+    const off = window.terminal42.chat.onDiff(({ diff }) => {
+      const artifact = pickPreviewArtifact(diff?.files ?? [])
+      if (!artifact) return
+      const url = fileUrlFor(project.path, artifact)
+      if (seenPreviewUrlsRef.current.has(url)) return
+      void window.terminal42.preview
+        .running()
+        .then((list) => {
+          if (!alive) return
+          if (list.some((r) => r.projectId === project.id && r.url)) return
+          if (seenPreviewUrlsRef.current.has(url)) return
+          seenPreviewUrlsRef.current.add(url)
+          autoOpenBrowser(url)
+        })
+        .catch(() => {})
+    })
+    return () => { alive = false; off() }
+  }, [project?.id, project?.path])
+
+  // Sniff terminal output across all sessions for local server URLs that  // Copilot (or any tool) prints inline: e.g. "Server is running at
   // http://localhost:8000/". When we see one we haven't auto-loaded yet,
   // pop the browser open and navigate there.
   useEffect(() => {
@@ -335,7 +362,12 @@ export function ProjectWorkspace({
               path={codeFile.path}
               width={browserWidth}
               onClose={() => setCodeFile(null)}
-              onShowPreview={() => { setCodeFile(null); setBrowserOpen(true) }}
+              onShowPreview={() => {
+                const page = pickPreviewArtifact([{ path: codeFile.path, status: 'modified' }])
+                setCodeFile(null)
+                setBrowserOpen(true)
+                if (page) setBrowserNavTo({ url: fileUrlFor(project.path, page), nonce: Date.now() })
+              }}
               onOpenFolder={() => { void window.terminal42.system.revealFolder(project.path) }}
             />
           </>

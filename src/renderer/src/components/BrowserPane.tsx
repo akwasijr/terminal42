@@ -849,6 +849,10 @@ function normalizeUrl(s: string): string {
   const v = sanitizeUrl(s)
   if (!v) return ''
   if (/^https?:\/\//i.test(v)) return v
+  // A local page written by a turn. It is already a complete URL, and the
+  // guesses below would mangle it into `https://file://…` because it contains
+  // a dot.
+  if (/^file:\/\//i.test(v)) return v
   if (/^localhost(:\d+)?(\/|$)/i.test(v)) return `http://${v}`
   if (/^[\w.-]+:\d+(\/|$)/.test(v)) return `http://${v}`
   if (/\./.test(v) || v.startsWith('/')) return `https://${v.replace(/^\/+/, '')}`
