@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { activityLabel } from '../lib/activityLabel'
 import { useCopilotSessionId } from '../lib/useCopilotSessionId'
 import type { Task, ContextUsage } from '../../../preload/index'
 import { IconExternal } from './icons'
@@ -420,24 +421,28 @@ function QuickActions({ sessionId, cwd }: { sessionId: string | null; cwd: strin
     }
 
     if (!status.hasRemote) {
+      // Hand the job to the agent.
+      //
+      // This used to write the git commands into a PTY belonging to this
+      // session and tell the user to check their terminal. Chat sessions have
+      // no PTY: `pty.write` answered `{ok: false}` and the message was a lie —
+      // verified live against three real sessions. Sending it as a turn is
+      // what the app is for, and the user can watch it happen.
       const connectViaChat = async () => {
         if (!sessionId) {
-          flash('err', 'No active session. Open a terminal first.')
+          flash('err', 'Open a session first.')
           return
         }
         setBusy('remote')
         try {
-          // Shell-escape the folder name to prevent injection
           const folderName = (cwd?.split('/').filter(Boolean).pop() ?? 'my-project')
             .replace(/['"\\$`!#&|;()\s]/g, '_')
-          const cmd = [
-            `git init 2>/dev/null;`,
-            `git add -A && git commit -m "Initial commit" 2>/dev/null;`,
-            `gh repo create "${folderName}" --private --source=. --push`
-          ].join(' ')
-          await window.terminal42.pty.write(sessionId, cmd + '\n')
-          window.dispatchEvent(new CustomEvent('t42:jump-to-terminal'))
-          flash('ok', 'Running. Check your terminal.')
+          const res = await window.terminal42.chat.send(
+            sessionId,
+            `Publish this folder to GitHub as a new private repository named "${folderName}". Initialise git if needed, commit everything, create the repo with gh and push. Tell me the repository URL when it is done.`
+          )
+          if (!res?.ok) throw new Error(res?.error ?? 'The session would not accept it.')
+          flash('ok', 'Asked the agent. Watch the chat.')
         } catch (err) {
           flash('err', `Couldn't send: ${String(err)}`)
         } finally {
@@ -592,43 +597,57 @@ function QuickActions({ sessionId, cwd }: { sessionId: string | null; cwd: strin
 
 /* ---------- What Copilot is doing ---------- */
 
-function cleanActivityLine(s: string): string {
-  let t = s
-  t = t.replace(/\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)/g, '')
-  t = t.replace(/\x1B\[[0-9;?]*[A-Za-z]/g, '')
-  t = t.replace(/\[(?:\d+;)*\d+m/g, '')
-  t = t.replace(/\u2500{3,}/g, '')
-  t = t.replace(/[─━_]{3,}/g, '')
-  t = t.replace(/[ \t\u00A0]+/g, ' ')
-  return t.trim()
-}
-
-const ACTIVITY_NOISE = [
-  /^connection error/i,
-  /capierror/i,
-  /retrying in \d+/i,
-  /total retry wait time/i,
-  /commands include/i,
-  /copilot uses ai/i,
-  /^[[\]<>·•:\-_/\\\s]+$/
-]
-
-function isUsefulActivity(s: string): boolean {
-  if (!s) return false
-  if (s.length < 3) return false
-  if (ACTIVITY_NOISE.some((r) => r.test(s))) return false
-  return true
-}
+// What the agent has actually been doing.
+//
+// This used to read `pty.activityHistory`, which only ever has content for a
+// terminal session. Chat sessions have no PTY, so for every session in this
+// workspace the tab said "Idle" forever — verified live against three real
+// linked sessions, all returning zero entries.
+//
+// The activity does exist, just somewhere else: every tool the agent runs is
+// emitted as `chat:tool` and persisted on the message that made the call. So
+// the list is seeded from history and then kept live from the same event the
+// transcript uses.
+type ActivityEntry = { id: string; label: string; at: number; status: 'running' | 'done' | 'error' }
 
 function ActivityBlock({ sessionId, isOtherSession }: { sessionId: string | null; isOtherSession?: boolean }) {
-  const [history, setHistory] = useState<{ line: string; at: number }[]>([])
-  const [now, setNow] = useState(Date.now())
+  const [entries, setEntries] = useState<ActivityEntry[]>([])
+  // Only the setter is used: relative timestamps are computed at render, so the
+  // tick exists to schedule a re-render, not to carry a value.
+  const [, setNow] = useState(Date.now())
 
   useEffect(() => {
-    if (!sessionId) { setHistory([]); return }
-    void window.terminal42.pty.activityHistory(sessionId).then(setHistory).catch(() => {})
-    const off = window.terminal42.pty.onActivityHistory(sessionId, setHistory)
-    return off
+    if (!sessionId) { setEntries([]); return }
+    let cancelled = false
+
+    // Seed from what the session already did, so opening the tab mid-way
+    // through a session is not an empty panel.
+    void window.terminal42.chat.history(sessionId).then((msgs) => {
+      if (cancelled) return
+      const seeded: ActivityEntry[] = []
+      for (const m of msgs) {
+        for (const t of m.toolCalls ?? []) {
+          seeded.push({ id: t.id, label: activityLabel(t), at: m.createdAt, status: t.status })
+        }
+      }
+      setEntries(seeded)
+    }).catch(() => {})
+
+    // Then follow along. A tool is emitted twice, once running and once
+    // finished, so entries are keyed by id and updated in place rather than
+    // appended — otherwise every command would appear as two rows.
+    const off = window.terminal42.chat.onTool(({ sessionId: sid, tool }) => {
+      if (sid !== sessionId) return
+      setEntries((prev) => {
+        const i = prev.findIndex((e) => e.id === tool.id)
+        const next: ActivityEntry = { id: tool.id, label: activityLabel(tool), at: Date.now(), status: tool.status }
+        if (i === -1) return [...prev, next]
+        const copy = prev.slice()
+        copy[i] = { ...next, at: prev[i].at }
+        return copy
+      })
+    })
+    return () => { cancelled = true; off() }
   }, [sessionId])
 
   useEffect(() => {
@@ -636,29 +655,31 @@ function ActivityBlock({ sessionId, isOtherSession }: { sessionId: string | null
     return () => clearInterval(t)
   }, [])
 
-  const cleaned = useMemo(() => {
-    const out: { line: string; at: number }[] = []
-    let prev = ''
-    for (const h of history) {
-      const c = cleanActivityLine(h.line)
-      if (!isUsefulActivity(c)) continue
-      if (c === prev) continue
-      out.push({ line: c, at: h.at })
-      prev = c
+  // Six edits to the same file is one thing happening, not six. Collapsing
+  // runs of the same label keeps the panel readable without hiding work: the
+  // count says how many times, and the row still carries the latest state.
+  const recent = useMemo(() => {
+    const collapsed: (ActivityEntry & { count: number })[] = []
+    for (const e of entries) {
+      const last = collapsed[collapsed.length - 1]
+      if (last && last.label === e.label) {
+        last.count += 1
+        last.at = e.at
+        last.status = e.status
+        continue
+      }
+      collapsed.push({ ...e, count: 1 })
     }
-    return out.slice(-8)
-  }, [history])
+    return collapsed.slice(-12)
+  }, [entries])
 
   if (!sessionId) {
     return <p className="px-1 py-1 text-[12px] text-text-muted">No session selected.</p>
   }
 
-  if (cleaned.length === 0) {
-    return <p className="px-1 py-1 text-[12px] text-text-muted">Idle. Activity will appear here when Copilot runs.</p>
+  if (recent.length === 0) {
+    return <p className="px-1 py-1 text-[12px] text-text-muted">Nothing yet. Commands and file edits appear here as the agent works.</p>
   }
-
-  const lastIdx = cleaned.length - 1
-  const isFresh = now - (cleaned[lastIdx]?.at ?? 0) < 4000
 
   return (
     <div className="flex flex-col">
@@ -666,30 +687,26 @@ function ActivityBlock({ sessionId, isOtherSession }: { sessionId: string | null
         <div className="mb-2 px-1 text-[10.5px] text-text-muted">Showing activity from another session.</div>
       )}
       <ul className="flex flex-col">
-        {cleaned.map((h, i) => {
-          const latest = i === lastIdx
-          const done = !latest || !isFresh
+        {recent.map((h) => {
+          const running = h.status === 'running'
           return (
-            <li
-              key={`${h.at}-${i}`}
-              className="flex items-baseline gap-2 px-1 py-2 text-[12px]"
-            >
+            <li key={h.id} className="flex items-baseline gap-2 px-1 py-2 text-[12px]">
               <span
                 className={[
                   'mt-0.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full',
-                  done ? 'bg-text-muted' : 'bg-text-primary animate-pulse'
+                  running ? 'bg-text-primary animate-pulse' : h.status === 'error' ? 'bg-danger' : 'bg-text-muted'
                 ].join(' ')}
                 aria-hidden="true"
               />
               <span
-                className={[
-                  'min-w-0 flex-1 truncate',
-                  done ? 'text-text-secondary' : 'text-text-primary'
-                ].join(' ')}
-                title={h.line}
+                className={['min-w-0 flex-1 truncate', running ? 'text-text-primary' : 'text-text-secondary'].join(' ')}
+                title={h.label}
               >
-                {h.line}
+                {h.label}
               </span>
+              {h.count > 1 && (
+                <span className="shrink-0 text-[10.5px] tabular-nums text-text-muted">×{h.count}</span>
+              )}
               <span className="shrink-0 text-[10.5px] tabular-nums text-text-muted">{relativeTime(h.at)}</span>
             </li>
           )
@@ -698,7 +715,6 @@ function ActivityBlock({ sessionId, isOtherSession }: { sessionId: string | null
     </div>
   )
 }
-
 /* ---------- Tasks (compact snippet for current session only) ---------- */
 
 function TasksBlock({ sessionId, projectId, onViewSession, onNavigate }: {
