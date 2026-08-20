@@ -19,6 +19,7 @@ import { registerMemoryIpc, backfillMemoryIndex } from './memory'
 import { registerFilesIpc } from './files'
 import { registerVoiceIpc } from './voice'
 import { registerSettingsIpc } from './settings'
+import { registerCopilotCliSettingsIpc } from './copilotCliSettings'
 import { registerInsightsIpc, stopInsightsScheduler } from './insights'
 import { registerSessionInsightsIpc } from './sessionInsights'
 import { registerTasksIpc, stopTasksWatcher } from './tasks'
@@ -349,6 +350,7 @@ app.whenReady().then(() => {
   registerFilesIpc(() => mainWindow)
   registerVoiceIpc()
   registerSettingsIpc()
+  registerCopilotCliSettingsIpc()
   registerModelsIpc(() => mainWindow)
   initModelCatalog(() => mainWindow)
   registerInsightsIpc(() => mainWindow)

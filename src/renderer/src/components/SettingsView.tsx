@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import type { Settings } from '../../../preload/index'
+import type { Settings, PlaintextTokenState } from '../../../preload/index'
 import { MODELS, onModelsChanged } from './ModelDropdown'
 import { IconExternal } from './icons'
 
@@ -286,6 +286,13 @@ function ConfigurationPane({
   s, update
 }: { s: Settings; update: <K extends keyof Settings>(k: K, v: Settings[K]) => void }) {
   const openToml = async (): Promise<void> => { await window.terminal42.settings.openConfigToml() }
+  const [plaintext, setPlaintext] = useState<PlaintextTokenState | null>(null)
+  useEffect(() => {
+    void window.terminal42.settings.getPlaintextToken().then(setPlaintext)
+  }, [])
+  const togglePlaintext = async (v: boolean): Promise<void> => {
+    setPlaintext(await window.terminal42.settings.setPlaintextToken(v))
+  }
   return (
     <>
       <Heading title="Configuration" />
@@ -312,6 +319,20 @@ function ConfigurationPane({
             <option value="workspace-write">Workspace write</option>
             <option value="danger">Danger</option>
           </select>
+        </Row>
+        <Row
+          label="Skip the macOS Keychain prompt"
+          hint={
+            plaintext?.ok === false
+              ? 'Cannot read ~/.copilot/settings.json, so this is unavailable. Fix or delete that file to use this.'
+              : 'Tells Copilot CLI to keep its GitHub token in ~/.copilot/config.json instead of the macOS Keychain, which is what triggers the access prompt. The trade-off: the token is then stored unencrypted. You may need to run “copilot login” once after changing this.'
+          }
+        >
+          <Toggle
+            checked={plaintext?.enabled === true}
+            disabled={plaintext === null || !plaintext.ok}
+            onChange={(v) => void togglePlaintext(v)}
+          />
         </Row>
         <Row label="Copilot config file">
           <button
@@ -428,15 +449,17 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
   )
 }
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
+      disabled={disabled}
       onClick={() => onChange(!checked)}
       className={[
         'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors',
+        disabled ? 'cursor-not-allowed opacity-50' : '',
         checked ? 'bg-accent' : 'bg-elevated'
       ].join(' ')}
     >

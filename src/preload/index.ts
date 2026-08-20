@@ -531,6 +531,12 @@ export type ProjectBrief = {
   createdAt: number
 }
 
+export type PlaintextTokenState = {
+  enabled: boolean
+  ok: boolean
+  path: string
+}
+
 export type Settings = {
   notifyAfterSeconds: number
   notifyCooldownSeconds: number
@@ -1057,7 +1063,11 @@ const api = {
     get: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),
     set: <K extends keyof Settings>(key: K, value: Settings[K]) =>
       ipcRenderer.invoke('settings:set', { key, value }),
-    openConfigToml: (): Promise<{ ok: boolean; path: string }> => ipcRenderer.invoke('settings:openConfigToml')
+    openConfigToml: (): Promise<{ ok: boolean; path: string }> => ipcRenderer.invoke('settings:openConfigToml'),
+    getPlaintextToken: (): Promise<PlaintextTokenState> =>
+      ipcRenderer.invoke('copilotCli:getPlaintextToken'),
+    setPlaintextToken: (enabled: boolean): Promise<PlaintextTokenState> =>
+      ipcRenderer.invoke('copilotCli:setPlaintextToken', enabled)
   },
   notify: {
     show: (title: string, body: string) => ipcRenderer.invoke('notify:show', { title, body })
