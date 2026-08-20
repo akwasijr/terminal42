@@ -73,6 +73,16 @@ export type ChatMessage = {
 type RunState = {
   child: ChildProcess
   assistantMsgId: string | null
+  /**
+   * The last assistant message of the turn, which is what the diff card and
+   * any later undo hang off.
+   *
+   * Kept separately because `assistantMsgId` is cleared the moment a message
+   * completes so the next one starts a fresh row — which meant that by the
+   * time the turn finished there was never an id to attach the diff to, and
+   * undo was never offered for any turn that ended normally.
+   */
+  lastAssistantMsgId: string | null
   buffer: string
   toolCalls: Map<string, ToolCall>
   cancelled: boolean
@@ -156,7 +166,7 @@ function emitTurnArtifact(win: BrowserWindow | null, sessionId: string, state: R
  */
 async function recordTurnDiff(win: BrowserWindow | null, sessionId: string, state: RunState): Promise<void> {
   try {
-    const messageId = state.assistantMsgId
+    const messageId = state.lastAssistantMsgId
     if (!messageId) return
     const before = await state.snapshot
     if (isEmptySnapshot(before)) return
@@ -266,6 +276,7 @@ function processJsonEvent(
   if (t === 'assistant.message_start') {
     const id = randomUUID()
     state.assistantMsgId = id
+    state.lastAssistantMsgId = id
     const msg: ChatMessage = {
       id, sessionId, role: 'assistant', content: '',
       toolCalls: Array.from(state.toolCalls.values()),
@@ -542,7 +553,7 @@ function send(
   }
 
   const state: RunState = {
-    child, assistantMsgId: null, buffer: '', toolCalls: new Map(), cancelled: false, doneEmitted: false,
+    child, assistantMsgId: null, lastAssistantMsgId: null, buffer: '', toolCalls: new Map(), cancelled: false, doneEmitted: false,
     cwd,
     // Fired here rather than awaited: the run must not wait on git.
     snapshot: takeTurnSnapshot(undoStore(), cwd),
@@ -620,6 +631,9 @@ function send(
       }
       insertMessage(notice)
       emit(win, 'chat:message', notice)
+      // The message this run was writing has been blanked for the retry, so
+      // it must not become the diff card's anchor.
+      state.lastAssistantMsgId = null
       finalizeRun(win, sessionId, state, code ?? -1)
       send(win, sessionId, state.originalText, { ...state.originalOpts, model: 'auto', isModelFallback: true, isAutoFallback: true })
       return
@@ -661,6 +675,7 @@ function send(
       updateMessage(replaced)
       emit(win, 'chat:message', replaced)
       state.assistantMsgId = null
+      state.lastAssistantMsgId = null
       finalizeRun(win, sessionId, state, code ?? 0)
       send(win, sessionId, state.originalText, { ...state.originalOpts, model: state.requestedModel, isFreshContextRetry: true })
       return
@@ -691,6 +706,9 @@ function send(
       }
       insertMessage(notice)
       emit(win, 'chat:message', notice)
+      // The message this run was writing has been blanked for the retry, so
+      // it must not become the diff card's anchor.
+      state.lastAssistantMsgId = null
       finalizeRun(win, sessionId, state, code ?? -1)
       send(win, sessionId, state.originalText, { ...state.originalOpts, model: null, isModelFallback: true })
       return
