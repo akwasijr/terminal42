@@ -16,7 +16,8 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import { buildGreeting } from '../../../shared/greeting'
-import { STARTER_PROMPT_TEXTS, type StarterPromptText, type StarterId } from './starterPrompts'
+import { starterTrio, STARTER_ROTATION_LENGTH, type StarterPromptText, type StarterId } from './starterPrompts'
+import { readAndAdvanceRotation } from './starterRotation'
 
 
 // Same palette the design wizard's thumbnails use, redeclared rather than
@@ -75,10 +76,22 @@ const ART: Record<StarterId, ReactNode> = {
   ),
 }
 
-const STARTER_PROMPTS: StarterPrompt[] = STARTER_PROMPT_TEXTS.map((t) => ({ ...t, art: ART[t.id] }))
+/**
+ * The rotation counter, advanced once per mounted empty state so a user who
+ * opens several chats sees different suggestions. Read once on mount:
+ * advancing on every render would swap the tiles under the cursor.
+ */
+function useStarterRotation(): number {
+  const [rotation] = useState<number>(() =>
+    readAndAdvanceRotation(localStorage, STARTER_ROTATION_LENGTH)
+  )
+  return rotation
+}
 
 export function ChatEmptyStateFull({ onPick }: { onPick: (prompt: string) => void }): JSX.Element {
   const name = useGreetingName()
+  const rotation = useStarterRotation()
+  const starters: StarterPrompt[] = starterTrio(rotation).map((t) => ({ ...t, art: ART[t.id] }))
 
   return (
     <section className="flex h-full w-full flex-col items-center justify-center px-6 py-10">
@@ -87,7 +100,7 @@ export function ChatEmptyStateFull({ onPick }: { onPick: (prompt: string) => voi
           {buildGreeting(name)}
         </h1>
         <ul className="grid gap-3 sm:grid-cols-3">
-          {STARTER_PROMPTS.map((p) => (
+          {starters.map((p) => (
             <li key={p.id} className="contents">
               <StarterCard prompt={p} onPick={onPick} />
             </li>
