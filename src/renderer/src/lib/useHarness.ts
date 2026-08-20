@@ -12,6 +12,7 @@
 
 import { useEffect, useState } from 'react'
 import type { ContextUsage } from '../../../preload/index'
+import { useCopilotSessionId } from './useCopilotSessionId'
 import { EMPTY_INSIGHTS, type SessionInsights } from '../../../shared/sessionInsights'
 
 const POLL_MS = 5000
@@ -24,22 +25,14 @@ export type Harness = {
 }
 
 export function useHarness(sessionId: string | null): Harness {
-  const [copilotId, setCopilotId] = useState<string | null>(null)
+  const copilotId = useCopilotSessionId(sessionId)
   const [insights, setInsights] = useState<SessionInsights>(EMPTY_INSIGHTS)
   const [usage, setUsage] = useState<ContextUsage | null>(null)
 
   useEffect(() => {
-    if (!sessionId) {
-      setCopilotId(null)
-      setInsights(EMPTY_INSIGHTS)
-      setUsage(null)
-      return
-    }
-    void window.terminal42.sessions.get(sessionId).then((s) => setCopilotId(s?.copilot_session_id ?? null))
-    const off = window.terminal42.pty.onLinked((p) => {
-      if (p.id === sessionId) setCopilotId(p.copilotSessionId)
-    })
-    return off
+    if (sessionId) return
+    setInsights(EMPTY_INSIGHTS)
+    setUsage(null)
   }, [sessionId])
 
   useEffect(() => {

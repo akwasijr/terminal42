@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCopilotSessionId } from '../lib/useCopilotSessionId'
 import type { Task, ContextUsage } from '../../../preload/index'
 import { IconExternal } from './icons'
 import { InfoRail } from './InfoRail'
@@ -136,7 +137,7 @@ function StatusBlock({
 }) {
   const [brainCount, setBrainCount] = useState<number>(0)
   const [persona, setPersona] = useState<string>('Default')
-  const [copilotId, setCopilotId] = useState<string | null>(null)
+  const copilotId = useCopilotSessionId(sessionId)
   const [usage, setUsage] = useState<ContextUsage | null>(null)
 
   useEffect(() => {
@@ -159,15 +160,6 @@ function StatusBlock({
   }, [projectId, sessionId])
 
   useEffect(() => {
-    if (!sessionId) { setCopilotId(null); return }
-    void window.terminal42.sessions.get(sessionId).then((s) => setCopilotId(s?.copilot_session_id ?? null))
-    const off = window.terminal42.pty.onLinked((p) => {
-      if (p.id === sessionId) setCopilotId(p.copilotSessionId)
-    })
-    return off
-  }, [sessionId])
-
-  useEffect(() => {
     if (!copilotId) { setUsage(null); return }
     void window.terminal42.copilot.contextUsage(copilotId).then(setUsage).catch(() => {})
     const off = window.terminal42.copilot.onContextUsage(copilotId, setUsage)
@@ -185,35 +177,23 @@ function StatusBlock({
         </span>
       </Row>
       <Row label="Persona">
-        <button
-          type="button"
-          onClick={() => onNavigate?.('workbench')}
-          className="truncate text-text-primary hover:underline"
-          title="Open Skills library"
-        >
+        <RowAction onClick={() => onNavigate?.('workbench')} title="Open the Skills library">
           {persona}
-        </button>
+        </RowAction>
       </Row>
       <Row label="Brain">
-        <button
-          type="button"
-          onClick={() => onNavigate?.('brain')}
-          className="text-text-primary hover:underline"
-          title="Open Brain editor"
-        >
+        <RowAction onClick={() => onNavigate?.('brain')} title="Open the Brain editor">
           {brainCount} {brainCount === 1 ? 'rule' : 'rules'}
-        </button>
+        </RowAction>
       </Row>
       <Row label="Folder">
-        <button
-          type="button"
+        <RowAction
           onClick={() => cwd && void window.terminal42.system.revealFolder(cwd)}
           disabled={!cwd}
-          className="truncate text-text-primary hover:underline disabled:opacity-50"
-          title={cwd ?? ''}
+          title={cwd ? `Show ${cwd} in Finder` : 'No folder for this session'}
         >
           {shortPath(cwd)}
-        </button>
+        </RowAction>
       </Row>
       <ContextRow usage={usage} hasSession={!!copilotId} />
     </div>
@@ -244,6 +224,39 @@ function ContextRow({ usage, hasSession }: { usage: ContextUsage | null; hasSess
   )
 }
 
+
+/**
+ * A value in the status list that does something when clicked.
+ *
+ * These rows read as plain text, so people assumed they were inert labels and
+ * never tried them. The dotted underline is the standing hint that the value is
+ * a control; hover and focus promote it to a solid one.
+ */
+function RowAction({
+  onClick, title, disabled, children
+}: {
+  onClick: () => void
+  title: string
+  disabled?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={[
+        'max-w-full truncate rounded-sm text-text-primary underline decoration-dotted decoration-text-muted underline-offset-[3px]',
+        'transition-colors hover:decoration-text-primary hover:decoration-solid',
+        'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+        'active:opacity-80 disabled:cursor-not-allowed disabled:no-underline disabled:opacity-50'
+      ].join(' ')}
+    >
+      {children}
+    </button>
+  )
+}
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -696,16 +709,7 @@ function TasksBlock({ sessionId, projectId, onViewSession, onNavigate }: {
 }) {
   void onViewSession; void projectId
   const [tasks, setTasks] = useState<Task[]>([])
-  const [copilotId, setCopilotId] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!sessionId) { setCopilotId(null); return }
-    void window.terminal42.sessions.get(sessionId).then((s) => setCopilotId(s?.copilot_session_id ?? null))
-    const off = window.terminal42.pty.onLinked((p) => {
-      if (p.id === sessionId) setCopilotId(p.copilotSessionId)
-    })
-    return off
-  }, [sessionId])
+  const copilotId = useCopilotSessionId(sessionId)
 
   useEffect(() => {
     if (!copilotId) { setTasks([]); return }

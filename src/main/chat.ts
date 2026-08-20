@@ -220,10 +220,16 @@ function getCopilotResumeId(sessionId: string): string | null {
   return row?.copilot_session_id ?? null
 }
 
-function saveCopilotResumeId(sessionId: string, copilotSessionId: string): void {
+// Returns true when this is a new link, so callers can tell the renderer.
+// Without that signal the renderer only ever learns a session's Copilot id
+// from `pty:linked`, which never fires for chat-only sessions — leaving the
+// context reading frozen at whatever it was when the panel mounted.
+function saveCopilotResumeId(sessionId: string, copilotSessionId: string): boolean {
+  const previous = getCopilotResumeId(sessionId)
   getDb()
     .prepare('UPDATE sessions SET copilot_session_id = ?, last_active_at = ? WHERE id = ?')
     .run(copilotSessionId, Date.now(), sessionId)
+  return previous !== copilotSessionId
 }
 
 function getSessionModel(sessionId: string): string | null {
@@ -322,7 +328,9 @@ function processJsonEvent(
   }
   if (t === 'result') {
     const copilotSessionId = (evt as { sessionId?: string }).sessionId
-    if (copilotSessionId) saveCopilotResumeId(sessionId, copilotSessionId)
+    if (copilotSessionId && saveCopilotResumeId(sessionId, copilotSessionId)) {
+      emit(win, 'pty:linked', { id: sessionId, copilotSessionId })
+    }
     emit(win, 'chat:done', { sessionId, exitCode: (evt as { exitCode?: number }).exitCode ?? 0 })
     return
   }
