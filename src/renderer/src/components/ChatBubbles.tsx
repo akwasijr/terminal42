@@ -8,7 +8,7 @@
 // (project) and `LoomMessage` (loom) satisfy it without adapters.
 
 import { chatActivityLabel, summarizeChatTools, type ChatToolGroup } from './chatActivity'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { IconBolt, IconCheck, IconChevronRight, IconClose, IconCopy } from './icons'
 import { BoxesThinking } from './PencilThinking'
@@ -245,22 +245,39 @@ function ToolPill({ tool }: { tool: ChatLikeToolCall }): JSX.Element {
 // Exported in case future callers want the raw tool pill.
 export { ToolPill }
 
-function MarkdownContent({ content }: { content: string }): JSX.Element {
+/**
+ * True while rendering the children of a fenced code block.
+ *
+ * react-markdown stopped passing an `inline` flag to the `code` component in
+ * v9, so the only reliable way to tell a fenced block from an inline span is
+ * position: a fenced block is a `code` inside a `pre`. Reading it from context
+ * beats guessing from the language class, which would misread a fence that
+ * has no language as an inline span.
+ */
+const InCodeBlock = createContext(false)
+
+export function MarkdownContent({ content }: { content: string }): JSX.Element {
   // Memoise renderer config so streaming updates don't reconstruct components.
   const components = useMemo(() => ({
     a: (props: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
       <a {...props} target="_blank" rel="noreferrer noopener" className="text-accent underline hover:opacity-80" />
     ),
-    code: (props: React.HTMLAttributes<HTMLElement> & { inline?: boolean }) => {
-      const { inline, className, children, ...rest } = props
-      if (inline) {
-        return <code className="rounded bg-elevated px-1 py-0.5 font-mono text-[12.5px] text-text-primary" {...rest}>{children}</code>
-      }
+    pre: (props: React.HTMLAttributes<HTMLPreElement>) => {
+      const { children, ...rest } = props
       return (
-        <pre className="my-2 overflow-x-auto rounded-lg bg-elevated p-3 font-mono text-[12.5px] leading-relaxed text-text-primary">
-          <code className={className} {...rest}>{children}</code>
-        </pre>
+        <InCodeBlock.Provider value={true}>
+          <pre
+            className="my-2 overflow-x-auto rounded-lg bg-elevated p-3 font-mono text-[12.5px] leading-relaxed text-text-primary"
+            {...rest}
+          >
+            {children}
+          </pre>
+        </InCodeBlock.Provider>
       )
+    },
+    code: (props: React.HTMLAttributes<HTMLElement>) => {
+      const { className, children, ...rest } = props
+      return <CodeSpan className={className} rest={rest}>{children}</CodeSpan>
     },
     p: (props: React.HTMLAttributes<HTMLParagraphElement>) => <p className="my-1.5 first:mt-0 last:mb-0" {...props} />,
     ul: (props: React.HTMLAttributes<HTMLUListElement>) => <ul className="my-1.5 list-disc pl-5" {...props} />,
@@ -274,4 +291,32 @@ function MarkdownContent({ content }: { content: string }): JSX.Element {
     )
   }), [])
   return <ReactMarkdown components={components}>{content}</ReactMarkdown>
+}
+
+/**
+ * A `code` element, styled as a chip inline and as plain text inside a fence.
+ *
+ * Applying the chip styling inside a fence would draw a rounded, padded box
+ * around every code block's contents — which is what a file path in the middle
+ * of a sentence used to look like, only inverted.
+ */
+function CodeSpan({
+  className,
+  rest,
+  children
+}: {
+  className?: string
+  rest: React.HTMLAttributes<HTMLElement>
+  children?: React.ReactNode
+}): JSX.Element {
+  const inBlock = useContext(InCodeBlock)
+  if (inBlock) return <code className={className} {...rest}>{children}</code>
+  return (
+    <code
+      className="rounded bg-elevated px-1 py-0.5 font-mono text-[12.5px] text-text-primary"
+      {...rest}
+    >
+      {children}
+    </code>
+  )
 }

@@ -65,7 +65,13 @@ describe('fileUrlFor', () => {
   })
 
   it('does not double the separator', () => {
-    expect(fileUrlFor('/Users/me/site/', '/index.html')).toBe('file:///Users/me/site/index.html')
+    expect(fileUrlFor('/Users/me/site/', './index.html')).toBe('file:///Users/me/site/index.html')
+  })
+
+  it('uses an absolute path as given, rather than joining it onto the base', () => {
+    // Tools report absolute paths; joining would produce a path that exists
+    // nowhere, and the preview would silently show a 404.
+    expect(fileUrlFor('/Users/me/site', '/tmp/other/index.html')).toBe('file:///tmp/other/index.html')
   })
 
   it('encodes spaces without destroying the path separators', () => {

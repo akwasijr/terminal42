@@ -1,18 +1,21 @@
-// Supplying an auth token to spawned `copilot` processes, so they never reach
-// for the macOS keychain.
+// Supplying an auth token to spawned `copilot` processes.
 //
-// The CLI resolves credentials in a fixed order: COPILOT_GITHUB_TOKEN, then
-// GH_TOKEN, then GITHUB_TOKEN, and only if none is present does it read the
-// system credential store. Reading that store is what triggers the recurring
-// "copilot wants to use your confidential information stored in copilot-cli in
-// your keychain" dialog — the keychain grants access per requesting binary, and
-// a CLI launched as a child of this app does not inherit the trust the user
-// granted when they ran it from their own terminal.
+// NOTE ON THE KEYCHAIN DIALOG: this does NOT stop it. That was the original
+// intent, and it was wrong. Verified against the CLI's own debug log: with
+// COPILOT_GITHUB_TOKEN set, the CLI still creates a macOS keychain entry for
+// service `copilot-cli` and reads it ("get password from entry Cred { service:
+// \"copilot-cli\" }"). The credential store is instantiated at startup
+// regardless of the environment.
 //
-// So if the user already has a usable token, we hand it over and the dialog
-// never appears. If they do not, nothing changes and the CLI authenticates the
-// way it always did; this is strictly a way to avoid a prompt, never a
-// replacement for logging in.
+// The setting that actually suppresses the read is `storeTokenPlaintext` in
+// ~/.copilot/settings.json — measured at 0 keychain reads with it, 1 without —
+// but that writes the token unencrypted to ~/.copilot/config.json, which is a
+// trade-off for the user to make, not this app.
+//
+// What this module is still good for: handing a token to a CLI that would
+// otherwise have none, e.g. when the app is launched from Finder and the
+// CLI's own `gh auth token` lookup fails. It is an availability fallback, not
+// a privacy measure.
 //
 // The token is held in memory for the life of the process and never written to
 // disk, logged, or sent to the renderer.

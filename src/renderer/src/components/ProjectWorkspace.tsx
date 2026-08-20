@@ -197,17 +197,19 @@ export function ProjectWorkspace({
   }, [project?.id])
 
   // Show a page the turn just wrote, instead of telling the user where it
-  // landed. Only fires for a path we haven't already shown, and never while a
-  // dev server is serving this project: that server is the real preview, and
-  // a file:// copy of one of its pages would load without the assets it
-  // serves. Uses the non-persisting open so closing the pane still sticks.
+  // landed. The path comes from the turn's own tool calls, so it arrives with
+  // the answer; deriving it from the worktree diff meant waiting on a tree
+  // hash that, in a large folder, never finished.
+  //
+  // Only fires for a page it hasn't shown before, and never while a dev server
+  // is serving this project: that server is the real preview, and a file://
+  // copy of one of its pages would load without the assets it serves. Uses the
+  // non-persisting open so closing the pane still sticks.
   useEffect(() => {
-    if (!project?.id || !project.path) return
+    if (!project?.id) return
     let alive = true
-    const off = window.terminal42.chat.onDiff(({ diff }) => {
-      const artifact = pickPreviewArtifact(diff?.files ?? [])
-      if (!artifact) return
-      const url = fileUrlFor(project.path, artifact)
+    const off = window.terminal42.chat.onArtifact(({ path, cwd }) => {
+      const url = fileUrlFor(cwd || project.path, path)
       if (seenPreviewUrlsRef.current.has(url)) return
       void window.terminal42.preview
         .running()

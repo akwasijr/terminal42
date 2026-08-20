@@ -51,13 +51,19 @@ function depth(path: string): number {
 }
 
 /**
- * A file:// URL for a project-relative path.
+ * A file:// URL for a path a turn wrote.
+ *
+ * The path may be absolute (tools generally report it that way) or relative to
+ * the turn's working directory, so both are accepted and an absolute path is
+ * never joined onto the base.
  *
  * Each segment is encoded separately so that spaces and other literal
  * characters survive while the separators stay separators — encoding the
  * whole path would turn every `/` into `%2F` and address nothing.
  */
-export function fileUrlFor(projectPath: string, relative: string): string {
-  const abs = `${projectPath.replace(/\/+$/, '')}/${relative.replace(/^\/+/, '')}`
+export function fileUrlFor(basePath: string, path: string): string {
+  const abs = path.startsWith('/')
+    ? path
+    : `${basePath.replace(/\/+$/, '')}/${path.replace(/^\.\//, '')}`
   return `file://${abs.split('/').map(encodeURIComponent).join('/')}`
 }

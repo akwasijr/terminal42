@@ -61,7 +61,23 @@ interface RawResult {
  * content through utf-8 is lossy, so restoring a PNG via a string round-trip
  * silently corrupts it.
  */
-function runGitRaw(cwd: string, args: string[], env?: NodeJS.ProcessEnv): Promise<RawResult> {
+/**
+ * How long any single git call in a snapshot may run before we give up.
+ *
+ * Snapshotting stages the whole worktree, and the cost of that is set by the
+ * folder, not by the turn. A session opened on a home directory or a Desktop
+ * holding tens of gigabytes will hash for minutes, on every turn, and the
+ * result is a chat that appears to work but never produces a diff card.
+ * Failing fast turns that into a plainly missing undo instead of a hang.
+ */
+export const GIT_TIMEOUT_MS = 15_000
+
+function runGitRaw(
+  cwd: string,
+  args: string[],
+  env?: NodeJS.ProcessEnv,
+  timeoutMs = GIT_TIMEOUT_MS
+): Promise<RawResult> {
   return new Promise((resolve) => {
     try {
       const child = spawn('git', args, {
@@ -70,13 +86,28 @@ function runGitRaw(cwd: string, args: string[], env?: NodeJS.ProcessEnv): Promis
       })
       const chunks: Buffer[] = []
       let err = ''
+      let settled = false
+      const finish = (r: RawResult): void => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        resolve(r)
+      }
+      // Kill rather than just resolving: an abandoned `git add` would carry on
+      // hashing in the background, so every turn would leave another one
+      // running.
+      const timer = setTimeout(() => {
+        try { child.kill('SIGKILL') } catch { /* already gone */ }
+        finish({ ok: false, code: -1, stdout: Buffer.alloc(0), stderr: `git timed out after ${timeoutMs}ms` })
+      }, timeoutMs)
+      timer.unref?.()
       child.stdout.on('data', (d: Buffer) => { chunks.push(d) })
       child.stderr.on('data', (d) => { err += d.toString() })
       child.on('error', (e) =>
-        resolve({ ok: false, code: -1, stdout: Buffer.alloc(0), stderr: String(e?.message ?? e) })
+        finish({ ok: false, code: -1, stdout: Buffer.alloc(0), stderr: String(e?.message ?? e) })
       )
       child.on('close', (code) =>
-        resolve({ ok: code === 0, code: code ?? -1, stdout: Buffer.concat(chunks), stderr: err })
+        finish({ ok: code === 0, code: code ?? -1, stdout: Buffer.concat(chunks), stderr: err })
       )
     } catch (e) {
       resolve({ ok: false, code: -1, stdout: Buffer.alloc(0), stderr: String((e as Error)?.message ?? e) })
@@ -84,14 +115,19 @@ function runGitRaw(cwd: string, args: string[], env?: NodeJS.ProcessEnv): Promis
   })
 }
 
-async function runGitText(cwd: string, args: string[], env?: NodeJS.ProcessEnv): Promise<{ ok: boolean; out: string; err: string }> {
-  const r = await runGitRaw(cwd, args, env)
+async function runGitText(
+  cwd: string,
+  args: string[],
+  env?: NodeJS.ProcessEnv,
+  timeoutMs?: number
+): Promise<{ ok: boolean; out: string; err: string }> {
+  const r = await runGitRaw(cwd, args, env, timeoutMs)
   return { ok: r.ok, out: r.stdout.toString('utf8'), err: r.stderr }
 }
 
-export async function isRepo(cwd: string): Promise<boolean> {
+export async function isRepo(cwd: string, timeoutMs?: number): Promise<boolean> {
   if (!cwd) return false
-  const r = await runGitText(cwd, ['rev-parse', '--is-inside-work-tree'])
+  const r = await runGitText(cwd, ['rev-parse', '--is-inside-work-tree'], undefined, timeoutMs)
   return r.ok && r.out.trim() === 'true'
 }
 
@@ -107,8 +143,8 @@ export async function isRepo(cwd: string): Promise<boolean> {
  * being able to undo changes to ignored files. Deliberate trade: ignored paths
  * are build output, and snapshotting them on every turn would be pathological.
  */
-export async function snapshotTree(cwd: string): Promise<string | null> {
-  if (!(await isRepo(cwd))) return null
+export async function snapshotTree(cwd: string, timeoutMs = GIT_TIMEOUT_MS): Promise<string | null> {
+  if (!(await isRepo(cwd, timeoutMs))) return null
   let dir: string | null = null
   try {
     dir = mkdtempSync(join(tmpdir(), 't42-snap-'))
@@ -116,9 +152,9 @@ export async function snapshotTree(cwd: string): Promise<string | null> {
     const env = { GIT_INDEX_FILE: indexFile }
     // Stage everything into the scratch index. The real index is untouched
     // because GIT_INDEX_FILE redirects all staging writes.
-    const add = await runGitText(cwd, ['add', '-A', '--', '.'], env)
+    const add = await runGitText(cwd, ['add', '-A', '--', '.'], env, timeoutMs)
     if (!add.ok) return null
-    const tree = await runGitText(cwd, ['write-tree'], env)
+    const tree = await runGitText(cwd, ['write-tree'], env, timeoutMs)
     if (!tree.ok) return null
     const sha = tree.out.trim()
     return /^[0-9a-f]{40,64}$/.test(sha) ? sha : null

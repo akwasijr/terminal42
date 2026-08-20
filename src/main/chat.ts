@@ -4,6 +4,8 @@ import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { getDb } from './db'
+import { writtenPathFrom, toolArgumentsOf } from '../shared/toolArtifacts'
+import { pickPreviewArtifact } from '../shared/previewArtifact'
 import { resolveModel } from './models'
 import { assembleCacheStableMessages, flattenPromptCacheMessages } from '../shared/promptCache'
 import { buildMemoryContext } from './memoryContext'
@@ -79,6 +81,10 @@ type RunState = {
   /** Worktree snapshot taken as the turn started. Held as a promise so
    *  starting the run is never blocked on git. */
   snapshot: Promise<TurnSnapshot | null>
+  /** Absolute paths the turn's tools wrote, in the order they were written.
+   *  Read from the tool calls rather than the snapshot so the preview can
+   *  open the moment the turn ends, whatever size the folder is. */
+  written: string[]
   // Retry context for transparent model fallback (one-shot --prompt mode
   // doesn't auto-fall-back on unknown --model, so we re-send without it).
   // If that hits a rate limit and is eligible for auto-switch, we retry
@@ -103,8 +109,23 @@ function finalizeRun(win: BrowserWindow | null, sessionId: string, state: RunSta
   running.delete(sessionId)
   if (state.doneEmitted) return
   state.doneEmitted = true
+  emitTurnArtifact(win, sessionId, state)
   void recordTurnDiff(win, sessionId, state)
   emit(win, 'chat:done', { sessionId, exitCode })
+}
+
+/**
+ * Tell the renderer about a page the turn wrote, so it can be shown rather
+ * than described.
+ *
+ * Emitted from the tool calls, not the diff: the diff needs a worktree
+ * snapshot, which in a large folder can take minutes, and a preview that
+ * arrives minutes after the answer is no preview at all.
+ */
+function emitTurnArtifact(win: BrowserWindow | null, sessionId: string, state: RunState): void {
+  const page = pickPreviewArtifact(state.written.map((path) => ({ path, status: 'added' })))
+  if (!page) return
+  emit(win, 'chat:artifact', { sessionId, path: page, cwd: state.cwd })
 }
 
 /**
@@ -256,7 +277,13 @@ function processJsonEvent(
     const data = (evt.data as Record<string, unknown>) ?? {}
     const id = String(data.toolCallId ?? data.id ?? randomUUID())
     const name = String(data.toolName ?? data.name ?? 'tool')
-    const input = data.input ? JSON.stringify(data.input).slice(0, 280) : undefined
+    // The CLI names this field `arguments`; `input` is accepted as a
+    // fallback for older event shapes. Reading only `input` meant tool
+    // arguments were silently always empty.
+    const args = toolArgumentsOf(data)
+    const input = args ? JSON.stringify(args).slice(0, 280) : undefined
+    const written = writtenPathFrom(name, args)
+    if (written && !state.written.includes(written)) state.written.push(written)
     state.toolCalls.set(id, { id, name, input, status: 'running' })
     emit(win, 'chat:tool', { sessionId, tool: state.toolCalls.get(id) })
     return
@@ -484,6 +511,7 @@ function send(
     cwd,
     // Fired here rather than awaited: the run must not wait on git.
     snapshot: takeTurnSnapshot(undoStore(), cwd),
+    written: [],
     requestedModel: model ?? null,
     originalText: text,
     originalOpts: { cwd: opts.cwd, prefix: opts.prefix, agentMode: opts.agentMode },

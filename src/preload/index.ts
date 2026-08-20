@@ -35,6 +35,14 @@ export type ChatToolCall = {
   summary?: string
 }
 
+/** A page a turn wrote, worth showing rather than describing. `path` is
+ *  absolute when the tool gave an absolute path, otherwise relative to `cwd`. */
+export type ChatArtifact = {
+  sessionId: string
+  path: string
+  cwd: string
+}
+
 export type ChatFileChange = {
   path: string
   status: 'added' | 'modified' | 'deleted'
@@ -655,6 +663,11 @@ const api = {
       ipcRenderer.invoke('chat:undo', messageId) as Promise<{ ok: boolean; reverted: string[]; error?: string }>,
     fileDiff: (messageId: string, path: string) =>
       ipcRenderer.invoke('chat:fileDiff', { messageId, path }) as Promise<{ ok: boolean; before: string | null; after: string | null; error?: string }>,
+    onArtifact: (cb: (d: ChatArtifact) => void) => {
+      const handler = (_e: unknown, d: ChatArtifact): void => cb(d)
+      ipcRenderer.on('chat:artifact', handler)
+      return () => ipcRenderer.removeListener('chat:artifact', handler)
+    },
     onDiff: (cb: (d: { sessionId: string; messageId: string; diff: ChatDiff }) => void) => {
       const handler = (_e: unknown, d: { sessionId: string; messageId: string; diff: ChatDiff }): void => cb(d)
       ipcRenderer.on('chat:diff', handler)
