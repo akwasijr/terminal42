@@ -21,6 +21,19 @@ import {
 import { pruneStore, type Store } from './localSnapshot'
 import { copilotEnvSync } from './copilotAuth'
 
+// Where the work is being read.
+//
+// The agent's habit is to finish a page by opening it in a browser. Here that
+// produces a second window showing what the preview pane is already showing,
+// and it steals focus. `open` is shimmed for agent runs (see browserShim.ts)
+// so this is belt and braces, but saying it plainly saves the agent the wasted
+// tool call and the confusing "it was not opened" reply.
+const HOUSING_PREFIX = [
+  'You are running inside Terminal 42, a desktop app. Anything you build is displayed to the user in the app\'s own preview pane, live, as soon as it exists on disk.',
+  'Do not open a browser. Do not run `open`, `xdg-open`, `start`, or a dev server flag like `--open`. If you start a server, just say which port it is on and stop there.',
+  ''
+].join('\n')
+
 /**
  * Where local file copies for undo are kept.
  *
@@ -499,6 +512,7 @@ function send(
   // would read as instructions trailing the request rather than framing it.
   const promptText = flattenPromptCacheMessages(assembleCacheStableMessages({
     stablePrefix: [
+      { role: 'system', content: HOUSING_PREFIX },
       { role: 'system', content: modePrefix },
       ...(figmaPrefix ? [{ role: 'system' as const, content: figmaPrefix }] : []),
       ...(opts.prefix ? [{ role: 'system' as const, content: opts.prefix }] : []),

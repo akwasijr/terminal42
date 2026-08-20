@@ -6,6 +6,7 @@ import { registerProjectIpc } from './projects'
 import { registerComposerIpc } from './composer'
 import { registerChatIpc, killAllChats, pruneUndoSnapshots } from './chat'
 import { primeCopilotToken } from './copilotAuth'
+import { useBrowserShim } from './browserShim'
 import { registerCanvasAssistIpc } from './canvasAssist'
 import { registerDesignIpc, stopAllDesignWatchers, killAllDesignRuns } from './design'
 import { registerPreviewIpc, killAllPreviews, runningPreviewCount, runningPreviewList, stopPreview } from './preview'
@@ -334,6 +335,10 @@ app.whenReady().then(() => {
   registerChatIpc(() => mainWindow)
   // Sweep expired undo copies once per launch, off the critical path.
   pruneUndoSnapshots()
+  // Put our own `open` ahead of the system one for agent runs, so a turn that
+  // builds a page shows it in the preview pane instead of also throwing the
+  // user's browser at them.
+  useBrowserShim(join(app.getPath('userData'), 'bin'))
   // Look up an auth token now, so the first CLI launch does not trigger the
   // macOS keychain dialog.
   primeCopilotToken()

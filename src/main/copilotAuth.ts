@@ -20,6 +20,7 @@
 // The token is held in memory for the life of the process and never written to
 // disk, logged, or sent to the renderer.
 
+import { agentEnv } from './browserShim'
 import { execFile } from 'node:child_process'
 
 /** Env vars the CLI checks, in its own order of precedence. */
@@ -90,8 +91,8 @@ export async function resolveCopilotToken(env: NodeJS.ProcessEnv = process.env):
  */
 export async function copilotEnv(base: NodeJS.ProcessEnv = process.env): Promise<NodeJS.ProcessEnv> {
   const token = await resolveCopilotToken(base)
-  if (!token) return { ...base }
-  return { ...base, COPILOT_GITHUB_TOKEN: token }
+  if (!token) return agentEnv({ ...base })
+  return agentEnv({ ...base, COPILOT_GITHUB_TOKEN: token })
 }
 
 /**
@@ -110,10 +111,10 @@ export async function copilotEnv(base: NodeJS.ProcessEnv = process.env): Promise
 export function copilotEnvSync(base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   for (const key of TOKEN_VARS) {
     const v = base[key]
-    if (v && isUsableToken(v)) return { ...base }
+    if (v && isUsableToken(v)) return agentEnv({ ...base })
   }
-  if (!cached) return { ...base }
-  return { ...base, COPILOT_GITHUB_TOKEN: cached }
+  if (!cached) return agentEnv({ ...base })
+  return agentEnv({ ...base, COPILOT_GITHUB_TOKEN: cached })
 }
 
 /**
