@@ -12,6 +12,8 @@ import {
   EMPTY_TERMINAL_STATE,
   type TerminalState
 } from '../../../shared/terminalProtocol'
+import { useHarness } from '../lib/useHarness'
+import { contextDisplay } from '../../../shared/contextUsage'
 
 const brainAppliedSet = new Set<string>()
 
@@ -633,7 +635,7 @@ export function TerminalPane({
         <div ref={containerRef} className="h-full w-full" data-testid="terminal-pane" />
       </div>
 
-      <ShellStatus state={shellState} />
+      <ShellStatus state={shellState} sessionId={sessionId} />
 
       {/* Search bar (⌘F) */}
       {searchOpen && (
@@ -708,17 +710,25 @@ export function TerminalPane({
   )
 }
 
-function ShellStatus({ state }: { state: TerminalState }) {
+function ShellStatus({ state, sessionId }: { state: TerminalState; sessionId: string | null }) {
   const last = state.blocks[state.blocks.length - 1]
   const progress = state.progress
   const running = last?.status === 'running'
+  // The same harness readings the side panel shows, from the same hook so the
+  // two can never disagree about one session. The terminal is where the agent
+  // actually runs, so hiding how much context is left behind a panel tab meant
+  // the number was never in view at the moment it mattered.
+  const { insights, usage } = useHarness(sessionId)
+  const ctx = contextDisplay(usage, { hasSession: Boolean(sessionId) })
+  const todoTotal = insights.counts.total
+  const hasHarness = todoTotal > 0 || ctx !== null
   // A block with no command name has nothing worth saying: it renders as a bare
   // dot plus the word "running", which duplicates what the terminal already
   // shows and collides with the CLI's own footer. Long-lived foreground
   // processes like the Copilot CLI never emit a command mark, so this was
   // pinned on screen permanently. Named commands still report exit and duration.
   const named = last?.command != null && last.command !== ''
-  if (!named && !progress) return null
+  if (!named && !progress && !hasHarness) return null
 
   const tone =
     running ? 'text-text-secondary'
@@ -768,6 +778,30 @@ function ShellStatus({ state }: { state: TerminalState }) {
               </span>
               <span className="w-9 text-right tabular-nums">{Math.round(progress.percent)}%</span>
             </>
+          )}
+        </span>
+      )}
+
+      {hasHarness && (
+        <span className={`flex shrink-0 items-center gap-3 text-text-muted ${progress ? '' : 'ml-auto'}`}>
+          {todoTotal > 0 && (
+            <span className="tabular-nums" title={`${insights.counts.done} of ${todoTotal} todos done`}>
+              {insights.counts.done}/{todoTotal}
+            </span>
+          )}
+          {ctx && (
+            <span
+              className="flex items-center gap-1.5 tabular-nums"
+              title={`Context ${ctx.percent}% used`}
+            >
+              <span aria-hidden className="h-1 w-10 overflow-hidden rounded-full bg-elevated">
+                <span
+                  className={`block h-full rounded-full ${ctx.percent >= 90 ? 'bg-error' : ctx.percent >= 70 ? 'bg-warning' : 'bg-text-muted'}`}
+                  style={{ width: `${Math.min(100, Math.max(0, ctx.percent))}%` }}
+                />
+              </span>
+              {ctx.percent}%
+            </span>
           )}
         </span>
       )}

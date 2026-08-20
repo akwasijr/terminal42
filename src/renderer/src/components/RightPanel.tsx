@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Task, ContextUsage } from '../../../preload/index'
 import { IconExternal } from './icons'
 import { InfoRail } from './InfoRail'
-import { EMPTY_INSIGHTS, type SessionInsights } from '../../../shared/sessionInsights'
 import { contextDisplay } from '../../../shared/contextUsage'
+import { useHarness } from '../lib/useHarness'
 
 /** "just now" / "4m ago" — only used in a tooltip, so it stays coarse. */
 function formatAge(ms: number): string {
@@ -788,35 +788,7 @@ function Empty({ children }: { children: React.ReactNode }) {
  * change event. A short interval is simpler than inventing one.
  */
 function SessionInsightsBlock({ sessionId }: { sessionId: string | null }): JSX.Element {
-  const [copilotId, setCopilotId] = useState<string | null>(null)
-  const [insights, setInsights] = useState<SessionInsights>(EMPTY_INSIGHTS)
-  const [usage, setUsage] = useState<ContextUsage | null>(null)
-
-  useEffect(() => {
-    if (!sessionId) { setCopilotId(null); return }
-    void window.terminal42.sessions.get(sessionId).then((s) => setCopilotId(s?.copilot_session_id ?? null))
-    const off = window.terminal42.pty.onLinked((p) => {
-      if (p.id === sessionId) setCopilotId(p.copilotSessionId)
-    })
-    return off
-  }, [sessionId])
-
-  useEffect(() => {
-    let cancelled = false
-    const load = (): void => {
-      void window.terminal42.sessionInsights
-        .get(copilotId, sessionId)
-        .then((next) => { if (!cancelled) setInsights(next) })
-        .catch(() => {})
-      void window.terminal42.copilot
-        .contextUsage(copilotId)
-        .then((u) => { if (!cancelled) setUsage(u) })
-        .catch(() => {})
-    }
-    load()
-    const t = setInterval(load, 5000)
-    return () => { cancelled = true; clearInterval(t) }
-  }, [copilotId, sessionId])
+  const { insights, usage } = useHarness(sessionId)
 
   if (!sessionId) {
     return <p className="px-1 py-2 text-[12px] text-text-muted">Open a session to see its harness.</p>
