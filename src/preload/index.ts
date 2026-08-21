@@ -670,6 +670,14 @@ const api = {
     isBusy: (sessionId: string) => ipcRenderer.invoke('chat:isBusy', sessionId) as Promise<boolean>,
     undo: (messageId: string) =>
       ipcRenderer.invoke('chat:undo', messageId) as Promise<{ ok: boolean; reverted: string[]; error?: string }>,
+    turnFiles: (messageId: string) =>
+      ipcRenderer.invoke('chat:turnFiles', messageId) as Promise<{
+        ok: boolean
+        files: Array<{ path: string; status: string; additions: number; deletions: number; binary: boolean }>
+        additions: number
+        deletions: number
+        error?: string
+      }>,
     fileDiff: (messageId: string, path: string) =>
       ipcRenderer.invoke('chat:fileDiff', { messageId, path }) as Promise<{ ok: boolean; before: string | null; after: string | null; error?: string }>,
     onArtifact: (cb: (d: ChatArtifact) => void) => {
@@ -1141,7 +1149,9 @@ const api = {
   },
   system: {
     revealFolder: (path: string): Promise<boolean> =>
-      ipcRenderer.invoke('system:revealFolder', path)
+      ipcRenderer.invoke('system:revealFolder', path),
+    exportFile: (defaultName: string, content: string): Promise<{ ok: boolean; path?: string; error?: string }> =>
+      ipcRenderer.invoke('system:exportFile', { defaultName, content })
   },
   git: {
     status: (cwd: string): Promise<{

@@ -286,3 +286,19 @@ export const IconStack = make(
     <path d="M2.5 11 L8 13.5 L13.5 11" />
   </>
 )
+
+export const IconExpand = make(
+  <>
+    <path d="M9.5 2.5 H13.5 V6.5" />
+    <path d="M6.5 13.5 H2.5 V9.5" />
+    <path d="M13.5 2.5 L9 7" />
+    <path d="M2.5 13.5 L7 9" />
+  </>
+)
+
+export const IconCollapse = make(
+  <>
+    <path d="M13 3 L9 7 M9 7 V3.5 M9 7 H12.5" />
+    <path d="M3 13 L7 9 M7 9 V12.5 M7 9 H3.5" />
+  </>
+)

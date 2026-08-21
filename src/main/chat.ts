@@ -13,7 +13,7 @@ import { assembleCacheStableMessages, flattenPromptCacheMessages } from '../shar
 import { buildMemoryContext } from './memoryContext'
 import { recordMemoryUse } from './sessionInsights'
 import { reframeGoal, renderGoalReframePrompt } from '../shared/goalReframe'
-import { type DiffSummary } from './gitSnapshot'
+import { type DiffSummary, type FileChange } from './gitSnapshot'
 import {
   takeTurnSnapshot, diffTurnSnapshot, revertTurnSnapshot, readFileAtSnapshot,
   isEmptySnapshot, type TurnSnapshot
@@ -429,6 +429,29 @@ async function loadFileDiff(
   try { after = await readFile(join(row.diff_cwd, path), 'utf8') }
   catch { after = null }
   return { ok: true, before, after }
+}
+
+/**
+ * The files a turn touched, for the code pane's file switcher.
+ *
+ * Read from the recorded diff rather than the working tree so the list still
+ * matches the turn after later edits, and so a file the turn deleted is still
+ * listed instead of silently vanishing.
+ */
+function loadTurnFiles(
+  messageId: string
+): { ok: boolean; files: FileChange[]; additions: number; deletions: number; error?: string } {
+  const row = getDb()
+    .prepare('SELECT diff_json FROM chat_messages WHERE id = ?')
+    .get(messageId) as { diff_json: string | null } | undefined
+  const empty = { files: [] as FileChange[], additions: 0, deletions: 0 }
+  if (!row?.diff_json) return { ok: false, ...empty, error: 'No recorded changes for this turn.' }
+  try {
+    const diff = JSON.parse(row.diff_json) as DiffSummary
+    return { ok: true, files: diff.files, additions: diff.additions, deletions: diff.deletions }
+  } catch {
+    return { ok: false, ...empty, error: 'Recorded changes could not be read.' }
+  }
 }
 
 function parseLine(line: string): Record<string, unknown> | null {
@@ -860,4 +883,5 @@ export function registerChatIpc(getWin: () => BrowserWindow | null): void {
   ipcMain.handle('chat:undo', async (_e, messageId: string) => undoTurn(messageId))
   ipcMain.handle('chat:fileDiff', async (_e, args: { messageId: string; path: string }) =>
     loadFileDiff(args.messageId, args.path))
+  ipcMain.handle('chat:turnFiles', (_e, messageId: string) => loadTurnFiles(messageId))
 }

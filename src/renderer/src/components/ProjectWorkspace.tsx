@@ -9,14 +9,13 @@ import { useSessionModel } from './ModelDropdown'
 import { ApplyBrainPrompt } from './ApplyBrainPrompt'
 import { TerminalActionsMenu } from './TerminalActionsMenu'
 import { KickoffPromptButton } from './KickoffPromptViewer'
-import { BrowserPane } from './BrowserPane'
-import { CodePane } from './CodePane'
+import { ArtifactPane, type CodeTarget } from './ArtifactPane'
 import { COMPOSER_FILL_EVENT } from './composerFill'
 import * as Dropdown from '@radix-ui/react-dropdown-menu'
 import { IconPlus, IconTerminal, IconExternal, IconChevronRight } from './icons'
 import { useSessions } from '../state/store'
 import { classifyStatus, type AgentStatus } from '../../../shared/agentStatus'
-import { pickPreviewArtifact, fileUrlFor, shouldShowPreview } from '../../../shared/previewArtifact'
+import { fileUrlFor, shouldShowPreview } from '../../../shared/previewArtifact'
 import { resolveServerUrl } from '../../../shared/localServer'
 import { clampChatWidth, CHAT_DEFAULT_WIDTH, CHAT_MIN_WIDTH, CHAT_MAX_WIDTH } from './paneWidth'
 
@@ -87,7 +86,12 @@ export function ProjectWorkspace({
   const [hasMessages, setHasMessages] = useState(false)
   // Which file the code pane is showing, and which turn's snapshot to diff it
   // against. Cleared when the pane closes.
-  const [codeFile, setCodeFile] = useState<{ messageId: string; path: string } | null>(null)
+  const [codeFile, setCodeFile] = useState<CodeTarget | null>(null)
+  // Which half of the artifact pane is showing, and whether it has taken the
+  // whole window. Preview and Code are the same pane now, so opening a file
+  // switches the tab instead of replacing what is on screen.
+  const [paneTab, setPaneTab] = useState<'preview' | 'code'>('preview')
+  const [paneExpanded, setPaneExpanded] = useState(false)
 
   /**
    * Attach files by appending their paths to the draft.
@@ -146,6 +150,10 @@ export function ProjectWorkspace({
   const autoOpenBrowser = (url: string) => {
     setBrowserOpenState(true)
     setBrowserNavTo({ url, nonce: Date.now() })
+    // A page just appeared, so show the page. Landing on the Code half
+    // because that is where the user was last would hide the thing the
+    // auto-open exists to reveal.
+    setPaneTab('preview')
   }
 
   // On project switch: reset the seen-URLs cache and hydrate the saved
@@ -293,10 +301,11 @@ export function ProjectWorkspace({
       <div className="flex flex-1 gap-[var(--gutter)] overflow-hidden p-[var(--gutter)]">
         <main
           className={[
-            'flex flex-col overflow-hidden rounded-panel bg-bg',
+            'flex-col overflow-hidden rounded-panel bg-bg',
+            paneExpanded ? 'hidden' : 'flex',
             paneOpen ? 'shrink-0' : 'flex-1'
           ].join(' ')}
-          style={paneOpen ? { width: `${chatWidth}px` } : undefined}
+          style={paneOpen && !paneExpanded ? { width: `${chatWidth}px` } : undefined}
         >
           <SessionTabs
             compact={paneOpen}
@@ -320,7 +329,7 @@ export function ProjectWorkspace({
                 <div className="flex items-center gap-0.5">
                   <button
                     type="button"
-                    onClick={() => setBrowserOpen((v) => !v)}
+                    onClick={() => { setBrowserOpen((v) => !v); setPaneTab('preview') }}
                     aria-pressed={browserOpen}
                     aria-label={browserOpen ? 'Hide browser preview' : 'Show browser preview'}
                     className={[
@@ -360,7 +369,7 @@ export function ProjectWorkspace({
                       sessionId={s.id}
                       onBusyChange={s.id === active?.id ? setBusy : undefined}
                       onHasMessagesChange={s.id === active?.id ? setHasMessages : undefined}
-                      onOpenFile={(messageId, path) => setCodeFile({ messageId, path })}
+                      onOpenFile={(messageId, path) => { setCodeFile({ messageId, path }); setPaneTab('code') }}
                     />
                   </div>
                 ))
@@ -394,32 +403,29 @@ export function ProjectWorkspace({
                 placeholder is gone rather than restored. */}
           </div>
         </main>
-        {codeFile ? (
+        {paneOpen ? (
           <>
-            <ResizeHandle side="left" currentWidth={chatWidth} onChange={(w) => setChatWidth(clampChatWidth(w))} min={CHAT_MIN_WIDTH} max={CHAT_MAX_WIDTH} />
-            <CodePane
-              messageId={codeFile.messageId}
-              path={codeFile.path}
-              width={0}
-              onClose={() => setCodeFile(null)}
-              onShowPreview={() => {
-                const page = pickPreviewArtifact([{ path: codeFile.path, status: 'modified' }])
-                setCodeFile(null)
-                setBrowserOpen(true)
-                if (page) setBrowserNavTo({ url: fileUrlFor(project.path, page), nonce: Date.now() })
-              }}
-              onOpenFolder={() => { void window.terminal42.system.revealFolder(project.path) }}
-            />
-          </>
-        ) : browserOpen ? (
-          <>
-            <ResizeHandle side="left" currentWidth={chatWidth} onChange={(w) => setChatWidth(clampChatWidth(w))} min={CHAT_MIN_WIDTH} max={CHAT_MAX_WIDTH} />
-            <BrowserPane
+            {!paneExpanded && (
+              <ResizeHandle side="left" currentWidth={chatWidth} onChange={(w) => setChatWidth(clampChatWidth(w))} min={CHAT_MIN_WIDTH} max={CHAT_MAX_WIDTH} />
+            )}
+            <ArtifactPane
               projectId={project.id}
-              width={0}
-              onClose={() => setBrowserOpen(false)}
-              navTo={browserNavTo}
+              projectPath={project.path}
               activeSessionId={active?.id ?? null}
+              codeTarget={codeFile}
+              onCodeTargetChange={setCodeFile}
+              tab={paneTab}
+              onTabChange={setPaneTab}
+              navTo={browserNavTo}
+              expanded={paneExpanded}
+              onToggleExpanded={() => setPaneExpanded((v) => !v)}
+              onClose={() => {
+                setCodeFile(null)
+                setBrowserOpen(false)
+                setPaneExpanded(false)
+                setPaneTab('preview')
+              }}
+              width={0}
             />
           </>
         ) : (

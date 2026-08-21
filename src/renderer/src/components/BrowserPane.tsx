@@ -12,6 +12,12 @@ type Props = {
   width: number
   navTo?: { url: string; nonce: number } | null
   activeSessionId?: string | null
+  /**
+   * Rendered inside the artifact pane, which already owns the frame: no
+   * rounded panel of its own, no close button, and it fills the space it is
+   * given instead of claiming a width.
+   */
+  embedded?: boolean
 }
 
 const LS_LEGACY_URLS = 't42:browser:urls'
@@ -123,7 +129,7 @@ const DEVICE_PRESETS: Array<{ id: string; label: string; width: number; ua?: str
   }
 ]
 
-export function BrowserPane({ initialUrl, projectId, onClose, width: _paneWidth, navTo, activeSessionId }: Props) {
+export function BrowserPane({ initialUrl, projectId, onClose, width: _paneWidth, navTo, activeSessionId, embedded }: Props) {
   const [urlBar, setUrlBar] = useState<string>('')
   const [committedUrl, setCommittedUrl] = useState<string>('')
   const [, setPageTitle] = useState<string>('')
@@ -486,9 +492,9 @@ export function BrowserPane({ initialUrl, projectId, onClose, width: _paneWidth,
   const isDesktop = device.id === 'desktop'
 
   return (
-    <aside
-      className="flex h-full flex-col bg-bg"
-      style={paneWidthStyle(_paneWidth)}
+    <section
+      className={embedded ? 'flex min-h-0 flex-1 flex-col bg-bg' : 'flex h-full flex-col bg-bg'}
+      style={embedded ? undefined : paneWidthStyle(_paneWidth)}
       aria-label="Web browser preview"
     >
       {/* Single combined toolbar row: matches session-tabs row height (h-9) */}
@@ -600,9 +606,11 @@ export function BrowserPane({ initialUrl, projectId, onClose, width: _paneWidth,
         <IconBtn aria="Open in external browser" onClick={openExternal} disabled={!committedUrl}>
           <ExternalArrow />
         </IconBtn>
-        <IconBtn aria="Hide browser pane" onClick={onClose}>
-          <PanelToggle />
-        </IconBtn>
+        {!embedded && (
+          <IconBtn aria="Hide browser pane" onClick={onClose}>
+            <PanelToggle />
+          </IconBtn>
+        )}
       </div>
 
       <div className="relative flex flex-1 overflow-hidden bg-bg/40">
@@ -658,7 +666,7 @@ export function BrowserPane({ initialUrl, projectId, onClose, width: _paneWidth,
           />
         )}
       </div>
-    </aside>
+    </section>
   )
 }
 

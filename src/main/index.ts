@@ -1,4 +1,5 @@
-import { app, BrowserWindow, shell, nativeTheme, Menu, ipcMain, session, nativeImage } from 'electron'
+import { app, BrowserWindow, shell, nativeTheme, Menu, ipcMain, session, nativeImage, dialog } from 'electron'
+import { writeFile } from 'fs/promises'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
 import { registerPtyIpc, killAllSessions, listLiveSessions, killSession } from './pty'
@@ -376,6 +377,22 @@ app.whenReady().then(() => {
   ipcMain.handle('system:revealFolder', async (_e, p: string) => {
     if (!p) return false
     try { shell.showItemInFolder(p); return true } catch { return false }
+  })
+
+  // Export saves a copy where the user asks for it. It deliberately does not
+  // hand the file to the operating system afterwards: opening it would put the
+  // work back in a browser, which is what the app exists to avoid.
+  ipcMain.handle('system:exportFile', async (_e, args: { defaultName: string; content: string }) => {
+    const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null
+    const opts = { defaultPath: join(app.getPath('downloads'), args.defaultName || 'export.txt') }
+    const res = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts)
+    if (res.canceled || !res.filePath) return { ok: false }
+    try {
+      await writeFile(res.filePath, args.content, 'utf8')
+      return { ok: true, path: res.filePath }
+    } catch (e) {
+      return { ok: false, error: String((e as Error)?.message ?? e) }
+    }
   })
 
   ipcMain.handle('browser:clearStorage', async (_e, scope: 'cookies' | 'cache' | 'all') => {
