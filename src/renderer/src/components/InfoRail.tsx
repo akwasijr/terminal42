@@ -37,7 +37,7 @@ export function InfoRail({
     <aside className={rootClassName} aria-labelledby="session-insights-title">
       <header className="p-1">
         <h2 id="session-insights-title" className="text-[13px] font-semibold text-text-primary">
-          Session insights
+          What this session is doing
         </h2>
       </header>
 
@@ -74,13 +74,13 @@ export function InfoRail({
       <section aria-labelledby="todo-progress-title" className="mt-3 rounded-lg bg-sunken p-3">
         <MetricHeader
           id="todo-progress-title"
-          title="Todo progress"
-          value={`${insights.counts.done}/${insights.counts.total}`}
-          titleText={`${insights.counts.done} done, ${insights.counts.in_progress} in progress, ${insights.counts.pending} pending, ${insights.counts.blocked} blocked`}
+          title="Plan progress"
+          value={`${insights.counts.done} of ${insights.counts.total} done`}
+          titleText={`${insights.counts.done} done, ${insights.counts.in_progress} in progress, ${insights.counts.pending} not started, ${insights.counts.blocked} blocked`}
         />
         <span
           role="meter"
-          aria-label="Todo completion"
+          aria-label="Plan progress"
           aria-valuemin={0}
           aria-valuemax={insights.counts.total}
           aria-valuenow={insights.counts.done}
@@ -102,7 +102,7 @@ export function InfoRail({
             count={insights.counts.pending}
             total={insights.counts.total}
             className="bg-text-muted"
-            label="Pending"
+            label="Not started"
           />
           <ProgressSegment
             count={insights.counts.blocked}
@@ -114,7 +114,7 @@ export function InfoRail({
         <ul className="mt-3 grid grid-cols-2 gap-2">
           <CountItem label="Done" value={insights.counts.done} tone="bg-success" />
           <CountItem label="In progress" value={insights.counts.in_progress} tone="bg-accent" />
-          <CountItem label="Pending" value={insights.counts.pending} tone="bg-text-muted" />
+          <CountItem label="Not started" value={insights.counts.pending} tone="bg-text-muted" />
           <CountItem label="Blocked" value={insights.counts.blocked} tone="bg-error" />
         </ul>
       </section>
@@ -122,19 +122,32 @@ export function InfoRail({
       <section aria-labelledby="hill-score-title" className="mt-3 rounded-lg bg-sunken p-3">
         <MetricHeader
           id="hill-score-title"
-          title="Hill score"
-          value={insights.hillMedian === null ? 'Unknown' : `${insights.hillMedian}/100`}
-          titleText={`${insights.scoredCount} of ${insights.counts.total} goals scorable; ${insights.weakCount} below ${HILL_GATE}`}
+          title="How clear the steps are"
+          value={
+            insights.hillMedian === null
+              ? 'Not enough detail to tell'
+              : insights.hillMedian >= HILL_GATE
+              ? 'Clear'
+              : 'Vague'
+          }
+          titleText={
+            insights.hillMedian === null
+              ? 'The steps are too short to judge'
+              : `Median clarity ${insights.hillMedian} out of 100; ${insights.weakCount} step${insights.weakCount === 1 ? '' : 's'} below ${HILL_GATE}`
+          }
         />
         <p className="mt-2 text-[11px] text-text-muted">
-          {insights.scoredCount} of {insights.counts.total} goals scorable
-          {insights.weakCount > 0 ? `; ${insights.weakCount} weak` : ''}
+          {insights.hillMedian === null
+            ? 'Steps this short cannot be judged, so nothing is guessed.'
+            : insights.weakCount > 0
+            ? `${insights.weakCount} step${insights.weakCount === 1 ? '' : 's'} could use a way to tell when it is finished.`
+            : 'Every step says how to tell when it is done.'}
         </p>
       </section>
 
       <section aria-labelledby="todo-list-title" className="mt-3 min-h-0 rounded-lg bg-sunken p-3">
         <h3 id="todo-list-title" className="text-[12px] font-semibold text-text-primary">
-          Goals
+          Steps
         </h3>
         {insights.todos.length > 0 ? (
           <ul className="mt-3 flex max-h-[320px] flex-col gap-2 overflow-y-auto pr-1">
@@ -144,40 +157,44 @@ export function InfoRail({
           </ul>
         ) : (
           <p className="mt-3 rounded-md bg-elevated p-3 text-[11px] text-text-muted">
-            No todos have been reported for this session.
+            The agent has not listed any steps for this session.
           </p>
         )}
       </section>
         </>
       ) : (
         <p className="mt-3 rounded-lg bg-sunken p-3 text-[11px] text-text-muted">
-          No goals reported yet.
+          No plan yet. When the agent lists the steps it intends to take, they appear here.
         </p>
       )}
 
-      <section aria-labelledby="auto-continue-title" className="mt-3 rounded-lg bg-sunken p-3">
-        <MetricHeader
-          id="auto-continue-title"
-          title="Auto-continue"
-          value={insights.autoContinue.enabled ? 'Enabled' : 'Disabled'}
-          titleText={insights.autoContinue.lastReason ?? 'No decline reason reported'}
-        />
-        <p className="mt-2 text-[11px] text-text-muted">
-          {insights.autoContinue.pokes} {insights.autoContinue.pokes === 1 ? 'poke' : 'pokes'}
-        </p>
-        {insights.autoContinue.lastReason ? (
-          <p
-            className="mt-3 rounded-md bg-elevated p-3 text-[11px] text-text-secondary"
-            title={insights.autoContinue.lastReason}
-          >
-            {insights.autoContinue.lastReason}
+      {/* Auto-continue is off by default and most sessions never poke, so the
+          card was three lines saying nothing. It appears only once there is
+          something to report. */}
+      {(insights.autoContinue.enabled || insights.autoContinue.pokes > 0) && (
+        <section aria-labelledby="auto-continue-title" className="mt-3 rounded-lg bg-sunken p-3">
+          <MetricHeader
+            id="auto-continue-title"
+            title="Carrying on by itself"
+            value={insights.autoContinue.enabled ? 'On' : 'Off'}
+            titleText={insights.autoContinue.lastReason ?? 'No reason reported'}
+          />
+          <p className="mt-2 text-[11px] text-text-muted">
+            {insights.autoContinue.pokes === 0
+              ? 'It has not needed a nudge.'
+              : `Nudged ${insights.autoContinue.pokes} time${insights.autoContinue.pokes === 1 ? '' : 's'} to keep going.`}
           </p>
-        ) : (
-          <p className="mt-3 rounded-md bg-elevated p-3 text-[11px] text-text-muted">
-            No decline reason reported.
-          </p>
-        )}
-      </section>
+          {insights.autoContinue.lastReason ? (
+            <p
+              className="mt-3 rounded-md bg-elevated p-3 text-[11px] text-text-secondary"
+              title={insights.autoContinue.lastReason}
+            >
+              Last time it stopped: {insights.autoContinue.lastReason}
+            </p>
+          ) : null}
+        </section>
+      )}
+
     </aside>
   )
 }
@@ -282,7 +299,7 @@ function TodoItem({ todo }: { todo: TodoInsight }): JSX.Element {
         {todo.hill !== null ? (
           <span
             role="meter"
-            aria-label={`Hill score for ${todo.text}`}
+            aria-label={`How clear this step is: ${todo.text}`}
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={todo.hill}
@@ -308,8 +325,8 @@ function hillPresentation(todo: TodoInsight): {
 } {
   if (todo.hill === null) {
     return {
-      label: 'Unknown',
-      title: 'Too short to judge honestly',
+      label: 'Too short to judge',
+      title: 'This step is too short to judge honestly, so it is not scored',
       className: 'bg-sunken text-text-muted',
       dotClassName: 'bg-text-muted',
       barClassName: 'bg-text-muted'
@@ -317,16 +334,16 @@ function hillPresentation(todo: TodoInsight): {
   }
   if (todo.weak) {
     return {
-      label: `Weak ${todo.hill}/100`,
-      title: `Scored below the ${HILL_GATE} hill gate`,
+      label: 'Needs a finish line',
+      title: `Clarity ${todo.hill} out of 100, below the ${HILL_GATE} this app expects: it does not say how to tell when it is done`,
       className: 'bg-warning/15 text-warning',
       dotClassName: 'bg-warning',
       barClassName: 'bg-warning'
     }
   }
   return {
-    label: `${todo.hill}/100`,
-    title: 'Scorable goal',
+    label: 'Clear',
+    title: `Clarity ${todo.hill} out of 100: it says how to tell when it is done`,
     className: 'bg-success/15 text-success',
     dotClassName: 'bg-success',
     barClassName: 'bg-success'
@@ -337,7 +354,7 @@ function statusLabel(status: TodoInsight['status']): string {
   if (status === 'in_progress') return 'In progress'
   if (status === 'done') return 'Done'
   if (status === 'blocked') return 'Blocked'
-  return 'Pending'
+  return 'Not started'
 }
 
 function statusTone(status: TodoInsight['status']): string {

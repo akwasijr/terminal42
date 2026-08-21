@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { activityLabel } from '../lib/activityLabel'
+import { gitErrorMessage } from '../lib/gitErrorMessage'
 import { useCopilotSessionId } from '../lib/useCopilotSessionId'
 import type { Task, ContextUsage } from '../../../preload/index'
 import { IconExternal } from './icons'
@@ -335,16 +336,13 @@ function QuickActions({ sessionId, cwd }: { sessionId: string | null; cwd: strin
     setTimeout(() => setMsg(null), ms)
   }
 
-  const tail = (s: string): string =>
-    s.trim().split('\n').slice(-2).join(' · ').slice(0, 200)
-
   const initRepo = async () => {
     if (!cwd) return
     setBusy('init')
     try {
       const res = await window.terminal42.git.init(cwd)
-      if (res.ok) flash('ok', `Initialized empty repo on branch ${res.branch ?? 'main'}`)
-      else flash('err', `git init failed: ${tail(res.stderr || res.stdout)}`)
+      if (res.ok) flash('ok', `Version control is on. You are on branch ${res.branch ?? 'main'}.`)
+      else flash('err', gitErrorMessage('init', `${res.stderr}\n${res.stdout}`), 10000)
     } finally { setBusy(null); void refresh() }
   }
 
@@ -358,7 +356,7 @@ function QuickActions({ sessionId, cwd }: { sessionId: string | null; cwd: strin
         flash('ok', 'Remote added.')
         setShowRemoteForm(false)
         setRemoteUrl('')
-      } else flash('err', `Add remote failed: ${tail(res.stderr || res.stdout)}`)
+      } else flash('err', gitErrorMessage('remote', `${res.stderr}\n${res.stdout}`), 10000)
     } finally { setBusy(null); void refresh() }
   }
 
@@ -367,8 +365,8 @@ function QuickActions({ sessionId, cwd }: { sessionId: string | null; cwd: strin
     setBusy('commit')
     try {
       const res = await window.terminal42.git.commitAll(cwd, 'Update from Terminal42')
-      if (res.ok) flash('ok', 'Committed all changes.')
-      else flash('err', `Commit failed: ${tail(res.stderr || res.stdout)}`)
+      if (res.ok) flash('ok', 'Saved all your changes.')
+      else flash('err', gitErrorMessage('commit', `${res.stderr}\n${res.stdout}`), 10000)
     } finally { setBusy(null); void refresh() }
   }
 
@@ -379,12 +377,12 @@ function QuickActions({ sessionId, cwd }: { sessionId: string | null; cwd: strin
       const opts = !status.hasUpstream ? { setUpstream: true, branch: status.branch } : undefined
       const res = await window.terminal42.git.push(cwd, opts)
       if (res.ok) {
-        flash('ok', `Pushed${status.branch ? ` ${status.branch}` : ''} to origin`)
-        void window.terminal42.notify.show('Pushed to GitHub', tail(res.stderr || res.stdout) || 'Up to date.')
+        flash('ok', `Sent your changes to GitHub${status.branch ? ` on ${status.branch}` : ''}.`)
+        void window.terminal42.notify.show('Sent to GitHub', 'Your changes are now on GitHub.')
       } else {
-        const detail = tail(res.stderr || res.stdout) || 'check terminal'
-        flash('err', `Failed (exit ${res.code}): ${detail}`, 10000)
-        void window.terminal42.notify.show('git push failed', detail)
+        const detail = gitErrorMessage('push', `${res.stderr}\n${res.stdout}`)
+        flash('err', detail, 12000)
+        void window.terminal42.notify.show('Could not send to GitHub', detail)
       }
     } finally { setBusy(null); void refresh() }
   }
@@ -395,10 +393,9 @@ function QuickActions({ sessionId, cwd }: { sessionId: string | null; cwd: strin
     try {
       const res = await window.terminal42.git.pull(cwd)
       if (res.ok) {
-        flash('ok', 'Pulled latest from GitHub.')
+        flash('ok', 'Got the latest from GitHub.')
       } else {
-        const detail = tail(res.stderr || res.stdout) || 'check terminal'
-        flash('err', `Pull failed: ${detail}`, 10000)
+        flash('err', gitErrorMessage('pull', `${res.stderr}\n${res.stdout}`), 12000)
       }
     } finally { setBusy(null); void refresh() }
   }

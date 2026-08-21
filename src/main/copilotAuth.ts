@@ -32,6 +32,33 @@ const TOKEN_VARS = ['COPILOT_GITHUB_TOKEN', 'GH_TOKEN', 'GITHUB_TOKEN'] as const
  * would pay for another failed lookup.
  */
 let cached: string | null | undefined
+let cachedAt = 0
+
+/**
+ * How long a lookup is trusted.
+ *
+ * `gh` hands out tokens that expire, and the CLI prefers the token we give it
+ * over its own working keychain login — so a cache that never expired turned
+ * "the app has been open since yesterday" into "every turn fails to
+ * authenticate". Observed exactly that. Re-asking `gh` costs a few
+ * milliseconds against a local credential store, so the window is short.
+ */
+const CACHE_TTL_MS = 5 * 60 * 1000
+
+/**
+ * Forget the cached token.
+ *
+ * Called when the CLI rejects it, so the next turn asks `gh` again instead of
+ * failing the same way forever.
+ */
+export function invalidateCopilotToken(): void {
+  cached = undefined
+  cachedAt = 0
+}
+
+function cacheIsFresh(): boolean {
+  return cached !== undefined && Date.now() - cachedAt < CACHE_TTL_MS
+}
 
 /** Classic PATs are explicitly unsupported by the CLI, so they are not offered. */
 function isUsableToken(t: string): boolean {
@@ -79,8 +106,9 @@ export async function resolveCopilotToken(env: NodeJS.ProcessEnv = process.env):
     const v = env[key]
     if (v && isUsableToken(v)) return null
   }
-  if (cached !== undefined) return cached
+  if (cacheIsFresh()) return cached ?? null
   cached = await askGh()
+  cachedAt = Date.now()
   return cached
 }
 
@@ -113,7 +141,14 @@ export function copilotEnvSync(base: NodeJS.ProcessEnv = process.env): NodeJS.Pr
     const v = base[key]
     if (v && isUsableToken(v)) return agentEnv({ ...base })
   }
-  if (!cached) return agentEnv({ ...base })
+  // A stale token is worse than none: the CLI prefers what we hand it over
+  // its own keychain login, so passing an expired one turns a working setup
+  // into "copilot exited with code 1". Past the window, say nothing and let
+  // the CLI authenticate itself, and start a refresh for the next turn.
+  if (!cached || !cacheIsFresh()) {
+    if (!cacheIsFresh()) primeCopilotToken()
+    return agentEnv({ ...base })
+  }
   return agentEnv({ ...base, COPILOT_GITHUB_TOKEN: cached })
 }
 
@@ -128,4 +163,14 @@ export function primeCopilotToken(): void {
 /** Testing seam: forget the cached lookup. */
 export function resetCopilotTokenCache(): void {
   cached = undefined
+  cachedAt = 0
 }
+
+/** Testing seam: pretend a lookup happened, with control over how long ago. */
+export function __setCachedTokenForTest(token: string | null, ageMs = 0): void {
+  cached = token
+  cachedAt = Date.now() - ageMs
+}
+
+/** The window a lookup is trusted for, exposed so tests do not guess it. */
+export const TOKEN_CACHE_TTL_MS = CACHE_TTL_MS

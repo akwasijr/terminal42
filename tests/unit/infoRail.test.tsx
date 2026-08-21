@@ -41,21 +41,22 @@ describe('InfoRail', () => {
   it('draws no score bar for a goal too short to judge', () => {
     const html = render(summarizeInsights({ tasks: [{ text: 'Validate schema' }] }))
     // Scoped to the hill meter: the todo-progress bar is a separate, valid meter.
-    expect(html).not.toContain('aria-label="Hill score for')
-    expect(html.toLowerCase()).toContain('unknown')
+    expect(html).not.toContain('aria-label="How clear this step is')
+    // And it says so in words the user can act on, rather than a number.
+    expect(html.toLowerCase()).toContain('too short to judge')
   })
 
   it('draws a score bar for a goal it could judge', () => {
     const html = render(summarizeInsights({ tasks: [{ text: LONG_GOOD }] }))
-    expect(html).toContain('aria-label="Hill score for')
+    expect(html).toContain('aria-label="How clear this step is')
   })
 
   it('distinguishes a weak goal from a strong one', () => {
     const weak = render(summarizeInsights({ tasks: [{ text: LONG_VAGUE }] }))
     const strong = render(summarizeInsights({ tasks: [{ text: LONG_GOOD }] }))
     expect(weak).not.toBe(strong)
-    expect(weak.toLowerCase()).toContain('weak')
-    expect(strong.toLowerCase()).not.toContain('weak')
+    expect(weak.toLowerCase()).toContain('needs a finish line')
+    expect(strong.toLowerCase()).not.toContain('needs a finish line')
   })
 
   it('surfaces why auto-continue last stood down', () => {

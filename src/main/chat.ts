@@ -19,7 +19,7 @@ import {
   isEmptySnapshot, type TurnSnapshot
 } from './turnSnapshot'
 import { pruneStore, type Store } from './localSnapshot'
-import { copilotEnvSync } from './copilotAuth'
+import { copilotEnvSync, invalidateCopilotToken } from './copilotAuth'
 
 // Where the work is being read.
 //
@@ -125,6 +125,7 @@ type RunState = {
   turnText: string
   /** True when this run is already the retry that drops --resume. */
   isFreshContextRetry: boolean
+  isAuthRetry: boolean
   rateLimitMessage: string | null
   rateLimitAutoEligible: boolean
   /**
@@ -441,9 +442,9 @@ function send(
   win: BrowserWindow | null,
   sessionId: string,
   text: string,
-  opts: { model?: string | null; cwd?: string | null; prefix?: string | null; agentMode?: 'interactive' | 'plan' | 'autopilot'; isModelFallback?: boolean; isAutoFallback?: boolean; isFreshContextRetry?: boolean }
+  opts: { model?: string | null; cwd?: string | null; prefix?: string | null; agentMode?: 'interactive' | 'plan' | 'autopilot'; isModelFallback?: boolean; isAutoFallback?: boolean; isFreshContextRetry?: boolean; isAuthRetry?: boolean }
 ): { ok: true } | { ok: false; error: string } {
-  if (running.has(sessionId) && !opts.isModelFallback && !opts.isAutoFallback && !opts.isFreshContextRetry) {
+  if (running.has(sessionId) && !opts.isModelFallback && !opts.isAutoFallback && !opts.isFreshContextRetry && !opts.isAuthRetry) {
     return { ok: false, error: 'Another response is in progress.' }
   }
   const cwd = opts.cwd ?? getProjectCwd(sessionId) ?? process.env.HOME ?? process.cwd()
@@ -580,6 +581,7 @@ function send(
     lastAssistantContent: '',
     turnText: '',
     isFreshContextRetry: !!opts.isFreshContextRetry,
+    isAuthRetry: !!opts.isAuthRetry,
     rateLimitMessage: null,
     rateLimitAutoEligible: false,
     win
@@ -725,6 +727,33 @@ function send(
       state.lastAssistantMsgId = null
       finalizeRun(win, sessionId, state, code ?? -1)
       send(win, sessionId, state.originalText, { ...state.originalOpts, model: null, isModelFallback: true })
+      return
+    }
+
+    // The CLI could not authenticate.
+    //
+    // Almost always because the token we handed it has expired: the CLI
+    // prefers ours over its own keychain login, so a stale one turns a working
+    // setup into a failed turn. Drop the cached token and run once more — the
+    // second attempt either gets a fresh one or passes none at all, which lets
+    // the CLI authenticate the way it would have without us.
+    const authFailed = code !== 0
+      && !state.cancelled
+      && !state.isAuthRetry
+      && /\/login|GITHUB_TOKEN|gh auth login|authenticat/i.test(stderrBuf)
+    if (authFailed) {
+      invalidateCopilotToken()
+      if (state.assistantMsgId) {
+        const msg: ChatMessage = {
+          id: state.assistantMsgId, sessionId, role: 'assistant',
+          content: '', toolCalls: [], status: 'cancelled', createdAt: Date.now()
+        }
+        updateMessage(msg)
+        emit(win, 'chat:message', msg)
+      }
+      state.lastAssistantMsgId = null
+      finalizeRun(win, sessionId, state, code ?? -1)
+      send(win, sessionId, state.originalText, { ...state.originalOpts, isAuthRetry: true })
       return
     }
 

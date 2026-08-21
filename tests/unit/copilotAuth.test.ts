@@ -1,5 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { resolveCopilotToken, copilotEnv, resetCopilotTokenCache } from '../../src/main/copilotAuth'
+import {
+  resolveCopilotToken,
+  copilotEnv,
+  copilotEnvSync,
+  resetCopilotTokenCache,
+  invalidateCopilotToken,
+  __setCachedTokenForTest,
+  TOKEN_CACHE_TTL_MS
+} from '../../src/main/copilotAuth'
 
 // The point of this module is to stop a keychain dialog appearing on every
 // turn. The risk is that in trying to avoid a prompt it quietly runs the agent
@@ -115,5 +123,43 @@ describe('copilotEnvSync', () => {
     const out = copilotEnvSync(base)
     expect(base.COPILOT_GITHUB_TOKEN).toBeUndefined()
     expect(out).not.toBe(base)
+  })
+})
+
+describe('a token that has gone stale', () => {
+  // The failure this prevents, observed for real: the app had been open
+  // overnight, kept handing the CLI the token it looked up at launch, and the
+  // CLI — which prefers the token it is given over its own keychain login —
+  // failed every turn with "run the /login command". The user's `gh` login was
+  // working the whole time.
+  it('is not passed to the CLI once it is past its window', () => {
+    __setCachedTokenForTest(FAKE, TOKEN_CACHE_TTL_MS + 1000)
+    const env = copilotEnvSync({ PATH: '/usr/bin' })
+    expect(env.COPILOT_GITHUB_TOKEN).toBeUndefined()
+  })
+
+  it('is still passed while it is fresh', () => {
+    __setCachedTokenForTest(FAKE, 0)
+    expect(copilotEnvSync({ PATH: '/usr/bin' }).COPILOT_GITHUB_TOKEN).toBe(FAKE)
+  })
+
+  it('is looked up again after the window rather than remembered forever', async () => {
+    __setCachedTokenForTest(FAKE, TOKEN_CACHE_TTL_MS + 1000)
+    // With no usable token in the environment this re-asks `gh`; whatever it
+    // answers, it must not return the value we planted.
+    const again = await resolveCopilotToken({ PATH: '/usr/bin' })
+    expect(again).not.toBe(FAKE)
+  })
+
+  it('is dropped when the CLI rejects it', () => {
+    __setCachedTokenForTest(FAKE, 0)
+    invalidateCopilotToken()
+    expect(copilotEnvSync({ PATH: '/usr/bin' }).COPILOT_GITHUB_TOKEN).toBeUndefined()
+  })
+
+  it('still leaves a token the user set themselves alone', () => {
+    __setCachedTokenForTest(FAKE, TOKEN_CACHE_TTL_MS + 1000)
+    const mine = 'gho_' + 'c'.repeat(36)
+    expect(copilotEnvSync({ PATH: '/usr/bin', GH_TOKEN: mine }).COPILOT_GITHUB_TOKEN).toBeUndefined()
   })
 })
