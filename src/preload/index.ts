@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { SessionInsights } from '../shared/sessionInsights'
+import type { MotionRecord, MotionLayoutRecord } from '../main/motion'
 
 export type { SessionInsights }
 
@@ -723,6 +724,29 @@ const api = {
       ipcRenderer.invoke('canvas:assistVision', { prompt, images, model }) as Promise<{ ok: true; text: string } | { ok: false; error: string }>,
     readClipboardHTML: () => ipcRenderer.invoke('canvas:readClipboardHTML') as Promise<string>,
   },
+  motion: {
+    list: () => ipcRenderer.invoke('motion:list') as Promise<MotionRecord[]>,
+    get: (id: string) => ipcRenderer.invoke('motion:get', id) as Promise<MotionRecord | null>,
+    create: (title: string, doc: unknown) =>
+      ipcRenderer.invoke('motion:create', { title, doc }) as Promise<MotionRecord>,
+    save: (id: string, doc: unknown, thumbnail?: string | null) =>
+      ipcRenderer.invoke('motion:save', { id, doc, thumbnail }) as Promise<boolean>,
+    rename: (id: string, title: string) =>
+      ipcRenderer.invoke('motion:rename', { id, title }) as Promise<boolean>,
+    delete: (id: string) => ipcRenderer.invoke('motion:delete', id) as Promise<boolean>,
+    layouts: () => ipcRenderer.invoke('motion:layouts') as Promise<MotionLayoutRecord[]>,
+    saveLayout: (name: string, componentId: string, doc: unknown, thumbnail?: string | null) =>
+      ipcRenderer.invoke('motion:saveLayout', { name, componentId, doc, thumbnail }) as Promise<MotionLayoutRecord>,
+    deleteLayout: (id: string) => ipcRenderer.invoke('motion:deleteLayout', id) as Promise<boolean>,
+    addImages: (paths: string[]): Promise<{ ok: boolean; images: Array<{ id: string; name: string; path: string; dataUrl: string }> }> =>
+      ipcRenderer.invoke('motion:addImages', paths),
+    importImages: () =>
+      ipcRenderer.invoke('motion:importImages') as Promise<{ ok: boolean; images: Array<{ id: string; name: string; path: string; dataUrl: string }> }>,
+    readImage: (path: string) => ipcRenderer.invoke('motion:readImage', path) as Promise<string | null>,
+    exportFile: (fileName: string, base64: string) =>
+      ipcRenderer.invoke('motion:exportFile', { fileName, base64 }) as Promise<{ ok: boolean; path?: string }>
+  },
+
   designs: {
     list: () => ipcRenderer.invoke('designs:list') as Promise<Design[]>,
     get: (id: string) => ipcRenderer.invoke('designs:get', id) as Promise<Design | null>,

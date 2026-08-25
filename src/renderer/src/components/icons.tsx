@@ -302,3 +302,15 @@ export const IconCollapse = make(
     <path d="M3 13 L7 9 M7 9 V12.5 M7 9 H3.5" />
   </>
 )
+
+// Three cards on an arc: the shape every Motion arrangement makes, whatever
+// the parameters.
+export const IconMotion = make(
+  <>
+    <rect x="6" y="3.5" width="4" height="9" rx="1" />
+    <path d="M4 5 V11" />
+    <path d="M2 6.5 V9.5" />
+    <path d="M12 5 V11" />
+    <path d="M14 6.5 V9.5" />
+  </>
+)

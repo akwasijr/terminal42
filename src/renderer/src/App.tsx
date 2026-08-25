@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, lazy, Suspense } from 'react'
 import {
   IconTerminal, IconFolder, IconSparkle, IconCode,
   IconGear, IconTheme, IconPlus, IconBell, IconBrain, IconEdit, IconTrash, IconClock,
-  IconChevronRight, IconWorkflow, IconChat, IconLayout
+  IconChevronRight, IconWorkflow, IconChat, IconLayout, IconMotion
 } from './components/icons'
 import * as Dropdown from '@radix-ui/react-dropdown-menu'
 import { ProjectWorkspace } from './components/ProjectWorkspace'
@@ -45,8 +45,14 @@ const DesignWorkspace = lazy(() =>
 const FreeformCanvas = lazy(() =>
   import('./components/FreeformCanvas').then((m) => ({ default: m.FreeformCanvas }))
 )
+// Motion pulls in three.js, which is far larger than the rest of the renderer
+// put together. Loading it only when someone opens Motion keeps the app's
+// first paint the same for everyone who never touches it.
+const MotionView = lazy(() =>
+  import('./components/motion/MotionView').then((m) => ({ default: m.MotionView }))
+)
 
-type NavId = 'terminal' | 'rawterm' | 'forms' | 'designs' | 'projects' | 'workbench' | 'brain' | 'activity' | 'settings'
+type NavId = 'terminal' | 'rawterm' | 'forms' | 'motion' | 'designs' | 'projects' | 'workbench' | 'brain' | 'activity' | 'settings'
 
 const UI_STATE_KEY = 't42:ui:state:v1'
 
@@ -88,6 +94,7 @@ const PRIMARY_NAV: { id: NavId; label: string; Icon: typeof IconTerminal }[] = [
   { id: 'terminal', label: 'Chat',     Icon: IconChat },
   { id: 'rawterm',  label: 'Terminal', Icon: IconTerminal },
   { id: 'forms',    label: 'Form',     Icon: IconLayout },
+  { id: 'motion',   label: 'Motion',   Icon: IconMotion },
   { id: 'designs',  label: 'Design',   Icon: IconSparkle },
 ]
 const SECONDARY_NAV: { id: NavId; label: string; Icon: typeof IconTerminal }[] = [
@@ -98,7 +105,7 @@ const SECONDARY_NAV: { id: NavId; label: string; Icon: typeof IconTerminal }[] =
 
 export function App() {
   const initialUI = loadUIState()
-  const validNav: NavId[] = ['terminal', 'rawterm', 'forms', 'designs', 'projects', 'workbench', 'brain', 'activity', 'settings']
+  const validNav: NavId[] = ['terminal', 'rawterm', 'forms', 'motion', 'designs', 'projects', 'workbench', 'brain', 'activity', 'settings']
   const [active, setActive] = useState<NavId>(
     initialUI.active && validNav.includes(initialUI.active) ? initialUI.active : 'terminal'
   )
@@ -1119,6 +1126,7 @@ function Main({
     active === 'workbench' ? <WorkbenchView activeSessionId={activeSessionId} onJumpToTerminal={() => setActive('terminal')} activeProjectId={activeProject?.id ?? null} /> :
     active === 'activity' ? <ActivityView onJumpToTerminal={(id) => { void window.terminal42.projects.touch(id).then(() => setActive('terminal')) }} /> :
     active === 'settings' ? <SettingsView theme={theme} onToggleTheme={onToggleTheme} /> :
+    active === 'motion' ? <ErrorBoundary><MotionView /></ErrorBoundary> :
     active === 'designs' || active === 'forms' ? (
       activeDesignId ? (
         <ErrorBoundary>

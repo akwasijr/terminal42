@@ -132,6 +132,32 @@ function migrate(d: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_chat_session ON chat_messages(session_id, created_at);
 
+    -- Motion pieces. The document is a single JSON blob rather than columns
+    -- because it is only ever read and written whole, and its shape changes
+    -- every time a component gains a parameter -- which would otherwise mean a
+    -- migration per slider.
+    CREATE TABLE IF NOT EXISTS motion_docs (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      doc TEXT NOT NULL,
+      thumbnail TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_motion_recent ON motion_docs(updated_at DESC);
+
+    -- Saved layouts: a document's parameters without its images, so a look can
+    -- be reapplied to different content.
+    CREATE TABLE IF NOT EXISTS motion_layouts (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      component_id TEXT NOT NULL,
+      doc TEXT NOT NULL,
+      thumbnail TEXT,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_motion_layouts ON motion_layouts(created_at DESC);
+
     CREATE TABLE IF NOT EXISTS designs (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,

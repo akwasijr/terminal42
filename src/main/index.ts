@@ -10,6 +10,7 @@ import { primeCopilotToken } from './copilotAuth'
 import { useBrowserShim } from './browserShim'
 import { registerCanvasAssistIpc } from './canvasAssist'
 import { registerDesignIpc, stopAllDesignWatchers, killAllDesignRuns } from './design'
+import { registerMotionIpc } from './motion'
 import { registerPreviewIpc, killAllPreviews, runningPreviewCount, runningPreviewList, stopPreview } from './preview'
 import { registerSkillsIpc } from './skills'
 import { registerRecipesIpc } from './recipes'
@@ -56,6 +57,11 @@ process.on('unhandledRejection', (reason) => {
 // Production builds keep hardware acceleration for smooth previews.
 if (process.env.ELECTRON_RENDERER_URL) {
   try { app.disableHardwareAcceleration() } catch {}
+  // Turning the GPU off also turns WebGL off, and Motion is a 3D feature. This
+  // switch hands WebGL to Chromium's software renderer instead, so Motion
+  // works in dev at a lower frame rate rather than not at all. Production
+  // never reaches this branch and uses the real GPU.
+  try { app.commandLine.appendSwitch('enable-unsafe-swiftshader') } catch {}
 }
 
 // Log when ANY Electron child process (GPU, network, utility) dies. The
@@ -345,6 +351,7 @@ app.whenReady().then(() => {
   primeCopilotToken()
   registerCanvasAssistIpc(() => mainWindow)
   registerDesignIpc(() => mainWindow)
+  registerMotionIpc(() => mainWindow)
   registerPreviewIpc(() => mainWindow)
   registerSkillsIpc(() => mainWindow)
   registerRecipesIpc(() => mainWindow)
