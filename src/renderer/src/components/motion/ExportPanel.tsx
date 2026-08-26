@@ -31,7 +31,7 @@ export function ExportPanel({
       onChange({ animation: { ...anim, [key]: { ...anim[key], ...p } } })
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col gap-1.5 p-2">
       <Section title="Animation">
         <p className="text-[11px] leading-relaxed text-text-muted">
           A component turns on its own for as long as you watch it. These are
@@ -51,40 +51,8 @@ export function ExportPanel({
         />
       </Section>
 
-      <Section title="Still">
-        <SegmentedRow
-          label="Format"
-          value={doc.export.stillFormat}
-          options={[{ value: 'png', label: 'PNG' }, { value: 'jpeg', label: 'JPEG' }]}
-          onChange={(v) => onChange({ export: { ...doc.export, stillFormat: v } })}
-        />
-        <SegmentedRow
-          label="Size"
-          value={String(doc.export.stillScale)}
-          options={[
-            { value: '1', label: '1×' }, { value: '2', label: '2×' },
-            { value: '3', label: '3×' }, { value: '4', label: '4×' }
-          ]}
-          onChange={(v) => onChange({ export: { ...doc.export, stillScale: Number(v) as 1 | 2 | 3 | 4 } })}
-        />
-        <ToggleRow
-          label="Transparent background"
-          hint="Saves as PNG whatever the format above says, because JPEG cannot hold transparency."
-          value={doc.export.transparentBackground}
-          onChange={(v) => onChange({ export: { ...doc.export, transparentBackground: v } })}
-        />
-        <button
-          type="button"
-          onClick={onExportStill}
-          disabled={busy}
-          className="rounded-sm bg-raised px-2 py-1.5 text-[11.5px] text-text-primary hover:bg-elevated disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-        >
-          Save this frame
-        </button>
-      </Section>
-
-      <Section title="Video">
-        <p className="rounded-sm bg-sunken px-2 py-1.5 font-mono text-[10.5px] text-text-secondary" role="status">
+      <Section title="Video" defaultOpen>
+        <p className="rounded-md bg-sunken px-2.5 py-2 text-[10.5px] text-text-secondary" role="status">
           {describeOutput(doc, cardCountFor(doc), support?.ext ?? 'mp4')}
         </p>
         <SegmentedRow
@@ -120,7 +88,7 @@ export function ExportPanel({
             type="button"
             onClick={onExportVideo}
             disabled={busy}
-            className="rounded-sm bg-accent px-2 py-1.5 text-[11.5px] text-accent-text hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            className="mt-1 rounded-lg bg-text-primary px-3 py-2 text-[12px] font-medium text-bg transition-opacity hover:opacity-90 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           >
             {busy ? 'Rendering…' : `Export ${support.ext.toUpperCase()}`}
           </button>
@@ -147,6 +115,38 @@ export function ExportPanel({
           </p>
         )}
       </Section>
+      <Section title="Still">
+        <SegmentedRow
+          label="Format"
+          value={doc.export.stillFormat}
+          options={[{ value: 'png', label: 'PNG' }, { value: 'jpeg', label: 'JPEG' }]}
+          onChange={(v) => onChange({ export: { ...doc.export, stillFormat: v } })}
+        />
+        <SegmentedRow
+          label="Size"
+          value={String(doc.export.stillScale)}
+          options={[
+            { value: '1', label: '1×' }, { value: '2', label: '2×' },
+            { value: '3', label: '3×' }, { value: '4', label: '4×' }
+          ]}
+          onChange={(v) => onChange({ export: { ...doc.export, stillScale: Number(v) as 1 | 2 | 3 | 4 } })}
+        />
+        <ToggleRow
+          label="Transparent background"
+          hint="Saves as PNG whatever the format above says, because JPEG cannot hold transparency."
+          value={doc.export.transparentBackground}
+          onChange={(v) => onChange({ export: { ...doc.export, transparentBackground: v } })}
+        />
+        <button
+          type="button"
+          onClick={onExportStill}
+          disabled={busy}
+          className="mt-1 rounded-lg bg-raised px-3 py-2 text-[12px] font-medium text-text-primary transition-colors hover:bg-elevated disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+        >
+          Save this frame
+        </button>
+      </Section>
+
     </div>
   )
 }
@@ -179,7 +179,7 @@ function EntranceRows({
                 aria-checked={spec.shape === s.id}
                 onClick={() => onChange({ shape: s.id })}
                 className={`rounded-sm px-2 py-1 text-[11px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
-                  spec.shape === s.id ? 'bg-accent/15 text-accent' : 'bg-sunken text-text-secondary hover:text-text-primary'
+                  spec.shape === s.id ? 'bg-raised text-text-primary' : 'bg-sunken text-text-muted hover:text-text-secondary'
                 }`}
               >
                 {s.label}

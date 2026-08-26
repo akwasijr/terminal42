@@ -73,6 +73,8 @@ export function MotionStage({
   const exportingRef = useRef(exporting)
   const [error, setError] = useState<string | null>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
+  /** Bumped when the engine finishes booting, so sizing can run again. */
+  const [ready, setReady] = useState(0)
   const [hint, setHint] = useState<string | null>(null)
   const dragRef = useRef<DragState | null>(null)
   const sizeRef = useRef(size)
@@ -130,6 +132,11 @@ export function MotionStage({
       .then((three) => {
         if (cancelled) return
         engineRef.current = new MotionEngine(three, canvas)
+        // three.js arrives after the first layout has already been measured,
+        // so the sizing effect has run and quietly done nothing. Announcing
+        // the engine makes it run again — without this the renderer keeps its
+        // default 300x150 buffer and every card is a soft upscale of it.
+        setReady((n) => n + 1)
       })
       .catch((e: unknown) => {
         if (!cancelled) setError(String((e as Error)?.message ?? e))
@@ -186,7 +193,7 @@ export function MotionStage({
         drawOverlay(ctx, doc.visual.text, over.width, over.height)
       }
     }
-  }, [size, doc.frame, doc.visual.text, doc.visual.logos, doc.visual.effects, images])
+  }, [size, ready, doc.frame, doc.visual.text, doc.visual.logos, doc.visual.effects, images])
 
   useEffect(() => {
     engineRef.current?.setImages(images)

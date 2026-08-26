@@ -17,6 +17,8 @@ import { MotionStage, type StageHandle } from './MotionStage'
 import { ExportPanel } from './ExportPanel'
 import { ParamsPanel, VisualPanel } from './MotionPanels'
 import { FrameToolbar, type FrameFit } from './FrameToolbar'
+import { ResizeHandle } from './ResizeHandle'
+import { useStoredWidth } from '../../lib/motion/paneWidth'
 import { IconChevronRight } from '../icons'
 
 type Tab = 'motion' | 'visual' | 'export'
@@ -49,6 +51,8 @@ export function MotionStudio({
   const [layoutName, setLayoutName] = useState('')
   const [poseMode, setPoseMode] = useState(false)
   const [fit, setFit] = useState<FrameFit>('contain')
+  const [leftWidth, setLeftWidth] = useStoredWidth('motion.leftPane', 240, 180, 420)
+  const [rightWidth, setRightWidth] = useStoredWidth('motion.rightPane', 256, 200, 460)
   // A replay is an event, not a state, so it travels as a counter the stage
   // watches: the same button pressed twice must fire twice.
   const [replayToken, setReplayToken] = useState(0)
@@ -263,6 +267,7 @@ export function MotionStudio({
   return (
     <div className="flex h-full w-full min-h-0 flex-1 gap-2 p-2">
       <ComponentsDrawer
+        width={leftWidth}
         doc={doc}
         onPickComponent={pickComponent}
         onPickPreset={pickPreset}
@@ -270,6 +275,7 @@ export function MotionStudio({
         onApplyLayout={applyLayout}
         onDeleteLayout={(lid) => void deleteLayout(lid)}
       />
+      <ResizeHandle label="Resize the components panel" width={leftWidth} onWidth={setLeftWidth} side="left" min={180} max={420} />
 
       <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-panel bg-surface">
         <header className="flex h-9 shrink-0 items-center gap-2 px-2">
@@ -413,15 +419,20 @@ export function MotionStudio({
         ) : null}
       </section>
 
-      <aside className="flex h-full w-64 shrink-0 flex-col overflow-hidden rounded-panel bg-surface">
-        <header className="flex shrink-0 items-center gap-0.5 p-2">
+      <ResizeHandle label="Resize the settings panel" width={rightWidth} onWidth={setRightWidth} side="right" min={200} max={460} />
+
+      <aside
+        style={{ width: rightWidth }}
+        className="flex h-full shrink-0 flex-col overflow-hidden rounded-panel bg-surface"
+      >
+        <header className="m-2 flex shrink-0 items-center gap-0.5 rounded-lg bg-sunken p-0.5">
           {(['motion', 'visual', 'export'] as const).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setTab(t)}
               aria-pressed={tab === t}
-              className={`rounded-sm px-2 py-1 text-[11.5px] capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+              className={`flex-1 rounded-md px-2 py-1.5 text-[11.5px] capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
                 tab === t ? 'bg-raised text-text-primary' : 'text-text-muted hover:text-text-secondary'
               }`}
             >

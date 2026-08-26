@@ -70,7 +70,7 @@ export function ImagesPanel({
 
   return (
     <>
-      <Section title="Images">
+      <Section title="Images" defaultOpen>
         <div className="flex items-center gap-0.5">
           {(['library', 'bentos'] as const).map((t) => (
             <button

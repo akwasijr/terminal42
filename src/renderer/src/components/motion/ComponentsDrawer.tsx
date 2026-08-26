@@ -23,9 +23,10 @@ export type SavedLayout = {
 }
 
 export function ComponentsDrawer({
-  doc, onPickComponent, onPickPreset, layouts, onApplyLayout, onDeleteLayout
+  doc, onPickComponent, onPickPreset, layouts, onApplyLayout, onDeleteLayout, width
 }: {
   doc: MotionDoc
+  width: number
   onPickComponent: (id: ComponentId) => void
   onPickPreset: (index: number) => void
   layouts: SavedLayout[]
@@ -37,15 +38,15 @@ export function ComponentsDrawer({
   const [drilled, setDrilled] = useState<ComponentId | null>(null)
 
   return (
-    <aside className="flex h-full w-60 shrink-0 flex-col overflow-hidden rounded-panel bg-surface">
-      <header className="flex shrink-0 items-center gap-0.5 p-2">
+    <aside style={{ width }} className="flex h-full shrink-0 flex-col overflow-hidden rounded-panel bg-surface">
+      <header className="flex shrink-0 items-center gap-0.5 rounded-lg bg-sunken p-0.5 m-2">
         {(['components', 'layouts'] as const).map((t) => (
           <button
             key={t}
             type="button"
             onClick={() => setTab(t)}
             aria-pressed={tab === t}
-            className={`rounded-sm px-2 py-1 text-[11.5px] capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+            className={`flex-1 rounded-md px-2 py-1.5 text-[11.5px] capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
               tab === t ? 'bg-raised text-text-primary' : 'text-text-muted hover:text-text-secondary'
             }`}
           >
@@ -86,10 +87,10 @@ export function ComponentsDrawer({
                     type="button"
                     onClick={() => { onPickComponent(c.id); setDrilled(c.id) }}
                     aria-current={doc.componentId === c.id ? 'true' : undefined}
-                    className={`flex w-full items-center gap-1.5 rounded-sm px-2 py-1.5 text-left text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                    className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
                       doc.componentId === c.id
-                        ? 'bg-accent/15 text-accent'
-                        : 'text-text-secondary hover:bg-raised hover:text-text-primary'
+                        ? 'bg-elevated font-medium text-text-primary'
+                        : 'text-text-secondary hover:bg-elevated/60 hover:text-text-primary'
                     }`}
                   >
                     <span className="flex-1">{c.label}</span>
@@ -192,7 +193,7 @@ function PresetList({
             onClick={() => onPick(i)}
             aria-pressed={activeIndex === i}
             className={`relative block w-full overflow-hidden rounded-sm bg-sunken transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
-              activeIndex === i ? 'ring-1 ring-accent' : 'hover:ring-1 hover:ring-border-strong'
+              activeIndex === i ? 'ring-1 ring-border-strong' : 'opacity-80 hover:opacity-100'
             }`}
           >
             <PresetThumb doc={previewDoc} index={i} />

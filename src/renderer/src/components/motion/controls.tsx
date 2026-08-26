@@ -10,43 +10,80 @@ import { useCallback, useId, useRef, useState, type ReactNode } from 'react'
 import { IconChevronRight } from '../icons'
 
 export function Section({
-  title, children, defaultOpen = true, onReset, right
+  title, children, defaultOpen = false, onReset, right, badge
 }: {
   title: string
   children: ReactNode
   defaultOpen?: boolean
   onReset?: () => void
   right?: ReactNode
+  badge?: string
 }): React.JSX.Element {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <section className="border-b border-border/60 last:border-b-0">
-      <header className="flex items-center gap-1 px-3 py-2">
+    <section className="flex flex-col">
+      {/* The header is the whole row, so the target is the width of the panel
+          rather than the width of the word. Actions sit inside it but above
+          it in the stacking order, which is why they are siblings of the
+          button rather than children of it — a button cannot contain a
+          button. */}
+      <div
+        className={`relative flex items-center rounded-lg bg-elevated transition-colors hover:bg-raised ${
+          open ? 'rounded-b-none' : ''
+        }`}
+      >
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="flex flex-1 items-center gap-1.5 text-left text-[11.5px] font-medium text-text-primary hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 rounded-sm"
+          className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[12px] font-medium text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
         >
-          <span className={`transition-transform ${open ? 'rotate-90' : ''}`}>
-            <IconChevronRight />
-          </span>
-          {title}
+          <span className="truncate">{title}</span>
+          {badge ? (
+            <span className="shrink-0 rounded-full bg-accent/15 px-1.5 py-0.5 text-[9.5px] font-medium uppercase tracking-wide text-accent">
+              {badge}
+            </span>
+          ) : null}
         </button>
-        {right}
-        {onReset ? (
+        <div className="flex shrink-0 items-center gap-0.5 pr-2">
+          {right}
+          {onReset ? (
+            <button
+              type="button"
+              onClick={onReset}
+              title={`Reset ${title.toLowerCase()}`}
+              aria-label={`Reset ${title.toLowerCase()}`}
+              className="rounded-md p-1 text-text-muted transition-colors hover:bg-sunken hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            >
+              <IconReset />
+            </button>
+          ) : null}
           <button
             type="button"
-            onClick={onReset}
-            title={`Reset ${title.toLowerCase()}`}
-            className="rounded-sm px-1.5 py-0.5 text-[10.5px] text-text-muted hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            onClick={() => setOpen((v) => !v)}
+            aria-hidden
+            tabIndex={-1}
+            className="pointer-events-none p-1 text-text-muted"
           >
-            Reset
+            <span className={`inline-block transition-transform ${open ? 'rotate-90' : ''}`}>
+              <IconChevronRight />
+            </span>
           </button>
-        ) : null}
-      </header>
-      {open ? <div className="flex flex-col gap-2 px-3 pb-3">{children}</div> : null}
+        </div>
+      </div>
+      {open ? (
+        <div className="flex flex-col gap-3 rounded-b-lg bg-elevated/60 px-3 pb-3 pt-2.5">{children}</div>
+      ) : null}
     </section>
+  )
+}
+
+function IconReset(): React.JSX.Element {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 2v6h6" />
+      <path d="M3.51 15a9 9 0 1 0 2.13-9.36L3 8" />
+    </svg>
   )
 }
 
@@ -90,8 +127,8 @@ export function SliderRow({
   }, [])
 
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-baseline justify-between gap-2">
+    <div className="flex flex-col gap-1.5 py-0.5">
+      <div className="flex items-center justify-between gap-2">
         <label
           htmlFor={id}
           onPointerDown={onPointerDown}
@@ -112,7 +149,7 @@ export function SliderRow({
             const n = Number(e.target.value)
             if (Number.isFinite(n)) onChange(Math.min(max, Math.max(min, n)))
           }}
-          className="w-16 rounded-sm bg-sunken px-1.5 py-0.5 text-right font-mono text-[10.5px] text-text-primary [appearance:textfield] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 [&::-webkit-inner-spin-button]:appearance-none"
+          className="w-14 shrink-0 rounded-md bg-sunken px-1.5 py-1 text-right text-[10.5px] tabular-nums text-text-primary [appearance:textfield] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 [&::-webkit-inner-spin-button]:appearance-none"
           aria-label={`${label}${unit ? ` in ${unit}` : ''}`}
         />
       </div>
@@ -147,7 +184,7 @@ export function ToggleRow({
         aria-checked={value}
         aria-label={label}
         onClick={() => onChange(!value)}
-        className={`relative h-4 w-7 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${value ? 'bg-accent' : 'bg-raised'}`}
+        className={`relative h-4 w-7 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${value ? 'bg-text-primary' : 'bg-raised'}`}
       >
         <span
           className={`absolute top-0.5 h-3 w-3 rounded-full bg-bg transition-transform ${value ? 'translate-x-3.5' : 'translate-x-0.5'}`}
@@ -165,10 +202,18 @@ export function SegmentedRow<T extends string>({
   options: Array<{ value: T; label: string }>
   onChange: (v: T) => void
 }): React.JSX.Element {
+  // Beyond four choices the row cannot sit beside its label without one of
+  // them being cut off, so a long set stacks under the label instead and is
+  // free to wrap. The panel is resizable, and this must survive its narrowest.
+  const stacked = options.length > 4
   return (
-    <div className={label ? 'flex items-center justify-between gap-2' : ''}>
-      {label ? <span className="text-[11px] text-text-secondary">{label}</span> : null}
-      <div role="radiogroup" aria-label={label} className="flex items-center gap-0.5 rounded-sm bg-sunken p-0.5">
+    <div className={stacked ? 'flex flex-col gap-1.5' : 'flex items-center justify-between gap-2'}>
+      {label ? <span className="shrink-0 text-[11px] text-text-secondary">{label}</span> : null}
+      <div
+        role="radiogroup"
+        aria-label={label}
+        className={`flex items-center gap-0.5 rounded-md bg-sunken p-0.5 ${stacked ? 'flex-wrap' : 'min-w-0'}`}
+      >
         {options.map((o) => (
           <button
             key={o.value}
@@ -176,7 +221,7 @@ export function SegmentedRow<T extends string>({
             role="radio"
             aria-checked={value === o.value}
             onClick={() => onChange(o.value)}
-            className={`rounded-[4px] px-2 py-0.5 text-[10.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+            className={`min-w-0 flex-1 truncate rounded-[5px] px-2 py-1 text-[10.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
               value === o.value ? 'bg-raised text-text-primary' : 'text-text-muted hover:text-text-secondary'
             }`}
           >
@@ -211,6 +256,35 @@ export function ColorRow({
           className="h-5 w-5 cursor-pointer rounded-sm border border-border bg-transparent p-0"
         />
       </div>
+    </div>
+  )
+}
+
+/**
+ * A quiet fold inside a section.
+ *
+ * Distinct from Section: a Section is a subject, and this is the tail of one.
+ * It gets no card of its own, because giving it one would make a refinement
+ * look like a peer of the thing it refines.
+ */
+export function Disclosure({
+  label, children
+}: { label: string; children: ReactNode }): React.JSX.Element {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="flex flex-col gap-2.5">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex items-center gap-1 self-start rounded-md py-0.5 text-[11px] text-text-muted transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+      >
+        <span className={`inline-block transition-transform ${open ? 'rotate-90' : ''}`}>
+          <IconChevronRight />
+        </span>
+        {open ? 'Fewer settings' : label}
+      </button>
+      {open ? <div className="flex flex-col gap-2.5">{children}</div> : null}
     </div>
   )
 }

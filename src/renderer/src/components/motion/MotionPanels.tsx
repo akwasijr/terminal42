@@ -10,12 +10,15 @@ import type {
 } from '../../../../shared/motion/types'
 import { componentFor } from '../../../../shared/motion/registry'
 import { paramsFor } from '../../../../shared/motion/defaults'
-import { ColorRow, SegmentedRow, Section, SliderRow, ToggleRow } from './controls'
+import { ColorRow, Disclosure, SegmentedRow, Section, SliderRow, ToggleRow } from './controls'
 import { ImagesPanel } from './MotionImages'
 import { LogoSection } from './MotionLogos'
 import { EffectsSection } from './MotionEffects'
 import { PosePad } from './PosePad'
 import { EasingEditor } from './EasingEditor'
+
+/** How many of a component's parameters are shown before the fold. */
+const PRIMARY_PARAMS = 5
 
 export function ParamsPanel({
   doc, onChange
@@ -36,9 +39,10 @@ export function ParamsPanel({
   }
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col gap-1.5 p-2">
       <Section
         title={component.label}
+        defaultOpen
         onReset={resetParams}
         right={
           <button
@@ -47,15 +51,25 @@ export function ParamsPanel({
             aria-checked={doc.componentEnabled}
             aria-label="Show the arrangement"
             onClick={() => onChange({ componentEnabled: !doc.componentEnabled })}
-            className={`relative h-4 w-7 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${doc.componentEnabled ? 'bg-accent' : 'bg-raised'}`}
+            className={`relative h-4 w-7 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${doc.componentEnabled ? 'bg-text-primary' : 'bg-raised'}`}
           >
             <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-bg transition-transform ${doc.componentEnabled ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
           </button>
         }
       >
-        {component.schema.map((spec) => (
+        {/* The first handful of parameters are the ones that change the
+            shape of the thing. The rest are refinements, and showing
+            seventeen sliders at once makes the first five harder to find. */}
+        {component.schema.slice(0, PRIMARY_PARAMS).map((spec) => (
           <ParamControl key={spec.key} spec={spec} value={params[spec.key]} onChange={(v) => setParam(spec.key, v)} />
         ))}
+        {component.schema.length > PRIMARY_PARAMS ? (
+          <Disclosure label={`${component.schema.length - PRIMARY_PARAMS} more settings`}>
+            {component.schema.slice(PRIMARY_PARAMS).map((spec) => (
+              <ParamControl key={spec.key} spec={spec} value={params[spec.key]} onChange={(v) => setParam(spec.key, v)} />
+            ))}
+          </Disclosure>
+        ) : null}
       </Section>
 
       <Section title="Pose" onReset={() => onChange({ pose: { tiltX: 12, tiltY: 0, tiltZ: 0 } })}>
@@ -143,7 +157,7 @@ export function VisualPanel({
     onChange({ visual: { ...doc.visual, card: { ...card, ...patch } } })
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col gap-1.5 p-2">
       <ImagesPanel doc={doc} onChange={onChange} onImportImages={onImportImages} busy={busy} />
 
       <Section title="Card">
