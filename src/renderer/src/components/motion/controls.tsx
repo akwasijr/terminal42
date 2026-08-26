@@ -187,7 +187,7 @@ export function ToggleRow({
         className={`relative h-4 w-7 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${value ? 'bg-text-primary' : 'bg-raised'}`}
       >
         <span
-          className={`absolute top-0.5 h-3 w-3 rounded-full bg-bg transition-transform ${value ? 'translate-x-3.5' : 'translate-x-0.5'}`}
+          className={`absolute left-0 top-0.5 h-3 w-3 rounded-full bg-bg transition-transform ${value ? 'translate-x-3.5' : 'translate-x-0.5'}`}
         />
       </button>
     </div>
@@ -202,17 +202,19 @@ export function SegmentedRow<T extends string>({
   options: Array<{ value: T; label: string }>
   onChange: (v: T) => void
 }): React.JSX.Element {
-  // Beyond four choices the row cannot sit beside its label without one of
-  // them being cut off, so a long set stacks under the label instead and is
-  // free to wrap. The panel is resizable, and this must survive its narrowest.
-  const stacked = options.length > 4
+  // An option you cannot read is not an option, so nothing here truncates.
+  // The label and the group sit on one line while they both fit; when they
+  // stop fitting the group wraps below the label, and if it is still too wide
+  // the options wrap among themselves. Letting the browser measure this beats
+  // guessing from the number of options, because a short set with a long
+  // label overflows just as easily as a long one.
   return (
-    <div className={stacked ? 'flex flex-col gap-1.5' : 'flex items-center justify-between gap-2'}>
+    <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
       {label ? <span className="shrink-0 text-[11px] text-text-secondary">{label}</span> : null}
       <div
         role="radiogroup"
         aria-label={label}
-        className={`flex items-center gap-0.5 rounded-md bg-sunken p-0.5 ${stacked ? 'flex-wrap' : 'min-w-0'}`}
+        className="flex max-w-full flex-none flex-wrap items-center gap-0.5 rounded-md bg-sunken p-0.5"
       >
         {options.map((o) => (
           <button
@@ -221,7 +223,7 @@ export function SegmentedRow<T extends string>({
             role="radio"
             aria-checked={value === o.value}
             onClick={() => onChange(o.value)}
-            className={`min-w-0 flex-1 truncate rounded-[5px] px-2 py-1 text-[10.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+            className={`shrink-0 whitespace-nowrap rounded-[5px] px-2 py-1 text-[10.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
               value === o.value ? 'bg-raised text-text-primary' : 'text-text-muted hover:text-text-secondary'
             }`}
           >

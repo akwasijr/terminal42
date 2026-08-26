@@ -2769,7 +2769,7 @@ function PageDefaults({ state, set }: PageProps): JSX.Element {
                     >
                       <span
                         className={[
-                          'absolute h-3 w-3 rounded-full bg-bg transition-transform',
+                          'absolute left-0 h-3 w-3 rounded-full bg-bg transition-transform',
                           on ? 'translate-x-3.5' : 'translate-x-0.5'
                         ].join(' ')}
                       />

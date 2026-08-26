@@ -53,7 +53,7 @@ export function ParamsPanel({
             onClick={() => onChange({ componentEnabled: !doc.componentEnabled })}
             className={`relative h-4 w-7 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${doc.componentEnabled ? 'bg-text-primary' : 'bg-raised'}`}
           >
-            <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-bg transition-transform ${doc.componentEnabled ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+            <span className={`absolute left-0 top-0.5 h-3 w-3 rounded-full bg-bg transition-transform ${doc.componentEnabled ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
           </button>
         }
       >

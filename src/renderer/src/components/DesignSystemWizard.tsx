@@ -538,7 +538,7 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
                               <div className="mt-0.5 text-[11.5px] text-text-muted">{r.hint}</div>
                             </div>
                             <span role="switch" aria-checked={on} className={['relative mt-0.5 inline-flex h-4 w-7 flex-shrink-0 items-center rounded-full transition-colors', on ? 'bg-text-primary' : 'bg-raised'].join(' ')}>
-                              <span className={['absolute h-3 w-3 rounded-full bg-bg transition-transform', on ? 'translate-x-3.5' : 'translate-x-0.5'].join(' ')} />
+                              <span className={['absolute left-0 h-3 w-3 rounded-full bg-bg transition-transform', on ? 'translate-x-3.5' : 'translate-x-0.5'].join(' ')} />
                             </span>
                           </button>
                         )
