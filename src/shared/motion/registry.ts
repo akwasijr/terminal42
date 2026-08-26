@@ -18,10 +18,19 @@ import { elevator } from './components/elevator'
 import { ribbon } from './components/ribbon'
 import { parallax } from './components/parallax'
 import { feed } from './components/feed'
+import { grid } from './components/grid'
+import { flip } from './components/flip'
+import { globe } from './components/global'
+import { cubic } from './components/cubic'
+import { column } from './components/column'
+import { plate } from './components/plate'
+import { spin } from './components/spin'
 
 export const MOTION_COMPONENTS: MotionComponent[] = [
   carousel, ring, slider, cardShuffle, cardDrop,
-  imageRepeater, space, elevator, ribbon, parallax, feed
+  imageRepeater, space, elevator, ribbon, parallax, feed,
+  // Listed in the order the design's own picker showed them.
+  grid, flip, globe, cubic, column, plate, spin
 ]
 
 const byId = new Map<ComponentId, MotionComponent>(MOTION_COMPONENTS.map((c) => [c.id, c]))

@@ -103,20 +103,28 @@ export function ComponentsDrawer({
               ))}
             </ul>
 
-            <p className="px-3 pb-1 pt-4 text-[11px] font-medium text-text-muted">Not built yet</p>
-            <ul className="flex flex-col gap-0.5">
-              {SOON_COMPONENTS.map((name) => (
-                <li key={name}>
-                  <span
-                    className="flex cursor-not-allowed items-center justify-between rounded-sm px-2 py-1.5 text-[12px] text-text-muted/60"
-                    title="Not built yet"
-                  >
-                    {name}
-                    <span className="rounded-full bg-raised px-1.5 py-0.5 text-[9.5px] text-text-muted">Soon</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
+            {/* Every named arrangement is built, so this section usually has
+                nothing to say. It stays for the next one to be named, but a
+                heading over an empty list would read as something failing to
+                load. */}
+            {SOON_COMPONENTS.length > 0 ? (
+              <>
+                <p className="px-3 pb-1 pt-4 text-[11px] font-medium text-text-muted">Not built yet</p>
+                <ul className="flex flex-col gap-0.5">
+                  {SOON_COMPONENTS.map((name) => (
+                    <li key={name}>
+                      <span
+                        className="flex cursor-not-allowed items-center justify-between rounded-sm px-2 py-1.5 text-[12px] text-text-muted/60"
+                        title="Not built yet"
+                      >
+                        {name}
+                        <span className="rounded-full bg-raised px-1.5 py-0.5 text-[9.5px] text-text-muted">Soon</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : null}
           </div>
         )
       ) : (

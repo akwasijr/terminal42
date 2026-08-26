@@ -12,6 +12,13 @@ import { elevator } from '../../src/shared/motion/components/elevator'
 import { ribbon } from '../../src/shared/motion/components/ribbon'
 import { parallax } from '../../src/shared/motion/components/parallax'
 import { feed } from '../../src/shared/motion/components/feed'
+import { grid } from '../../src/shared/motion/components/grid'
+import { flip } from '../../src/shared/motion/components/flip'
+import { globe } from '../../src/shared/motion/components/global'
+import { cubic } from '../../src/shared/motion/components/cubic'
+import { column } from '../../src/shared/motion/components/column'
+import { plate } from '../../src/shared/motion/components/plate'
+import { spin } from '../../src/shared/motion/components/spin'
 
 // Imported directly rather than from a registry: the registry file is authored
 // separately and must not be a dependency of the invariant these components owe.
@@ -26,7 +33,14 @@ const components: MotionComponent[] = [
   elevator,
   ribbon,
   parallax,
-  feed
+  feed,
+  grid,
+  flip,
+  globe,
+  cubic,
+  column,
+  plate,
+  spin
 ]
 
 const NUMERIC_FIELDS: Array<keyof CardPlacement> = ['x', 'y', 'z', 'rotX', 'rotY', 'rotZ', 'scale', 'opacity', 'bend']
@@ -94,6 +108,14 @@ describe.each(components.map((c) => [c.label, c] as const))('%s component', (_la
     }
   })
 
+  // Comparing phase 0 with phase 1 cannot see a broken seam: every component
+  // wraps its phase, so phase 1 *is* phase 0 and the check passes by
+  // construction. The seam only shows up on approach — at phase 0.999999 a
+  // conveyor that advances a fractional number of cards per loop has carried
+  // the whole arrangement part of a step away from where it started, and jumps
+  // back on the next frame. Cards are compared as a set because a conveyor is
+  // allowed to recycle a card from one end to the other; what must not change
+  // is the shape they make.
   it('produces only finite numbers across the loop', () => {
     for (const params of combos) {
       const n = Math.min(MAX_CARDS, component.cardCount(params))

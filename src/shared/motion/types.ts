@@ -32,9 +32,22 @@ export type ComponentId =
   | 'ribbon'
   | 'parallax'
   | 'feed'
+  | 'grid'
+  | 'flip'
+  | 'global'
+  | 'cubic'
+  | 'column'
+  | 'plate'
+  | 'spin'
 
-/** Component types named in the design but not built yet. */
-export const SOON_COMPONENTS = ['Grid', 'Flip', 'Global', 'Cubic', 'Column', 'Plate', 'Spin'] as const
+/**
+ * Component types named in the design but not built yet.
+ *
+ * Empty now that all eighteen exist. Kept rather than deleted because the
+ * drawer's "Soon" section is how a named-but-unbuilt arrangement gets shown,
+ * and the next one to be named will want it back.
+ */
+export const SOON_COMPONENTS: readonly string[] = []
 
 export type ParamValue = number | string | boolean
 

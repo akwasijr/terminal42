@@ -57,13 +57,16 @@ describe('document defaults', () => {
 
 describe('registry', () => {
   it('knows every component the type union names', () => {
-    expect(MOTION_COMPONENTS).toHaveLength(11)
+    expect(MOTION_COMPONENTS).toHaveLength(18)
     for (const c of MOTION_COMPONENTS) expect(componentFor(c.id).id).toBe(c.id)
   })
 
   it('falls back rather than rendering nothing', () => {
-    expect(hasComponent('spin')).toBe(false)
-    expect(componentFor('spin').id).toBe('carousel')
+    // A saved document can name a component this build does not have, either
+    // because it was written by a newer build or because one was withdrawn.
+    // The id below is deliberately not a real one and must stay that way.
+    expect(hasComponent('no-such-component')).toBe(false)
+    expect(componentFor('no-such-component').id).toBe('carousel')
   })
 })
 
