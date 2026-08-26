@@ -647,7 +647,7 @@ export function DesignChatRail({ designId }: { designId: string }): JSX.Element 
                   disabled={!body.trim()}
                   aria-label={busy ? 'Add to queue' : 'Send'}
                   title={busy ? 'Add to queue (↵)' : 'Send (↵)'}
-                  className="grid h-8 w-8 place-items-center rounded-full bg-accent text-accent-text transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="grid h-8 w-8 place-items-center rounded-full bg-action text-action-text transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <IconArrowUp size={14} />
                 </button>

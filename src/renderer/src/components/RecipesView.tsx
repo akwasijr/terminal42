@@ -106,7 +106,7 @@ export function RecipesView() {
                         type="button"
                         onClick={() => void run(r.id)}
                         disabled={!!running}
-                        className="flex items-center gap-1 rounded-md bg-accent px-2 py-1 text-[11px] font-medium text-accent-text disabled:opacity-50"
+                        className="flex items-center gap-1 rounded-md bg-action px-2 py-1 text-[11px] font-medium text-action-text disabled:opacity-50"
                       >
                         <IconPlay size={11} /> {running === r.id ? 'Running…' : 'Run'}
                       </button>
@@ -274,7 +274,7 @@ function ScheduleDialog({
             type="button"
             onClick={() => void add()}
             disabled={busy}
-            className="rounded-md bg-accent px-3 py-1 text-[12px] font-medium text-accent-text disabled:opacity-50"
+            className="rounded-md bg-action px-3 py-1 text-[12px] font-medium text-action-text disabled:opacity-50"
           >
             Add schedule
           </button>

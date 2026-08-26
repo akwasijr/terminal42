@@ -206,11 +206,6 @@ export function VisualPanel({
         >
           Add text
         </button>
-        {doc.visual.text.length === 0 ? (
-          <p className="text-[11px] text-text-muted">
-            Text sits flat over the piece rather than in the scene, so it stays upright and readable however the cards move.
-          </p>
-        ) : null}
         {doc.visual.text.map((layer, i) => {
           const setLayer = (patch: Partial<typeof layer>): void => onChange({
             visual: {

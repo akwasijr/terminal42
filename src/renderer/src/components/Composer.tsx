@@ -269,7 +269,7 @@ export function Composer({
                   disabled={!canSend}
                   aria-label="Send message"
                   title={canSend ? 'Send (↵)' : 'Type a message to send'}
-                  className="grid h-8 w-8 place-items-center rounded-full bg-elevated text-text-secondary transition-colors hover:bg-accent hover:text-accent-text disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-elevated disabled:hover:text-text-secondary"
+                  className="grid h-8 w-8 place-items-center rounded-full bg-elevated text-text-secondary transition-colors hover:bg-action hover:text-action-text disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-elevated disabled:hover:text-text-secondary"
                 >
                   <IconArrowUp size={14} />
                 </button>

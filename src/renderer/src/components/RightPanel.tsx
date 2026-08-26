@@ -463,7 +463,7 @@ function QuickActions({ sessionId, cwd }: { sessionId: string | null; cwd: strin
             <button
               onClick={() => void addRemote()}
               disabled={busy !== null}
-              className="flex-1 rounded-md bg-accent px-2 py-1 text-[11px] text-white hover:opacity-90 disabled:opacity-50"
+              className="flex-1 rounded-md bg-action px-2 py-1 text-[11px] text-action-text hover:opacity-90 disabled:opacity-50"
             >
               {busy === 'remote' ? 'Connecting…' : 'Connect'}
             </button>

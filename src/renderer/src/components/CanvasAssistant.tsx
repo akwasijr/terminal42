@@ -280,7 +280,7 @@ export function CanvasAssistant({ getContext, onCreate, onAnimate, onEdit, onDel
                 <textarea value={treeInput} onChange={(e) => setTreeInput(e.target.value)} spellCheck={false} className="min-h-0 flex-1 resize-none rounded-lg bg-elevated/40 p-2.5 font-mono text-[11px] leading-snug text-text-primary focus:outline-none" />
                 {treeErr && <div className="mt-1.5 text-[11px] text-error">{treeErr}</div>}
                 <div className="mt-2 flex items-center gap-3">
-                  <button type="button" onClick={renderTree} className="rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-text hover:opacity-90">Render on canvas</button>
+                  <button type="button" onClick={renderTree} className="rounded-md bg-action px-3 py-1.5 text-[12px] font-medium text-action-text hover:opacity-90">Render on canvas</button>
                   {treeScore && <span className="text-[11px] text-text-muted">contrast {Math.round(treeScore.contrast * 100)}% · grid {Math.round(treeScore.grid * 100)}% · overlaps {treeScore.overlaps} · boxes {treeScore.boxes} · hand {treeScore.handIcons} · orphans {treeScore.orphans} · accent {Math.round(treeScore.accentArea * 100)}% · score {Math.round(treeScore.total * 100)}</span>}
                 </div>
                 <div className="mt-3 pt-2">

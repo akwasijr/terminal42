@@ -771,7 +771,7 @@ function ExpandedSession({
               disabled={!reply.trim() || sending}
               aria-label="Send reply"
               title="Send (↵)"
-              className="grid h-7 w-7 place-items-center rounded-full bg-accent text-accent-text transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+              className="grid h-7 w-7 place-items-center rounded-full bg-action text-action-text transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <IconArrowUp size={12} />
             </button>

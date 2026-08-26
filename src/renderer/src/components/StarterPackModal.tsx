@@ -265,7 +265,7 @@ export function StarterPackModal({
               type="button"
               onClick={() => void install()}
               disabled={selectedNew === 0 || installing}
-              className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-text disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
+              className="flex items-center gap-1.5 rounded-md bg-action px-3 py-1.5 text-[12px] font-medium text-action-text disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
             >
               {installing ? 'Installing…' : (
                 <>

@@ -33,10 +33,6 @@ export function ExportPanel({
   return (
     <div className="flex flex-col gap-1.5 p-2">
       <Section title="Animation">
-        <p className="text-[11px] leading-relaxed text-text-muted">
-          A component turns on its own for as long as you watch it. These are
-          the moves it makes once, on the way in and on the way out.
-        </p>
         <EntranceRows label="Component in" spec={anim.componentIn} onChange={setSpec('componentIn')} />
         <EntranceRows label="Component out" spec={anim.componentOut} onChange={setSpec('componentOut')} />
         <EntranceRows label="Text and logo in" spec={anim.textIn} onChange={setSpec('textIn')} />
@@ -88,7 +84,7 @@ export function ExportPanel({
             type="button"
             onClick={onExportVideo}
             disabled={busy}
-            className="mt-1 rounded-lg bg-text-primary px-3 py-2 text-[12px] font-medium text-bg transition-opacity hover:opacity-90 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            className="mt-1 rounded-lg bg-action px-3 py-2 text-[12px] font-medium text-action-text transition-opacity hover:opacity-90 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           >
             {busy ? 'Rendering…' : `Export ${support.ext.toUpperCase()}`}
           </button>
@@ -109,11 +105,7 @@ export function ExportPanel({
               {progress.label} frame {progress.done} of {progress.total}
             </p>
           </div>
-        ) : (
-          <p className="text-[10.5px] text-text-muted">
-            Every frame is drawn at an exact point in the loop, so the video ends where it began.
-          </p>
-        )}
+        ) : null}
       </Section>
       <Section title="Still">
         <SegmentedRow

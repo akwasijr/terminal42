@@ -260,7 +260,7 @@ export function BrainNotes() {
             <button
               type="button"
               onClick={() => setOnboarding(true)}
-              className="rounded-md bg-accent px-2.5 py-1 font-medium text-accent-text hover:opacity-90"
+              className="rounded-md bg-action px-2.5 py-1 font-medium text-action-text hover:opacity-90"
             >
               Start interview
             </button>
@@ -619,7 +619,7 @@ function BrainOnboarding({
               <button
                 type="button"
                 onClick={next}
-                className="rounded-md bg-accent px-3 py-1 text-[12px] font-medium text-accent-text hover:opacity-90"
+                className="rounded-md bg-action px-3 py-1 text-[12px] font-medium text-action-text hover:opacity-90"
               >
                 {step === total - 1 ? 'Review' : 'Next'}
               </button>
@@ -627,7 +627,7 @@ function BrainOnboarding({
               <button
                 type="button"
                 onClick={() => onFinish(preview)}
-                className="rounded-md bg-accent px-3 py-1 text-[12px] font-medium text-accent-text hover:opacity-90"
+                className="rounded-md bg-action px-3 py-1 text-[12px] font-medium text-action-text hover:opacity-90"
               >
                 Save to Brain
               </button>
@@ -671,7 +671,7 @@ function ChipQuestion({
               className={[
                 'rounded-full border px-3 py-1 text-[12.5px] transition-colors',
                 on
-                  ? 'border-accent bg-accent text-accent-text'
+                  ? 'border-accent bg-action text-action-text'
                   : 'bg-bg text-text-secondary hover: hover:text-text-primary'
               ].join(' ')}
             >

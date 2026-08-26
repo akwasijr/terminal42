@@ -147,7 +147,7 @@ export function AnimationsPanel({ obj, duration, patch, pushHistory }: {
           </label>
 
           <div className="flex items-center gap-1.5 pt-0.5">
-            <button type="button" onClick={apply} className="flex-1 rounded bg-accent px-2 py-1.5 text-[12px] text-accent-text hover:opacity-90">{anims.some((a) => a.id === draft.id) ? 'Update animation' : 'Add animation'}</button>
+            <button type="button" onClick={apply} className="flex-1 rounded bg-action px-2 py-1.5 text-[12px] text-action-text hover:opacity-90">{anims.some((a) => a.id === draft.id) ? 'Update animation' : 'Add animation'}</button>
             <button type="button" onClick={() => setDraft(null)} className="rounded px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary">Cancel</button>
           </div>
         </div>

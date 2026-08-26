@@ -537,8 +537,8 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
                               <div className="text-[12.5px] font-medium text-text-primary">{r.label}</div>
                               <div className="mt-0.5 text-[11.5px] text-text-muted">{r.hint}</div>
                             </div>
-                            <span role="switch" aria-checked={on} className={['relative mt-0.5 inline-flex h-4 w-7 flex-shrink-0 items-center rounded-full transition-colors', on ? 'bg-accent' : 'bg-bg/60'].join(' ')}>
-                              <span className={['absolute h-3 w-3 rounded-full bg-text-primary transition-transform', on ? 'translate-x-3.5' : 'translate-x-0.5'].join(' ')} />
+                            <span role="switch" aria-checked={on} className={['relative mt-0.5 inline-flex h-4 w-7 flex-shrink-0 items-center rounded-full transition-colors', on ? 'bg-text-primary' : 'bg-raised'].join(' ')}>
+                              <span className={['absolute h-3 w-3 rounded-full bg-bg transition-transform', on ? 'translate-x-3.5' : 'translate-x-0.5'].join(' ')} />
                             </span>
                           </button>
                         )
@@ -579,7 +579,7 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
           <button onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0 || busy} className="rounded-md px-3 py-1.5 text-[13px] text-text-secondary hover:bg-surface disabled:opacity-30 disabled:hover:bg-transparent">← Back</button>
           <div className="flex-1" />
           {isLast && needsScreenshotDecision && <span className="mr-3 text-[11.5px] text-text-muted">Finish screenshot analysis or skip it first.</span>}
-          <button onClick={() => { if (isLast) void handleGenerate(); else setIdx((i) => i + 1) }} disabled={busy || (isLast && needsScreenshotDecision)} className="rounded-md bg-accent px-4 py-1.5 text-[13px] font-medium text-accent-text hover:opacity-90 disabled:opacity-50">{isLast ? 'Generate' : 'Next →'}</button>
+          <button onClick={() => { if (isLast) void handleGenerate(); else setIdx((i) => i + 1) }} disabled={busy || (isLast && needsScreenshotDecision)} className="rounded-md bg-action px-4 py-1.5 text-[13px] font-medium text-action-text hover:opacity-90 disabled:opacity-50">{isLast ? 'Generate' : 'Next →'}</button>
         </footer>
       </div>
     </div>

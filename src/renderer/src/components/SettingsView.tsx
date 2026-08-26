@@ -460,12 +460,12 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
       className={[
         'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors',
         disabled ? 'cursor-not-allowed opacity-50' : '',
-        checked ? 'bg-accent' : 'bg-elevated'
+        checked ? 'bg-text-primary' : 'bg-elevated'
       ].join(' ')}
     >
       <span
         className={[
-          'inline-block h-4 w-4 translate-y-0.5 rounded-full bg-white shadow transition-transform',
+          'inline-block h-4 w-4 translate-y-0.5 rounded-full bg-bg shadow transition-transform',
           checked ? 'translate-x-[18px]' : 'translate-x-0.5'
         ].join(' ')}
       />

@@ -379,7 +379,7 @@ export function BriefWizard({ folderPath, projectId, initial, onCancel, onComple
               <button
                 onClick={() => finish(true)}
                 disabled={saving || !state.type}
-                className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-text hover:opacity-90 disabled:opacity-30"
+                className="rounded-md bg-action px-4 py-2 text-sm font-medium text-action-text hover:opacity-90 disabled:opacity-30"
               >
                 {saving ? 'Saving' : 'Save and start with Copilot'}
               </button>
@@ -388,7 +388,7 @@ export function BriefWizard({ folderPath, projectId, initial, onCancel, onComple
             <button
               onClick={next}
               disabled={!canAdvance}
-              className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-text hover:opacity-90 disabled:opacity-30"
+              className="rounded-md bg-action px-4 py-2 text-sm font-medium text-action-text hover:opacity-90 disabled:opacity-30"
             >
               {state.type === 'blank' ? 'Create blank project' : 'Next →'}
             </button>
@@ -896,7 +896,7 @@ function PageDesignSystem({ state, set }: { state: WizardState; set: <K extends 
                   <span
                     className={[
                       'grid h-8 w-8 flex-shrink-0 place-items-center rounded-md font-mono text-[13px]',
-                      selected ? 'bg-accent text-accent-text' : 'bg-surface text-text-secondary'
+                      selected ? 'bg-action text-action-text' : 'bg-surface text-text-secondary'
                     ].join(' ')}
                     aria-hidden
                   >
@@ -958,7 +958,7 @@ function PageData({ state, set }: { state: WizardState; set: <K extends keyof Wi
                   <span
                     className={[
                       'grid h-8 w-8 flex-shrink-0 place-items-center rounded-md font-mono text-[13px]',
-                      selected ? 'bg-accent text-accent-text' : 'bg-surface text-text-secondary'
+                      selected ? 'bg-action text-action-text' : 'bg-surface text-text-secondary'
                     ].join(' ')}
                     aria-hidden
                   >
@@ -1127,7 +1127,7 @@ function PageUiStyle({ state, set }: { state: WizardState; set: <K extends keyof
         <div className="mb-4 text-xs text-text-secondary">Preview</div>
         <div className="flex items-center justify-center gap-4 pointer-events-none select-none">
           <div
-            className="bg-accent px-5 py-2.5 text-sm font-medium text-accent-text"
+            className="bg-action px-5 py-2.5 text-sm font-medium text-action-text"
             style={{
               borderRadius: radius.px,
               boxShadow: shadow.css,

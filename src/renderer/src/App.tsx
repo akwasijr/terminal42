@@ -544,7 +544,7 @@ function RenameDialog({
             type="button"
             disabled={!value.trim()}
             onClick={() => onSubmit(value.trim())}
-            className="rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-text disabled:opacity-40"
+            className="rounded-md bg-action px-3 py-1.5 text-[12px] font-medium text-action-text disabled:opacity-40"
           >Rename</button>
         </div>
       </div>
@@ -598,7 +598,7 @@ function ConfirmDialog({
               'rounded-md px-3 py-1.5 text-[12px] font-medium',
               destructive
                 ? 'bg-red-600 text-white hover:bg-red-500'
-                : 'bg-accent text-accent-text hover:opacity-90'
+                : 'bg-action text-action-text hover:opacity-90'
             ].join(' ')}
           >{confirmLabel}</button>
         </div>
@@ -693,7 +693,7 @@ function InboxBell({ unread }: { unread: number }) {
       >
         <IconBell size={14} />
         {unread > 0 && (
-          <span className="absolute right-0.5 top-0.5 grid h-3.5 min-w-[14px] place-items-center rounded-full bg-accent px-1 text-[9.5px] font-semibold leading-none text-accent-text">
+          <span className="absolute right-0.5 top-0.5 grid h-3.5 min-w-[14px] place-items-center rounded-full bg-action px-1 text-[9.5px] font-semibold leading-none text-action-text">
             {unread > 99 ? '99+' : unread}
           </span>
         )}
@@ -1368,7 +1368,7 @@ function EmptyHome({ onAddProject, onOpenFolder }: { onAddProject: () => void; o
         <button
           type="button"
           onClick={onAddProject}
-          className="rounded-md bg-accent px-3 py-1.5 text-[13px] font-medium text-accent-text hover:opacity-90"
+          className="rounded-md bg-action px-3 py-1.5 text-[13px] font-medium text-action-text hover:opacity-90"
         >
           New project
         </button>

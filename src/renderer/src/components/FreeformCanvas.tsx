@@ -3159,7 +3159,7 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
         type="button"
         onClick={() => setTool(id)}
         aria-label={hint}
-        className={['grid h-7 w-7 place-items-center rounded-md transition-colors', tool === id ? 'bg-accent text-accent-text' : 'text-text-secondary hover:bg-elevated hover:text-text-primary'].join(' ')}
+        className={['grid h-7 w-7 place-items-center rounded-md transition-colors', tool === id ? 'bg-action text-action-text' : 'text-text-secondary hover:bg-elevated hover:text-text-primary'].join(' ')}
       >{TOOL_ICONS[id]}</button>
     </Tooltip>
   )
@@ -3172,7 +3172,7 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
   const shapeDropdown = (): JSX.Element => (
     <div className="relative">
       <Tooltip label="Shapes" side="bottom">
-        <button type="button" onClick={() => setShapeMenuOpen((o) => !o)} className={['flex h-7 items-center gap-1 rounded-md px-1.5 transition-colors', shapeTools.includes(tool) ? 'bg-accent text-accent-text' : 'text-text-secondary hover:bg-elevated hover:text-text-primary'].join(' ')}>
+        <button type="button" onClick={() => setShapeMenuOpen((o) => !o)} className={['flex h-7 items-center gap-1 rounded-md px-1.5 transition-colors', shapeTools.includes(tool) ? 'bg-action text-action-text' : 'text-text-secondary hover:bg-elevated hover:text-text-primary'].join(' ')}>
           {TOOL_ICONS[activeShape]}
           <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 4.5 6 7.5 9 4.5" /></svg>
         </button>
@@ -3466,7 +3466,7 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14l5-5-5-5" /><path d="M20 9H9a5 5 0 0 0 0 10h1" /></svg>
         </button></Tooltip>
         <div className="mx-1.5" />
-        <Tooltip label="Toggle the animation timeline" side="bottom"><button type="button" onClick={() => setTimelineOpen((v) => !v)} className={['flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px]', timelineOpen ? 'bg-accent text-accent-text' : 'text-text-secondary hover:bg-elevated hover:text-text-primary'].join(' ')}>
+        <Tooltip label="Toggle the animation timeline" side="bottom"><button type="button" onClick={() => setTimelineOpen((v) => !v)} className={['flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px]', timelineOpen ? 'bg-action text-action-text' : 'text-text-secondary hover:bg-elevated hover:text-text-primary'].join(' ')}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 7h18M3 12h18M3 17h18" /><circle cx="8" cy="7" r="1.6" fill="currentColor" /><circle cx="15" cy="12" r="1.6" fill="currentColor" /><circle cx="10" cy="17" r="1.6" fill="currentColor" /></svg>
           Animation
         </button></Tooltip>
@@ -3481,7 +3481,7 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
               Saved
             </span>
           )}
-          <Tooltip label="Save the active artboard as an HTML design" side="bottom"><button type="button" onClick={() => void exportHtml()} className="ml-2 rounded-md bg-accent px-2.5 py-1 text-[12px] font-medium text-accent-text hover:opacity-90">Save to design</button></Tooltip>
+          <Tooltip label="Save the active artboard as an HTML design" side="bottom"><button type="button" onClick={() => void exportHtml()} className="ml-2 rounded-md bg-action px-2.5 py-1 text-[12px] font-medium text-action-text hover:opacity-90">Save to design</button></Tooltip>
         </div>
       </div>
 
@@ -4921,7 +4921,7 @@ function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gra
   }, [pushHistory])
   const Toggle = useMemo(() => function Toggle({ on, set, children, tip }: { on: boolean; set: () => void; children: React.ReactNode; tip?: string }): JSX.Element {
     return (
-      <Tooltip label={tip ?? ''} side="top"><button type="button" onClick={() => { pushHistory(); set() }} className={['rounded px-2 py-1 text-[11.5px]', on ? 'bg-accent text-accent-text' : 'bg-elevated text-text-secondary hover:text-text-primary'].join(' ')}>{children}</button></Tooltip>
+      <Tooltip label={tip ?? ''} side="top"><button type="button" onClick={() => { pushHistory(); set() }} className={['rounded px-2 py-1 text-[11.5px]', on ? 'bg-action text-action-text' : 'bg-elevated text-text-secondary hover:text-text-primary'].join(' ')}>{children}</button></Tooltip>
     )
   }, [pushHistory])
   const Slider = useMemo(() => function Slider({ label, value, min, max, step = 1, on, kf, tip }: { label: string; value: number; min: number; max: number; step?: number; on: (v: number) => void; kf?: { keyed: boolean; toggle: () => void }; tip?: string }): JSX.Element {

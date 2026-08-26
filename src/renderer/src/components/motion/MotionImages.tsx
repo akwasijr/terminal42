@@ -153,7 +153,7 @@ export function ImagesPanel({
               </>
             ) : (
               <p className="text-[11px] text-text-muted">
-                With no pictures the cards show a plain face, which is useful while you tune the motion.
+                No pictures yet.
               </p>
             )}
           </>
@@ -192,7 +192,7 @@ export function ImagesPanel({
 
             {bentos.length === 0 ? (
               <p className="text-[11px] text-text-muted">
-                A bento is a set of pictures kept together, so the same images can be dropped into any motion.
+                No bentos yet.
               </p>
             ) : (
               <ul className="flex flex-col gap-1">

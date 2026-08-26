@@ -224,7 +224,7 @@ function KickoffPromptModal({
             <button
               onClick={onPaste}
               disabled={load.kind !== 'ok' || !sessionId}
-              className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-40"
+              className="rounded-md bg-action px-3 py-1.5 text-xs font-medium text-action-text hover:opacity-90 disabled:opacity-40"
               title={
                 !sessionId
                   ? 'No active session at the time this dialog opened'

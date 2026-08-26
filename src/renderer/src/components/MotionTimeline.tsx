@@ -275,7 +275,7 @@ export function MotionTimeline({ selector, initial, getDoc, onApply, onClose }: 
     <div className="absolute inset-x-0 bottom-0 z-40 flex h-[268px] flex-col bg-elevated/95 backdrop-blur-sm">
       {/* Control bar */}
       <div className="flex items-center gap-2 px-3 py-1.5 text-[11.5px] text-text-secondary">
-        <button type="button" onClick={play} title={playing ? 'Pause' : 'Play'} className="grid h-7 w-7 place-items-center rounded-md bg-accent text-accent-text hover:opacity-90">
+        <button type="button" onClick={play} title={playing ? 'Pause' : 'Play'} className="grid h-7 w-7 place-items-center rounded-md bg-action text-action-text hover:opacity-90">
           {playing
             ? <svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor"><rect x="2" y="1.5" width="3" height="9" rx="1" /><rect x="7" y="1.5" width="3" height="9" rx="1" /></svg>
             : <svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor"><path d="M3 1.5l7 4.5-7 4.5z" /></svg>}
@@ -293,7 +293,7 @@ export function MotionTimeline({ selector, initial, getDoc, onApply, onClose }: 
         <button type="button" onClick={() => setPlayback((p) => (p === 'loop' ? 'once' : p === 'once' ? 'pingpong' : 'loop'))} className="rounded px-2 py-0.5 capitalize hover:bg-bg/60" title="Playback mode">{playback}</button>
         <div className="ml-auto flex items-center gap-2">
           <button type="button" onClick={copyCss} className="rounded-md px-2 py-1 hover:bg-bg/60" title="Copy the animation as CSS">Copy CSS</button>
-          <button type="button" onClick={() => onApply(spec)} className="rounded-md bg-accent px-2.5 py-1 font-medium text-accent-text hover:opacity-90" title="Bake this animation into the design">Apply to design</button>
+          <button type="button" onClick={() => onApply(spec)} className="rounded-md bg-action px-2.5 py-1 font-medium text-action-text hover:opacity-90" title="Bake this animation into the design">Apply to design</button>
           <button type="button" onClick={() => { clearInline(); onClose() }} className="grid h-6 w-6 place-items-center rounded text-text-muted hover:bg-bg/60 hover:text-text-primary" title="Close">
             <svg width="9" height="9" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M3 3l8 8M11 3l-8 8" /></svg>
           </button>

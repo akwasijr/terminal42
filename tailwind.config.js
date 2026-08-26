@@ -17,6 +17,8 @@ export default {
         'text-muted': 'rgb(var(--text-muted) / <alpha-value>)',
         accent: 'rgb(var(--accent) / <alpha-value>)',
         'accent-text': 'rgb(var(--accent-text) / <alpha-value>)',
+        action: 'rgb(var(--action) / <alpha-value>)',
+        'action-text': 'rgb(var(--action-text) / <alpha-value>)',
         success: 'rgb(var(--success) / <alpha-value>)',
         warning: 'rgb(var(--warning) / <alpha-value>)',
         error: 'rgb(var(--error) / <alpha-value>)'

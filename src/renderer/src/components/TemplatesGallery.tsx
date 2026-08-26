@@ -228,7 +228,7 @@ function PreviewModal({
             <button
               type="button"
               onClick={onUse}
-              className="rounded-md bg-accent px-3 py-1.5 text-[13px] font-medium text-accent-text hover:opacity-90"
+              className="rounded-md bg-action px-3 py-1.5 text-[13px] font-medium text-action-text hover:opacity-90"
             >
               Use this template
             </button>

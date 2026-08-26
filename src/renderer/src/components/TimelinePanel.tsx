@@ -460,7 +460,7 @@ export function TimelinePanel({ objects, selIds, onSelect, setMotion, getDoc, on
       )}
       {/* Top bar */}
       <div className="flex items-center gap-1.5 px-3 py-1.5 text-[11.5px] text-text-secondary">
-        <button type="button" onClick={play} title={playing ? 'Pause (Space)' : 'Play (Space)'} className="grid h-7 w-7 place-items-center rounded-md bg-accent text-accent-text transition-opacity hover:opacity-90">
+        <button type="button" onClick={play} title={playing ? 'Pause (Space)' : 'Play (Space)'} className="grid h-7 w-7 place-items-center rounded-md bg-action text-action-text transition-opacity hover:opacity-90">
           {playing
             ? <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><rect x="2" y="1.5" width="3" height="9" rx="1" /><rect x="7" y="1.5" width="3" height="9" rx="1" /></svg>
             : <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M3 1.5l7 4.5-7 4.5z" /></svg>}

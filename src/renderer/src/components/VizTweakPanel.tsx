@@ -99,7 +99,7 @@ export function VizTweakPanel({
           onClick={onTogglePick}
           className={[
             'h-7 rounded-md px-3 text-[11.5px] font-medium transition-colors',
-            pickMode ? 'bg-accent text-white' : 'bg-elevated text-text-primary hover:bg-elevated/80'
+            pickMode ? 'bg-action text-action-text' : 'bg-elevated text-text-primary hover:bg-elevated/80'
           ].join(' ')}
         >
           {pickMode ? 'Picking…' : 'Pick element'}
@@ -672,7 +672,7 @@ function Footer({
           onClick={handleSend}
           disabled={diffCount === 0 || !activeSessionId}
           title={activeSessionId ? 'Paste into the active terminal' : 'No active terminal session'}
-          className="h-7 rounded-md bg-accent px-3 text-[11.5px] font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          className="h-7 rounded-md bg-action px-3 text-[11.5px] font-medium text-action-text hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {sent ? 'Sent' : 'Send to chat'}
         </button>

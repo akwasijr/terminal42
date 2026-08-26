@@ -42,7 +42,7 @@ export function LogoSection({
     >
       {usable.length === 0 ? (
         <p className="text-[11px] text-text-muted">
-          A logo is one of the pictures in this piece, placed over the frame. Add a picture first.
+          Add a picture first.
         </p>
       ) : null}
       {logos.map((layer, i) => {

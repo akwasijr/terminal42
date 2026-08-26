@@ -340,7 +340,7 @@ function NewMenu({ onPick }: { onPick: (k: 'skill' | 'recipe') => void }) {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 rounded-md bg-accent px-2.5 py-1.5 text-[12px] font-medium text-accent-text"
+        className="flex items-center gap-1.5 rounded-md bg-action px-2.5 py-1.5 text-[12px] font-medium text-action-text"
       >
         <IconPlus size={12} /> New
       </button>
@@ -442,7 +442,7 @@ function Card({
               type="button"
               onClick={onInstall}
               disabled={running}
-              className="flex items-center gap-1 rounded-md bg-accent px-2.5 py-1.5 text-[11px] font-medium text-accent-text hover:bg-accent/90 disabled:opacity-50"
+              className="flex items-center gap-1 rounded-md bg-action px-2.5 py-1.5 text-[11px] font-medium text-action-text hover:bg-action/90 disabled:opacity-50"
             >
               <IconPlus size={10} />
               {running ? 'Adding…' : 'Add'}
@@ -461,7 +461,7 @@ function Card({
               type="button"
               onClick={onRun}
               disabled={running}
-              className="flex items-center gap-1 rounded-md bg-accent px-2.5 py-1.5 text-[11px] font-medium text-accent-text hover:bg-accent/90 disabled:opacity-50"
+              className="flex items-center gap-1 rounded-md bg-action px-2.5 py-1.5 text-[11px] font-medium text-action-text hover:bg-action/90 disabled:opacity-50"
             >
               {isRecipe ? <IconPlay size={10} /> : <IconTerminal size={10} />}
               {running ? '…' : isRecipe ? 'Run' : 'Insert'}
@@ -700,7 +700,7 @@ function Editor({
             type="button"
             onClick={() => void save()}
             disabled={!name.trim()}
-            className="rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-text disabled:opacity-50"
+            className="rounded-md bg-action px-3 py-1.5 text-[12px] font-medium text-action-text disabled:opacity-50"
           >
             Save
           </button>
@@ -927,7 +927,7 @@ function ScheduleDialog({
                 type="button"
                 onClick={() => void add()}
                 disabled={busy}
-                className="rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-text disabled:opacity-50"
+                className="rounded-md bg-action px-3 py-1.5 text-[12px] font-medium text-action-text disabled:opacity-50"
               >
                 Add schedule
               </button>

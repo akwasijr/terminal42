@@ -123,7 +123,7 @@ export function ComponentsDrawer({
         <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
           {layouts.length === 0 ? (
             <p className="px-2 py-6 text-center text-[11.5px] text-text-muted">
-              Saved layouts keep a look without its pictures, so you can put new images into the same motion.
+              No saved layouts yet.
             </p>
           ) : (
             <ul className="flex flex-col gap-1">

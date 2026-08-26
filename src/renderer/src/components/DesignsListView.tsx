@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { formatAge } from '../lib/formatAge'
 import type { Design, DesignBrief, DesignGroup, TemplateInfo } from '../../../preload/index'
 import { DesignWizard } from './DesignWizard'
 import { TemplatesGallery } from './TemplatesGallery'
@@ -317,7 +318,7 @@ export function DesignsListView({
                 type="button"
                 onClick={() => setNewMenuOpen((o) => !o)}
                 disabled={creating}
-                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md bg-accent px-3 py-1.5 text-[13px] font-medium text-accent-text transition-opacity hover:opacity-90 disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md bg-action px-3 py-1.5 text-[13px] font-medium text-action-text transition-opacity hover:opacity-90 disabled:opacity-50"
               >
                 <IconPlus size={13} />
                 <span>{creating ? 'Creating\u2026' : scope === 'form' ? 'New form' : 'New design'}</span>
@@ -577,7 +578,7 @@ function EmptyState({ noun, onCreate }: { noun: 'form' | 'design'; onCreate: () 
       <button
         type="button"
         onClick={onCreate}
-        className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md bg-accent px-3 py-1.5 text-[13px] font-medium text-accent-text transition-opacity hover:opacity-90"
+        className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md bg-action px-3 py-1.5 text-[13px] font-medium text-action-text transition-opacity hover:opacity-90"
       >
         <IconPlus size={13} />
         <span>Create your first {noun}</span>
@@ -772,14 +773,3 @@ function ConfirmDelete({ design, onCancel, onConfirm }: {
   )
 }
 
-function formatAge(ts: number): string {
-  const diff = Date.now() - ts
-  const m = Math.floor(diff / 60000)
-  if (m < 1) return 'just now'
-  if (m < 60) return `${m}m ago`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
-  const d = Math.floor(h / 24)
-  if (d < 7) return `${d}d ago`
-  return new Date(ts).toLocaleDateString()
-}

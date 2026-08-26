@@ -98,7 +98,7 @@ export function EasingEditor({ easing, onChange }: { easing: Easing; onChange: (
               onClick={() => onChange(p.value)}
               aria-pressed={active}
               className={`rounded-sm px-1.5 py-0.5 text-[10.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
-                active ? 'bg-accent text-accent-text' : 'bg-sunken text-text-muted hover:text-text-primary'
+                active ? 'bg-action text-action-text' : 'bg-sunken text-text-muted hover:text-text-primary'
               }`}
             >
               {p.label}

@@ -103,8 +103,8 @@ export function EasingCurveEditor({ value, onChange, size = 150 }: {
     <div className="flex flex-col gap-2">
       {/* tabs */}
       <div className="flex items-center gap-0.5 self-start rounded-md bg-bg/60 p-0.5 text-[11px]">
-        <button type="button" onClick={() => { setTab('curve'); if (spring) onChange('cubic-bezier(0.22,1,0.36,1)') }} className={['rounded px-2 py-0.5', tab === 'curve' ? 'bg-accent text-accent-text' : 'text-text-secondary hover:text-text-primary'].join(' ')}>Curve</button>
-        <button type="button" onClick={() => { setTab('spring'); if (!spring) setSpring(0.5, 6) }} className={['rounded px-2 py-0.5', tab === 'spring' ? 'bg-accent text-accent-text' : 'text-text-secondary hover:text-text-primary'].join(' ')}>Spring</button>
+        <button type="button" onClick={() => { setTab('curve'); if (spring) onChange('cubic-bezier(0.22,1,0.36,1)') }} className={['rounded px-2 py-0.5', tab === 'curve' ? 'bg-action text-action-text' : 'text-text-secondary hover:text-text-primary'].join(' ')}>Curve</button>
+        <button type="button" onClick={() => { setTab('spring'); if (!spring) setSpring(0.5, 6) }} className={['rounded px-2 py-0.5', tab === 'spring' ? 'bg-action text-action-text' : 'text-text-secondary hover:text-text-primary'].join(' ')}>Spring</button>
       </div>
 
       {tab === 'curve' ? (
@@ -130,7 +130,7 @@ export function EasingCurveEditor({ value, onChange, size = 150 }: {
             {EASING_PRESETS.map((p) => {
               const on = value === p.value
               return (
-                <button key={p.id} type="button" onClick={() => setBezier(p.value)} className={['flex items-center gap-1.5 rounded px-1.5 py-1 text-left text-[10.5px]', on ? 'bg-accent text-accent-text' : 'bg-bg/60 text-text-secondary hover:text-text-primary'].join(' ')}>
+                <button key={p.id} type="button" onClick={() => setBezier(p.value)} className={['flex items-center gap-1.5 rounded px-1.5 py-1 text-left text-[10.5px]', on ? 'bg-action text-action-text' : 'bg-bg/60 text-text-secondary hover:text-text-primary'].join(' ')}>
                   <svg width="15" height="15" viewBox="0 0 16 16" fill="none" className="shrink-0"><path d={curveIconPath(p.value, 16, 16)} stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
                   <span className="truncate">{p.label}</span>
                 </button>
@@ -152,7 +152,7 @@ export function EasingCurveEditor({ value, onChange, size = 150 }: {
             {naming && (
               <div className="flex items-center gap-1">
                 <input autoFocus type="text" value={varName} onChange={(e) => setVarName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { setVars(saveEasingVar(varName, value)); setNaming(false) } if (e.key === 'Escape') setNaming(false) }} placeholder="Curve name" className="min-w-0 flex-1 rounded bg-bg/60 px-1.5 py-1 text-[11px] text-text-primary focus:outline-none" />
-                <button type="button" onClick={() => { setVars(saveEasingVar(varName, value)); setNaming(false) }} className="rounded bg-accent px-2 py-1 text-[10.5px] text-accent-text hover:opacity-90">Save</button>
+                <button type="button" onClick={() => { setVars(saveEasingVar(varName, value)); setNaming(false) }} className="rounded bg-action px-2 py-1 text-[10.5px] text-action-text hover:opacity-90">Save</button>
                 <button type="button" onClick={() => setNaming(false)} className="rounded px-1.5 py-1 text-[10.5px] text-text-muted hover:text-text-primary">Cancel</button>
               </div>
             )}
@@ -161,7 +161,7 @@ export function EasingCurveEditor({ value, onChange, size = 150 }: {
                 {vars.map((v) => {
                   const on = value === v.value
                   return (
-                    <span key={v.id} className={['group flex items-center gap-1 rounded py-0.5 pl-1.5 pr-1 text-[10.5px]', on ? 'bg-accent text-accent-text' : 'bg-bg/60 text-text-secondary'].join(' ')}>
+                    <span key={v.id} className={['group flex items-center gap-1 rounded py-0.5 pl-1.5 pr-1 text-[10.5px]', on ? 'bg-action text-action-text' : 'bg-bg/60 text-text-secondary'].join(' ')}>
                       <button type="button" onClick={() => setBezier(v.value)} className="flex items-center gap-1 hover:text-text-primary" title={`Apply ${v.name}`}>
                         <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d={curveIconPath(v.value, 16, 16)} stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
                         <span className="max-w-[88px] truncate">{v.name}</span>
@@ -196,7 +196,7 @@ export function EasingCurveEditor({ value, onChange, size = 150 }: {
           </label>
           <div className="flex flex-wrap gap-1">
             {SPRING_PRESETS.map((p) => (
-              <button key={p.id} type="button" onClick={() => setSpring(p.bounce, p.freq)} className={['rounded px-1.5 py-0.5 text-[10px]', sp.bounce === p.bounce && sp.freq === p.freq ? 'bg-accent text-accent-text' : 'bg-bg/60 text-text-secondary hover:text-text-primary'].join(' ')}>{p.label}</button>
+              <button key={p.id} type="button" onClick={() => setSpring(p.bounce, p.freq)} className={['rounded px-1.5 py-0.5 text-[10px]', sp.bounce === p.bounce && sp.freq === p.freq ? 'bg-action text-action-text' : 'bg-bg/60 text-text-secondary hover:text-text-primary'].join(' ')}>{p.label}</button>
             ))}
           </div>
         </>

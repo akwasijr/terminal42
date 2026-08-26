@@ -123,7 +123,7 @@ function DecideForMe({ state, set, field, onPick }: {
     >
       <span className={[
         'grid h-3.5 w-3.5 place-items-center rounded-sm border transition-colors',
-        on ? 'border-accent bg-accent text-accent-text' : 'bg-transparent'
+        on ? 'border-accent bg-action text-action-text' : 'bg-transparent'
       ].join(' ')}>
         {on && (
           <svg viewBox="0 0 12 12" width="9" height="9" aria-hidden="true">
@@ -764,7 +764,7 @@ export function DesignWizard({ onCancel, onComplete, initialIdea, target = 'html
             <button
               onClick={next}
               disabled={!canAdvance || creating}
-              className="inline-flex items-center gap-2 rounded-md bg-accent px-4 py-1.5 text-[13px] font-medium text-accent-text hover:opacity-90 disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-md bg-action px-4 py-1.5 text-[13px] font-medium text-action-text hover:opacity-90 disabled:opacity-50"
             >
               {creating && (
                 <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -1021,7 +1021,7 @@ function PageSubtype({ state, set }: PageProps): JSX.Element {
               {multi && (
                 <span className={[
                   'grid h-3.5 w-3.5 flex-shrink-0 place-items-center rounded-sm border transition-colors',
-                  selected ? 'border-accent bg-accent text-accent-text' : 'bg-transparent'
+                  selected ? 'border-accent bg-action text-action-text' : 'bg-transparent'
                 ].join(' ')}>
                   {selected && (
                     <svg viewBox="0 0 12 12" width="9" height="9" aria-hidden="true">
@@ -1556,7 +1556,7 @@ function PageFonts({ state, set }: PageProps): JSX.Element {
       >
         <span className={[
           'mt-0.5 grid h-4 w-4 flex-shrink-0 place-items-center rounded-sm border transition-colors',
-          customActive ? 'border-accent bg-accent text-accent-text' : 'bg-transparent'
+          customActive ? 'border-accent bg-action text-action-text' : 'bg-transparent'
         ].join(' ')}>
           {customActive && (
             <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true">
@@ -2528,7 +2528,7 @@ function PageInspiration({ state, set }: PageProps): JSX.Element {
             <span className={[
               'mt-0.5 grid h-4 w-4 flex-shrink-0 place-items-center rounded-sm border transition-colors',
               state.useTemplateLook
-                ? 'border-accent bg-accent text-accent-text'
+                ? 'border-accent bg-action text-action-text'
                 : 'bg-transparent'
             ].join(' ')}>
               {state.useTemplateLook && (
@@ -2764,12 +2764,12 @@ function PageDefaults({ state, set }: PageProps): JSX.Element {
                       aria-checked={on}
                       className={[
                         'relative mt-0.5 inline-flex h-4 w-7 flex-shrink-0 items-center rounded-full transition-colors',
-                        on ? 'bg-accent' : 'bg-bg/60'
+                        on ? 'bg-text-primary' : 'bg-raised'
                       ].join(' ')}
                     >
                       <span
                         className={[
-                          'absolute h-3 w-3 rounded-full bg-text-primary transition-transform',
+                          'absolute h-3 w-3 rounded-full bg-bg transition-transform',
                           on ? 'translate-x-3.5' : 'translate-x-0.5'
                         ].join(' ')}
                       />

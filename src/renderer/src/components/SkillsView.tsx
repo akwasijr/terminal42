@@ -285,7 +285,7 @@ export function SkillsView({
               type="button"
               onClick={() => void save()}
               disabled={!draftName.trim()}
-              className="rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-text disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
+              className="rounded-md bg-action px-3 py-1.5 text-[12px] font-medium text-action-text disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
             >
               Save
             </button>
@@ -431,7 +431,7 @@ export function SkillsView({
                 <button
                   type="button"
                   onClick={() => void insertWithValues()}
-                  className="rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-text"
+                  className="rounded-md bg-action px-3 py-1.5 text-[12px] font-medium text-action-text"
                 >
                   Insert
                 </button>
@@ -460,7 +460,7 @@ export function SkillsView({
           <button
             type="button"
             onClick={newOne}
-            className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
+            className="flex items-center gap-1.5 rounded-md bg-action px-3 py-1.5 text-[12px] font-medium text-action-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
           >
             <IconPlus size={12} /> New skill
           </button>
@@ -592,7 +592,7 @@ export function SkillsView({
                       className={
                         'rounded-sm px-2 py-0.5 text-[11px] ' +
                         (filterTag === t
-                          ? 'bg-accent text-accent-text'
+                          ? 'bg-action text-action-text'
                           : 'bg-elevated text-text-secondary hover:text-text-primary')
                       }
                     >
@@ -758,7 +758,7 @@ function EmptyState({ onStarterPack, onNew }: { onStarterPack: () => void; onNew
         <button
           type="button"
           onClick={onStarterPack}
-          className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
+          className="flex items-center gap-1.5 rounded-md bg-action px-3 py-1.5 text-[12px] font-medium text-action-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
         >
           <IconSparkle size={12} /> Browse starter pack
         </button>
@@ -871,7 +871,7 @@ function ProposedCard({
         <button
           type="button"
           onClick={onAccept}
-          className="flex items-center gap-1 rounded bg-accent px-2 py-1 text-[11px] font-medium text-accent-text hover:opacity-90"
+          className="flex items-center gap-1 rounded bg-action px-2 py-1 text-[11px] font-medium text-action-text hover:opacity-90"
         >
           <IconCheck size={11} />
           Accept

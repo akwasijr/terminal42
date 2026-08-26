@@ -1001,7 +1001,7 @@ export function DesignCanvas({
             className={[
               'flex h-7 items-center gap-1.5 rounded-md px-2 text-[11.5px] transition-colors disabled:opacity-40',
               annotate
-                ? 'bg-accent text-accent-text'
+                ? 'bg-action text-action-text'
                 : 'text-text-secondary hover:bg-elevated hover:text-text-primary'
             ].join(' ')}
           >
@@ -1016,7 +1016,7 @@ export function DesignCanvas({
             className={[
               'flex h-7 items-center gap-1.5 rounded-md px-2 text-[11.5px] transition-colors disabled:opacity-40',
               editMode
-                ? 'bg-accent text-accent-text'
+                ? 'bg-action text-action-text'
                 : 'text-text-secondary hover:bg-elevated hover:text-text-primary'
             ].join(' ')}
           >
@@ -1031,7 +1031,7 @@ export function DesignCanvas({
             className={[
               'flex h-7 items-center gap-1.5 rounded-md px-2 text-[11.5px] transition-colors disabled:opacity-40',
               compareMode
-                ? 'bg-accent text-accent-text'
+                ? 'bg-action text-action-text'
                 : 'text-text-secondary hover:bg-elevated hover:text-text-primary'
             ].join(' ')}
           >
@@ -1049,7 +1049,7 @@ export function DesignCanvas({
             className={[
               'flex h-7 items-center gap-1.5 rounded-md px-2 text-[11.5px] transition-colors disabled:opacity-40',
               motionMode
-                ? 'bg-accent text-accent-text'
+                ? 'bg-action text-action-text'
                 : 'text-text-secondary hover:bg-elevated hover:text-text-primary'
             ].join(' ')}
           >
@@ -1066,7 +1066,7 @@ export function DesignCanvas({
             className={[
               'flex h-7 items-center gap-1.5 rounded-md px-2 text-[11.5px] transition-colors disabled:opacity-40',
               shaderMode
-                ? 'bg-accent text-accent-text'
+                ? 'bg-action text-action-text'
                 : 'text-text-secondary hover:bg-elevated hover:text-text-primary'
             ].join(' ')}
           >
@@ -1163,7 +1163,7 @@ export function DesignCanvas({
                   onClick={() => setShaderPick((s) => (s ? { ...s, shader: p.id } : s))}
                   className={[
                     'rounded-md px-2 py-1.5 text-[11px] transition-colors',
-                    shaderPick.shader === p.id ? 'bg-accent text-accent-text' : 'bg-elevated text-text-primary hover:bg-elevated/70'
+                    shaderPick.shader === p.id ? 'bg-action text-action-text' : 'bg-elevated text-text-primary hover:bg-elevated/70'
                   ].join(' ')}
                 >{p.label}</button>
               ))}
@@ -1178,7 +1178,7 @@ export function DesignCanvas({
             </label>
             <div className="mt-1 flex justify-end gap-2">
               <button type="button" onClick={() => setShaderPick(null)} className="rounded-md px-2 py-1 text-[11.5px] text-text-secondary hover:bg-elevated hover:text-text-primary">Cancel</button>
-              <button type="button" onClick={applyShader} className="rounded-md bg-accent px-2.5 py-1 text-[11.5px] font-medium text-accent-text hover:opacity-90">Apply</button>
+              <button type="button" onClick={applyShader} className="rounded-md bg-action px-2.5 py-1 text-[11.5px] font-medium text-action-text hover:opacity-90">Apply</button>
             </div>
           </div>
         )}
@@ -1194,7 +1194,7 @@ export function DesignCanvas({
                   key={p.id}
                   type="button"
                   onClick={() => applyMotionPreset(p.id)}
-                  className="flex items-center justify-between rounded-md bg-elevated px-2.5 py-1.5 text-left text-[12px] text-text-primary transition-colors hover:bg-accent hover:text-accent-text"
+                  className="flex items-center justify-between rounded-md bg-elevated px-2.5 py-1.5 text-left text-[12px] text-text-primary transition-colors hover:bg-action hover:text-action-text"
                 >
                   <span>{p.label}</span>
                 </button>
@@ -1202,7 +1202,7 @@ export function DesignCanvas({
               <button
                 type="button"
                 onClick={openTimeline}
-                className="mt-1 flex items-center justify-between rounded-md border border-accent/40 px-2.5 py-1.5 text-left text-[12px] text-accent transition-colors hover:bg-accent hover:text-accent-text"
+                className="mt-1 flex items-center justify-between rounded-md border border-accent/40 px-2.5 py-1.5 text-left text-[12px] text-accent transition-colors hover:bg-action hover:text-action-text"
               >
                 <span>Custom timeline…</span>
               </button>
@@ -1243,7 +1243,7 @@ export function DesignCanvas({
                 type="button"
                 onClick={() => void sendComment()}
                 disabled={!pickComment.trim()}
-                className="rounded-md bg-accent px-2.5 py-1 text-[11.5px] font-medium text-accent-text hover:opacity-90 disabled:opacity-40"
+                className="rounded-md bg-action px-2.5 py-1 text-[11.5px] font-medium text-action-text hover:opacity-90 disabled:opacity-40"
               >Send</button>
             </div>
           </div>
@@ -1783,7 +1783,7 @@ function FigmaSendDialog({ designTitle: _designTitle, onCancel, onSend }: {
             type="button"
             onClick={submit}
             disabled={!canSend}
-            className="rounded-md bg-accent px-3.5 py-1.5 text-[12.5px] font-medium text-accent-text hover:opacity-90 disabled:opacity-30"
+            className="rounded-md bg-action px-3.5 py-1.5 text-[12.5px] font-medium text-action-text hover:opacity-90 disabled:opacity-30"
           >
             Send to Figma
           </button>
@@ -2087,7 +2087,7 @@ function EditInspector({ pick, onChange, onChangeText, onClose, onSync, hasChang
           onClick={onSync}
           disabled={!hasChanges}
           title="Send your edits to the chat so they bake into the next version"
-          className="rounded-md bg-accent px-2.5 py-1 text-[11.5px] font-medium text-accent-text transition-opacity hover:opacity-90 disabled:opacity-40"
+          className="rounded-md bg-action px-2.5 py-1 text-[11.5px] font-medium text-action-text transition-opacity hover:opacity-90 disabled:opacity-40"
         >Sync to design</button>
       </footer>
     </div>
@@ -2142,7 +2142,7 @@ function ElementInspector({ pick, onChange, onChangeText }: {
                 key={w}
                 type="button"
                 onClick={() => onChange('fontWeight', w)}
-                className={['flex-1 px-1.5 py-1 text-[10.5px] transition-colors', s.fontWeight === w ? 'bg-accent text-accent-text' : 'text-text-secondary hover:text-text-primary'].join(' ')}
+                className={['flex-1 px-1.5 py-1 text-[10.5px] transition-colors', s.fontWeight === w ? 'bg-action text-action-text' : 'text-text-secondary hover:text-text-primary'].join(' ')}
               >{w}</button>
             ))}
           </div>
