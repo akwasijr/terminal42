@@ -70,6 +70,12 @@ export function FrameToolbar({
   const frame = doc.frame
   const setFrame = (p: Partial<MotionDoc['frame']>): void => onChange({ frame: { ...frame, ...p } })
 
+  // One popover at a time. Each panel used to own its own open flag and close
+  // itself on an outside mousedown, which works for a mouse but not for a
+  // keyboard: Enter and Space fire click with no mousedown at all, so panels
+  // stacked on top of each other. Single selection cannot express that state.
+  const [openPop, setOpenPop] = useState<string | null>(null)
+
   return (
     <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center p-2">
       <div className="pointer-events-auto flex items-center gap-0.5 rounded-panel bg-surface/90 px-1 py-1 shadow-sm backdrop-blur">
@@ -90,7 +96,7 @@ export function FrameToolbar({
 
         <Divider />
 
-        <Popover label="Frame size" trigger={<span className="font-mono text-[10.5px]">{frame.aspect}</span>}>
+        <Popover label="Frame size" open={openPop === 'frame'} onOpen={(o) => setOpenPop(o ? 'frame' : null)} trigger={<span className="font-mono text-[10.5px]">{frame.aspect}</span>}>
           <PopTitle>Frame size</PopTitle>
           <div className="flex flex-wrap gap-1">
             {ASPECTS.map((a) => (
@@ -116,6 +122,8 @@ export function FrameToolbar({
         <Divider />
 
         <Popover
+          open={openPop === 'background'}
+          onOpen={(o) => setOpenPop(o ? 'background' : null)}
           label="Background"
           trigger={
             <span
@@ -154,7 +162,7 @@ export function FrameToolbar({
           <GridGlyph />
         </ToolButton>
         {frame.gridVisible ? (
-          <Popover label="Grid size" trigger={<span className="font-mono text-[10.5px]">{frame.gridColumns}×{frame.gridRows}</span>}>
+          <Popover label="Grid size" open={openPop === 'grid'} onOpen={(o) => setOpenPop(o ? 'grid' : null)} trigger={<span className="font-mono text-[10.5px]">{frame.gridColumns}×{frame.gridRows}</span>}>
             <PopTitle>Grid size</PopTitle>
             <div className="flex flex-wrap gap-1">
               {GRID_PRESETS.map((g) => (
@@ -218,7 +226,7 @@ function ToolButton({
       aria-pressed={active}
       disabled={disabled}
       className={`flex h-7 min-w-7 items-center justify-center rounded-sm px-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:opacity-40 ${
-        active ? 'bg-raised text-accent' : 'text-text-secondary hover:bg-raised hover:text-text-primary'
+        active ? 'bg-raised text-text-primary' : 'text-text-secondary hover:bg-raised hover:text-text-primary'
       }`}
     >
       {children}
@@ -237,29 +245,34 @@ function Divider(): React.JSX.Element {
  * that stays open while you go back to dragging the frame is in the way of
  * the only thing you opened it to look at.
  */
-function Popover({ label, trigger, children }: { label: string; trigger: ReactNode; children: ReactNode }): React.JSX.Element {
-  const [open, setOpen] = useState(false)
+function Popover({ label, trigger, children, open, onOpen }: {
+  label: string
+  trigger: ReactNode
+  children: ReactNode
+  open: boolean
+  onOpen: (open: boolean) => void
+}): React.JSX.Element {
   const ref = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     if (!open) return
     const onDown = (e: MouseEvent): void => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      if (ref.current && !ref.current.contains(e.target as Node)) onOpen(false)
     }
-    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') setOpen(false) }
+    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') onOpen(false) }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
     return () => {
       document.removeEventListener('mousedown', onDown)
       document.removeEventListener('keydown', onKey)
     }
-  }, [open])
+  }, [open, onOpen])
 
   return (
     <div ref={ref} className="relative">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => onOpen(!open)}
         title={label}
         aria-label={label}
         aria-expanded={open}
@@ -289,7 +302,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
       onClick={onClick}
       aria-pressed={active}
       className={`rounded-sm px-2 py-1 font-mono text-[10.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
-        active ? 'bg-accent/15 text-accent' : 'bg-raised text-text-secondary hover:text-text-primary'
+        active ? 'bg-elevated text-text-primary' : 'bg-raised text-text-secondary hover:text-text-primary'
       }`}
     >
       {children}

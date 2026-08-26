@@ -10,14 +10,27 @@
 import type { CardPlacement, MotionDoc, Pose } from '../../../../shared/motion/types'
 import { computePlacements } from '../../../../shared/motion/frame'
 
-/** Matches the engine's camera closely enough that a thumbnail predicts the frame. */
+/**
+ * The engine's camera, mirrored here.
+ *
+ * A thumbnail is only worth showing if it predicts the frame, so it uses the
+ * same lens and the same distance rather than zooming to fit whatever the
+ * preset happens to contain. Fitting to content made every preset fill its
+ * tile: two enormous cards and forty tiny ones both ended up tile-sized, so
+ * the strip told you nothing about how they differ.
+ */
 const FOCAL = 12
+const FOV_DEG = 38
+
+/** Card footprint in scene units, shared by the fit measurement and the draw. */
+const CARD_W = 0.62
+const CARD_H = 0.82
 
 export function drawPresetThumb(
   canvas: HTMLCanvasElement,
   doc: MotionDoc,
   phase: number,
-  opts: { width: number; height: number; accent: string; muted: string }
+  opts: { width: number; height: number; near: string; far: string }
 ): void {
   const dpr = Math.min(2, window.devicePixelRatio || 1)
   canvas.width = Math.round(opts.width * dpr)
@@ -35,20 +48,17 @@ export function drawPresetThumb(
     // the real renderer draws it.
     .sort((a, b) => b.z - a.z)
 
-  const bounds = extent(projected)
-  const pad = 6
-  const scale = Math.min(
-    (opts.width - pad * 2) / Math.max(0.001, bounds.w),
-    (opts.height - pad * 2) / Math.max(0.001, bounds.h)
-  )
+  // Pixels per world unit at the z = 0 plane, straight off the camera's
+  // frustum. Anything the real frame would crop, the tile crops too.
+  const scale = opts.height / (2 * Math.tan((FOV_DEG * Math.PI) / 360) * FOCAL)
 
   for (const p of projected) {
-    const x = opts.width / 2 + (p.x - bounds.cx) * scale
-    const y = opts.height / 2 + (p.y - bounds.cy) * scale
-    const w = Math.max(1.5, 0.62 * p.depth * scale * p.scale)
-    const h = Math.max(2, 0.82 * p.depth * scale * p.scale)
+    const x = opts.width / 2 + p.x * scale
+    const y = opts.height / 2 + p.y * scale
+    const w = Math.max(1.5, CARD_W * p.depth * scale * p.scale)
+    const h = Math.max(2, CARD_H * p.depth * scale * p.scale)
     ctx.globalAlpha = Math.max(0.12, Math.min(1, p.opacity * (0.45 + p.depth * 0.55)))
-    ctx.fillStyle = p.depth > 0.9 ? opts.accent : opts.muted
+    ctx.fillStyle = p.depth > 0.9 ? opts.near : opts.far
     roundRect(ctx, x - w / 2, y - h / 2, w, h, Math.min(w, h) * 0.16)
     ctx.fill()
   }
@@ -67,21 +77,6 @@ function project(p: CardPlacement, pose: Pose): Projected {
   const z2 = p.y * Math.sin(rx) + z1 * Math.cos(rx)
   const depth = FOCAL / Math.max(0.5, FOCAL - z2)
   return { x: x1 * depth, y: -y2 * depth, z: z2, depth, scale: p.scale, opacity: p.opacity }
-}
-
-function extent(ps: Projected[]): { cx: number; cy: number; w: number; h: number } {
-  if (ps.length === 0) return { cx: 0, cy: 0, w: 1, h: 1 }
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
-  for (const p of ps) {
-    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x)
-    minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y)
-  }
-  return {
-    cx: (minX + maxX) / 2,
-    cy: (minY + maxY) / 2,
-    w: Math.max(1.2, maxX - minX + 1),
-    h: Math.max(1.2, maxY - minY + 1)
-  }
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {

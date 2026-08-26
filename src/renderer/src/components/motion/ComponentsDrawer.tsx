@@ -234,8 +234,11 @@ function PresetThumb({ doc, index }: { doc: MotionDoc; index: number }): React.J
     drawPresetThumb(canvas, preset, 0.18, {
       width: THUMB_W,
       height: THUMB_H,
-      accent: rgb('--accent', '#7aa2f7'),
-      muted: rgb('--border-strong', '#555')
+      // Cards are pale objects in the real renderer, so the thumbnail draws
+      // them pale too. Painting them the brand colour made every preset look
+      // like a status light rather than a preview of the frame.
+      near: rgb('--text-primary', '#f0f0f2'),
+      far: rgb('--border-strong', '#555')
     })
   }, [component, doc, index])
 
