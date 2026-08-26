@@ -116,6 +116,8 @@ export type FrameStyle = {
   gridColour: string
   /** Whether the grid is drawn in exports as well as on screen. */
   gridInExport: boolean
+  /** Space between the frame's edge and the piece inside it, in percent. */
+  gap: number
 }
 
 export type TextLayer = {
@@ -125,6 +127,48 @@ export type TextLayer = {
   colour: string
   x: number
   y: number
+}
+
+/**
+ * A mark sitting flat over the frame.
+ *
+ * A logo is a picture rather than words, but it is placed the same way a text
+ * layer is — as a fraction of the frame, so it lands in the same spot at every
+ * export size.
+ */
+export type LogoLayer = {
+  id: string
+  imageId: string
+  /** Width as a percentage of the frame's width; height follows the picture. */
+  size: number
+  opacity: number
+  x: number
+  y: number
+}
+
+/**
+ * Treatments applied to the finished frame rather than to any one card.
+ *
+ * These are drawn in the same 2D pass as the backdrop and the overlay, which
+ * is what makes an export match the screen without the effects having to know
+ * anything about the renderer.
+ */
+export type EffectsState = {
+  /** Softens the whole frame, in pixels at 1080p. */
+  blur: number
+  /** Film grain strength, 0 for none. */
+  grain: number
+  /** How dark the corners go, 0 for none. */
+  vignette: number
+  /** A soft shadow inside the frame edge, 0 for none. */
+  shadow: number
+  /** Colour grade, all neutral at their defaults. */
+  brightness: number
+  contrast: number
+  saturation: number
+  /** A colour laid over the frame, at `tintAmount` strength. */
+  tint: string
+  tintAmount: number
 }
 
 export type ImageRef = {
@@ -162,6 +206,8 @@ export type VisualState = {
   /** How images are handed to cards. */
   imageOrder: 'in-order' | 'scatter'
   text: TextLayer[]
+  logos: LogoLayer[]
+  effects: EffectsState
 }
 
 /**

@@ -158,6 +158,18 @@ function migrate(d: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_motion_layouts ON motion_layouts(created_at DESC);
 
+    -- Bentos: a named set of pictures, kept apart from layouts because they
+    -- are the other half of the same decision. A layout is a motion without
+    -- its images; a bento is images without a motion, so the two can be
+    -- combined freely.
+    CREATE TABLE IF NOT EXISTS motion_bentos (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      images TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_motion_bentos ON motion_bentos(created_at DESC);
+
     CREATE TABLE IF NOT EXISTS designs (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,

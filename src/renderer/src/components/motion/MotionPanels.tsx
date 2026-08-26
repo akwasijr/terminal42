@@ -11,6 +11,9 @@ import type {
 import { componentFor } from '../../../../shared/motion/registry'
 import { paramsFor } from '../../../../shared/motion/defaults'
 import { ColorRow, SegmentedRow, Section, SliderRow, ToggleRow } from './controls'
+import { ImagesPanel } from './MotionImages'
+import { LogoSection } from './MotionLogos'
+import { EffectsSection } from './MotionEffects'
 import { PosePad } from './PosePad'
 import { EasingEditor } from './EasingEditor'
 
@@ -141,45 +144,7 @@ export function VisualPanel({
 
   return (
     <div className="flex flex-col">
-      <Section title="Images">
-        <button
-          type="button"
-          onClick={onImportImages}
-          disabled={busy}
-          className="rounded-sm bg-raised px-2 py-1.5 text-[11.5px] text-text-primary hover:bg-elevated disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-        >
-          {busy ? 'Adding…' : 'Add images'}
-        </button>
-        {doc.visual.images.length === 0 ? (
-          <p className="text-[11px] text-text-muted">
-            With no images the cards show a plain face, which is useful while you tune the motion.
-          </p>
-        ) : (
-          <>
-            <SegmentedRow
-              label="Order"
-              value={doc.visual.imageOrder}
-              options={[{ value: 'in-order', label: 'In order' }, { value: 'scatter', label: 'Scatter' }]}
-              onChange={(v) => onChange({ visual: { ...doc.visual, imageOrder: v } })}
-            />
-            <ul className="flex flex-wrap gap-1">
-              {doc.visual.images.map((img) => (
-                <li key={img.id}>
-                  <button
-                    type="button"
-                    title={`Remove ${img.name}`}
-                    aria-label={`Remove ${img.name}`}
-                    onClick={() => onChange({ visual: { ...doc.visual, images: doc.visual.images.filter((i) => i.id !== img.id) } })}
-                    className="rounded-sm bg-sunken px-1.5 py-1 text-[10.5px] text-text-muted hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-                  >
-                    {img.name.length > 14 ? `${img.name.slice(0, 12)}…` : img.name} ×
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-      </Section>
+      <ImagesPanel doc={doc} onChange={onChange} onImportImages={onImportImages} busy={busy} />
 
       <Section title="Card">
         <SegmentedRow
@@ -265,6 +230,10 @@ export function VisualPanel({
           )
         })}
       </Section>
+
+      <LogoSection doc={doc} onChange={onChange} />
+
+      <EffectsSection doc={doc} onChange={onChange} />
 
     </div>
   )

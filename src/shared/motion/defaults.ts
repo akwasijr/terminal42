@@ -6,7 +6,8 @@
 // the fastest way to understand the tool: move a slider, watch what changes.
 
 import type {
-  AnimationState, CardOverride, ComponentId, EntranceShape, EntranceSpec, MotionDoc, ParamSpec, ParamValue
+  AnimationState, CardOverride, ComponentId, EffectsState, EntranceShape, EntranceSpec, LogoLayer,
+  MotionDoc, ParamSpec, ParamValue
 } from './types'
 import { defaultEntrance, ENTRANCE_SHAPES } from './entrance'
 
@@ -55,7 +56,9 @@ export function emptyDoc(componentId: ComponentId = 'carousel'): MotionDoc {
       },
       images: [],
       imageOrder: 'in-order',
-      text: []
+      text: [],
+      logos: [],
+      effects: defaultEffects()
     },
     frame: {
       aspect: '16:9',
@@ -65,7 +68,8 @@ export function emptyDoc(componentId: ComponentId = 'carousel'): MotionDoc {
       gridColumns: 12,
       gridRows: 12,
       gridColour: '#3a3a38',
-      gridInExport: false
+      gridInExport: false,
+      gap: 0
     },
     export: {
       resolution: 1080,
@@ -110,7 +114,9 @@ export function hydrateDoc(raw: unknown): MotionDoc {
       ...(doc.visual ?? {}),
       card: { ...base.visual.card, ...(doc.visual?.card ?? {}) },
       images: doc.visual?.images ?? [],
-      text: doc.visual?.text ?? []
+      text: doc.visual?.text ?? [],
+      logos: hydrateLogos(doc.visual?.logos),
+      effects: hydrateEffects(doc.visual?.effects)
     },
     frame: { ...base.frame, ...(doc.frame ?? {}) },
     export: { ...base.export, ...(doc.export ?? {}) }
@@ -208,5 +214,66 @@ export function paramsFor(
 ): Record<string, ParamValue> {
   const out: Record<string, ParamValue> = {}
   for (const spec of schema) out[spec.key] = coerceParam(spec, stored?.[spec.key])
+  return out
+}
+
+export function defaultEffects(): EffectsState {
+  return {
+    blur: 0,
+    grain: 0,
+    vignette: 0,
+    shadow: 0,
+    brightness: 100,
+    contrast: 100,
+    saturation: 100,
+    tint: '#000000',
+    tintAmount: 0
+  }
+}
+
+/**
+ * Effects are all numbers with a neutral value, so a stored piece missing the
+ * section, or holding a half-written one, opens looking exactly as it did
+ * before effects existed.
+ */
+function hydrateEffects(raw: unknown): EffectsState {
+  const base = defaultEffects()
+  if (!raw || typeof raw !== 'object') return base
+  const given = raw as Partial<Record<keyof EffectsState, unknown>>
+  const num = (key: keyof EffectsState, lo: number, hi: number): number => {
+    const v = given[key]
+    return typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : (base[key] as number)
+  }
+  return {
+    blur: num('blur', 0, 40),
+    grain: num('grain', 0, 100),
+    vignette: num('vignette', 0, 100),
+    shadow: num('shadow', 0, 100),
+    brightness: num('brightness', 0, 200),
+    contrast: num('contrast', 0, 200),
+    saturation: num('saturation', 0, 200),
+    tint: typeof given.tint === 'string' && /^#[0-9a-f]{6}$/i.test(given.tint) ? given.tint : base.tint,
+    tintAmount: num('tintAmount', 0, 100)
+  }
+}
+
+function hydrateLogos(raw: unknown): LogoLayer[] {
+  if (!Array.isArray(raw)) return []
+  const out: LogoLayer[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const l = item as Partial<Record<keyof LogoLayer, unknown>>
+    if (typeof l.id !== 'string' || typeof l.imageId !== 'string') continue
+    const num = (v: unknown, fallback: number, lo: number, hi: number): number =>
+      typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : fallback
+    out.push({
+      id: l.id,
+      imageId: l.imageId,
+      size: num(l.size, 20, 1, 100),
+      opacity: num(l.opacity, 100, 0, 100),
+      x: num(l.x, 50, 0, 100),
+      y: num(l.y, 50, 0, 100)
+    })
+  }
   return out
 }

@@ -243,6 +243,11 @@ export class MotionEngine {
    * decoded image for thumbnails and for the library, and decoding the same
    * file twice for two consumers is a visible stall on a large photo.
    */
+  /** The source pictures, so overlays drawn in 2D can reach the same images. */
+  get sourceImages(): Map<string, HTMLImageElement> {
+    return this.images
+  }
+
   setImages(images: Map<string, HTMLImageElement>): void {
     this.images = images
     if (this.doc) {
@@ -290,7 +295,10 @@ export class MotionEngine {
     const p = wrap01(phase)
 
     this.root.position.set(doc.transform.positionX, doc.transform.positionY, 0)
-    this.root.scale.setScalar(Math.max(0.01, doc.transform.scale))
+    // Frame gap is padding, and padding on a 3D scene is the piece stepping
+    // back from the edges — there is no border to thicken, only room to give.
+    const gap = Math.min(90, Math.max(0, doc.frame.gap)) / 100
+    this.root.scale.setScalar(Math.max(0.01, doc.transform.scale) * (1 - gap))
 
     const d = doc.displacement
     this.poseGroup.rotation.set(

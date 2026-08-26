@@ -32,7 +32,11 @@ export function MotionStudio({
 }): React.JSX.Element {
   const [doc, setDoc] = useState<MotionDoc>(initialDoc)
   const [tab, setTab] = useState<Tab>('motion')
-  const [playing, setPlaying] = useState(true)
+  // A piece opens still. Motion that runs the whole time you are working is
+  // motion you cannot work against: a card you are aiming at has moved by the
+  // time you reach it. Both kinds of motion are triggered — the loop from the
+  // toolbar, the entrance from Play.
+  const [playing, setPlaying] = useState(false)
   const [phase, setPhase] = useState(0)
   const [exporting, setExporting] = useState(false)
   const [progress, setProgress] = useState<ExportProgress | null>(null)

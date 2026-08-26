@@ -101,6 +101,8 @@ export function FrameToolbar({
           </div>
           <PopTitle>Corners</PopTitle>
           <Stepper value={frame.corners} min={0} max={48} step={2} suffix="px" onChange={(v) => setFrame({ corners: v })} />
+          <PopTitle>Gap</PopTitle>
+          <Stepper value={frame.gap} min={0} max={60} step={2} suffix="%" onChange={(v) => setFrame({ gap: v })} />
         </Popover>
 
         <ToolButton

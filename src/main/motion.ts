@@ -42,6 +42,15 @@ type DocRow = {
   created_at: number; updated_at: number
 }
 
+export type MotionBentoRecord = {
+  id: string
+  name: string
+  images: Array<{ id: string; src: string; name: string }>
+  createdAt: number
+}
+
+type BentoRow = { id: string; name: string; images: string; created_at: number }
+
 type LayoutRow = {
   id: string; name: string; component_id: string; doc: string
   thumbnail: string | null; created_at: number
@@ -133,6 +142,29 @@ export function deleteMotionLayout(id: string): boolean {
   return getDb().prepare('DELETE FROM motion_layouts WHERE id = ?').run(id).changes > 0
 }
 
+export function listMotionBentos(): MotionBentoRecord[] {
+  const rows = getDb().prepare('SELECT * FROM motion_bentos ORDER BY created_at DESC').all() as BentoRow[]
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    images: (parse(r.images) as MotionBentoRecord['images']) ?? [],
+    createdAt: r.created_at
+  }))
+}
+
+export function saveMotionBento(name: string, images: MotionBentoRecord['images']): MotionBentoRecord {
+  const id = randomUUID()
+  const now = Date.now()
+  getDb()
+    .prepare('INSERT INTO motion_bentos (id, name, images, created_at) VALUES (?, ?, ?, ?)')
+    .run(id, name, JSON.stringify(images ?? []), now)
+  return { id, name, images, createdAt: now }
+}
+
+export function deleteMotionBento(id: string): boolean {
+  return getDb().prepare('DELETE FROM motion_bentos WHERE id = ?').run(id).changes > 0
+}
+
 const MIME: Record<string, string> = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
   '.webp': 'image/webp', '.gif': 'image/gif', '.avif': 'image/avif'
@@ -155,7 +187,35 @@ async function toStoredImage(sourcePath: string): Promise<{ id: string; name: st
   }
 }
 
+/**
+ * Write an image the renderer generated into the same folder imports live in.
+ *
+ * The starter pictures are drawn in the renderer rather than shipped as files,
+ * but they must not be carried in the document as base64: a document is
+ * rewritten on every slider drag, and a dozen inline pictures would make every
+ * one of those writes megabytes long.
+ */
+async function storeImageData(name: string, base64: string): Promise<{ id: string; name: string; path: string; dataUrl: string }> {
+  const id = randomUUID()
+  await fs.mkdir(imagesRoot(), { recursive: true })
+  const dest = join(imagesRoot(), `${id}.png`)
+  const bytes = Buffer.from(base64, 'base64')
+  await fs.writeFile(dest, bytes)
+  return { id, name, path: dest, dataUrl: `data:image/png;base64,${base64}` }
+}
+
 export function registerMotionIpc(getWin: () => BrowserWindow | null): void {
+  ipcMain.handle('motion:bentos', () => listMotionBentos())
+  ipcMain.handle('motion:saveBento', (_e, args: { name: string; images: MotionBentoRecord['images'] }) =>
+    saveMotionBento(args.name, args.images))
+  ipcMain.handle('motion:deleteBento', (_e, id: string) => deleteMotionBento(id))
+  ipcMain.handle('motion:storeImage', async (_e, args: { name: string; base64: string }) => {
+    try {
+      return { ok: true as const, image: await storeImageData(args.name, args.base64) }
+    } catch {
+      return { ok: false as const }
+    }
+  })
   ipcMain.handle('motion:list', () => listMotionDocs())
   ipcMain.handle('motion:get', (_e, id: string) => getMotionDoc(id))
   ipcMain.handle('motion:create', (_e, args: { title?: string; doc: unknown }) =>

@@ -12,7 +12,8 @@ import { cardCountFor, emptyOverride } from '../../../../shared/motion/frame'
 import { placementsAt, totalDuration } from '../../../../shared/motion/entrance'
 import type { FrameFit } from './FrameToolbar'
 import { MotionEngine } from '../../lib/motion/engine'
-import { drawBackdrop, drawOverlay, FRAME_ASPECT_RATIO } from '../../lib/motion/backdrop'
+import { drawBackdrop, drawLogos, drawOverlay, FRAME_ASPECT_RATIO } from '../../lib/motion/backdrop'
+import { beforeCardsFilter, drawEffects } from '../../lib/motion/effects'
 
 export type StageHandle = {
   engine: () => MotionEngine | null
@@ -107,11 +108,16 @@ export function MotionStage({
       const ctx = out.getContext('2d')
       if (!ctx) return null
       drawBackdrop(ctx, doc.frame, w, h, { showGrid: doc.frame.gridVisible })
+      ctx.save()
+      ctx.filter = beforeCardsFilter(doc.visual.effects, h)
       ctx.drawImage(gl, 0, 0, w, h)
+      ctx.restore()
+      drawEffects(ctx, doc.visual.effects, w, h)
+      drawLogos(ctx, doc.visual.logos, images, w, h)
       drawOverlay(ctx, doc.visual.text, w, h)
       return out.toDataURL('image/jpeg', 0.7)
     }
-  }), [doc.frame, doc.visual.text, size])
+  }), [doc.frame, doc.visual.text, doc.visual.logos, doc.visual.effects, images, size])
 
   // Boot the engine once. three.js is imported here rather than at module
   // scope so opening the Motion list does not pay for the 3D renderer; only
@@ -175,10 +181,12 @@ export function MotionStage({
       const ctx = over.getContext('2d')
       if (ctx) {
         ctx.clearRect(0, 0, over.width, over.height)
+        drawEffects(ctx, doc.visual.effects, over.width, over.height)
+        drawLogos(ctx, doc.visual.logos, images, over.width, over.height)
         drawOverlay(ctx, doc.visual.text, over.width, over.height)
       }
     }
-  }, [size, doc.frame, doc.visual.text])
+  }, [size, doc.frame, doc.visual.text, doc.visual.logos, doc.visual.effects, images])
 
   useEffect(() => {
     engineRef.current?.setImages(images)
@@ -430,6 +438,7 @@ export function MotionStage({
         <canvas
           ref={glRef}
           className="absolute inset-0 h-full w-full cursor-grab active:cursor-grabbing"
+          style={{ filter: beforeCardsFilter(doc.visual.effects, size.height || 1080) }}
           role="img"
           aria-label={
             poseMode

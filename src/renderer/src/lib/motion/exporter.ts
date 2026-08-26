@@ -12,7 +12,8 @@
 import type { MotionDoc } from '../../../../shared/motion/types'
 import { cardCountFor } from '../../../../shared/motion/frame'
 import { clipTimeline, placementsAt } from '../../../../shared/motion/entrance'
-import { drawBackdrop, drawOverlay, exportSize } from './backdrop'
+import { drawBackdrop, drawLogos, drawOverlay, exportSize } from './backdrop'
+import { beforeCardsFilter, drawEffects } from './effects'
 import type { MotionEngine } from './engine'
 
 export type ExportProgress = { done: number; total: number; label: string }
@@ -48,7 +49,14 @@ function composite(
     transparent,
     showGrid: doc.frame.gridInExport || doc.export.gridBehindComponent
   })
+  // The filter belongs on the cards, the paint belongs over them, and the
+  // logo and the type sit above both — a caption is not part of the photograph.
+  ctx.save()
+  ctx.filter = beforeCardsFilter(doc.visual.effects, height)
   ctx.drawImage(gl, 0, 0, width, height)
+  ctx.restore()
+  drawEffects(ctx, doc.visual.effects, width, height)
+  drawLogos(ctx, doc.visual.logos, engine.sourceImages, width, height)
   drawOverlay(ctx, doc.visual.text, width, height)
 }
 

@@ -8,8 +8,10 @@
 import { useState } from 'react'
 import type { EntranceSpec, MotionDoc } from '../../../../shared/motion/types'
 import { ENTRANCE_SHAPES } from '../../../../shared/motion/entrance'
+import { cardCountFor } from '../../../../shared/motion/frame'
 import { SegmentedRow, Section, SliderRow, ToggleRow } from './controls'
 import { supportedVideoMime } from '../../lib/motion/exporter'
+import { describeOutput } from '../../lib/motion/backdrop'
 
 export function ExportPanel({
   doc, onChange, onExportStill, onExportVideo, progress, busy
@@ -82,6 +84,9 @@ export function ExportPanel({
       </Section>
 
       <Section title="Video">
+        <p className="rounded-sm bg-sunken px-2 py-1.5 font-mono text-[10.5px] text-text-secondary" role="status">
+          {describeOutput(doc, cardCountFor(doc), support?.ext ?? 'mp4')}
+        </p>
         <SegmentedRow
           label="Height"
           value={String(doc.export.resolution)}
@@ -96,6 +101,11 @@ export function ExportPanel({
           value={String(doc.export.fps)}
           options={[{ value: '24', label: '24' }, { value: '30', label: '30' }, { value: '60', label: '60' }]}
           onChange={(v) => onChange({ export: { ...doc.export, fps: Number(v) as 24 | 30 | 60 } })}
+        />
+        <ToggleRow
+          label="Draw the grid behind the piece"
+          value={doc.export.gridBehindComponent}
+          onChange={(v) => onChange({ export: { ...doc.export, gridBehindComponent: v } })}
         />
         <SliderRow
           label="Loop length in seconds"

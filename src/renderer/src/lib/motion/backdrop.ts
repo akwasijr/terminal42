@@ -7,7 +7,8 @@
 // looking at. A grid drawn as scene geometry would have needed its own
 // perspective handling and would not have matched.
 
-import type { FrameStyle, TextLayer } from '../../../../shared/motion/types'
+import type { FrameStyle, LogoLayer, MotionDoc, TextLayer } from '../../../../shared/motion/types'
+import { clipTimeline } from '../../../../shared/motion/entrance'
 
 export function drawBackdrop(
   ctx: CanvasRenderingContext2D,
@@ -98,4 +99,56 @@ export function drawOverlay(
     ctx.fillText(layer.text, (layer.x / 100) * width, (layer.y / 100) * height)
     ctx.restore()
   }
+}
+
+/**
+ * Logos drawn over the piece.
+ *
+ * Flat and upright for the same reason text is: a mark is identity, and a
+ * logo that tumbles with the scene reads as another card rather than as the
+ * signature on the work. Width is a fraction of the frame and the height
+ * follows the picture, so a wordmark and a roundel both keep their shape.
+ */
+export function drawLogos(
+  ctx: CanvasRenderingContext2D,
+  layers: LogoLayer[],
+  images: Map<string, HTMLImageElement>,
+  width: number,
+  height: number
+): void {
+  for (const layer of layers) {
+    const img = images.get(layer.imageId)
+    if (!img || !img.complete || img.naturalWidth === 0) continue
+    if (layer.opacity <= 0) continue
+    const w = (layer.size / 100) * width
+    const h = w * (img.naturalHeight / img.naturalWidth)
+    ctx.save()
+    ctx.globalAlpha = Math.min(1, Math.max(0, layer.opacity / 100))
+    ctx.drawImage(img, (layer.x / 100) * width - w / 2, (layer.y / 100) * height - h / 2, w, h)
+    ctx.restore()
+  }
+}
+
+/**
+ * The one-line description of what pressing Export will produce.
+ *
+ * Worth having because every number in it comes from a different section of
+ * the panel — the aspect from the frame toolbar, the height and rate from
+ * Video, the length from the entrance, the loop and the exit together. Nobody
+ * should have to add those up in their head to find out how long the file is.
+ */
+export function describeOutput(
+  doc: MotionDoc,
+  cardCount: number,
+  ext: string
+): string {
+  const { width, height } = exportSize(doc.frame.aspect, doc.export.resolution)
+  const seconds = clipTimeline(doc, cardCount).frames / Math.max(1, doc.export.fps)
+  return [
+    `Output ${ext.toUpperCase()}`,
+    `${width}×${height}`,
+    `${doc.export.fps}fps`,
+    `${seconds.toFixed(1)}s`,
+    doc.frame.aspect
+  ].join(' · ')
 }
