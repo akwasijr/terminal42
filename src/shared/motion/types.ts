@@ -226,6 +226,88 @@ export type LogoLayer = {
   y: number
 }
 
+/** How far a treatment reaches in from each edge, as a percentage of the frame. */
+export type EdgeAmounts = { top: number; bottom: number; left: number; right: number }
+
+/**
+ * The shape of the ramp from an edge to the middle.
+ *
+ * Linear is an even ramp, which reads as a deliberate band. Soft eases at
+ * both ends, so the treatment fades out without a visible line where it
+ * stops. They are genuinely different looks rather than two strengths of
+ * the same one, which is why this is a choice and not another slider.
+ */
+export type EdgeFalloff = 'linear' | 'soft'
+
+/** Whether a treatment touches only the cards or the whole picture. */
+export type EffectScope = 'component' | 'everything'
+
+/**
+ * A shadow cast by the component, as a light would.
+ *
+ * Distinct from `EffectsState.shadow`, which darkens the inside of the frame
+ * edge and belongs to the frame rather than to anything in it. This one is
+ * the component's own silhouette, offset and blurred, so it moves with the
+ * cards and tells you where they are in space.
+ */
+export type DropShadowFx = {
+  enabled: boolean
+  /** Degrees clockwise from straight down, which is where a light overhead puts it. */
+  angle: number
+  /** Offset as a percentage of the frame's short side, so it survives a resize. */
+  distance: number
+  /** Softness as a percentage of the short side. */
+  blur: number
+  /** How solid the shadow is, 0 to 100. */
+  density: number
+  colour: string
+}
+
+/** Blur that reaches in from the frame's edges rather than covering everything. */
+export type EdgeBlurFx = {
+  enabled: boolean
+  falloff: EdgeFalloff
+  edges: EdgeAmounts
+  /** Blur strength, as a percentage of the frame's short side. */
+  amount: number
+  /** How gradually the blur gives way to the sharp picture. */
+  softness: number
+  over: EffectScope
+}
+
+/** A wash of colour reaching in from the frame's edges. */
+export type EdgeShadeFx = {
+  enabled: boolean
+  /**
+   * Dark and Light are the two answers people actually want, and each picks
+   * its own colour. The colour is kept alongside rather than replacing them
+   * so switching back and forth does not lose the shade you chose.
+   */
+  mode: 'dark' | 'light'
+  colour: string
+  falloff: EdgeFalloff
+  edges: EdgeAmounts
+  softness: number
+  over: EffectScope
+}
+
+/**
+ * A band along the frame's edges that bends the picture behind it, the way
+ * the thick edge of a sheet of glass does.
+ */
+export type GlassFx = {
+  enabled: boolean
+  /** All edges at one width, or each edge set on its own. */
+  edges: 'all' | 'per-edge'
+  per: EdgeAmounts
+  /** Band width as a percentage of the frame's short side. */
+  width: number
+  /** How far the picture is pulled through the band. */
+  refraction: number
+  /** How sharply the bend accelerates towards the edge. */
+  curve: number
+}
+
 /**
  * Treatments applied to the finished frame rather than to any one card.
  *
@@ -249,6 +331,18 @@ export type EffectsState = {
   /** A colour laid over the frame, at `tintAmount` strength. */
   tint: string
   tintAmount: number
+  /**
+   * The four treatments that need to know where the cards are, or what is
+   * already drawn underneath them.
+   *
+   * Held as objects rather than another dozen flat fields because each is a
+   * switch with its own settings: off is the only state most pieces are in,
+   * and a piece should be able to say that once instead of nine times.
+   */
+  dropShadow: DropShadowFx
+  edgeBlur: EdgeBlurFx
+  edgeShade: EdgeShadeFx
+  glass: GlassFx
 }
 
 export type ImageRef = {

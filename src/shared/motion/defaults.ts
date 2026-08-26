@@ -6,7 +6,8 @@
 // the fastest way to understand the tool: move a slider, watch what changes.
 
 import type {
-  AnimationState, CardOverride, ComponentId, EffectsState, EntranceShape, EntranceSpec, LogoLayer,
+  AnimationState, CardOverride, ComponentId, DropShadowFx, EdgeAmounts, EdgeBlurFx, EdgeFalloff,
+  EdgeShadeFx, EffectScope, EffectsState, EntranceShape, EntranceSpec, GlassFx, LogoLayer,
   MotionDoc, ParamSpec, ParamValue
 } from './types'
 import { defaultEntrance, ENTRANCE_SHAPES } from './entrance'
@@ -251,8 +252,28 @@ export function defaultEffects(): EffectsState {
     contrast: 100,
     saturation: 100,
     tint: '#000000',
-    tintAmount: 0
+    tintAmount: 0,
+    dropShadow: { enabled: false, angle: 0, distance: 30, blur: 20, density: 45, colour: '#000000' },
+    // The edges start with a reach rather than at zero so that switching one
+    // of these on does something. A switch that appears to do nothing reads
+    // as broken, and nobody goes looking for the second setting that would
+    // have made the first one work.
+    edgeBlur: { enabled: false, falloff: 'soft', edges: evenEdges(35), amount: 30, softness: 50, over: 'everything' },
+    edgeShade: { enabled: false, mode: 'dark', colour: '#000000', falloff: 'linear', edges: evenEdges(35), softness: 55, over: 'everything' },
+    glass: { enabled: false, edges: 'all', per: evenEdges(100), width: 12, refraction: 45, curve: 2 }
   }
+}
+
+/**
+ * Every edge at zero.
+ *
+ * A treatment that arrived reaching in from all four edges would change how
+ * a piece looks the moment it was switched on, before the user had said
+ * where they wanted it. Starting at nothing means turning it on shows
+ * nothing, and every edge that appears is one the user asked for.
+ */
+function evenEdges(n: number): EdgeAmounts {
+  return { top: n, bottom: n, left: n, right: n }
 }
 
 /**
@@ -276,8 +297,100 @@ function hydrateEffects(raw: unknown): EffectsState {
     brightness: num('brightness', 0, 200),
     contrast: num('contrast', 0, 200),
     saturation: num('saturation', 0, 200),
-    tint: typeof given.tint === 'string' && /^#[0-9a-f]{6}$/i.test(given.tint) ? given.tint : base.tint,
-    tintAmount: num('tintAmount', 0, 100)
+    tint: hexOr(given.tint, base.tint),
+    tintAmount: num('tintAmount', 0, 100),
+    dropShadow: hydrateDropShadow(given.dropShadow, base.dropShadow),
+    edgeBlur: hydrateEdgeBlur(given.edgeBlur, base.edgeBlur),
+    edgeShade: hydrateEdgeShade(given.edgeShade, base.edgeShade),
+    glass: hydrateGlass(given.glass, base.glass)
+  }
+}
+
+function hexOr(v: unknown, fallback: string): string {
+  return typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v : fallback
+}
+
+function boolOr(v: unknown, fallback: boolean): boolean {
+  return typeof v === 'boolean' ? v : fallback
+}
+
+function numOr(v: unknown, fallback: number, lo: number, hi: number): number {
+  return typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : fallback
+}
+
+function oneOf<T extends string>(v: unknown, options: readonly T[], fallback: T): T {
+  return typeof v === 'string' && (options as readonly string[]).includes(v) ? (v as T) : fallback
+}
+
+function hydrateEdges(raw: unknown, fallback: EdgeAmounts): EdgeAmounts {
+  if (!raw || typeof raw !== 'object') return { ...fallback }
+  const g = raw as Partial<Record<keyof EdgeAmounts, unknown>>
+  return {
+    top: numOr(g.top, fallback.top, 0, 100),
+    bottom: numOr(g.bottom, fallback.bottom, 0, 100),
+    left: numOr(g.left, fallback.left, 0, 100),
+    right: numOr(g.right, fallback.right, 0, 100)
+  }
+}
+
+const FALLOFFS: readonly EdgeFalloff[] = ['linear', 'soft']
+const SCOPES: readonly EffectScope[] = ['component', 'everything']
+
+function hydrateDropShadow(raw: unknown, base: DropShadowFx): DropShadowFx {
+  if (!raw || typeof raw !== 'object') return { ...base }
+  const g = raw as Partial<Record<keyof DropShadowFx, unknown>>
+  return {
+    enabled: boolOr(g.enabled, base.enabled),
+    // Wrapped rather than clamped: an angle is a direction, and 370 degrees
+    // is a direction rather than an out-of-range number.
+    angle: typeof g.angle === 'number' && Number.isFinite(g.angle) ? ((g.angle % 360) + 360) % 360 : base.angle,
+    distance: numOr(g.distance, base.distance, 0, 100),
+    blur: numOr(g.blur, base.blur, 0, 100),
+    density: numOr(g.density, base.density, 0, 100),
+    colour: hexOr(g.colour, base.colour)
+  }
+}
+
+function hydrateEdgeBlur(raw: unknown, base: EdgeBlurFx): EdgeBlurFx {
+  if (!raw || typeof raw !== 'object') return { ...base, edges: { ...base.edges } }
+  const g = raw as Partial<Record<keyof EdgeBlurFx, unknown>>
+  return {
+    enabled: boolOr(g.enabled, base.enabled),
+    falloff: oneOf(g.falloff, FALLOFFS, base.falloff),
+    edges: hydrateEdges(g.edges, base.edges),
+    amount: numOr(g.amount, base.amount, 0, 100),
+    softness: numOr(g.softness, base.softness, 0, 100),
+    over: oneOf(g.over, SCOPES, base.over)
+  }
+}
+
+function hydrateEdgeShade(raw: unknown, base: EdgeShadeFx): EdgeShadeFx {
+  if (!raw || typeof raw !== 'object') return { ...base, edges: { ...base.edges } }
+  const g = raw as Partial<Record<keyof EdgeShadeFx, unknown>>
+  return {
+    enabled: boolOr(g.enabled, base.enabled),
+    mode: oneOf(g.mode, ['dark', 'light'] as const, base.mode),
+    colour: hexOr(g.colour, base.colour),
+    falloff: oneOf(g.falloff, FALLOFFS, base.falloff),
+    edges: hydrateEdges(g.edges, base.edges),
+    softness: numOr(g.softness, base.softness, 0, 100),
+    over: oneOf(g.over, SCOPES, base.over)
+  }
+}
+
+function hydrateGlass(raw: unknown, base: GlassFx): GlassFx {
+  if (!raw || typeof raw !== 'object') return { ...base, per: { ...base.per } }
+  const g = raw as Partial<Record<keyof GlassFx, unknown>>
+  return {
+    enabled: boolOr(g.enabled, base.enabled),
+    edges: oneOf(g.edges, ['all', 'per-edge'] as const, base.edges),
+    per: hydrateEdges(g.per, base.per),
+    width: numOr(g.width, base.width, 0, 100),
+    refraction: numOr(g.refraction, base.refraction, 0, 100),
+    // An exponent, not a percentage. Below one the bend would grow towards
+    // the middle instead of the lip, and at zero it would not bend at all,
+    // so the range starts where the effect starts meaning something.
+    curve: numOr(g.curve, base.curve, 1, 4)
   }
 }
 

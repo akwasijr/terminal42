@@ -14,6 +14,8 @@ import type { FrameFit } from './FrameToolbar'
 import { MotionEngine } from '../../lib/motion/engine'
 import { drawBackdrop, drawLogos, drawOverlay, FRAME_ASPECT_RATIO } from '../../lib/motion/backdrop'
 import { beforeCardsFilter, drawEffects } from '../../lib/motion/effects'
+import { composeFrame, releaseComposeScratch } from '../../lib/motion/compose'
+import { needsPixelPass, releaseFxScratches } from '../../lib/motion/frameFx'
 import { ensureTextFonts } from '../../lib/motion/fonts'
 
 export type StageHandle = {
@@ -67,6 +69,10 @@ export function MotionStage({
   const glRef = useRef<HTMLCanvasElement | null>(null)
   const backRef = useRef<HTMLCanvasElement | null>(null)
   const overRef = useRef<HTMLCanvasElement | null>(null)
+  // Only used when an effect needs the pixels rather than the numbers. The
+  // three stacked canvases below cannot express "blur what is underneath
+  // you", because in the DOM nothing can reach the layer it is sitting on.
+  const fxRef = useRef<HTMLCanvasElement | null>(null)
   const engineRef = useRef<MotionEngine | null>(null)
   const docRef = useRef(doc)
   const phaseRef = useRef(phase)
@@ -78,6 +84,10 @@ export function MotionStage({
   const [ready, setReady] = useState(0)
   /** Bumped when a webfont the type asks for has finished loading. */
   const [fontTick, setFontTick] = useState(0)
+  // Whether the pixel pass is currently drawing. Held as a ref for the render
+  // loop and as state for the one style that depends on it.
+  const [fxLive, setFxLive] = useState(false)
+  const fxLiveRef = useRef(false)
   const [hint, setHint] = useState<string | null>(null)
   const dragRef = useRef<DragState | null>(null)
   const sizeRef = useRef(size)
@@ -102,8 +112,7 @@ export function MotionStage({
     },
     snapshot: (maxWidth: number) => {
       const gl = glRef.current
-      const back = backRef.current
-      if (!gl || !back) return null
+      if (!gl) return null
       const ratio = FRAME_ASPECT_RATIO[doc.frame.aspect] ?? 16 / 9
       const w = Math.round(maxWidth)
       const h = Math.round(maxWidth / ratio)
@@ -112,14 +121,7 @@ export function MotionStage({
       out.height = h
       const ctx = out.getContext('2d')
       if (!ctx) return null
-      drawBackdrop(ctx, doc.frame, w, h, { showGrid: doc.frame.gridVisible })
-      ctx.save()
-      ctx.filter = beforeCardsFilter(doc.visual.effects, h)
-      ctx.drawImage(gl, 0, 0, w, h)
-      ctx.restore()
-      drawEffects(ctx, doc.visual.effects, w, h)
-      drawLogos(ctx, doc.visual.logos, images, w, h)
-      drawOverlay(ctx, doc.visual.text, w, h)
+      composeFrame(ctx, doc, gl, w, h, { showGrid: doc.frame.gridVisible, images })
       return out.toDataURL('image/jpeg', 0.7)
     }
   }), [doc.frame, doc.visual.text, doc.visual.logos, doc.visual.effects, images, size])
@@ -148,6 +150,8 @@ export function MotionStage({
       cancelled = true
       engineRef.current?.dispose()
       engineRef.current = null
+      releaseComposeScratch()
+      releaseFxScratches()
     }
   }, [])
 
@@ -183,6 +187,11 @@ export function MotionStage({
       back.height = Math.round(size.height * dpr)
       const ctx = back.getContext('2d')
       if (ctx) drawBackdrop(ctx, doc.frame, back.width, back.height)
+    }
+    const fx = fxRef.current
+    if (fx && size.width > 0) {
+      fx.width = Math.round(size.width * dpr)
+      fx.height = Math.round(size.height * dpr)
     }
     const over = overRef.current
     if (over && size.width > 0) {
@@ -439,6 +448,34 @@ export function MotionStage({
         }
       }
       engine.render(phaseRef.current, placementsAt(d, phaseRef.current, anim))
+
+      // The pixel pass is opaque and covers the backdrop and the cards, so
+      // turning it off is a matter of not drawing it: the layers underneath
+      // are still there, still correct, and cost nothing extra.
+      const fxCanvas = fxRef.current
+      const gl = glRef.current
+      const wants = needsPixelPass(d.visual.effects)
+      if (fxCanvas && gl && fxCanvas.width > 0) {
+        const fctx = fxCanvas.getContext('2d')
+        if (fctx) {
+          if (wants) {
+            composeFrame(fctx, d, gl, fxCanvas.width, fxCanvas.height, {
+              showGrid: d.frame.gridVisible,
+              // Grain, logos and type live on the static layer above, which
+              // is redrawn only when the document changes. Reading back every
+              // pixel for a texture that never moves would cost more each
+              // frame than everything else here together.
+              skipStatic: true
+            })
+          } else if (fxLiveRef.current) {
+            fctx.clearRect(0, 0, fxCanvas.width, fxCanvas.height)
+          }
+        }
+      }
+      if (fxLiveRef.current !== wants) {
+        fxLiveRef.current = wants
+        setFxLive(wants)
+      }
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
@@ -474,6 +511,12 @@ export function MotionStage({
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
           onWheel={onWheel}
+        />
+        <canvas
+          ref={fxRef}
+          className="pointer-events-none absolute inset-0 h-full w-full"
+          style={{ display: fxLive ? 'block' : 'none' }}
+          aria-hidden="true"
         />
         <canvas ref={overRef} className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true" />
         {hint ? (
