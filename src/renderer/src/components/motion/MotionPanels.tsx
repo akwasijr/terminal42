@@ -266,28 +266,6 @@ export function VisualPanel({
         })}
       </Section>
 
-      <Section title="Frame">
-        <SegmentedRow
-          label="Aspect"
-          value={doc.frame.aspect}
-          options={[
-            { value: '16:9', label: '16:9' }, { value: '4:5', label: '4:5' }, { value: '9:16', label: '9:16' },
-            { value: '1:1', label: '1:1' }, { value: '4:3', label: '4:3' }
-          ]}
-          onChange={(v) => onChange({ frame: { ...doc.frame, aspect: v } })}
-        />
-        <SliderRow label="Frame corners" value={doc.frame.corners} min={0} max={48} step={1} onChange={(v) => onChange({ frame: { ...doc.frame, corners: v } })} />
-        <ColorRow label="Background" value={doc.frame.background} onChange={(v) => onChange({ frame: { ...doc.frame, background: v } })} />
-        <ToggleRow label="Show grid" value={doc.frame.gridVisible} onChange={(v) => onChange({ frame: { ...doc.frame, gridVisible: v } })} />
-        {doc.frame.gridVisible ? (
-          <>
-            <SliderRow label="Columns" value={doc.frame.gridColumns} min={1} max={48} step={1} onChange={(v) => onChange({ frame: { ...doc.frame, gridColumns: v } })} />
-            <SliderRow label="Rows" value={doc.frame.gridRows} min={1} max={48} step={1} onChange={(v) => onChange({ frame: { ...doc.frame, gridRows: v } })} />
-            <ColorRow label="Grid colour" value={doc.frame.gridColour} onChange={(v) => onChange({ frame: { ...doc.frame, gridColour: v } })} />
-            <ToggleRow label="Keep grid in exports" value={doc.frame.gridInExport} onChange={(v) => onChange({ frame: { ...doc.frame, gridInExport: v } })} />
-          </>
-        ) : null}
-      </Section>
     </div>
   )
 }

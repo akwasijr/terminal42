@@ -10,7 +10,8 @@
 // as long as the video is.
 
 import type { MotionDoc } from '../../../../shared/motion/types'
-import { cardCountFor, computePlacements } from '../../../../shared/motion/frame'
+import { cardCountFor } from '../../../../shared/motion/frame'
+import { clipTimeline, placementsAt } from '../../../../shared/motion/entrance'
 import { drawBackdrop, drawOverlay, exportSize } from './backdrop'
 import type { MotionEngine } from './engine'
 
@@ -37,11 +38,12 @@ function composite(
   width: number,
   height: number,
   out: HTMLCanvasElement,
-  transparent: boolean
+  transparent: boolean,
+  anim: { kind: 'in' | 'out'; elapsedSec: number } | null = null
 ): void {
   const ctx = out.getContext('2d')
   if (!ctx) return
-  const gl = engine.renderAtSize(width, height, phase, computePlacements(doc, phase))
+  const gl = engine.renderAtSize(width, height, phase, placementsAt(doc, phase, anim))
   drawBackdrop(ctx, doc.frame, width, height, {
     transparent,
     showGrid: doc.frame.gridInExport || doc.export.gridBehindComponent
@@ -84,7 +86,9 @@ export async function exportVideo(
 
   const { width, height } = exportSize(doc.frame.aspect, doc.export.resolution)
   const fps = doc.export.fps
-  const frames = Math.max(1, Math.round(doc.export.durationSec * fps))
+
+  const timeline = clipTimeline(doc, cardCountFor(doc))
+  const frames = timeline.frames
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
@@ -113,11 +117,8 @@ export async function exportVideo(
 
   for (let k = 0; k < frames; k++) {
     if (signal?.cancelled) break
-    // The last frame is deliberately not phase 1. Phase 1 is the same picture
-    // as phase 0, so including it would show one duplicated frame at the join
-    // and make a seamless loop hitch once per repeat.
-    const phase = k / frames
-    composite(engine, doc, phase, width, height, canvas, false)
+    const { phase, anim } = timeline.at(k)
+    composite(engine, doc, phase, width, height, canvas, false, anim)
     const due = startedAt + k * interval
     const waitFor = due - performance.now()
     // The wait doubles as the yield that lets the progress bar paint; without

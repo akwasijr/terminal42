@@ -164,6 +164,48 @@ export type VisualState = {
   text: TextLayer[]
 }
 
+/**
+ * How a group of things arrives on screen, or leaves.
+ *
+ * Entrance and exit are deliberately *not* the same kind of thing as a
+ * component's own animation. A component loops: it is a pure function of
+ * phase that closes at both ends, and it runs for as long as you are looking
+ * at it. An entrance happens once, has a beginning and an end, and does not
+ * have to close. Keeping them apart is what lets Play mean "show me the
+ * entrance again" while the piece carries on turning underneath.
+ */
+export type EntranceShape =
+  | 'fade'
+  | 'rise'
+  | 'drop'
+  | 'scale'
+  | 'fly-in'
+  | 'unfold'
+  | 'spiral'
+
+export type EntranceSpec = {
+  enabled: boolean
+  shape: EntranceShape
+  /** Seconds the whole move takes, before stagger is added. */
+  duration: number
+  /** Seconds between the first card starting and the last one starting. */
+  stagger: number
+  easing: Easing
+}
+
+/**
+ * The four switches the export panel offers, held as full specs so the shape
+ * of an entrance can be edited rather than only turned on and off.
+ */
+export type AnimationState = {
+  componentIn: EntranceSpec
+  componentOut: EntranceSpec
+  textIn: EntranceSpec
+  textOut: EntranceSpec
+  /** Seconds between replays when Play is left looping. */
+  replayEvery: number
+}
+
 export type VideoFormat = 'mp4' | 'webm' | 'gif'
 
 export type ExportState = {
@@ -199,6 +241,7 @@ export type MotionDoc = {
    * new count simply stop applying; turn it back up and they return.
    */
   overrides: Record<string, CardOverride>
+  animation: AnimationState
   visual: VisualState
   frame: FrameStyle
   export: ExportState

@@ -8,7 +8,9 @@
 
 import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from 'react'
 import type { CardOverride, MotionDoc } from '../../../../shared/motion/types'
-import { cardCountFor, computePlacements, emptyOverride } from '../../../../shared/motion/frame'
+import { cardCountFor, emptyOverride } from '../../../../shared/motion/frame'
+import { placementsAt, totalDuration } from '../../../../shared/motion/entrance'
+import type { FrameFit } from './FrameToolbar'
 import { MotionEngine } from '../../lib/motion/engine'
 import { drawBackdrop, drawOverlay, FRAME_ASPECT_RATIO } from '../../lib/motion/backdrop'
 
@@ -31,7 +33,11 @@ export function MotionStage({
   selected,
   onSelect,
   onPatch,
-  onDropFiles
+  onDropFiles,
+  poseMode = false,
+  fit = 'contain',
+  replayToken = 0,
+  replayLooping = false
 }: {
   doc: MotionDoc
   images: Map<string, HTMLImageElement>
@@ -47,6 +53,13 @@ export function MotionStage({
   onPatch: (patch: Partial<MotionDoc>) => void
   /** Pictures dragged in from the desktop, with the card they landed on. */
   onDropFiles: (files: File[], cardIndex: number | null) => void
+  /** While true a drag poses the whole piece instead of picking up a card. */
+  poseMode?: boolean
+  /** 'edge' lets the frame fill the panel instead of sitting inside it. */
+  fit?: FrameFit
+  /** Bumped to replay the entrance; the value itself means nothing. */
+  replayToken?: number
+  replayLooping?: boolean
 }): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const glRef = useRef<HTMLCanvasElement | null>(null)
@@ -63,6 +76,13 @@ export function MotionStage({
   const dragRef = useRef<DragState | null>(null)
   const sizeRef = useRef(size)
   sizeRef.current = size
+  const poseRef = useRef(poseMode)
+  poseRef.current = poseMode
+  // When the entrance started, in rAF time. Null means the piece is settled
+  // and only its own loop is running.
+  const replayRef = useRef<number | null>(null)
+  const replayLoopRef = useRef(replayLooping)
+  replayLoopRef.current = replayLooping
 
   docRef.current = doc
   playingRef.current = playing
@@ -116,20 +136,27 @@ export function MotionStage({
   }, [])
 
   // Size the frame to the largest rectangle of the chosen aspect that fits.
+  //
+  // Edge-to-edge is the same rectangle grown until it touches the panel on
+  // both sides — the aspect never changes, because the aspect is what will be
+  // exported. All the toolbar's second button does is take the margin away.
   useLayoutEffect(() => {
     const host = hostRef.current
     if (!host) return
     const ratio = FRAME_ASPECT_RATIO[doc.frame.aspect] ?? 16 / 9
     const measure = (): void => {
       const rect = host.getBoundingClientRect()
-      const width = Math.max(0, Math.min(rect.width, rect.height * ratio))
+      const pad = fit === 'edge' ? 0 : 32
+      const w = Math.max(0, rect.width - pad)
+      const h = Math.max(0, rect.height - pad)
+      const width = Math.max(0, Math.min(w, h * ratio))
       setSize({ width: Math.round(width), height: Math.round(width / ratio) })
     }
     measure()
     const ro = new ResizeObserver(measure)
     ro.observe(host)
     return () => ro.disconnect()
-  }, [doc.frame.aspect])
+  }, [doc.frame.aspect, fit])
 
   useEffect(() => {
     const dpr = Math.min(2, window.devicePixelRatio || 1)
@@ -161,6 +188,17 @@ export function MotionStage({
     engineRef.current?.setSelected(selected)
   }, [selected])
 
+  // Play means "show me the entrance again". The token is a counter rather
+  // than a boolean because pressing the same button twice has to fire twice.
+  useEffect(() => {
+    if (replayToken === 0) return
+    replayRef.current = performance.now()
+  }, [replayToken])
+
+  useEffect(() => {
+    if (!replayLooping) replayRef.current = null
+  }, [replayLooping])
+
   // ── Working in the frame ──────────────────────────────────────────────
   //
   // The canvas is the tool, not a preview of one, so the pointer has to mean
@@ -179,7 +217,12 @@ export function MotionStage({
     if (!engine) return
     const at = ndc(e, e.currentTarget)
     const hit = engine.pick(at[0], at[1])
-    const mode: DragState['mode'] = e.shiftKey ? 'scrub' : hit !== null && !e.metaKey && !e.ctrlKey ? 'card' : 'orbit'
+    // Pose is a mode because there is nowhere else to put it: the same drag
+    // has to mean "turn the piece" and "pick up that card", and a modifier
+    // cannot carry both without one of them fighting the other.
+    const mode: DragState['mode'] = poseRef.current
+      ? e.shiftKey ? 'scale' : e.metaKey || e.ctrlKey ? 'move' : 'orbit'
+      : e.shiftKey ? 'scrub' : hit !== null && !e.metaKey && !e.ctrlKey ? 'card' : 'orbit'
     const d = docRef.current
     dragRef.current = {
       mode,
@@ -196,6 +239,7 @@ export function MotionStage({
       // stale value — a fast drag would move the card a fraction of the way
       // the pointer went.
       basePose: { ...d.pose },
+      baseTransform: { ...d.transform },
       baseOverride: { ...(d.overrides[String(hit)] ?? emptyOverride()) },
       acc: { x: 0, y: 0, z: 0, rx: 0, ry: 0 }
     }
@@ -205,8 +249,10 @@ export function MotionStage({
     try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* no capture, still draggable */ }
     setHint(
       mode === 'scrub' ? 'Scrubbing the loop'
-        : mode === 'card' ? (e.altKey ? 'Turning this card' : 'Moving this card')
-          : 'Turning the piece'
+        : mode === 'scale' ? 'Scaling the piece'
+          : mode === 'move' ? 'Moving the piece'
+            : mode === 'card' ? (e.altKey ? 'Turning this card' : 'Moving this card')
+              : 'Turning the piece'
     )
   }
 
@@ -225,6 +271,26 @@ export function MotionStage({
       const next = (((drag.startPhase + (e.clientX - drag.startX) / width) % 1) + 1) % 1
       phaseRef.current = next
       onPhase(next)
+    } else if (drag.mode === 'scale') {
+      // Up is bigger, which is the way every other scale handle in the app
+      // works, and the accumulator keeps a fast drag honest.
+      drag.acc.y += dyNdc
+      onPatch({
+        transform: {
+          ...d.transform,
+          scale: clamp(drag.baseTransform.scale * Math.exp(drag.acc.y * 1.4), 0.1, 4)
+        }
+      })
+    } else if (drag.mode === 'move') {
+      drag.acc.x += dxNdc
+      drag.acc.y += dyNdc
+      onPatch({
+        transform: {
+          ...d.transform,
+          positionX: clamp(drag.baseTransform.positionX + drag.acc.x * 50, -100, 100),
+          positionY: clamp(drag.baseTransform.positionY + drag.acc.y * 50, -100, 100)
+        }
+      })
     } else if (drag.mode === 'orbit') {
       // Dragging right turns the piece to the right, which means rotating
       // about Y; up and down leans it towards you.
@@ -319,15 +385,35 @@ export function MotionStage({
         phaseRef.current = (phaseRef.current + dt / duration) % 1
         onPhase(phaseRef.current)
       }
-      engine.setDoc(d, cardCountFor(d))
-      engine.render(phaseRef.current, computePlacements(d, phaseRef.current))
+      const count = cardCountFor(d)
+      engine.setDoc(d, count)
+
+      // The entrance plays over the top of the loop rather than instead of
+      // it: the cards arrive into wherever the pattern has got to, which is
+      // why there is no jump when the entrance hands over.
+      let anim: { kind: 'in'; elapsedSec: number } | null = null
+      const started = replayRef.current
+      if (started !== null) {
+        const spec = d.animation.componentIn
+        const span = totalDuration(spec, count)
+        const elapsed = (now - started) / 1000
+        if (elapsed <= span) {
+          anim = { kind: 'in', elapsedSec: elapsed }
+        } else if (replayLoopRef.current) {
+          const gap = Math.max(0.5, d.animation.replayEvery)
+          if (elapsed >= span + gap) replayRef.current = now
+        } else {
+          replayRef.current = null
+        }
+      }
+      engine.render(phaseRef.current, placementsAt(d, phaseRef.current, anim))
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
   }, [onPhase])
 
   return (
-    <div ref={hostRef} className="flex h-full w-full items-center justify-center overflow-hidden p-4">
+    <div ref={hostRef} className="flex h-full w-full items-center justify-center overflow-hidden">
       {error ? (
         <p className="max-w-sm text-center text-[12px] text-error" role="alert">
           The 3D renderer could not start: {error}
@@ -345,7 +431,11 @@ export function MotionStage({
           ref={glRef}
           className="absolute inset-0 h-full w-full cursor-grab active:cursor-grabbing"
           role="img"
-          aria-label={`${doc.componentId} motion piece. Drag to turn it, drag a card to move it, scroll to zoom.`}
+          aria-label={
+            poseMode
+              ? `${doc.componentId} motion piece. Posing: drag to turn it, Shift+drag to scale, Cmd+drag to move.`
+              : `${doc.componentId} motion piece. Drag to turn it, drag a card to move it, scroll to zoom.`
+          }
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={endDrag}
@@ -364,7 +454,7 @@ export function MotionStage({
 }
 
 type DragState = {
-  mode: 'orbit' | 'card' | 'scrub'
+  mode: 'orbit' | 'card' | 'scrub' | 'scale' | 'move'
   index: number | null
   from: [number, number]
   last: [number, number]
@@ -373,6 +463,7 @@ type DragState = {
   rotate: boolean
   moved: boolean
   basePose: MotionDoc['pose']
+  baseTransform: MotionDoc['transform']
   baseOverride: CardOverride
   /** How far this drag has gone so far, in scene units and degrees. */
   acc: { x: number; y: number; z: number; rx: number; ry: number }

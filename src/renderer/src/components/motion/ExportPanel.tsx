@@ -6,7 +6,8 @@
 // quietly producing a WebM named .gif would be worse than not offering it.
 
 import { useState } from 'react'
-import type { MotionDoc } from '../../../../shared/motion/types'
+import type { EntranceSpec, MotionDoc } from '../../../../shared/motion/types'
+import { ENTRANCE_SHAPES } from '../../../../shared/motion/entrance'
 import { SegmentedRow, Section, SliderRow, ToggleRow } from './controls'
 import { supportedVideoMime } from '../../lib/motion/exporter'
 
@@ -22,8 +23,32 @@ export function ExportPanel({
 }): React.JSX.Element {
   const [support] = useState(() => supportedVideoMime())
 
+  const anim = doc.animation
+  const setSpec = (key: 'componentIn' | 'componentOut' | 'textIn' | 'textOut') =>
+    (p: Partial<EntranceSpec>): void =>
+      onChange({ animation: { ...anim, [key]: { ...anim[key], ...p } } })
+
   return (
     <div className="flex flex-col">
+      <Section title="Animation">
+        <p className="text-[11px] leading-relaxed text-text-muted">
+          A component turns on its own for as long as you watch it. These are
+          the moves it makes once, on the way in and on the way out.
+        </p>
+        <EntranceRows label="Component in" spec={anim.componentIn} onChange={setSpec('componentIn')} />
+        <EntranceRows label="Component out" spec={anim.componentOut} onChange={setSpec('componentOut')} />
+        <EntranceRows label="Text and logo in" spec={anim.textIn} onChange={setSpec('textIn')} />
+        <EntranceRows label="Text and logo out" spec={anim.textOut} onChange={setSpec('textOut')} />
+        <SliderRow
+          label="Replay every"
+          value={anim.replayEvery}
+          min={1}
+          max={20}
+          step={0.5}
+          onChange={(v) => onChange({ animation: { ...anim, replayEvery: v } })}
+        />
+      </Section>
+
       <Section title="Still">
         <SegmentedRow
           label="Format"
@@ -112,6 +137,49 @@ export function ExportPanel({
           </p>
         )}
       </Section>
+    </div>
+  )
+}
+
+/**
+ * One entrance, on a disclosure.
+ *
+ * The switch is the row, and the settings only appear once it is on, because
+ * four entrances each with four controls would be twenty rows of panel for a
+ * piece that in most cases uses none of them.
+ */
+function EntranceRows({
+  label, spec, onChange
+}: {
+  label: string
+  spec: EntranceSpec
+  onChange: (p: Partial<EntranceSpec>) => void
+}): React.JSX.Element {
+  return (
+    <div className="flex flex-col gap-2 border-t border-border/50 pt-2 first:border-t-0">
+      <ToggleRow label={label} value={spec.enabled} onChange={(v) => onChange({ enabled: v })} />
+      {spec.enabled ? (
+        <>
+          <div className="flex flex-wrap gap-1" role="radiogroup" aria-label="Shape">
+            {ENTRANCE_SHAPES.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                role="radio"
+                aria-checked={spec.shape === s.id}
+                onClick={() => onChange({ shape: s.id })}
+                className={`rounded-sm px-2 py-1 text-[11px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                  spec.shape === s.id ? 'bg-accent/15 text-accent' : 'bg-sunken text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+          <SliderRow label="Time" value={spec.duration} min={0.1} max={4} step={0.05} onChange={(v) => onChange({ duration: v })} />
+          <SliderRow label="Stagger" value={spec.stagger} min={0} max={0.5} step={0.01} onChange={(v) => onChange({ stagger: v })} />
+        </>
+      ) : null}
     </div>
   )
 }

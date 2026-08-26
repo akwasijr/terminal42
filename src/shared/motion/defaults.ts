@@ -6,13 +6,25 @@
 // the fastest way to understand the tool: move a slider, watch what changes.
 
 import type {
-  CardOverride, ComponentId, MotionDoc, ParamSpec, ParamValue
+  AnimationState, CardOverride, ComponentId, EntranceShape, EntranceSpec, MotionDoc, ParamSpec, ParamValue
 } from './types'
+import { defaultEntrance, ENTRANCE_SHAPES } from './entrance'
 
 export function defaultParams(schema: ParamSpec[]): Record<string, ParamValue> {
   const out: Record<string, ParamValue> = {}
   for (const spec of schema) out[spec.key] = spec.default
   return out
+}
+
+/** Freshly built animation state: every switch present, all off by default. */
+export function defaultAnimation(): AnimationState {
+  return {
+    componentIn: defaultEntrance('in'),
+    componentOut: defaultEntrance('out'),
+    textIn: defaultEntrance('in'),
+    textOut: defaultEntrance('out'),
+    replayEvery: 5
+  }
 }
 
 export function emptyDoc(componentId: ComponentId = 'carousel'): MotionDoc {
@@ -31,6 +43,7 @@ export function emptyDoc(componentId: ComponentId = 'carousel'): MotionDoc {
     transform: { positionX: 0, positionY: 0, scale: 1 },
     easing: { x1: 0.25, y1: 0, x2: 0, y2: 1 },
     overrides: {},
+    animation: defaultAnimation(),
     visual: {
       card: {
         aspect: '4:5',
@@ -91,6 +104,7 @@ export function hydrateDoc(raw: unknown): MotionDoc {
     transform: { ...base.transform, ...(doc.transform ?? {}) },
     easing: { ...base.easing, ...(doc.easing ?? {}) },
     overrides: hydrateOverrides(doc.overrides),
+    animation: hydrateAnimation(doc.animation),
     visual: {
       ...base.visual,
       ...(doc.visual ?? {}),
@@ -127,6 +141,53 @@ function hydrateOverrides(raw: unknown): Record<string, CardOverride> {
 
 function num(v: unknown): number {
   return typeof v === 'number' && Number.isFinite(v) ? v : 0
+}
+
+/**
+ * Rebuild the animation switches, repairing anything a stored document has
+ * corrupted or predates.
+ *
+ * Same reasoning as `hydrateOverrides`: a bad `duration` of `"1s"` or a shape
+ * the current code no longer knows must not survive into a live document, or
+ * `cardProgress` and `applyEntrance` would be handed NaN and every card would
+ * either vanish or freeze.
+ */
+function hydrateAnimation(raw: unknown): AnimationState {
+  const base = defaultAnimation()
+  if (!raw || typeof raw !== 'object') return base
+  const a = raw as Partial<AnimationState>
+  return {
+    componentIn: hydrateEntrance(a.componentIn, base.componentIn),
+    componentOut: hydrateEntrance(a.componentOut, base.componentOut),
+    textIn: hydrateEntrance(a.textIn, base.textIn),
+    textOut: hydrateEntrance(a.textOut, base.textOut),
+    replayEvery: Number.isFinite(a.replayEvery) && (a.replayEvery as number) > 0 ? (a.replayEvery as number) : base.replayEvery
+  }
+}
+
+function hydrateEntrance(raw: unknown, fallback: EntranceSpec): EntranceSpec {
+  if (!raw || typeof raw !== 'object') return fallback
+  const s = raw as Partial<EntranceSpec>
+  const shape = ENTRANCE_SHAPES.some((e) => e.id === s.shape) ? (s.shape as EntranceShape) : fallback.shape
+  return {
+    enabled: typeof s.enabled === 'boolean' ? s.enabled : fallback.enabled,
+    shape,
+    // Clamped to something sane rather than merely finite: a stored duration
+    // of 0 or of 500 would either divide by zero downstream or make Play look
+    // like it never started.
+    duration: Number.isFinite(s.duration) ? Math.min(10, Math.max(0.05, s.duration as number)) : fallback.duration,
+    stagger: Number.isFinite(s.stagger) ? Math.min(2, Math.max(0, s.stagger as number)) : fallback.stagger,
+    easing: {
+      x1: num2(s.easing?.x1, fallback.easing.x1),
+      y1: num2(s.easing?.y1, fallback.easing.y1),
+      x2: num2(s.easing?.x2, fallback.easing.x2),
+      y2: num2(s.easing?.y2, fallback.easing.y2)
+    }
+  }
+}
+
+function num2(v: unknown, fallback: number): number {
+  return typeof v === 'number' && Number.isFinite(v) ? v : fallback
 }
 
 /** Clamp a stored value into what the schema currently allows. */

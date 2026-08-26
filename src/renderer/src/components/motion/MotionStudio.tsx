@@ -9,13 +9,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ComponentId, MotionDoc } from '../../../../shared/motion/types'
 import { componentFor } from '../../../../shared/motion/registry'
 import { presetParams } from '../../../../shared/motion/presets'
-import { hydrateDoc } from '../../../../shared/motion/defaults'
+import { emptyDoc, hydrateDoc } from '../../../../shared/motion/defaults'
 import { cardCountFor, emptyOverride, overrideIsEmpty } from '../../../../shared/motion/frame'
 import { exportStill, exportVideo, type ExportProgress } from '../../lib/motion/exporter'
 import { ComponentsDrawer, type SavedLayout } from './ComponentsDrawer'
 import { MotionStage, type StageHandle } from './MotionStage'
 import { ExportPanel } from './ExportPanel'
 import { ParamsPanel, VisualPanel } from './MotionPanels'
+import { FrameToolbar, type FrameFit } from './FrameToolbar'
 import { IconChevronRight } from '../icons'
 
 type Tab = 'motion' | 'visual' | 'export'
@@ -42,6 +43,13 @@ export function MotionStudio({
   const [selected, setSelected] = useState<number | null>(null)
   const [naming, setNaming] = useState(false)
   const [layoutName, setLayoutName] = useState('')
+  const [poseMode, setPoseMode] = useState(false)
+  const [fit, setFit] = useState<FrameFit>('contain')
+  // A replay is an event, not a state, so it travels as a counter the stage
+  // watches: the same button pressed twice must fire twice.
+  const [replayToken, setReplayToken] = useState(0)
+  const [replayLooping, setReplayLooping] = useState(false)
+  const [replayed, setReplayed] = useState(false)
   const stage = useRef<StageHandle | null>(null)
   const cancelRef = useRef({ cancelled: false })
 
@@ -117,6 +125,17 @@ export function MotionStudio({
     setSelected(null)
     patch({ componentId, overrides: {} })
   }
+
+  // "Put the view back" means the angle and the zoom you were given, not the
+  // motion you have built — pose and transform are how you are looking at the
+  // piece, everything else is the piece.
+  const base = useMemo(() => emptyDoc(doc.componentId), [doc.componentId])
+  const viewChanged = useMemo(
+    () => JSON.stringify(doc.pose) !== JSON.stringify(base.pose)
+      || JSON.stringify(doc.transform) !== JSON.stringify(base.transform),
+    [doc.pose, doc.transform, base]
+  )
+  const resetView = (): void => patch({ pose: { ...base.pose }, transform: { ...base.transform } })
 
   const resetCard = (index: number): void => {
     const next = { ...doc.overrides }
@@ -238,7 +257,7 @@ export function MotionStudio({
   }
 
   return (
-    <div className="flex h-full min-h-0 gap-2 p-2">
+    <div className="flex h-full w-full min-h-0 flex-1 gap-2 p-2">
       <ComponentsDrawer
         doc={doc}
         onPickComponent={pickComponent}
@@ -246,12 +265,6 @@ export function MotionStudio({
         layouts={layouts}
         onApplyLayout={applyLayout}
         onDeleteLayout={(lid) => void deleteLayout(lid)}
-        onSaveLayout={beginSaveLayout}
-        naming={naming}
-        layoutName={layoutName}
-        onLayoutNameChange={setLayoutName}
-        onConfirmName={() => void saveLayout(layoutName)}
-        onCancelName={() => setNaming(false)}
       />
 
       <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-panel bg-surface">
@@ -279,17 +292,31 @@ export function MotionStudio({
               Reset {handEdits} hand {handEdits === 1 ? 'edit' : 'edits'}
             </button>
           ) : null}
-          <button
-            type="button"
-            onClick={() => setPlaying((p) => !p)}
-            aria-pressed={playing}
-            className="rounded-sm px-2 py-1 text-[11px] text-text-secondary hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-          >
-            {playing ? 'Pause' : 'Play'}
-          </button>
         </header>
 
-        <div className="min-h-0 flex-1">
+        <div className="relative min-h-0 flex-1">
+          <FrameToolbar
+            doc={doc}
+            onChange={patch}
+            playing={playing}
+            onTogglePlaying={() => setPlaying((p) => !p)}
+            onReplay={() => {
+              // Press once to see the entrance again, press again to leave it
+              // repeating, press a third time to stop. Looping on the first
+              // press would make it impossible to watch the move just once.
+              if (replayLooping) { setReplayLooping(false); return }
+              if (replayed) setReplayLooping(true)
+              setReplayed(true)
+              setReplayToken((t) => t + 1)
+            }}
+            replayLooping={replayLooping}
+            poseMode={poseMode}
+            onPoseMode={setPoseMode}
+            fit={fit}
+            onFit={setFit}
+            onResetView={resetView}
+            viewChanged={viewChanged}
+          />
           <MotionStage
             doc={doc}
             images={images}
@@ -302,7 +329,50 @@ export function MotionStudio({
             onSelect={setSelected}
             onPatch={patch}
             onDropFiles={(f, card) => void dropFiles(f, card)}
+            poseMode={poseMode}
+            fit={fit}
+            replayToken={replayToken}
+            replayLooping={replayLooping}
           />
+        </div>
+
+        <div className="flex shrink-0 justify-center pt-1.5">
+          {naming ? (
+            <form
+              className="flex items-center gap-1"
+              onSubmit={(e) => { e.preventDefault(); void saveLayout(layoutName) }}
+            >
+              <input
+                autoFocus
+                value={layoutName}
+                onChange={(e) => setLayoutName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Escape') setNaming(false) }}
+                aria-label="Layout name"
+                className="w-48 rounded-sm bg-raised px-2 py-1 text-[11.5px] text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+              />
+              <button
+                type="submit"
+                className="rounded-sm bg-raised px-2 py-1 text-[11px] text-text-primary hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={() => setNaming(false)}
+                className="rounded-sm px-2 py-1 text-[11px] text-text-muted hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+              >
+                Cancel
+              </button>
+            </form>
+          ) : (
+            <button
+              type="button"
+              onClick={beginSaveLayout}
+              className="rounded-sm px-2.5 py-1 text-[11px] text-text-muted hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            >
+              Save this layout
+            </button>
+          )}
         </div>
 
         <footer className="flex shrink-0 items-center gap-2 px-3 pb-2 pt-1">

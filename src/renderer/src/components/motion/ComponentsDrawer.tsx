@@ -21,8 +21,7 @@ export type SavedLayout = {
 }
 
 export function ComponentsDrawer({
-  doc, onPickComponent, onPickPreset, layouts, onApplyLayout, onDeleteLayout, onSaveLayout,
-  naming, layoutName, onLayoutNameChange, onConfirmName, onCancelName
+  doc, onPickComponent, onPickPreset, layouts, onApplyLayout, onDeleteLayout
 }: {
   doc: MotionDoc
   onPickComponent: (id: ComponentId) => void
@@ -30,13 +29,6 @@ export function ComponentsDrawer({
   layouts: SavedLayout[]
   onApplyLayout: (l: SavedLayout) => void
   onDeleteLayout: (id: string) => void
-  onSaveLayout: () => void
-  /** True while the drawer is asking what to call the layout. */
-  naming: boolean
-  layoutName: string
-  onLayoutNameChange: (name: string) => void
-  onConfirmName: () => void
-  onCancelName: () => void
 }): React.JSX.Element {
   const [tab, setTab] = useState<'components' | 'layouts'>('components')
 
@@ -99,34 +91,6 @@ export function ComponentsDrawer({
         </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-          <button
-            type="button"
-            onClick={onSaveLayout}
-            className="mb-2 w-full rounded-sm bg-raised px-2 py-1.5 text-[11.5px] text-text-primary hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-          >
-            Save this layout
-          </button>
-          {naming ? (
-            <form
-              className="mb-2 flex items-center gap-1"
-              onSubmit={(e) => { e.preventDefault(); onConfirmName() }}
-            >
-              <input
-                autoFocus
-                value={layoutName}
-                onChange={(e) => onLayoutNameChange(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Escape') onCancelName() }}
-                aria-label="Layout name"
-                className="min-w-0 flex-1 rounded-sm bg-sunken px-1.5 py-1 text-[11.5px] text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-              />
-              <button
-                type="submit"
-                className="rounded-sm bg-raised px-2 py-1 text-[11px] text-text-primary hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-              >
-                Save
-              </button>
-            </form>
-          ) : null}
           {layouts.length === 0 ? (
             <p className="px-2 py-6 text-center text-[11.5px] text-text-muted">
               Saved layouts keep a look without its pictures, so you can put new images into the same motion.
