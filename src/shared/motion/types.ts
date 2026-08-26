@@ -92,6 +92,30 @@ export type Pose = { tiltX: number; tiltY: number; tiltZ: number }
 
 export type CardTilt = { tiltX: number; tiltY: number; tiltZ: number; stagger: boolean }
 
+/**
+ * A travelling wave laid over the arrangement.
+ *
+ * Wave reads the card's position along one axis, so the displacement sweeps
+ * across the piece; ripple reads its distance from the middle, so it spreads
+ * outwards from there. They are the same maths with a different input, but
+ * they look nothing alike, which is why both are here.
+ */
+export type WaveStyle = 'wave' | 'ripple'
+
+/** Which axis a wave sweeps along. Ignored by ripple, which has no direction. */
+export type WaveDirection = 'horizontal' | 'vertical'
+
+export type Wave = {
+  /** How far a card is pushed towards or away from the camera, in scene units. */
+  depth: number
+  /** How many crests fit across the arrangement. */
+  frequency: number
+  /** Whole passes per loop, so the wave is where it started when the loop ends. */
+  speed: number
+  style: WaveStyle
+  direction: WaveDirection
+}
+
 export type Displacement = {
   displaceZ: number
   displaceY: number
@@ -101,6 +125,7 @@ export type Displacement = {
   panX: number
   panZ: number
   panSpeed: number
+  wave: Wave
 }
 
 export type Transform = { positionX: number; positionY: number; scale: number }

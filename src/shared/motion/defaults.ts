@@ -8,7 +8,7 @@
 import type {
   AnimationState, CardOverride, ComponentId, DropShadowFx, EdgeAmounts, EdgeBlurFx, EdgeFalloff,
   EdgeShadeFx, EffectScope, EffectsState, EntranceShape, EntranceSpec, GlassFx, LogoLayer,
-  MotionDoc, ParamSpec, ParamValue
+  MotionDoc, ParamSpec, ParamValue, Wave
 } from './types'
 import { defaultEntrance, ENTRANCE_SHAPES } from './entrance'
 import { wrap01 } from './math'
@@ -41,7 +41,8 @@ export function emptyDoc(componentId: ComponentId = 'carousel'): MotionDoc {
     cardTilt: { tiltX: 0, tiltY: 0, tiltZ: 0, stagger: false },
     displacement: {
       displaceZ: 0, displaceY: 0, speed: 1, offset: 0.4,
-      freeOrbit: 0, panX: 0, panZ: 0, panSpeed: 1
+      freeOrbit: 0, panX: 0, panZ: 0, panSpeed: 1,
+      wave: { depth: 0, frequency: 1, speed: 1, style: 'wave', direction: 'horizontal' }
     },
     transform: { positionX: 0, positionY: 0, scale: 1 },
     easing: { x1: 0.25, y1: 0, x2: 0, y2: 1 },
@@ -106,7 +107,11 @@ export function hydrateDoc(raw: unknown): MotionDoc {
     params: { ...(doc.params ?? {}) },
     pose: { ...base.pose, ...(doc.pose ?? {}) },
     cardTilt: { ...base.cardTilt, ...(doc.cardTilt ?? {}) },
-    displacement: { ...base.displacement, ...(doc.displacement ?? {}) },
+    displacement: {
+      ...base.displacement,
+      ...(doc.displacement ?? {}),
+      wave: hydrateWave((doc.displacement as { wave?: unknown } | undefined)?.wave, base.displacement.wave)
+    },
     transform: { ...base.transform, ...(doc.transform ?? {}) },
     easing: { ...base.easing, ...(doc.easing ?? {}) },
     overrides: hydrateOverrides(doc.overrides),
@@ -303,6 +308,18 @@ function hydrateEffects(raw: unknown): EffectsState {
     edgeBlur: hydrateEdgeBlur(given.edgeBlur, base.edgeBlur),
     edgeShade: hydrateEdgeShade(given.edgeShade, base.edgeShade),
     glass: hydrateGlass(given.glass, base.glass)
+  }
+}
+
+function hydrateWave(raw: unknown, base: Wave): Wave {
+  if (!raw || typeof raw !== 'object') return { ...base }
+  const w = raw as Partial<Record<keyof Wave, unknown>>
+  return {
+    depth: numOr(w.depth, base.depth, -20, 20),
+    frequency: numOr(w.frequency, base.frequency, 0, 12),
+    speed: numOr(w.speed, base.speed, 0, 8),
+    style: oneOf(w.style, ['wave', 'ripple'] as const, base.style),
+    direction: oneOf(w.direction, ['horizontal', 'vertical'] as const, base.direction)
   }
 }
 

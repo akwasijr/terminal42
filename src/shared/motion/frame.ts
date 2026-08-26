@@ -5,11 +5,11 @@
 // the frame the user approved rather than a very similar one: there is no
 // second code path that could drift.
 
-import type { CardOverride, CardPlacement, MotionDoc, ParamValue, Pose } from './types'
+import type { CardOverride, CardPlacement, MotionDoc, ParamValue, Pose, Wave } from './types'
 import { componentFor } from './registry'
 import { paramsFor } from './defaults'
 import { valueAt } from './keyframes'
-import { cubicBezier, restingPlacement, wrap01 } from './math'
+import { cubicBezier, restingPlacement, TAU, wrap01 } from './math'
 
 /**
  * The component's settings, at a point in the loop.
@@ -184,4 +184,26 @@ function scatterPick(index: number, n: number): number {
   // every frame, in every process, or an export would not match the screen.
   const x = Math.sin(index * 127.1 + 311.7) * 43758.5453
   return Math.floor((x - Math.floor(x)) * n) % n
+}
+
+/**
+ * How far a wave pushes a card at this point in the loop.
+ *
+ * The phase is the card's own position plus the time, so two cards at
+ * different places are at different points in the wave — which is the whole
+ * difference between a wave and the drift above it, where every card moves
+ * together. Time enters in whole passes per loop so the wave is exactly
+ * where it started when the loop comes round, and the seam does not jump.
+ */
+export function waveAt(w: Wave, x: number, y: number, p: number): number {
+  if (w.depth === 0 || w.frequency === 0) return 0
+  // Divided by a nominal arrangement size so `frequency` means crests across
+  // the piece rather than crests per scene unit, which would depend on how
+  // big the component happens to be.
+  const SPAN = 8
+  const along = w.style === 'ripple'
+    ? Math.hypot(x, y) / SPAN
+    : (w.direction === 'vertical' ? y : x) / SPAN
+  const travel = p * Math.round(w.speed)
+  return Math.sin((along * w.frequency + travel) * TAU) * w.depth
 }

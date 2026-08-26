@@ -9,7 +9,7 @@ import type {
   CardStyle, ComponentId, MotionDoc, ParamSpec, ParamValue
 } from '../../../../shared/motion/types'
 import { componentFor } from '../../../../shared/motion/registry'
-import { paramsFor } from '../../../../shared/motion/defaults'
+import { emptyDoc, paramsFor } from '../../../../shared/motion/defaults'
 import { paramAffectsCount } from '../../../../shared/motion/frame'
 import { makeKeyer, type Keyer } from '../../lib/motion/keying'
 import { ColorRow, Disclosure, SegmentedRow, SelectRow, Section, SliderRow, ToggleRow } from './controls'
@@ -34,6 +34,9 @@ export function ParamsPanel({
   const component = componentFor(doc.componentId)
   const params = paramsFor(component.schema, doc.params[doc.componentId])
   const keyer = makeKeyer(doc, phase, onChange)
+  const wave = doc.displacement.wave
+  const setWave = (patch: Partial<typeof wave>): void =>
+    onChange({ displacement: { ...doc.displacement, wave: { ...wave, ...patch } } })
 
   const setParam = (key: string, value: ParamValue): void => {
     onChange({
@@ -98,7 +101,7 @@ export function ParamsPanel({
       </Section>
 
       <Section title="Displacement" defaultOpen={false} onReset={() => onChange({
-        displacement: { displaceZ: 0, displaceY: 0, speed: 1, offset: 0.4, freeOrbit: 0, panX: 0, panZ: 0, panSpeed: 1 }
+        displacement: emptyDoc(doc.componentId).displacement
       })}>
         <SliderRow label="Drift up and down" value={doc.displacement.displaceY} min={-6} max={6} step={0.1} onChange={(v) => onChange({ displacement: { ...doc.displacement, displaceY: v } })} />
         <SliderRow label="Drift near and far" value={doc.displacement.displaceZ} min={-6} max={6} step={0.1} onChange={(v) => onChange({ displacement: { ...doc.displacement, displaceZ: v } })} />
@@ -108,6 +111,29 @@ export function ParamsPanel({
         <SliderRow label="Pan sideways" value={doc.displacement.panX} min={-8} max={8} step={0.1} onChange={(v) => onChange({ displacement: { ...doc.displacement, panX: v } })} />
         <SliderRow label="Pan in and out" value={doc.displacement.panZ} min={-8} max={8} step={0.1} onChange={(v) => onChange({ displacement: { ...doc.displacement, panZ: v } })} />
         <SliderRow label="Pan speed" value={doc.displacement.panSpeed} min={1} max={6} step={1} onChange={(v) => onChange({ displacement: { ...doc.displacement, panSpeed: v } })} />
+
+        {/* Drift and pan move the whole arrangement together. A wave moves
+            each card by a different amount, which is what makes a row of
+            them read as travelling rather than sliding. */}
+        <Disclosure label="Wave">
+          <SliderRow label="Depth" value={wave.depth} min={-20} max={20} step={0.1} onChange={(v) => setWave({ depth: v })} />
+          <SliderRow label="Frequency" value={wave.frequency} min={0} max={12} step={0.1} onChange={(v) => setWave({ frequency: v })} />
+          <SliderRow label="Passes per loop" value={wave.speed} min={0} max={8} step={1} onChange={(v) => setWave({ speed: v })} />
+          <SegmentedRow
+            label="Style"
+            value={wave.style}
+            options={[{ value: 'wave', label: 'Wave' }, { value: 'ripple', label: 'Ripple' }]}
+            onChange={(v) => setWave({ style: v })}
+          />
+          {wave.style === 'wave' ? (
+            <SegmentedRow
+              label="Direction"
+              value={wave.direction}
+              options={[{ value: 'horizontal', label: 'Horizontal' }, { value: 'vertical', label: 'Vertical' }]}
+              onChange={(v) => setWave({ direction: v })}
+            />
+          ) : null}
+        </Disclosure>
       </Section>
 
       <Section title="Transform" defaultOpen={false} onReset={() => onChange({ transform: { positionX: 0, positionY: 0, scale: 1 } })}>

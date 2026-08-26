@@ -22,7 +22,7 @@
 import type * as THREE from 'three'
 import type { CardPlacement, MotionDoc } from '../../../../shared/motion/types'
 import { TAU, wrap01 } from '../../../../shared/motion/math'
-import { imageAssignment, resolvedPose } from '../../../../shared/motion/frame'
+import { imageAssignment, resolvedPose, waveAt } from '../../../../shared/motion/frame'
 import { applyBendShader, cardAspect, drawCardFace } from './cardTexture'
 
 type CardHandle = {
@@ -330,7 +330,7 @@ export class MotionEngine {
       const pl = placements[i]
       if (!pl) { c.group.visible = false; continue }
       c.group.visible = pl.opacity > 0.001
-      c.group.position.set(pl.x, pl.y, pl.z)
+      c.group.position.set(pl.x, pl.y, pl.z + waveAt(d.wave, pl.x, pl.y, p))
       // Card tilt is added on top of whatever the component decided, so it
       // reads as "and also lean them all like this" rather than replacing the
       // arrangement's own orientation.
