@@ -10,6 +10,9 @@ import type { MotionDoc } from '../../../../shared/motion/types'
 import { emptyDoc, hydrateDoc } from '../../../../shared/motion/defaults'
 import { MOTION_COMPONENTS } from '../../../../shared/motion/registry'
 import { MotionStudio } from './MotionStudio'
+import { MotionTemplates } from './MotionTemplates'
+import { buildTemplateDoc } from '../../lib/motion/templateDoc'
+import type { MotionTemplate } from '../../../../shared/motion/templates'
 import { IconPlus, IconTrash } from '../icons'
 import { formatAge } from '../../lib/formatAge'
 
@@ -20,6 +23,7 @@ export function MotionView(): React.JSX.Element {
   const [open, setOpen] = useState<{ id: string; title: string; doc: MotionDoc } | null>(null)
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [templatesOpen, setTemplatesOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
 
   const refresh = useCallback(async (): Promise<void> => {
@@ -43,6 +47,16 @@ export function MotionView(): React.JSX.Element {
     const doc = emptyDoc(componentId)
     const label = MOTION_COMPONENTS.find((c) => c.id === componentId)?.label ?? 'Motion'
     const row = await window.terminal42.motion.create(label, doc)
+    await refresh()
+    setOpen({ id: row.id, title: row.title, doc })
+  }
+
+  // A template arrives as a whole piece, so it is created exactly as a blank
+  // one is: stored first, then opened, so closing it leaves something behind.
+  const createFromTemplate = async (template: MotionTemplate): Promise<void> => {
+    setTemplatesOpen(false)
+    const doc = await buildTemplateDoc(template)
+    const row = await window.terminal42.motion.create(template.name, doc)
     await refresh()
     setOpen({ id: row.id, title: row.title, doc })
   }
@@ -77,7 +91,15 @@ export function MotionView(): React.JSX.Element {
       <div className="mx-auto max-w-6xl px-8 pb-10 pt-10">
         <header className="mb-4 flex items-center justify-between gap-4">
           <h1 className="text-[20px] font-semibold text-text-primary">Motion</h1>
-          <div ref={menuRef} className="relative flex-shrink-0">
+          <div className="flex flex-shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setTemplatesOpen(true)}
+            className="whitespace-nowrap rounded-md bg-surface px-3 py-1.5 text-[13px] font-medium text-text-primary transition-colors hover:bg-elevated"
+          >
+            Templates
+          </button>
+          <div ref={menuRef} className="relative">
             <button
               type="button"
               onClick={() => setMenuOpen((o) => !o)}
@@ -102,13 +124,21 @@ export function MotionView(): React.JSX.Element {
               </div>
             )}
           </div>
+          </div>
         </header>
 
         {loading ? (
           <p className="text-[12px] text-text-muted">Loading…</p>
         ) : rows.length === 0 ? (
-          <div className="rounded-xl bg-surface/40 px-6 py-16 text-center text-[13px] text-text-muted">
-            No pieces yet.
+          <div className="rounded-xl bg-surface/40 px-6 py-16 text-center">
+            <p className="text-[13px] text-text-muted">No pieces yet.</p>
+            <button
+              type="button"
+              onClick={() => setTemplatesOpen(true)}
+              className="mt-3 rounded-md bg-action px-3 py-1.5 text-[13px] font-medium text-action-text transition-opacity hover:opacity-90"
+            >
+              Browse templates
+            </button>
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -142,6 +172,9 @@ export function MotionView(): React.JSX.Element {
           </div>
         )}
       </div>
+      {templatesOpen && (
+        <MotionTemplates onPick={(t) => void createFromTemplate(t)} onClose={() => setTemplatesOpen(false)} />
+      )}
     </div>
   )
 }

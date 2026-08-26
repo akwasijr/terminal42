@@ -298,6 +298,7 @@ export function MotionStudio({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Back to all pieces"
             className="rounded-sm px-1.5 py-1 text-[11.5px] text-text-muted hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           >
             <span className="inline-block rotate-180"><IconChevronRight /></span>
