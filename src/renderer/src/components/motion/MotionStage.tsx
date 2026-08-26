@@ -8,7 +8,10 @@
 
 import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from 'react'
 import type { CardOverride, MotionDoc } from '../../../../shared/motion/types'
-import { cardCountFor, emptyOverride, layerVisibility } from '../../../../shared/motion/frame'
+import {
+  cardCountFor, emptyOverride, hasEffectKeys, hasLayerKeys, layerVisibility,
+  resolvedEffects, resolvedLogoLayers, resolvedTextLayers
+} from '../../../../shared/motion/frame'
 import { placementsAt, totalDuration } from '../../../../shared/motion/entrance'
 import type { FrameFit } from './FrameToolbar'
 import { MotionEngine } from '../../lib/motion/engine'
@@ -206,9 +209,10 @@ export function MotionStage({
       const ctx = over.getContext('2d')
       if (ctx) {
         ctx.clearRect(0, 0, over.width, over.height)
-        drawEffects(ctx, doc.visual.effects, over.width, over.height)
-        drawLogos(ctx, doc.visual.logos, images, over.width, over.height, phaseRef.current)
-        drawOverlay(ctx, doc.visual.text, over.width, over.height, phaseRef.current)
+        const p = phaseRef.current
+        drawEffects(ctx, resolvedEffects(doc, p), over.width, over.height)
+        drawLogos(ctx, resolvedLogoLayers(doc, p), images, over.width, over.height, p)
+        drawOverlay(ctx, resolvedTextLayers(doc, p), over.width, over.height, p)
       }
     }
   }, [size, ready, fontTick, visTick, doc.frame, doc.visual.text, doc.visual.logos, doc.visual.effects, images])
@@ -484,7 +488,13 @@ export function MotionStage({
         setFxLive(wants)
       }
 
-      const vis = visibilitySignature(d, phaseRef.current)
+      // A keyed effect changes the cheap path's filter, which lives in the
+      // markup and so would otherwise hold still for the whole loop.
+      if (gl && hasEffectKeys(d)) {
+        gl.style.filter = beforeCardsFilter(resolvedEffects(d, phaseRef.current), gl.clientHeight || 1080)
+      }
+
+      const vis = staticSignature(d, phaseRef.current)
       if (vis !== visRef.current) {
         visRef.current = vis
         setVisTick((n) => n + 1)
@@ -567,7 +577,7 @@ type DragState = {
  * exists to avoid. Two decimal places is finer than the eye reads on an
  * opacity ramp and coarse enough to hold still.
  */
-function visibilitySignature(doc: MotionDoc, phase: number): string {
+function staticSignature(doc: MotionDoc, phase: number): string {
   let out = ''
   for (const t of doc.visual.text) {
     if (t.from === undefined && t.to === undefined) continue
@@ -576,6 +586,20 @@ function visibilitySignature(doc: MotionDoc, phase: number): string {
   for (const l of doc.visual.logos) {
     if (l.from === undefined && l.to === undefined) continue
     out += `l${l.id}:${layerVisibility(l, phase).toFixed(2)};`
+  }
+  // Keyed type, marks and grain live on the same rarely-drawn layer, so the
+  // signature has to speak for them too or a keyed heading would sit still.
+  if (hasLayerKeys(doc)) {
+    for (const t of resolvedTextLayers(doc, phase)) {
+      out += `T${t.id}:${t.size.toFixed(2)},${t.x.toFixed(2)},${t.y.toFixed(2)},${(t.opacity ?? 100).toFixed(1)},${(t.tracking ?? 0).toFixed(1)};`
+    }
+    for (const l of resolvedLogoLayers(doc, phase)) {
+      out += `L${l.id}:${l.size.toFixed(2)},${l.x.toFixed(2)},${l.y.toFixed(2)},${l.opacity.toFixed(1)};`
+    }
+  }
+  if (hasEffectKeys(doc)) {
+    const fx = resolvedEffects(doc, phase)
+    out += `F${fx.grain.toFixed(1)},${fx.vignette.toFixed(1)},${fx.shadow.toFixed(1)},${fx.tintAmount.toFixed(1)};`
   }
   return out
 }

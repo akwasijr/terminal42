@@ -5,7 +5,10 @@
 // the frame the user approved rather than a very similar one: there is no
 // second code path that could drift.
 
-import type { CardOverride, CardPlacement, MotionDoc, ParamValue, Pose, Wave } from './types'
+import type {
+  CardOverride, CardPlacement, EffectsState, LogoLayer, MotionDoc, ParamValue, Pose, TextLayer, Wave
+} from './types'
+import { TEXT_DEFAULTS } from './types'
 import { componentFor } from './registry'
 import { paramsFor } from './defaults'
 import { valueAt } from './keyframes'
@@ -258,4 +261,98 @@ export function layerVisibility(
   const inAt = into / fade
   const outAt = (width - into) / fade
   return Math.min(1, Math.max(0, Math.min(inAt, outAt, 1)))
+}
+
+/**
+ * The text layer fields a keyframe can drive.
+ *
+ * Numbers only, and only the ones worth moving. A colour or a font could be
+ * keyed in principle, but halfway between two families is not a font, and a
+ * piece that needs two typefaces needs two layers rather than one that melts
+ * between them.
+ */
+const TEXT_KEY_FIELDS = ['size', 'x', 'y', 'opacity', 'tracking'] as const
+
+/** The same, for a mark: where it sits, how large, how present. */
+const LOGO_KEY_FIELDS = ['size', 'x', 'y', 'opacity'] as const
+
+/** The flat, numeric frame effects. The four grouped treatments are not keyed. */
+const FX_KEY_FIELDS = [
+  'blur', 'grain', 'vignette', 'shadow', 'brightness', 'contrast', 'saturation', 'tintAmount'
+] as const
+
+/** Whether anything on the static layer moves during the loop. */
+export function hasLayerKeys(doc: MotionDoc): boolean {
+  if (!doc.keys) return false
+  return Object.keys(doc.keys).some((t) => t.startsWith('text:') || t.startsWith('logo:'))
+}
+
+/** Whether any frame effect moves during the loop. */
+export function hasEffectKeys(doc: MotionDoc): boolean {
+  if (!doc.keys) return false
+  return Object.keys(doc.keys).some((t) => t.startsWith('fx:'))
+}
+
+/**
+ * Text layers as they stand at a point in the loop.
+ *
+ * The layers are returned rather than mutated, and returned unchanged when
+ * nothing is keyed, so the common case allocates nothing and the drawing code
+ * does not need to know keyframes exist.
+ */
+export function resolvedTextLayers(doc: MotionDoc, phase: number): TextLayer[] {
+  const keys = doc.keys
+  if (!keys) return doc.visual.text
+  return doc.visual.text.map((layer) => {
+    let out: TextLayer | null = null
+    for (const field of TEXT_KEY_FIELDS) {
+      const target = `text:${layer.id}:${field}`
+      if (!keys[target]) continue
+      const set = layer[field] !== undefined
+      const current = layer[field] ?? TEXT_DEFAULTS[field as 'opacity' | 'tracking'] ?? 0
+      const next = valueAt(keys, target, phase, current)
+      // A field the layer never set has to be written even when the track
+      // lands on the default, or the answer would be the absence of a value
+      // where a track exists — true of the drawing, but a lie about the data.
+      if (set && next === current) continue
+      out = out ?? { ...layer }
+      out[field] = next
+    }
+    return out ?? layer
+  })
+}
+
+/** Logo layers as they stand at a point in the loop. */
+export function resolvedLogoLayers(doc: MotionDoc, phase: number): LogoLayer[] {
+  const keys = doc.keys
+  if (!keys) return doc.visual.logos
+  return doc.visual.logos.map((layer) => {
+    let out: LogoLayer | null = null
+    for (const field of LOGO_KEY_FIELDS) {
+      const target = `logo:${layer.id}:${field}`
+      if (!keys[target]) continue
+      const next = valueAt(keys, target, phase, layer[field])
+      if (next === layer[field]) continue
+      out = out ?? { ...layer }
+      out[field] = next
+    }
+    return out ?? layer
+  })
+}
+
+/** Frame effects as they stand at a point in the loop. */
+export function resolvedEffects(doc: MotionDoc, phase: number): EffectsState {
+  const keys = doc.keys
+  const fx = doc.visual.effects
+  if (!keys) return fx
+  let out: EffectsState | null = null
+  for (const field of FX_KEY_FIELDS) {
+    const target = `fx:${field}`
+    if (!keys[target]) continue
+    const next = valueAt(keys, target, phase, fx[field])
+    if (next === fx[field]) continue
+    out = out ?? { ...fx }
+    out[field] = next
+  }
+  return out ?? fx
 }

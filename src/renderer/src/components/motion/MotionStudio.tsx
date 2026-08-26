@@ -490,7 +490,7 @@ export function MotionStudio({
         <div className="min-h-0 flex-1 overflow-y-auto">
           {tab === 'motion' ? <ParamsPanel doc={doc} onChange={patch} phase={phase} /> : null}
           {tab === 'visual' ? (
-            <VisualPanel doc={doc} onChange={patch} onImportImages={() => void importImages()} busy={busyImages} />
+            <VisualPanel doc={doc} onChange={patch} onImportImages={() => void importImages()} busy={busyImages} phase={phase} />
           ) : null}
           {tab === 'export' ? (
             <ExportPanel

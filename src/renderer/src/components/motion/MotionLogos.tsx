@@ -7,12 +7,14 @@
 
 import type { LogoLayer, MotionDoc } from '../../../../shared/motion/types'
 import { Section, SliderRow } from './controls'
+import type { Keyer } from '../../lib/motion/keying'
 
 export function LogoSection({
-  doc, onChange
+  doc, onChange, keyer
 }: {
   doc: MotionDoc
   onChange: (patch: Partial<MotionDoc>) => void
+  keyer?: Keyer
 }): React.JSX.Element {
   const logos = doc.visual.logos
   const setLogos = (next: LogoLayer[]): void => onChange({ visual: { ...doc.visual, logos: next } })
@@ -70,10 +72,10 @@ export function LogoSection({
                 ×
               </button>
             </div>
-            <SliderRow label="Size" value={layer.size} min={1} max={100} step={0.5} onChange={(v) => setLayer({ size: v })} />
-            <SliderRow label="Across" value={layer.x} min={0} max={100} step={0.5} onChange={(v) => setLayer({ x: v })} />
-            <SliderRow label="Down" value={layer.y} min={0} max={100} step={0.5} onChange={(v) => setLayer({ y: v })} />
-            <SliderRow label="Opacity" value={layer.opacity} min={0} max={100} step={1} onChange={(v) => setLayer({ opacity: v })} />
+            <SliderRow label="Size" value={layer.size} min={1} max={100} step={0.5} onChange={(v) => setLayer({ size: v })} keyframe={keyer?.(`logo:${layer.id}:size`, layer.size)} />
+            <SliderRow label="Across" value={layer.x} min={0} max={100} step={0.5} onChange={(v) => setLayer({ x: v })} keyframe={keyer?.(`logo:${layer.id}:x`, layer.x)} />
+            <SliderRow label="Down" value={layer.y} min={0} max={100} step={0.5} onChange={(v) => setLayer({ y: v })} keyframe={keyer?.(`logo:${layer.id}:y`, layer.y)} />
+            <SliderRow label="Opacity" value={layer.opacity} min={0} max={100} step={1} onChange={(v) => setLayer({ opacity: v })} keyframe={keyer?.(`logo:${layer.id}:opacity`, layer.opacity)} />
           </div>
         )
       })}

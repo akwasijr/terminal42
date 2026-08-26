@@ -14,6 +14,7 @@
 // the image at all: a caption is not in the photograph.
 
 import type { MotionDoc } from '../../../../shared/motion/types'
+import { resolvedEffects, resolvedLogoLayers, resolvedTextLayers } from '../../../../shared/motion/frame'
 import { drawBackdrop, drawLogos, drawOverlay } from './backdrop'
 import { beforeCardsFilter, drawEffects } from './effects'
 import {
@@ -67,7 +68,8 @@ export function composeFrame(
   opts: ComposeOptions = {}
 ): void {
   if (width <= 0 || height <= 0) return
-  const fx = doc.visual.effects
+  const phase = opts.phase ?? 0
+  const fx = resolvedEffects(doc, phase)
   const target = ctx.canvas
 
   drawBackdrop(ctx, doc.frame, width, height, {
@@ -107,7 +109,7 @@ export function composeFrame(
 
   if (!opts.skipStatic) {
     drawEffects(ctx, fx, width, height)
-    drawLogos(ctx, doc.visual.logos, opts.images ?? new Map(), width, height, opts.phase ?? 0)
-    drawOverlay(ctx, doc.visual.text, width, height, opts.phase ?? 0)
+    drawLogos(ctx, resolvedLogoLayers(doc, phase), opts.images ?? new Map(), width, height, phase)
+    drawOverlay(ctx, resolvedTextLayers(doc, phase), width, height, phase)
   }
 }

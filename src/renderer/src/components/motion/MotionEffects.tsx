@@ -8,13 +8,15 @@
 import type { EffectsState, MotionDoc } from '../../../../shared/motion/types'
 import { defaultEffects } from '../../../../shared/motion/defaults'
 import { ColorRow, SegmentedRow, Section, SliderRow } from './controls'
+import type { Keyer } from '../../lib/motion/keying'
 import { AngleDial, EdgeRows, FalloffRow, FxGroup } from './effectsControls'
 
 export function EffectsSection({
-  doc, onChange
+  doc, onChange, keyer
 }: {
   doc: MotionDoc
   onChange: (patch: Partial<MotionDoc>) => void
+  keyer?: Keyer
 }): React.JSX.Element {
   const fx = doc.visual.effects
   const set = (patch: Partial<EffectsState>): void =>
@@ -26,15 +28,15 @@ export function EffectsSection({
       defaultOpen={false}
       onReset={() => onChange({ visual: { ...doc.visual, effects: defaultEffects() } })}
     >
-      <SliderRow label="Blur" value={fx.blur} min={0} max={40} step={0.5} onChange={(v) => set({ blur: v })} />
-      <SliderRow label="Grain" value={fx.grain} min={0} max={100} step={1} onChange={(v) => set({ grain: v })} />
-      <SliderRow label="Vignette" value={fx.vignette} min={0} max={100} step={1} onChange={(v) => set({ vignette: v })} />
-      <SliderRow label="Edge shadow" value={fx.shadow} min={0} max={100} step={1} onChange={(v) => set({ shadow: v })} />
-      <SliderRow label="Brightness" value={fx.brightness} min={0} max={200} step={1} onChange={(v) => set({ brightness: v })} />
-      <SliderRow label="Contrast" value={fx.contrast} min={0} max={200} step={1} onChange={(v) => set({ contrast: v })} />
-      <SliderRow label="Saturation" value={fx.saturation} min={0} max={200} step={1} onChange={(v) => set({ saturation: v })} />
+      <SliderRow label="Blur" value={fx.blur} min={0} max={40} step={0.5} onChange={(v) => set({ blur: v })} keyframe={keyer?.('fx:blur', fx.blur)} />
+      <SliderRow label="Grain" value={fx.grain} min={0} max={100} step={1} onChange={(v) => set({ grain: v })} keyframe={keyer?.('fx:grain', fx.grain)} />
+      <SliderRow label="Vignette" value={fx.vignette} min={0} max={100} step={1} onChange={(v) => set({ vignette: v })} keyframe={keyer?.('fx:vignette', fx.vignette)} />
+      <SliderRow label="Edge shadow" value={fx.shadow} min={0} max={100} step={1} onChange={(v) => set({ shadow: v })} keyframe={keyer?.('fx:shadow', fx.shadow)} />
+      <SliderRow label="Brightness" value={fx.brightness} min={0} max={200} step={1} onChange={(v) => set({ brightness: v })} keyframe={keyer?.('fx:brightness', fx.brightness)} />
+      <SliderRow label="Contrast" value={fx.contrast} min={0} max={200} step={1} onChange={(v) => set({ contrast: v })} keyframe={keyer?.('fx:contrast', fx.contrast)} />
+      <SliderRow label="Saturation" value={fx.saturation} min={0} max={200} step={1} onChange={(v) => set({ saturation: v })} keyframe={keyer?.('fx:saturation', fx.saturation)} />
       <ColorRow label="Tint" value={fx.tint} onChange={(v) => set({ tint: v })} />
-      <SliderRow label="Tint amount" value={fx.tintAmount} min={0} max={100} step={1} onChange={(v) => set({ tintAmount: v })} />
+      <SliderRow label="Tint amount" value={fx.tintAmount} min={0} max={100} step={1} onChange={(v) => set({ tintAmount: v })} keyframe={keyer?.('fx:tintAmount', fx.tintAmount)} />
 
       {/* Everything above is a number over the finished picture. Everything
           below needs to know where the cards are or what is already drawn

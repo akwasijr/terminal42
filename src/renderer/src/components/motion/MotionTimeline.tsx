@@ -374,7 +374,27 @@ export function trackLabel(doc: MotionDoc, target: TrackTarget): string {
     return spec ? spec.label : rest
   }
   if (kind === 'pose') return POSE_LABELS[rest] ?? `Pose ${rest}`
+  if (kind === 'fx') return FX_LABELS[rest] ?? rest
+  if (kind === 'text' || kind === 'logo') {
+    const [id, field] = splitOnce(rest)
+    const name = kind === 'text'
+      ? doc.visual.text.find((t) => t.id === id)?.text.trim().split('\n')[0]
+      : `Logo ${doc.visual.logos.findIndex((l) => l.id === id) + 1}`
+    // The layer's own words are the best name it has; the field is what
+    // tells two tracks on the same layer apart.
+    return `${(name || 'Layer').slice(0, 14)} ${FIELD_LABELS[field] ?? field}`
+  }
   return target
+}
+
+const FX_LABELS: Record<string, string> = {
+  blur: 'Blur', grain: 'Grain', vignette: 'Vignette', shadow: 'Edge shadow',
+  brightness: 'Brightness', contrast: 'Contrast', saturation: 'Saturation',
+  tintAmount: 'Tint amount'
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  size: 'size', x: 'across', y: 'down', opacity: 'opacity', tracking: 'tracking'
 }
 
 const POSE_LABELS: Record<string, string> = {

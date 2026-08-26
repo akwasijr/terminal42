@@ -197,13 +197,15 @@ function ParamControl({
 }
 
 export function VisualPanel({
-  doc, onChange, onImportImages, busy
+  doc, onChange, onImportImages, busy, phase
 }: {
   doc: MotionDoc
   onChange: (patch: Partial<MotionDoc>) => void
   onImportImages: () => void
   busy: boolean
+  phase: number
 }): React.JSX.Element {
+  const keyer = makeKeyer(doc, phase, onChange)
   const card = doc.visual.card
   const setCard = (patch: Partial<CardStyle>): void =>
     onChange({ visual: { ...doc.visual, card: { ...card, ...patch } } })
@@ -285,7 +287,7 @@ export function VisualPanel({
                   ×
                 </button>
               </div>
-              <SliderRow label="Size" value={layer.size} min={1} max={40} step={0.5} onChange={(v) => setLayer({ size: v })} />
+              <SliderRow label="Size" value={layer.size} min={1} max={40} step={0.5} onChange={(v) => setLayer({ size: v })} keyframe={keyer(`text:${layer.id}:size`, layer.size)} />
               <SelectRow
                 label="Font"
                 value={layer.font ?? TEXT_DEFAULTS.font}
@@ -299,8 +301,8 @@ export function VisualPanel({
                 onChange={(v) => setLayer({ weight: v })}
               />
               <ColorRow label="Colour" value={layer.colour} onChange={(v) => setLayer({ colour: v })} />
-              <SliderRow label="Across" value={layer.x} min={0} max={100} step={0.5} onChange={(v) => setLayer({ x: v })} />
-              <SliderRow label="Down" value={layer.y} min={0} max={100} step={0.5} onChange={(v) => setLayer({ y: v })} />
+              <SliderRow label="Across" value={layer.x} min={0} max={100} step={0.5} onChange={(v) => setLayer({ x: v })} keyframe={keyer(`text:${layer.id}:x`, layer.x)} />
+              <SliderRow label="Down" value={layer.y} min={0} max={100} step={0.5} onChange={(v) => setLayer({ y: v })} keyframe={keyer(`text:${layer.id}:y`, layer.y)} />
               {/* The refinements fold away: most layers only ever need a size,
                   a face and a place to sit. */}
               <Disclosure label="More type">
@@ -319,6 +321,7 @@ export function VisualPanel({
                   value={layer.tracking ?? TEXT_DEFAULTS.tracking}
                   min={-10} max={40} step={0.5}
                   onChange={(v) => setLayer({ tracking: v })}
+                  keyframe={keyer(`text:${layer.id}:tracking`, layer.tracking ?? TEXT_DEFAULTS.tracking)}
                 />
                 <SliderRow
                   label="Line height"
@@ -331,6 +334,7 @@ export function VisualPanel({
                   value={layer.opacity ?? TEXT_DEFAULTS.opacity}
                   min={0} max={100} step={1}
                   onChange={(v) => setLayer({ opacity: v })}
+                  keyframe={keyer(`text:${layer.id}:opacity`, layer.opacity ?? TEXT_DEFAULTS.opacity)}
                 />
                 <ToggleRow label="Italic" value={layer.italic ?? TEXT_DEFAULTS.italic} onChange={(v) => setLayer({ italic: v })} />
                 <ToggleRow label="Underline" value={layer.underline ?? TEXT_DEFAULTS.underline} onChange={(v) => setLayer({ underline: v })} />
@@ -341,9 +345,9 @@ export function VisualPanel({
         })}
       </Section>
 
-      <LogoSection doc={doc} onChange={onChange} />
+      <LogoSection doc={doc} onChange={onChange} keyer={keyer} />
 
-      <EffectsSection doc={doc} onChange={onChange} />
+      <EffectsSection doc={doc} onChange={onChange} keyer={keyer} />
 
     </div>
   )
