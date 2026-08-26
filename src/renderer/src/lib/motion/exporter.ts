@@ -14,6 +14,7 @@ import { cardCountFor } from '../../../../shared/motion/frame'
 import { clipTimeline, placementsAt } from '../../../../shared/motion/entrance'
 import { drawBackdrop, drawLogos, drawOverlay, exportSize } from './backdrop'
 import { beforeCardsFilter, drawEffects } from './effects'
+import { ensureTextFonts } from './fonts'
 import type { MotionEngine } from './engine'
 
 export type ExportProgress = { done: number; total: number; label: string }
@@ -91,6 +92,10 @@ export async function exportVideo(
 ): Promise<{ base64: string; ext: 'mp4' | 'webm'; lagged: boolean } | { error: string }> {
   const support = supportedVideoMime()
   if (!support) return { error: 'This build cannot encode video: no MP4 or WebM encoder is available.' }
+
+  // Before the first frame, not during: a face that arrives midway through
+  // would change the type partway into the video.
+  await ensureTextFonts(doc.visual.text)
 
   const { width, height } = exportSize(doc.frame.aspect, doc.export.resolution)
   const fps = doc.export.fps

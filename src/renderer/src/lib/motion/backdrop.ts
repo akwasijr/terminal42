@@ -8,7 +8,9 @@
 // perspective handling and would not have matched.
 
 import type { FrameStyle, LogoLayer, MotionDoc, TextLayer } from '../../../../shared/motion/types'
+import { resolvedText } from '../../../../shared/motion/types'
 import { clipTimeline } from '../../../../shared/motion/entrance'
+import { fontByLabel } from '../freeformTypes'
 
 export function drawBackdrop(
   ctx: CanvasRenderingContext2D,
@@ -81,7 +83,16 @@ function even(n: number): number {
  * which is exactly what nobody wants from a caption.
  *
  * Sizes and positions are fractions of the frame, so a layer placed at 1080
- * lands in the same place at 4K.
+ * lands in the same place at 4K. Tracking is a fraction of the type size for
+ * the same reason: as a pixel count it would look right on screen and pull the
+ * letters apart in the export.
+ *
+ * Two things the 2D API does not give us are done by hand. It has no notion of
+ * a line box, so multiple lines are laid out here and the block is centred on
+ * the layer's own position rather than hanging below it — the anchor should
+ * mean the same thing whether the layer is one line or three. And it cannot
+ * underline, so the rule is measured and drawn per line, which is also the
+ * only way to get it under a *centred* line rather than under the whole block.
  */
 export function drawOverlay(
   ctx: CanvasRenderingContext2D,
@@ -89,14 +100,42 @@ export function drawOverlay(
   width: number,
   height: number
 ): void {
-  for (const layer of layers) {
-    if (!layer.text.trim()) continue
+  for (const raw of layers) {
+    if (!raw.text.trim()) continue
+    const layer = resolvedText(raw)
+    if (layer.opacity <= 0) continue
+
+    const px = Math.round((layer.size / 100) * height)
+    if (px <= 0) continue
+    const lines = (layer.caps ? layer.text.toLocaleUpperCase() : layer.text).split('\n')
+    const step = px * layer.lineHeight
+
     ctx.save()
+    ctx.globalAlpha = layer.opacity / 100
     ctx.fillStyle = layer.colour
-    ctx.textAlign = 'center'
+    ctx.textAlign = layer.align
     ctx.textBaseline = 'middle'
-    ctx.font = `600 ${Math.round((layer.size / 100) * height)}px "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif`
-    ctx.fillText(layer.text, (layer.x / 100) * width, (layer.y / 100) * height)
+    ctx.font = `${layer.italic ? 'italic ' : ''}${layer.weight} ${px}px ${fontByLabel(layer.font).stack}`
+    // Chromium has honoured this since 99, but it is still not everywhere, and
+    // assigning an unknown property would silently do nothing rather than warn.
+    if ('letterSpacing' in ctx) ctx.letterSpacing = `${(layer.tracking / 100) * px}px`
+
+    const x = (layer.x / 100) * width
+    const y = (layer.y / 100) * height
+    // Centre the block of lines on y, so the anchor is the middle of the text
+    // however many lines it turns out to have.
+    const top = y - ((lines.length - 1) * step) / 2
+
+    lines.forEach((line, i) => {
+      const ly = top + i * step
+      ctx.fillText(line, x, ly)
+      if (!layer.underline || !line.trim()) return
+      const w = ctx.measureText(line).width
+      const lx = layer.align === 'left' ? x : layer.align === 'right' ? x - w : x - w / 2
+      // Just below the baseline, and thick enough to survive a small export.
+      ctx.fillRect(lx, ly + px * 0.42, w, Math.max(1, px * 0.055))
+    })
+
     ctx.restore()
   }
 }

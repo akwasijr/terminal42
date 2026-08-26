@@ -12,6 +12,7 @@ import { presetParams } from '../../../../shared/motion/presets'
 import { emptyDoc, hydrateDoc } from '../../../../shared/motion/defaults'
 import { cardCountFor, emptyOverride, overrideIsEmpty } from '../../../../shared/motion/frame'
 import { exportStill, exportVideo, type ExportProgress } from '../../lib/motion/exporter'
+import { ensureTextFonts } from '../../lib/motion/fonts'
 import { ComponentsDrawer, type SavedLayout } from './ComponentsDrawer'
 import { MotionStage, type StageHandle } from './MotionStage'
 import { ExportPanel } from './ExportPanel'
@@ -199,6 +200,9 @@ export function MotionStudio({
     if (!engine) return
     setExporting(true)
     try {
+      // The stage asks for these too, but a still can be saved the moment a
+      // family is picked, before that request has come back.
+      await ensureTextFonts(doc.visual.text)
       const still = exportStill(engine, doc, phase)
       if (!still) { setNote('That frame could not be captured.'); return }
       const res = await window.terminal42.motion.exportFile(`${slug(title)}.${still.ext}`, still.base64)

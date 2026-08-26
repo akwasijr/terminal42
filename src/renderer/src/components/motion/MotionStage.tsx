@@ -14,6 +14,7 @@ import type { FrameFit } from './FrameToolbar'
 import { MotionEngine } from '../../lib/motion/engine'
 import { drawBackdrop, drawLogos, drawOverlay, FRAME_ASPECT_RATIO } from '../../lib/motion/backdrop'
 import { beforeCardsFilter, drawEffects } from '../../lib/motion/effects'
+import { ensureTextFonts } from '../../lib/motion/fonts'
 
 export type StageHandle = {
   engine: () => MotionEngine | null
@@ -75,6 +76,8 @@ export function MotionStage({
   const [size, setSize] = useState({ width: 0, height: 0 })
   /** Bumped when the engine finishes booting, so sizing can run again. */
   const [ready, setReady] = useState(0)
+  /** Bumped when a webfont the type asks for has finished loading. */
+  const [fontTick, setFontTick] = useState(0)
   const [hint, setHint] = useState<string | null>(null)
   const dragRef = useRef<DragState | null>(null)
   const sizeRef = useRef(size)
@@ -193,7 +196,21 @@ export function MotionStage({
         drawOverlay(ctx, doc.visual.text, over.width, over.height)
       }
     }
-  }, [size, ready, doc.frame, doc.visual.text, doc.visual.logos, doc.visual.effects, images])
+  }, [size, ready, fontTick, doc.frame, doc.visual.text, doc.visual.logos, doc.visual.effects, images])
+
+  // A webfont arrives after the frame it was first asked for has been painted,
+  // and a canvas does not re-render itself the way the DOM does. Bumping this
+  // once the faces are ready repaints the overlay with the real type instead of
+  // leaving the fallback that was drawn while it loaded.
+  useEffect(() => {
+    let alive = true
+    void ensureTextFonts(doc.visual.text).then(() => {
+      if (alive) setFontTick((n) => n + 1)
+    })
+    return () => {
+      alive = false
+    }
+  }, [doc.visual.text])
 
   useEffect(() => {
     engineRef.current?.setImages(images)

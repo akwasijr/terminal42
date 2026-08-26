@@ -1,7 +1,10 @@
 // The control vocabulary for Motion's panels.
 //
 // Every parameter in the app is one of four things — a number, a switch, a
-// choice, or a colour — so there are four row components and nothing else.
+// choice, or a colour — so there are four row components, plus one variant.
+// SegmentedRow and SelectRow are both a choice; they differ only in how many
+// options there are to show, because fourteen typefaces laid out flat would
+// swamp the panel that a left/centre/right does not.
 // Panels are then described as data rather than markup, which is what lets a
 // component declare its own parameters and get a working panel without any
 // panel code knowing it exists.
@@ -231,6 +234,41 @@ export function SegmentedRow<T extends string>({
           </button>
         ))}
       </div>
+    </div>
+  )
+}
+
+/**
+ * A choice with more options than will sit on a row.
+ *
+ * The same kind of thing as SegmentedRow, shown differently because of scale
+ * alone. It is a native select rather than a bespoke menu so that typing a
+ * letter jumps to a family and the keyboard works without any of it being
+ * reimplemented here.
+ */
+export function SelectRow<T extends string | number>({
+  label, value, options, onChange
+}: {
+  label: string
+  value: T
+  options: Array<{ value: T; label: string }>
+  onChange: (v: T) => void
+}): React.JSX.Element {
+  const id = useId()
+  const numeric = typeof value === 'number'
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <label htmlFor={id} className="shrink-0 text-[11px] text-text-secondary">{label}</label>
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange((numeric ? Number(e.target.value) : e.target.value) as T)}
+        className="min-w-0 max-w-[60%] rounded-sm bg-sunken px-1.5 py-1 text-[10.5px] text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+      >
+        {options.map((o) => (
+          <option key={String(o.value)} value={o.value}>{o.label}</option>
+        ))}
+      </select>
     </div>
   )
 }

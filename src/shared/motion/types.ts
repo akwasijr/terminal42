@@ -133,13 +133,76 @@ export type FrameStyle = {
   gap: number
 }
 
+/**
+ * Words laid over the frame.
+ *
+ * Everything here that carries a measurement is a fraction of the frame rather
+ * than a pixel count, which is what lets a piece composed on screen export at
+ * 4K without the type sliding or changing weight. Size is a percentage of the
+ * frame's height; tracking is a percentage of the type's own size, so it
+ * scales with the letters instead of drifting apart as the frame grows.
+ *
+ * The typographic fields are optional on purpose. A piece saved before they
+ * existed has none of them, and must still open and look exactly as it did,
+ * so every one of them resolves through `resolvedText` rather than being
+ * written into old documents by a migration.
+ */
 export type TextLayer = {
   id: string
   text: string
+  /** Type size as a percentage of the frame's height. */
   size: number
   colour: string
   x: number
   y: number
+  /** A family name from the renderer's font list; falls back if unknown. */
+  font?: string
+  /** 400–800, matching the weights the families are loaded with. */
+  weight?: number
+  italic?: boolean
+  underline?: boolean
+  align?: TextAlign
+  /** Line spacing in ems, applied only when the text has more than one line. */
+  lineHeight?: number
+  /** Letter spacing as a percentage of the type size. */
+  tracking?: number
+  /** 0–100. Separate from the colour so a layer can fade without a new hex. */
+  opacity?: number
+  /** Whether the words are drawn in capitals. */
+  caps?: boolean
+}
+
+export type TextAlign = 'left' | 'center' | 'right'
+
+/** What a text layer means when it says nothing. */
+export const TEXT_DEFAULTS = {
+  font: 'DM Sans',
+  weight: 600,
+  italic: false,
+  underline: false,
+  align: 'center' as TextAlign,
+  lineHeight: 1.2,
+  tracking: 0,
+  opacity: 100,
+  caps: false
+} as const
+
+/** A text layer with every typographic field settled, for drawing. */
+export type ResolvedText = TextLayer & Required<Omit<TextLayer, 'id' | 'text' | 'size' | 'colour' | 'x' | 'y'>>
+
+export function resolvedText(layer: TextLayer): ResolvedText {
+  return {
+    ...layer,
+    font: layer.font ?? TEXT_DEFAULTS.font,
+    weight: layer.weight ?? TEXT_DEFAULTS.weight,
+    italic: layer.italic ?? TEXT_DEFAULTS.italic,
+    underline: layer.underline ?? TEXT_DEFAULTS.underline,
+    align: layer.align ?? TEXT_DEFAULTS.align,
+    lineHeight: layer.lineHeight ?? TEXT_DEFAULTS.lineHeight,
+    tracking: layer.tracking ?? TEXT_DEFAULTS.tracking,
+    opacity: layer.opacity ?? TEXT_DEFAULTS.opacity,
+    caps: layer.caps ?? TEXT_DEFAULTS.caps
+  }
 }
 
 /**

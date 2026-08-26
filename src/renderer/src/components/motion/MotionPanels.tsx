@@ -10,7 +10,9 @@ import type {
 } from '../../../../shared/motion/types'
 import { componentFor } from '../../../../shared/motion/registry'
 import { paramsFor } from '../../../../shared/motion/defaults'
-import { ColorRow, Disclosure, SegmentedRow, Section, SliderRow, ToggleRow } from './controls'
+import { ColorRow, Disclosure, SegmentedRow, SelectRow, Section, SliderRow, ToggleRow } from './controls'
+import { FONTS, WEIGHTS } from '../../lib/freeformTypes'
+import { TEXT_DEFAULTS, type TextAlign } from '../../../../shared/motion/types'
 import { ImagesPanel } from './MotionImages'
 import { LogoSection } from './MotionLogos'
 import { EffectsSection } from './MotionEffects'
@@ -216,11 +218,13 @@ export function VisualPanel({
           return (
             <div key={layer.id} className="flex flex-col gap-2 rounded-md bg-sunken p-2">
               <div className="flex items-center gap-1">
-                <input
+                <textarea
                   value={layer.text}
                   onChange={(e) => setLayer({ text: e.target.value })}
                   aria-label={`Text layer ${i + 1}`}
-                  className="min-w-0 flex-1 rounded-sm bg-bg px-1.5 py-1 text-[11.5px] text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                  rows={1}
+                  spellCheck={false}
+                  className="min-w-0 flex-1 resize-y rounded-sm bg-bg px-1.5 py-1 text-[11.5px] text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
                 />
                 <button
                   type="button"
@@ -232,9 +236,56 @@ export function VisualPanel({
                 </button>
               </div>
               <SliderRow label="Size" value={layer.size} min={1} max={40} step={0.5} onChange={(v) => setLayer({ size: v })} />
+              <SelectRow
+                label="Font"
+                value={layer.font ?? TEXT_DEFAULTS.font}
+                options={FONTS.map((f) => ({ value: f.label, label: f.label }))}
+                onChange={(v) => setLayer({ font: v })}
+              />
+              <SelectRow
+                label="Weight"
+                value={layer.weight ?? TEXT_DEFAULTS.weight}
+                options={WEIGHTS.map((w) => ({ value: w.value, label: w.label }))}
+                onChange={(v) => setLayer({ weight: v })}
+              />
+              <ColorRow label="Colour" value={layer.colour} onChange={(v) => setLayer({ colour: v })} />
               <SliderRow label="Across" value={layer.x} min={0} max={100} step={0.5} onChange={(v) => setLayer({ x: v })} />
               <SliderRow label="Down" value={layer.y} min={0} max={100} step={0.5} onChange={(v) => setLayer({ y: v })} />
-              <ColorRow label="Colour" value={layer.colour} onChange={(v) => setLayer({ colour: v })} />
+              {/* The refinements fold away: most layers only ever need a size,
+                  a face and a place to sit. */}
+              <Disclosure label="More type">
+                <SegmentedRow<TextAlign>
+                  label="Align"
+                  value={layer.align ?? TEXT_DEFAULTS.align}
+                  options={[
+                    { value: 'left', label: 'Left' },
+                    { value: 'center', label: 'Centre' },
+                    { value: 'right', label: 'Right' }
+                  ]}
+                  onChange={(v) => setLayer({ align: v })}
+                />
+                <SliderRow
+                  label="Tracking"
+                  value={layer.tracking ?? TEXT_DEFAULTS.tracking}
+                  min={-10} max={40} step={0.5}
+                  onChange={(v) => setLayer({ tracking: v })}
+                />
+                <SliderRow
+                  label="Line height"
+                  value={layer.lineHeight ?? TEXT_DEFAULTS.lineHeight}
+                  min={0.7} max={2.5} step={0.05}
+                  onChange={(v) => setLayer({ lineHeight: v })}
+                />
+                <SliderRow
+                  label="Opacity"
+                  value={layer.opacity ?? TEXT_DEFAULTS.opacity}
+                  min={0} max={100} step={1}
+                  onChange={(v) => setLayer({ opacity: v })}
+                />
+                <ToggleRow label="Italic" value={layer.italic ?? TEXT_DEFAULTS.italic} onChange={(v) => setLayer({ italic: v })} />
+                <ToggleRow label="Underline" value={layer.underline ?? TEXT_DEFAULTS.underline} onChange={(v) => setLayer({ underline: v })} />
+                <ToggleRow label="Capitals" value={layer.caps ?? TEXT_DEFAULTS.caps} onChange={(v) => setLayer({ caps: v })} />
+              </Disclosure>
             </div>
           )
         })}
