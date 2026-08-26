@@ -8,6 +8,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useColorPicker } from './pickerContext'
+import { useBrandColours } from '../../lib/motion/brand'
 import type { FrameAspect, MotionDoc } from '../../../../shared/motion/types'
 
 export type FrameFit = 'contain' | 'edge'
@@ -438,15 +439,38 @@ function ResetGlyph(): React.JSX.Element {
  * colour and opens the picker: when the background is one of the five it
  * repeats it, and when it is not, it is the only place that colour is shown.
  */
+/**
+ * The background colour, as one dot that opens into the palette.
+ *
+ * A row of five squares sat next to the play button and the grid toggle and
+ * looked like part of the same set of controls, which they are not: they are
+ * one choice with five common answers. Collapsed, the toolbar reads as a
+ * short line of tools; opened, it is a palette, and the colours in it are
+ * the brand's rather than a fixed list nobody chose.
+ */
 function BackgroundSwatches({
   value, onChange
 }: { value: string; onChange: (v: string) => void }): React.JSX.Element {
   const openPicker = useColorPicker()
+  const brand = useBrandColours()
   const custom = useRef<HTMLButtonElement>(null)
+  const box = useRef<HTMLDivElement>(null)
+  const [open, setOpen] = useState(false)
   const safe = /^#[0-9a-fA-F]{6}$/.test(value) ? value : '#000000'
   const current = safe.toLowerCase()
 
-  const open = (): void => {
+  // Closing on an outside click rather than on blur, so that moving from a
+  // swatch to the picker button does not shut the row on the way.
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent): void => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [open])
+
+  const askForColour = (): void => {
     const r = custom.current?.getBoundingClientRect()
     if (!openPicker || !r) return
     openPicker({
@@ -454,49 +478,64 @@ function BackgroundSwatches({
       opacity: 1,
       showAlpha: false,
       anchor: { left: r.left, top: r.top, right: r.right, bottom: r.bottom },
+      colorVars: brand.map((hex, i) => ({ id: `brand-${i}`, name: hex, hex })),
       onChange
     })
   }
 
+  const swatches = [...new Set([...brand.map((c) => c.toLowerCase()), ...SWATCHES.map((s) => s.value)])]
+
   return (
-    <div className="flex items-center gap-1" role="group" aria-label="Background">
-      {SWATCHES.map((s) => (
-        <button
-          key={s.value}
-          type="button"
-          // The hex is on the tooltip because the name is what you pick by and
-          // the number is what you need when you are matching something else.
-          title={`${s.label} · ${s.value.toUpperCase()}`}
-          aria-label={s.label}
-          aria-pressed={current === s.value}
-          onClick={() => onChange(s.value)}
-          className="h-4 w-4 shrink-0 rounded-[4px] transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          style={{
-            background: s.value,
-            boxShadow: current === s.value
-              ? '0 0 0 1.5px var(--color-accent), inset 0 0 0 1px rgb(255 255 255 / 0.14)'
-              : 'inset 0 0 0 1px rgb(255 255 255 / 0.14)'
-          }}
-        />
-      ))}
+    <div ref={box} className="flex items-center gap-1" role="group" aria-label="Background">
       <button
-        ref={custom}
         type="button"
-        onClick={open}
-        disabled={!openPicker}
-        title={`Pick a background · ${safe.toUpperCase()}`}
-        aria-label="Pick a background"
-        className="relative h-4 w-4 shrink-0 rounded-full transition-transform enabled:hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        style={{
-          background: `conic-gradient(from 0deg, #ff4d4d, #ffd24d, #4dff88, #4dd2ff, #8a4dff, #ff4dd2, #ff4d4d)`,
-          boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / 0.2)'
-        }}
-      >
-        <span
-          className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full"
-          style={{ background: safe, boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / 0.25)' }}
-        />
-      </button>
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-label="Background colour"
+        title={`Background · ${safe.toUpperCase()}`}
+        className="h-4 w-4 shrink-0 rounded-full transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        style={{ background: safe, boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / 0.22)' }}
+      />
+      {open ? (
+        <>
+          {swatches.map((hex) => (
+            <button
+              key={hex}
+              type="button"
+              title={hex.toUpperCase()}
+              aria-label={`Background ${hex}`}
+              aria-pressed={current === hex}
+              onClick={() => onChange(hex)}
+              className="h-4 w-4 shrink-0 rounded-full transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              style={{
+                background: hex,
+                boxShadow: current === hex
+                  ? '0 0 0 1.5px var(--color-accent), inset 0 0 0 1px rgb(255 255 255 / 0.14)'
+                  : 'inset 0 0 0 1px rgb(255 255 255 / 0.14)'
+              }}
+            />
+          ))}
+          <button
+            ref={custom}
+            type="button"
+            onClick={askForColour}
+            disabled={!openPicker}
+            title={`Pick a background · ${safe.toUpperCase()}`}
+            aria-label="Pick a background"
+            className="relative h-4 w-4 shrink-0 rounded-full transition-transform enabled:hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            style={{
+              background: 'conic-gradient(from 0deg, #ff4d4d, #ffd24d, #4dff88, #4dd2ff, #8a4dff, #ff4dd2, #ff4d4d)',
+              boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / 0.2)'
+            }}
+          >
+            <span
+              className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+              style={{ background: safe, boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / 0.25)' }}
+            />
+          </button>
+        </>
+      ) : null}
     </div>
   )
+
 }

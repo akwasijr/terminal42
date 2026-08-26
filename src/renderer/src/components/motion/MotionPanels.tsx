@@ -16,6 +16,7 @@ import { ColorRow, Disclosure, SegmentedRow, SelectRow, Section, SliderRow, Togg
 import { FONTS, WEIGHTS } from '../../lib/freeformTypes'
 import { TEXT_DEFAULTS, type TextAlign } from '../../../../shared/motion/types'
 import { ImagesPanel } from './MotionImages'
+import { BrandSection } from './MotionBrand'
 import { LogoSection } from './MotionLogos'
 import { EffectsSection } from './MotionEffects'
 import { PosePad } from './PosePad'
@@ -212,6 +213,8 @@ export function VisualPanel({
 
   return (
     <div className="flex flex-col gap-1.5 p-2">
+      <BrandSection />
+
       <ImagesPanel doc={doc} onChange={onChange} onImportImages={onImportImages} busy={busy} />
 
       <Section title="Card">

@@ -170,6 +170,21 @@ function migrate(d: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_motion_bentos ON motion_bentos(created_at DESC);
 
+    -- Brand sets: colours and typefaces a piece can be built from, kept
+    -- outside the document because a brand outlives any one piece. Held as
+    -- one table with a kind rather than a table per kind, since every kind
+    -- is the same shape -- a name and a short list -- and a new kind should
+    -- not need a migration.
+    CREATE TABLE IF NOT EXISTS motion_brand_sets (
+      id TEXT PRIMARY KEY,
+      kind TEXT NOT NULL,
+      name TEXT NOT NULL,
+      items TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_motion_brand_sets ON motion_brand_sets(kind, created_at);
+
     CREATE TABLE IF NOT EXISTS designs (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,

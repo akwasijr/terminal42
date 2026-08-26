@@ -165,6 +165,60 @@ export function deleteMotionBento(id: string): boolean {
   return getDb().prepare('DELETE FROM motion_bentos WHERE id = ?').run(id).changes > 0
 }
 
+export type BrandSetRecord = {
+  id: string
+  kind: string
+  name: string
+  items: string[]
+  createdAt: number
+  updatedAt: number
+}
+
+type BrandRow = {
+  id: string; kind: string; name: string; items: string
+  created_at: number; updated_at: number
+}
+
+export function listBrandSets(kind?: string): BrandSetRecord[] {
+  const db = getDb()
+  const rows = (kind
+    ? db.prepare('SELECT * FROM motion_brand_sets WHERE kind = ? ORDER BY created_at').all(kind)
+    : db.prepare('SELECT * FROM motion_brand_sets ORDER BY kind, created_at').all()) as BrandRow[]
+  return rows.map((r) => ({
+    id: r.id,
+    kind: r.kind,
+    name: r.name,
+    items: (parse(r.items) as string[]) ?? [],
+    createdAt: r.created_at,
+    updatedAt: r.updated_at
+  }))
+}
+
+/**
+ * Write a set, creating it if the id is new.
+ *
+ * One call for both, because the panel edits a set in place: renaming it and
+ * adding a colour to it are the same gesture from the user's side, and a
+ * separate create path would only exist to be forgotten on one of them.
+ */
+export function saveBrandSet(args: {
+  id?: string; kind: string; name: string; items: string[]
+}): BrandSetRecord {
+  const now = Date.now()
+  const id = args.id ?? randomUUID()
+  const items = JSON.stringify(args.items ?? [])
+  getDb().prepare(`
+    INSERT INTO motion_brand_sets (id, kind, name, items, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET name = excluded.name, items = excluded.items, updated_at = excluded.updated_at
+  `).run(id, args.kind, args.name, items, now, now)
+  return { id, kind: args.kind, name: args.name, items: args.items ?? [], createdAt: now, updatedAt: now }
+}
+
+export function deleteBrandSet(id: string): boolean {
+  return getDb().prepare('DELETE FROM motion_brand_sets WHERE id = ?').run(id).changes > 0
+}
+
 const MIME: Record<string, string> = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
   '.webp': 'image/webp', '.gif': 'image/gif', '.avif': 'image/avif'
@@ -205,6 +259,10 @@ async function storeImageData(name: string, base64: string): Promise<{ id: strin
 }
 
 export function registerMotionIpc(getWin: () => BrowserWindow | null): void {
+  ipcMain.handle('motion:brandSets', (_e, kind?: string) => listBrandSets(kind))
+  ipcMain.handle('motion:saveBrandSet', (_e, args: { id?: string; kind: string; name: string; items: string[] }) =>
+    saveBrandSet(args))
+  ipcMain.handle('motion:deleteBrandSet', (_e, id: string) => deleteBrandSet(id))
   ipcMain.handle('motion:bentos', () => listMotionBentos())
   ipcMain.handle('motion:saveBento', (_e, args: { name: string; images: MotionBentoRecord['images'] }) =>
     saveMotionBento(args.name, args.images))

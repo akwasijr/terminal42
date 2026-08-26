@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { SessionInsights } from '../shared/sessionInsights'
-import type { MotionRecord, MotionLayoutRecord, MotionBentoRecord } from '../main/motion'
+import type { MotionRecord, MotionLayoutRecord, MotionBentoRecord, BrandSetRecord } from '../main/motion'
 
 export type { SessionInsights }
 
@@ -743,6 +743,11 @@ const api = {
     importImages: () =>
       ipcRenderer.invoke('motion:importImages') as Promise<{ ok: boolean; images: Array<{ id: string; name: string; path: string; dataUrl: string }> }>,
     readImage: (path: string) => ipcRenderer.invoke('motion:readImage', path) as Promise<string | null>,
+    brandSets: (kind?: string) =>
+      ipcRenderer.invoke('motion:brandSets', kind) as Promise<BrandSetRecord[]>,
+    saveBrandSet: (args: { id?: string; kind: string; name: string; items: string[] }) =>
+      ipcRenderer.invoke('motion:saveBrandSet', args) as Promise<BrandSetRecord>,
+    deleteBrandSet: (id: string) => ipcRenderer.invoke('motion:deleteBrandSet', id) as Promise<boolean>,
     bentos: () => ipcRenderer.invoke('motion:bentos') as Promise<MotionBentoRecord[]>,
     saveBento: (name: string, images: MotionBentoRecord['images']) =>
       ipcRenderer.invoke('motion:saveBento', { name, images }) as Promise<MotionBentoRecord>,

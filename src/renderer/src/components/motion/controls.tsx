@@ -12,6 +12,7 @@
 import { useCallback, useId, useRef, useState, type ReactNode } from 'react'
 import { IconChevronRight } from '../icons'
 import { useColorPicker } from './pickerContext'
+import { useBrandColours } from '../../lib/motion/brand'
 
 export function Section({
   title, children, defaultOpen = false, onReset, right, badge
@@ -326,6 +327,7 @@ export function ColorRow({
 }: { label: string; value: string; onChange: (v: string) => void }): React.JSX.Element {
   const id = useId()
   const openPicker = useColorPicker()
+  const brand = useBrandColours()
   const swatch = useRef<HTMLButtonElement>(null)
   const safe = /^#[0-9a-fA-F]{6}$/.test(value) ? value : '#000000'
 
@@ -337,6 +339,10 @@ export function ColorRow({
       opacity: 1,
       showAlpha: false,
       anchor: { left: r.left, top: r.top, right: r.right, bottom: r.bottom },
+      // The brand's own colours, offered wherever a colour is asked for, so
+      // that staying on palette is the easy path rather than a hex you have
+      // to remember and retype.
+      colorVars: brand.map((hex, i) => ({ id: `brand-${i}`, name: hex, hex })),
       onChange: (hex) => onChange(hex)
     })
   }
