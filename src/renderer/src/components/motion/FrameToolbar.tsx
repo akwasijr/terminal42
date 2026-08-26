@@ -7,6 +7,7 @@
 // where your eye already is.
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useColorPicker } from './pickerContext'
 import type { FrameAspect, MotionDoc } from '../../../../shared/motion/types'
 
 export type FrameFit = 'contain' | 'edge'
@@ -386,15 +387,40 @@ function HexField({ value, onChange }: { value: string; onChange: (v: string) =>
     if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex)) onChange(hex.toLowerCase())
     else setDraft(value)
   }
+  const openPicker = useColorPicker()
+  const swatch = useRef<HTMLButtonElement>(null)
+  const safe = /^#[0-9a-f]{6}$/i.test(value) ? value : '#000000'
+  const open = (): void => {
+    const r = swatch.current?.getBoundingClientRect()
+    if (!openPicker || !r) return
+    openPicker({
+      value: safe,
+      opacity: 1,
+      showAlpha: false,
+      anchor: { left: r.left, top: r.top, right: r.right, bottom: r.bottom },
+      onChange: (hex) => onChange(hex)
+    })
+  }
   return (
     <div className="flex items-center gap-1.5">
-      <input
-        type="color"
-        value={/^#[0-9a-f]{6}$/i.test(value) ? value : '#000000'}
-        onChange={(e) => onChange(e.target.value)}
-        aria-label="Pick a colour"
-        className="h-6 w-7 shrink-0 cursor-pointer rounded-sm border border-border bg-transparent p-0.5"
-      />
+      {openPicker ? (
+        <button
+          ref={swatch}
+          type="button"
+          onClick={open}
+          aria-label="Pick a colour"
+          className="h-6 w-7 shrink-0 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+          style={{ background: safe, boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / 0.14)' }}
+        />
+      ) : (
+        <input
+          type="color"
+          value={safe}
+          onChange={(e) => onChange(e.target.value)}
+          aria-label="Pick a colour"
+          className="h-6 w-7 shrink-0 cursor-pointer rounded-sm bg-transparent p-0.5"
+        />
+      )}
       <input
         value={draft}
         onChange={(e) => setDraft(e.target.value)}

@@ -18,6 +18,8 @@ import { MotionStage, type StageHandle } from './MotionStage'
 import { ExportPanel } from './ExportPanel'
 import { ParamsPanel, VisualPanel } from './MotionPanels'
 import { MotionTimeline } from './MotionTimeline'
+import { MotionPickerProvider, type OpenColorPicker } from './pickerContext'
+import { ColorPicker, type PickerRequest } from '../ColorPicker'
 import { FrameToolbar, type FrameFit } from './FrameToolbar'
 import { ResizeHandle } from './ResizeHandle'
 import { useStoredWidth } from '../../lib/motion/paneWidth'
@@ -42,6 +44,7 @@ export function MotionStudio({
   // toolbar, the entrance from Play.
   const [playing, setPlaying] = useState(false)
   const [phase, setPhase] = useState(0)
+  const [pickerReq, setPickerReq] = useState<PickerRequest | null>(null)
   const [exporting, setExporting] = useState(false)
   const [progress, setProgress] = useState<ExportProgress | null>(null)
   const [note, setNote] = useState<string | null>(null)
@@ -269,7 +272,15 @@ export function MotionStudio({
     setLayouts((l) => l.filter((x) => x.id !== layoutId))
   }
 
+  // Colour is picked with the app's own picker, the same one Form uses, so a
+  // swatch behaves identically in both places. It is rendered here because it
+  // floats over everything and a panel that scrolls cannot host it.
+  const openPicker = useCallback<OpenColorPicker>((req) => {
+    setPickerReq({ ...req, onClose: () => setPickerReq(null) })
+  }, [])
+
   return (
+    <MotionPickerProvider value={openPicker}>
     <div className="flex h-full w-full min-h-0 flex-1 gap-2 p-2">
       <ComponentsDrawer
         width={leftWidth}
@@ -453,7 +464,9 @@ export function MotionStudio({
           ) : null}
         </div>
       </aside>
+      {pickerReq ? <ColorPicker req={pickerReq} /> : null}
     </div>
+    </MotionPickerProvider>
   )
 }
 

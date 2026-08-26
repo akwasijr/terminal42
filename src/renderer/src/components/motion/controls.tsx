@@ -11,6 +11,7 @@
 
 import { useCallback, useId, useRef, useState, type ReactNode } from 'react'
 import { IconChevronRight } from '../icons'
+import { useColorPicker } from './pickerContext'
 
 export function Section({
   title, children, defaultOpen = false, onReset, right, badge
@@ -312,10 +313,34 @@ export function SelectRow<T extends string | number>({
   )
 }
 
+/**
+ * A colour, edited the way Form edits colour.
+ *
+ * The swatch opens the app's own picker rather than the browser's, so hex,
+ * opacity and the design system's colour variables are all in the same place
+ * they are everywhere else. Outside a picker host it falls back to the native
+ * input, so the row still works rather than becoming inert.
+ */
 export function ColorRow({
   label, value, onChange
 }: { label: string; value: string; onChange: (v: string) => void }): React.JSX.Element {
   const id = useId()
+  const openPicker = useColorPicker()
+  const swatch = useRef<HTMLButtonElement>(null)
+  const safe = /^#[0-9a-fA-F]{6}$/.test(value) ? value : '#000000'
+
+  const open = (): void => {
+    const r = swatch.current?.getBoundingClientRect()
+    if (!openPicker || !r) return
+    openPicker({
+      value: safe,
+      opacity: 1,
+      showAlpha: false,
+      anchor: { left: r.left, top: r.top, right: r.right, bottom: r.bottom },
+      onChange: (hex) => onChange(hex)
+    })
+  }
+
   return (
     <div className="flex items-center justify-between gap-2">
       <label htmlFor={id} className="text-[11px] text-text-secondary">{label}</label>
@@ -325,15 +350,31 @@ export function ColorRow({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           aria-label={`${label} hex value`}
-          className="w-20 rounded-sm bg-sunken px-1.5 py-0.5 font-mono text-[10.5px] text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+          className="w-20 rounded-sm bg-sunken px-1.5 py-0.5 font-mono text-[10.5px] uppercase text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
         />
-        <input
-          id={id}
-          type="color"
-          value={/^#[0-9a-fA-F]{6}$/.test(value) ? value : '#000000'}
-          onChange={(e) => onChange(e.target.value)}
-          className="h-5 w-5 cursor-pointer rounded-sm border border-border bg-transparent p-0"
-        />
+        {openPicker ? (
+          <button
+            ref={swatch}
+            id={id}
+            type="button"
+            onClick={open}
+            aria-label={`Edit ${label.toLowerCase()}`}
+            // An inset ring rather than a border: it reads as the edge of the
+            // colour instead of a line drawn around it, and stays visible on
+            // a swatch the same tone as the panel.
+            className="h-5 w-5 shrink-0 rounded-[5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            style={{ background: safe, boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / 0.14)' }}
+          />
+        ) : (
+          <input
+            id={id}
+            type="color"
+            value={safe}
+            onChange={(e) => onChange(e.target.value)}
+            aria-label={`Edit ${label.toLowerCase()}`}
+            className="h-5 w-5 shrink-0 cursor-pointer rounded-sm bg-transparent p-0"
+          />
+        )}
       </div>
     </div>
   )
