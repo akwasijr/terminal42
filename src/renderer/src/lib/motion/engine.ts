@@ -22,7 +22,7 @@
 import type * as THREE from 'three'
 import type { CardPlacement, MotionDoc } from '../../../../shared/motion/types'
 import { TAU, wrap01 } from '../../../../shared/motion/math'
-import { imageAssignment } from '../../../../shared/motion/frame'
+import { imageAssignment, resolvedPose } from '../../../../shared/motion/frame'
 import { applyBendShader, cardAspect, drawCardFace } from './cardTexture'
 
 type CardHandle = {
@@ -301,10 +301,13 @@ export class MotionEngine {
     this.root.scale.setScalar(Math.max(0.01, doc.transform.scale) * (1 - gap))
 
     const d = doc.displacement
+    // Read through resolvedPose so a keyed tilt moves the camera over the
+    // loop. Unkeyed it is doc.pose unchanged, so this costs nothing.
+    const pose = resolvedPose(doc, p)
     this.poseGroup.rotation.set(
-      degToRad(doc.pose.tiltX),
-      degToRad(doc.pose.tiltY),
-      degToRad(doc.pose.tiltZ)
+      degToRad(pose.tiltX),
+      degToRad(pose.tiltY),
+      degToRad(pose.tiltZ)
     )
 
     // Displacement is expressed in whole turns per loop for the same reason

@@ -97,8 +97,22 @@ function IconReset(): React.JSX.Element {
  * most of these is a few pixels wide on a 200px slider, and dragging the word
  * "Radius" is far easier to aim at than a 12px thumb.
  */
+/**
+ * A value that can change over the loop.
+ *
+ * `keyed` is whether the track exists at all, `here` whether one of its keys
+ * sits at the instant showing now — the two differ, and the button has to say
+ * which, or there is no way to tell "this animates" from "this animates and
+ * you are looking at a key".
+ */
+export type KeyframeHandle = {
+  keyed: boolean
+  here: boolean
+  onToggle: () => void
+}
+
 export function SliderRow({
-  label, value, min, max, step = 0.01, unit, onChange
+  label, value, min, max, step = 0.01, unit, onChange, keyframe
 }: {
   label: string
   value: number
@@ -107,6 +121,7 @@ export function SliderRow({
   step?: number
   unit?: string
   onChange: (v: number) => void
+  keyframe?: KeyframeHandle
 }): React.JSX.Element {
   const id = useId()
   const drag = useRef<{ x: number; start: number } | null>(null)
@@ -142,6 +157,30 @@ export function SliderRow({
         >
           {label}
         </label>
+        {keyframe ? (
+          <button
+            type="button"
+            onClick={keyframe.onToggle}
+            title={
+              keyframe.here
+                ? `Remove the key on ${label} at this point in the loop`
+                : `Key ${label} at this point in the loop`
+            }
+            aria-label={keyframe.here ? `Remove key on ${label}` : `Key ${label}`}
+            aria-pressed={keyframe.here}
+            className="ml-auto grid h-4 w-4 shrink-0 place-items-center rounded-sm text-text-muted hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+          >
+            <span
+              className={`block h-[7px] w-[7px] rotate-45 ${
+                keyframe.here
+                  ? 'bg-accent'
+                  : keyframe.keyed
+                    ? 'bg-transparent ring-1 ring-inset ring-accent'
+                    : 'bg-transparent ring-1 ring-inset ring-current'
+              }`}
+            />
+          </button>
+        ) : null}
         <input
           type="number"
           value={Number(value.toFixed(3))}

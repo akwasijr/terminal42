@@ -10,6 +10,7 @@ import type {
   MotionDoc, ParamSpec, ParamValue
 } from './types'
 import { defaultEntrance, ENTRANCE_SHAPES } from './entrance'
+import { wrap01 } from './math'
 
 export function defaultParams(schema: ParamSpec[]): Record<string, ParamValue> {
   const out: Record<string, ParamValue> = {}
@@ -119,8 +120,31 @@ export function hydrateDoc(raw: unknown): MotionDoc {
       effects: hydrateEffects(doc.visual?.effects)
     },
     frame: { ...base.frame, ...(doc.frame ?? {}) },
-    export: { ...base.export, ...(doc.export ?? {}) }
+    export: { ...base.export, ...(doc.export ?? {}) },
+    keys: hydrateKeys(doc.keys)
   }
+}
+
+/**
+ * Keyframe tracks, with anything malformed dropped.
+ *
+ * A document is a file on disk that a person can edit, and a track holding a
+ * key with no time would divide by nothing halfway through a render. Bad keys
+ * are discarded rather than repaired, because there is no honest guess at
+ * where a key without a time was meant to go.
+ */
+function hydrateKeys(raw: MotionDoc['keys']): MotionDoc['keys'] {
+  if (!raw || typeof raw !== 'object') return undefined
+  const out: NonNullable<MotionDoc['keys']> = {}
+  for (const [target, track] of Object.entries(raw)) {
+    if (!track || !Array.isArray(track.keys)) continue
+    const keys = track.keys
+      .filter((k) => k && typeof k.t === 'number' && Number.isFinite(k.t) && typeof k.v === 'number' && Number.isFinite(k.v))
+      .map((k, i) => ({ ...k, id: k.id || `k${i}`, t: wrap01(k.t) }))
+      .sort((a, b) => a.t - b.t)
+    if (keys.length > 0) out[target] = { ...track, keys }
+  }
+  return Object.keys(out).length > 0 ? out : undefined
 }
 
 /**

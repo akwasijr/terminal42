@@ -5,14 +5,53 @@
 // the frame the user approved rather than a very similar one: there is no
 // second code path that could drift.
 
-import type { CardOverride, CardPlacement, MotionDoc, ParamValue } from './types'
+import type { CardOverride, CardPlacement, MotionDoc, ParamValue, Pose } from './types'
 import { componentFor } from './registry'
 import { paramsFor } from './defaults'
+import { valueAt } from './keyframes'
 import { cubicBezier, restingPlacement, wrap01 } from './math'
 
-export function resolvedParams(doc: MotionDoc): Record<string, ParamValue> {
+/**
+ * The component's settings, at a point in the loop.
+ *
+ * Without a phase this is what the panel says, which is what the panel itself
+ * and anything phase-independent wants. With one, keyed parameters are
+ * overlaid, which is what actually draws a frame.
+ *
+ * Only numbers are overlaid. A keyframe interpolates, and there is no halfway
+ * between "forward" and "reverse".
+ */
+export function resolvedParams(doc: MotionDoc, phase?: number): Record<string, ParamValue> {
   const component = componentFor(doc.componentId)
-  return paramsFor(component.schema, doc.params[doc.componentId])
+  const base = paramsFor(component.schema, doc.params[doc.componentId])
+  if (phase === undefined || !doc.keys) return base
+  const out = { ...base }
+  for (const spec of component.schema) {
+    if (spec.kind !== 'slider') continue
+    const current = out[spec.key]
+    if (typeof current !== 'number') continue
+    out[spec.key] = valueAt(doc.keys, `param:${spec.key}`, phase, current)
+  }
+  return out
+}
+
+/**
+ * The pose, at a point in the loop.
+ *
+ * Kept beside the parameters rather than in the engine so that the screen and
+ * the exporter cannot disagree about where the camera was looking.
+ */
+export function resolvedPose(doc: MotionDoc, phase?: number): Pose {
+  if (phase === undefined || !doc.keys) return doc.pose
+  const at = (field: keyof Pose): number => {
+    const v = doc.pose[field]
+    return typeof v === 'number' ? valueAt(doc.keys, `pose:${field}`, phase, v) : (v as number)
+  }
+  const out = { ...doc.pose }
+  for (const field of Object.keys(doc.pose) as Array<keyof Pose>) {
+    if (typeof doc.pose[field] === 'number') (out[field] as number) = at(field)
+  }
+  return out
 }
 
 export function cardCountFor(doc: MotionDoc): number {
@@ -30,18 +69,55 @@ export function cardCountFor(doc: MotionDoc): number {
  */
 export function computePlacements(doc: MotionDoc, phase: number): CardPlacement[] {
   const component = componentFor(doc.componentId)
-  const params = resolvedParams(doc)
-  const count = Math.max(0, Math.round(component.cardCount(params)))
   const e = doc.easing
   const p = doc.animationEnabled
     ? wrap01(cubicBezier(e.x1, e.y1, e.x2, e.y2, wrap01(phase)))
     : 0
+  // Keyed values are read at the loop position, not the eased one.
+  //
+  // Easing describes how a component travels its own path; a keyframe is the
+  // user pointing at a place on the scrubber and saying "here". Sampling
+  // tracks through the easing curve would move the key away from the mark it
+  // was set against, make parameter tracks disagree with pose tracks (which
+  // are read in the engine at the raw phase), and silence every track when
+  // the piece's own animation is switched off. Keys carry their own easing
+  // per segment, which is where that belongs.
+  const params = resolvedParams(doc, wrap01(phase))
+  // The count is deliberately taken from the unkeyed settings. The engine
+  // allocates one mesh per card once, and a count that changed across the
+  // loop would mean cards appearing and vanishing at the seam. The panel
+  // therefore refuses to key any parameter the count depends on; this is the
+  // second lock, for documents that were edited by hand.
+  const count = Math.max(0, Math.round(component.cardCount(resolvedParams(doc))))
   const out: CardPlacement[] = []
   for (let i = 0; i < count; i++) {
     const base = doc.componentEnabled ? component.layout(p, i, count, params) : restingPlacement()
     out.push(applyOverride(base, doc.overrides?.[String(i)]))
   }
   return out
+}
+
+/**
+ * Whether the card count depends on a parameter.
+ *
+ * Asked rather than tabulated: every component declares how many cards it
+ * wants as a function, so the honest way to find out which settings feed it
+ * is to move one and see whether the answer changes. A table would need
+ * updating each time a component was added and would be wrong silently.
+ */
+export function paramAffectsCount(
+  component: { cardCount: (p: Record<string, ParamValue>) => number },
+  params: Record<string, ParamValue>,
+  key: string
+): boolean {
+  const current = params[key]
+  if (typeof current !== 'number') return false
+  const base = component.cardCount(params)
+  for (const probe of [current + 1, current + 3, Math.max(0, current - 1)]) {
+    if (probe === current) continue
+    if (component.cardCount({ ...params, [key]: probe }) !== base) return true
+  }
+  return false
 }
 
 /**

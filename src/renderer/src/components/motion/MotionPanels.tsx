@@ -10,6 +10,8 @@ import type {
 } from '../../../../shared/motion/types'
 import { componentFor } from '../../../../shared/motion/registry'
 import { paramsFor } from '../../../../shared/motion/defaults'
+import { paramAffectsCount } from '../../../../shared/motion/frame'
+import { makeKeyer, type Keyer } from '../../lib/motion/keying'
 import { ColorRow, Disclosure, SegmentedRow, SelectRow, Section, SliderRow, ToggleRow } from './controls'
 import { FONTS, WEIGHTS } from '../../lib/freeformTypes'
 import { TEXT_DEFAULTS, type TextAlign } from '../../../../shared/motion/types'
@@ -23,10 +25,15 @@ import { EasingEditor } from './EasingEditor'
 const PRIMARY_PARAMS = 5
 
 export function ParamsPanel({
-  doc, onChange
-}: { doc: MotionDoc; onChange: (patch: Partial<MotionDoc>) => void }): React.JSX.Element {
+  doc, onChange, phase
+}: {
+  doc: MotionDoc
+  onChange: (patch: Partial<MotionDoc>) => void
+  phase: number
+}): React.JSX.Element {
   const component = componentFor(doc.componentId)
   const params = paramsFor(component.schema, doc.params[doc.componentId])
+  const keyer = makeKeyer(doc, phase, onChange)
 
   const setParam = (key: string, value: ParamValue): void => {
     onChange({
@@ -63,19 +70,19 @@ export function ParamsPanel({
             shape of the thing. The rest are refinements, and showing
             seventeen sliders at once makes the first five harder to find. */}
         {component.schema.slice(0, PRIMARY_PARAMS).map((spec) => (
-          <ParamControl key={spec.key} spec={spec} value={params[spec.key]} onChange={(v) => setParam(spec.key, v)} />
+          <ParamControl key={spec.key} spec={spec} value={params[spec.key]} onChange={(v) => setParam(spec.key, v)} keyer={keyer} params={params} component={component} />
         ))}
         {component.schema.length > PRIMARY_PARAMS ? (
           <Disclosure label={`${component.schema.length - PRIMARY_PARAMS} more settings`}>
             {component.schema.slice(PRIMARY_PARAMS).map((spec) => (
-              <ParamControl key={spec.key} spec={spec} value={params[spec.key]} onChange={(v) => setParam(spec.key, v)} />
+              <ParamControl key={spec.key} spec={spec} value={params[spec.key]} onChange={(v) => setParam(spec.key, v)} keyer={keyer} params={params} component={component} />
             ))}
           </Disclosure>
         ) : null}
       </Section>
 
       <Section title="Pose" onReset={() => onChange({ pose: { tiltX: 12, tiltY: 0, tiltZ: 0 } })}>
-        <PosePad pose={doc.pose} onChange={(pose) => onChange({ pose })} />
+        <PosePad pose={doc.pose} onChange={(pose) => onChange({ pose })} keyer={keyer} />
       </Section>
 
       <Section title="Card tilt" defaultOpen={false} onReset={() => onChange({ cardTilt: { tiltX: 0, tiltY: 0, tiltZ: 0, stagger: false } })}>
@@ -118,18 +125,35 @@ export function ParamsPanel({
 }
 
 function ParamControl({
-  spec, value, onChange
-}: { spec: ParamSpec; value: ParamValue; onChange: (v: ParamValue) => void }): React.JSX.Element {
+  spec, value, onChange, keyer, params, component
+}: {
+  spec: ParamSpec
+  value: ParamValue
+  onChange: (v: ParamValue) => void
+  keyer?: Keyer
+  params?: Record<string, ParamValue>
+  component?: { cardCount: (p: Record<string, ParamValue>) => number }
+}): React.JSX.Element {
   if (spec.kind === 'slider') {
+    const v = typeof value === 'number' ? value : spec.default
+    // A count that changed over the loop would mean cards appearing and
+    // vanishing at the seam, so those sliders are not offered a diamond at
+    // all — refusing here is kinder than accepting the key and ignoring it.
+    const keyable =
+      keyer !== undefined &&
+      params !== undefined &&
+      component !== undefined &&
+      !paramAffectsCount(component, params, spec.key)
     return (
       <SliderRow
         label={spec.label}
-        value={typeof value === 'number' ? value : spec.default}
+        value={v}
         min={spec.min}
         max={spec.max}
         step={spec.step}
         unit={spec.unit}
         onChange={onChange}
+        keyframe={keyable ? keyer(`param:${spec.key}`, v) : undefined}
       />
     )
   }

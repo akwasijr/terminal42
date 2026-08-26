@@ -8,8 +8,11 @@
 import { useCallback, useRef } from 'react'
 import type { Pose } from '../../../../shared/motion/types'
 import { SliderRow } from './controls'
+import type { Keyer } from '../../lib/motion/keying'
 
-export function PosePad({ pose, onChange }: { pose: Pose; onChange: (p: Pose) => void }): React.JSX.Element {
+export function PosePad({
+  pose, onChange, keyer
+}: { pose: Pose; onChange: (p: Pose) => void; keyer?: Keyer }): React.JSX.Element {
   const drag = useRef<{ x: number; y: number; pose: Pose } | null>(null)
 
   const down = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -83,9 +86,9 @@ export function PosePad({ pose, onChange }: { pose: Pose; onChange: (p: Pose) =>
           </g>
         </svg>
       </div>
-      <SliderRow label="Tilt X" value={pose.tiltX} min={-180} max={180} step={1} unit="degrees" onChange={(v) => onChange({ ...pose, tiltX: v })} />
-      <SliderRow label="Tilt Y" value={pose.tiltY} min={-180} max={180} step={1} unit="degrees" onChange={(v) => onChange({ ...pose, tiltY: v })} />
-      <SliderRow label="Tilt Z" value={pose.tiltZ} min={-180} max={180} step={1} unit="degrees" onChange={(v) => onChange({ ...pose, tiltZ: v })} />
+      <SliderRow label="Tilt X" value={pose.tiltX} min={-180} max={180} step={1} unit="degrees" onChange={(v) => onChange({ ...pose, tiltX: v })} keyframe={keyer?.('pose:tiltX', pose.tiltX)} />
+      <SliderRow label="Tilt Y" value={pose.tiltY} min={-180} max={180} step={1} unit="degrees" onChange={(v) => onChange({ ...pose, tiltY: v })} keyframe={keyer?.('pose:tiltY', pose.tiltY)} />
+      <SliderRow label="Tilt Z" value={pose.tiltZ} min={-180} max={180} step={1} unit="degrees" onChange={(v) => onChange({ ...pose, tiltZ: v })} keyframe={keyer?.('pose:tiltZ', pose.tiltZ)} />
     </div>
   )
 }

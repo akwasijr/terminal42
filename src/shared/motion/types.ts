@@ -20,6 +20,10 @@
 // frame and the exporter work without knowing which generator produced the
 // cards.
 
+// Type-only, so this is erased at build time and the pair of files do not
+// form a runtime cycle even though each names a type from the other.
+import type { Keyframes } from './keyframes'
+
 export type ComponentId =
   | 'carousel'
   | 'ring'
@@ -367,6 +371,14 @@ export type MotionDoc = {
   visual: VisualState
   frame: FrameStyle
   export: ExportState
+  /**
+   * Values that change across the loop, by target.
+   *
+   * Optional because every piece made before keyframes existed has none, and
+   * an absent map means "nothing moves but the component", which is exactly
+   * what those pieces did.
+   */
+  keys?: Keyframes
 }
 
 /**

@@ -17,6 +17,7 @@ import { ComponentsDrawer, type SavedLayout } from './ComponentsDrawer'
 import { MotionStage, type StageHandle } from './MotionStage'
 import { ExportPanel } from './ExportPanel'
 import { ParamsPanel, VisualPanel } from './MotionPanels'
+import { MotionTimeline } from './MotionTimeline'
 import { FrameToolbar, type FrameFit } from './FrameToolbar'
 import { ResizeHandle } from './ResizeHandle'
 import { useStoredWidth } from '../../lib/motion/paneWidth'
@@ -389,21 +390,12 @@ export function MotionStudio({
           )}
         </div>
 
-        <footer className="flex shrink-0 items-center gap-2 px-3 pb-2 pt-1">
-          <input
-            type="range"
-            min={0}
-            max={0.999}
-            step={0.001}
-            value={phase}
-            aria-label="Position in the loop"
-            onChange={(e) => { setPlaying(false); setPhase(Number(e.target.value)) }}
-            className="motion-slider flex-1"
-          />
-          <span className="w-10 shrink-0 text-right font-mono text-[10.5px] text-text-muted">
-            {Math.round(phase * 100)}%
-          </span>
-        </footer>
+        <MotionTimeline
+          doc={doc}
+          phase={phase}
+          onPhase={(p) => { setPlaying(false); setPhase(p) }}
+          onChange={patch}
+        />
         {selected !== null ? (
           <div className="flex shrink-0 items-center gap-2 px-3 pb-2 text-[11px] text-text-secondary">
             <span>Card {selected + 1} selected. Drag it to move, hold Alt to turn it, drop a picture on it.</span>
@@ -445,7 +437,7 @@ export function MotionStudio({
           ))}
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {tab === 'motion' ? <ParamsPanel doc={doc} onChange={patch} /> : null}
+          {tab === 'motion' ? <ParamsPanel doc={doc} onChange={patch} phase={phase} /> : null}
           {tab === 'visual' ? (
             <VisualPanel doc={doc} onChange={patch} onImportImages={() => void importImages()} busy={busyImages} />
           ) : null}
