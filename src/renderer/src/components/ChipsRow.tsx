@@ -49,7 +49,7 @@ export function ChipsRow({
       <Chip
         icon={<IconFolder size={12} />}
         label={folderLabel}
-        title={onOpenFolder ? `${cwd} — click to reveal in Finder` : cwd}
+        title={onOpenFolder ? `${cwd} (click to reveal in Finder)` : cwd}
         onClick={onOpenFolder}
       />
       {isRepo && (

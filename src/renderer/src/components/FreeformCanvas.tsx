@@ -3453,10 +3453,10 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
           <div className="mx-1" />
           {toolBtn('frame', 'Frame (F)')}
           {shapeDropdown()}
-          {toolBtn('pencil', 'Pencil — draw freehand (N)')}
+          {toolBtn('pencil', 'Pencil: draw freehand (N)')}
           {toolBtn('text', 'Text (T)')}
           <div className="mx-1" />
-          {toolBtn('artboard', 'Artboard — drag to add a new one (B)')}
+          {toolBtn('artboard', 'Artboard: drag to add a new one (B)')}
         </div>
         <div className="mx-1.5" />
         <Tooltip label="Undo (⌘Z)" side="bottom"><button type="button" onClick={undo} disabled={!canUndo} aria-label="Undo" className="grid h-7 w-7 place-items-center rounded text-text-secondary enabled:hover:bg-elevated enabled:hover:text-text-primary disabled:opacity-30">
@@ -3589,7 +3589,7 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
             {/* Objects */}
             <div className={`flex items-center justify-between ${PANEL_HEADER_ROW}`}>
               <span className={PANEL_HEADER_TEXT}>Layers</span>
-              <button type="button" onClick={() => setTool('artboard')} title="Add artboard — drag on the canvas (B)" className="text-text-muted hover:text-text-primary">
+              <button type="button" onClick={() => setTool('artboard')} title="Add artboard: drag on the canvas (B)" className="text-text-muted hover:text-text-primary">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
               </button>
             </div>
@@ -5073,13 +5073,13 @@ function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gra
                     Group
                   </button>
                 </Tooltip>
-                <Tooltip label="Auto-layout — arrange the items side by side" side="left" className="block w-full">
+                <Tooltip label="Auto-layout: arrange the items side by side" side="left" className="block w-full">
                   <button type="button" onClick={() => groupSelection('horizontal')} className="flex w-full items-center gap-2 rounded bg-elevated px-2 py-1.5 text-[11.5px] text-text-secondary hover:text-text-primary">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="4" width="4.5" height="8" rx="1" /><rect x="9.5" y="4" width="4.5" height="8" rx="1" /></svg>
                     Horizontal flow
                   </button>
                 </Tooltip>
-                <Tooltip label="Auto-layout — stack the items top to bottom" side="left" className="block w-full">
+                <Tooltip label="Auto-layout: stack the items top to bottom" side="left" className="block w-full">
                   <button type="button" onClick={() => groupSelection('vertical')} className="flex w-full items-center gap-2 rounded bg-elevated px-2 py-1.5 text-[11.5px] text-text-secondary hover:text-text-primary">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="4" y="2" width="8" height="4.5" rx="1" /><rect x="4" y="9.5" width="8" height="4.5" rx="1" /></svg>
                     Vertical flow
@@ -5113,7 +5113,7 @@ function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gra
                 <option value="">+ Add artboard…</option>
                 {ARTBOARD_GROUPS.map((g) => (
                   <optgroup key={g.group} label={g.group}>
-                    {g.items.map((p) => <option key={p.label} value={`${p.w}|${p.h}|${p.label}`}>{p.label} — {p.w}×{p.h}</option>)}
+                    {g.items.map((p) => <option key={p.label} value={`${p.w}|${p.h}|${p.label}`}>{p.label} · {p.w}×{p.h}</option>)}
                   </optgroup>
                 ))}
               </select>

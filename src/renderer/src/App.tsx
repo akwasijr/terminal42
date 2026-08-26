@@ -908,7 +908,7 @@ function Sidebar({
             active={projectsOpen}
             showLabel={projectsOpen}
             onClick={() => setProjectsOpen((o) => !o)}
-            title={activeProject ? `Projects — ${activeProject.name}` : 'Projects'}
+            title={activeProject ? `Projects: ${activeProject.name}` : 'Projects'}
           >
             <IconFolder size={18} />
           </RailItem>

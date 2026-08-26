@@ -70,7 +70,7 @@ export function MotionView(): React.JSX.Element {
       </header>
 
       <section>
-        <h2 className="pb-2 text-[11px] uppercase tracking-wide text-text-muted">Start from</h2>
+        <h2 className="pb-2 text-[12px] font-medium text-text-secondary">Start from</h2>
         <ul className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-2">
           {MOTION_COMPONENTS.map((c) => (
             <li key={c.id}>
@@ -88,7 +88,7 @@ export function MotionView(): React.JSX.Element {
       </section>
 
       <section className="min-h-0">
-        <h2 className="pb-2 text-[11px] uppercase tracking-wide text-text-muted">Your pieces</h2>
+        <h2 className="pb-2 text-[12px] font-medium text-text-secondary">Your pieces</h2>
         {loading ? (
           <p className="text-[12px] text-text-muted">Loading…</p>
         ) : rows.length === 0 ? (

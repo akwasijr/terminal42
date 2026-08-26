@@ -99,7 +99,7 @@ function PlanRow({ step }: { step: PlanStep }): JSX.Element {
       </span>
       {step.status === 'needs_input' && step.question && (
         <span className="ml-2 truncate text-[11px] text-text-muted" title={step.question}>
-          — {step.question}
+          {step.question}
         </span>
       )}
     </li>

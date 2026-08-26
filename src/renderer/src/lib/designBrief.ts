@@ -333,11 +333,11 @@ export const SURFACE_SHAPE_OPTIONS: Array<{ id: SurfaceShapeId; label: string; h
 
 export const SECONDARY_BUTTON_OPTIONS: Array<{ id: SecondaryButtonId; label: string; hint: string }> = [
   { id: 'outlined',        label: 'Outlined',         hint: 'Transparent fill, 1-1.5px border in primary color, primary color text' },
-  { id: 'ghost',           label: 'Ghost (text only)', hint: 'No fill, no border, just colored text — hover gets a subtle bg tint' },
+  { id: 'ghost',           label: 'Ghost (text only)', hint: 'No fill, no border, just colored text; hover gets a subtle bg tint' },
   { id: 'soft',            label: 'Soft / tinted',    hint: 'Light tint of the primary color as fill, primary color text, no border' },
   { id: 'neutral',         label: 'Neutral filled',   hint: 'Surface gray fill, primary text color, no border (Material-style "tonal")' },
   { id: 'accent',          label: 'Accent color',     hint: 'Filled with the secondary/accent brand color, white text' },
-  { id: 'underline',       label: 'Underlined link',  hint: 'Inline text-style with an underline — minimal, editorial' },
+  { id: 'underline',       label: 'Underlined link',  hint: 'Inline text-style with an underline; minimal, editorial' },
   { id: 'same-as-primary', label: 'Same as primary (no distinction)', hint: 'Treat secondary actions identically to primary (rare; use only if intentional)' }
 ]
 

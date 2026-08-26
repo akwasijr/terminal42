@@ -40,7 +40,7 @@ export function Section({
         >
           <span className="truncate">{title}</span>
           {badge ? (
-            <span className="shrink-0 rounded-full bg-accent/15 px-1.5 py-0.5 text-[9.5px] font-medium uppercase tracking-wide text-accent">
+            <span className="shrink-0 rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] font-medium text-accent">
               {badge}
             </span>
           ) : null}

@@ -98,7 +98,7 @@ export function ImagesPanel({
               {busy ? 'Adding…' : 'Add your own'}
             </button>
 
-            <p className="pt-1 text-[10.5px] uppercase tracking-wide text-text-muted">Starter set</p>
+            <p className="pt-1 text-[11px] font-medium text-text-muted">Starter set</p>
             <ul className="grid grid-cols-3 gap-1">
               {IMAGE_BANK.map((b) => {
                 const inUse = images.some((i) => i.name === b.label)
@@ -126,8 +126,8 @@ export function ImagesPanel({
 
             {images.length > 0 ? (
               <>
-                <p className="pt-1 text-[10.5px] uppercase tracking-wide text-text-muted">
-                  In this piece — {images.length}
+                <p className="pt-1 text-[11px] font-medium text-text-muted">
+                  In this piece ({images.length})
                 </p>
                 <SegmentedRow
                   label="Order"

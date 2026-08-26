@@ -225,7 +225,7 @@ export function MotionStudio({
       setNote(
         saved.ok
           ? res.lagged
-            ? `Saved to ${saved.path}. Rendering could not keep up, so the clip runs slightly long — a smaller size or fewer cards will fix it.`
+            ? `Saved to ${saved.path}. Rendering could not keep up, so the clip runs slightly long. A smaller size or fewer cards will fix it.`
             : `Saved to ${saved.path}`
           : null
       )

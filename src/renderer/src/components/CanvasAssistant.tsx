@@ -257,7 +257,7 @@ export function CanvasAssistant({ getContext, onCreate, onAnimate, onEdit, onDel
             </div>
             <div className="flex min-h-0 flex-1">
               <div className="flex w-1/2 flex-col overflow-y-auto p-3">
-                <div className="mb-2 text-[11px] font-medium text-text-muted">Last run — each model call</div>
+                <div className="mb-2 text-[11px] font-medium text-text-muted">Last run, each model call</div>
                 {!lastTrace ? (
                   <p className="text-[12px] leading-relaxed text-text-muted">Run a prompt (Quality or Fast) and the structure → visual → critique → variant calls show up here: timing, what was parsed, and the raw model output — so you can see exactly where it went wrong.</p>
                 ) : lastTrace.map((s, i) => (
@@ -285,7 +285,7 @@ export function CanvasAssistant({ getContext, onCreate, onAnimate, onEdit, onDel
                 </div>
                 <div className="mt-3 pt-2">
                   <div className="mb-1 flex items-center justify-between">
-                    <span className="text-[11px] font-medium text-text-muted">Quality benchmark — cross-domain scorecard</span>
+                    <span className="text-[11px] font-medium text-text-muted">Quality benchmark, cross-domain scorecard</span>
                     <button type="button" onClick={() => setBenchOut(formatScorecard(runBenchmark()))} className="rounded-md px-2.5 py-1 text-[11px] font-medium text-text-primary hover:bg-elevated">Run benchmark</button>
                   </div>
                   {benchOut
@@ -526,8 +526,8 @@ export function CanvasAssistant({ getContext, onCreate, onAnimate, onEdit, onDel
               )}
             </div>
             <div className="flex h-7 items-center rounded-md bg-elevated p-0.5 text-[11px]">
-              <button type="button" onClick={() => setQuality(true)} title="Quality — design properly (slower, multi-step)" className={['rounded px-2 py-1 font-medium transition-colors', quality ? 'bg-bg text-text-primary' : 'text-text-muted hover:text-text-primary'].join(' ')}>Quality</button>
-              <button type="button" onClick={() => setQuality(false)} title="Fast — quick single pass" className={['rounded px-2 py-1 font-medium transition-colors', !quality ? 'bg-bg text-text-primary' : 'text-text-muted hover:text-text-primary'].join(' ')}>Fast</button>
+              <button type="button" onClick={() => setQuality(true)} title="Quality: design properly (slower, multi-step)" className={['rounded px-2 py-1 font-medium transition-colors', quality ? 'bg-bg text-text-primary' : 'text-text-muted hover:text-text-primary'].join(' ')}>Quality</button>
+              <button type="button" onClick={() => setQuality(false)} title="Fast: quick single pass" className={['rounded px-2 py-1 font-medium transition-colors', !quality ? 'bg-bg text-text-primary' : 'text-text-muted hover:text-text-primary'].join(' ')}>Fast</button>
             </div>
             <div className="ml-auto flex items-center gap-1">
               <div ref={composerMenuRef} className="relative">

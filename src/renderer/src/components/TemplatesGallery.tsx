@@ -206,7 +206,7 @@ function PreviewModal({
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-bg/75 backdrop-blur-sm">
               <Spinner large />
               <span className="text-[13px] text-text-secondary">{state.msg || 'Generating preview…'}</span>
-              <span className="text-[11.5px] text-text-muted">First run installs dependencies — this can take a few minutes.</span>
+              <span className="text-[11.5px] text-text-muted">First run installs dependencies, which can take a few minutes.</span>
             </div>
           )}
         </div>

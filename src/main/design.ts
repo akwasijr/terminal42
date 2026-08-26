@@ -967,7 +967,7 @@ async function send(
       }
       const notice: DesignMessage = {
         id: randomUUID(), designId, role: 'system',
-        content: `Model "${state.requestedModel}" isn't available on this Copilot CLI right now — retrying with the default model.`,
+        content: `Model "${state.requestedModel}" isn't available on this Copilot CLI right now, so this is retrying with the default model.`,
         toolCalls: [], status: 'done', createdAt: Date.now()
       }
       insertMessage(notice)

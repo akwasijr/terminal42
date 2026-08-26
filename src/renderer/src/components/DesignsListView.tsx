@@ -553,7 +553,7 @@ function FolderAssign({ id, current, folders, onAssign }: { id: string; current:
       </button>
       {open && (
         <div className="absolute right-0 top-full z-30 mt-1 w-44 overflow-hidden rounded-lg bg-raised py-1 shadow-overlay">
-          <div className="px-3 py-1 text-[10.5px] font-medium uppercase tracking-wide text-text-muted">Move to folder</div>
+          <div className="px-3 py-1 text-[11px] font-medium text-text-muted">Move to folder</div>
           <button type="button" onClick={(e) => { e.stopPropagation(); onAssign(id, null); setOpen(false) }} className={['flex w-full items-center px-3 py-1.5 text-left text-[12px] hover:bg-elevated', !current ? 'text-text-primary' : 'text-text-secondary'].join(' ')}>No folder</button>
           {folders.map((f) => (
             <button key={f} type="button" onClick={(e) => { e.stopPropagation(); onAssign(id, f); setOpen(false) }} className={['flex w-full items-center justify-between px-3 py-1.5 text-left text-[12px] hover:bg-elevated', current === f ? 'text-text-primary' : 'text-text-secondary'].join(' ')}>

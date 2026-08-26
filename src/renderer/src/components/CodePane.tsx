@@ -126,7 +126,7 @@ export function CodeView({
  */
 function SourceBody({ text, tokens }: { text: string | null; tokens: CodeToken[][] | null }): JSX.Element {
   if (text === null) {
-    return <p className="px-3 py-6 text-[12.5px] text-text-muted">This file no longer exists — the turn deleted it.</p>
+    return <p className="px-3 py-6 text-[12.5px] text-text-muted">This file no longer exists. The turn deleted it.</p>
   }
   if (text === '') {
     return <p className="px-3 py-6 text-[12.5px] text-text-muted">This file is empty.</p>

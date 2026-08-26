@@ -103,7 +103,7 @@ export function ComponentsDrawer({
               ))}
             </ul>
 
-            <p className="px-2 pb-1 pt-3 text-[10.5px] uppercase tracking-wide text-text-muted">Not built yet</p>
+            <p className="px-3 pb-1 pt-4 text-[11px] font-medium text-text-muted">Not built yet</p>
             <ul className="flex flex-col gap-0.5">
               {SOON_COMPONENTS.map((name) => (
                 <li key={name}>

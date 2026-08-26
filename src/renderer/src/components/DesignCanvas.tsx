@@ -636,7 +636,7 @@ export function DesignCanvas({
       ? `"${elementLabel}"`
       : friendlyElementLabel(pick.selector)
     const text = `On the canvas, the element \`${pick.selector}\`${pick.text ? ` ("${pick.text}")` : ''}: ${note}`
-    const displayText = elementCaption ? `${elementCaption} — ${note}` : note
+    const displayText = elementCaption ? `${elementCaption}: ${note}` : note
 
     setPick(null); setPickComment(''); setAnnotate(false)
     // Route through the chat rail's send pipeline so the annotation

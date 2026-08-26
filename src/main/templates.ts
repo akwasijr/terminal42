@@ -31,9 +31,9 @@ export type TemplateInfo = {
 const DISPLAY_OVERRIDES: Record<string, { name: string; description: string; category: TemplateInfo['category'] }> = {
   'consumer-app': { name: 'Consumer app', description: 'Mobile-first consumer product shell.', category: 'consumer' },
   'dashboard': { name: 'Dashboard', description: 'Generic analytics dashboard scaffold.', category: 'dashboard' },
-  'fluent-enterprise-dashboard': { name: 'Fluent — Enterprise dashboard', description: 'Microsoft Fluent enterprise dashboard.', category: 'fluent' },
-  'fluent-internal-tools': { name: 'Fluent — Internal tools', description: 'Internal tooling kit on Fluent.', category: 'fluent' },
-  'fluent-teams-app': { name: 'Fluent — Teams app', description: 'Teams-style app shell on Fluent.', category: 'fluent' },
+  'fluent-enterprise-dashboard': { name: 'Fluent: Enterprise dashboard', description: 'Microsoft Fluent enterprise dashboard.', category: 'fluent' },
+  'fluent-internal-tools': { name: 'Fluent: Internal tools', description: 'Internal tooling kit on Fluent.', category: 'fluent' },
+  'fluent-teams-app': { name: 'Fluent: Teams app', description: 'Teams-style app shell on Fluent.', category: 'fluent' },
   'industry-banking': { name: 'Banking', description: 'Banking & financial services starter.', category: 'industry' },
   'industry-ceo-dashboard': { name: 'CEO dashboard', description: 'Executive board-level dashboard.', category: 'industry' },
   'industry-education-higher': { name: 'Higher education', description: 'University / higher-ed starter.', category: 'industry' },

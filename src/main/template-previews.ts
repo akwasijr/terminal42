@@ -159,7 +159,7 @@ async function generateOne(id: string, broadcast: (msg: string, pct?: number) =>
     const onProgress: ProgressFn = (msg) => broadcast(msg)
 
     if (!existsSync(join(src, 'node_modules'))) {
-      onProgress('Installing dependencies (first run only — this can take a few minutes)…')
+      onProgress('Installing dependencies (first run only, this can take a few minutes)…')
       const ins = await runStreamed('npm', ['install', '--no-audit', '--no-fund', '--legacy-peer-deps', '--loglevel=error'], src, onProgress, 'install')
       if (ins.code !== 0) return { ok: false, error: `npm install failed: ${ins.lastErr || 'see logs'}` }
     }

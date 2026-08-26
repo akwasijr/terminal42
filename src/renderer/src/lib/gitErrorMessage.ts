@@ -64,7 +64,7 @@ const PULL_RULES: Rule[] = [
 const COMMIT_RULES: Rule[] = [
   {
     match: /nothing to commit|no changes added to commit/i,
-    message: 'There was nothing to save — no files have changed.'
+    message: 'There was nothing to save. No files have changed.'
   },
   {
     match: /Please tell me who you are|unable to auto-detect email address/i,

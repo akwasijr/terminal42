@@ -186,7 +186,7 @@ export function FrameToolbar({
         <Divider />
 
         <ToolButton
-          label={poseMode ? 'Stop posing — drag turns the piece' : 'Pose: drag to tilt, Shift to scale, Cmd to move'}
+          label={poseMode ? 'Stop posing. Drag turns the piece.' : 'Pose: drag to tilt, Shift to scale, Cmd to move'}
           onClick={() => onPoseMode(!poseMode)}
           active={poseMode}
         >
@@ -279,7 +279,7 @@ function Popover({ label, trigger, children }: { label: string; trigger: ReactNo
 }
 
 function PopTitle({ children }: { children: ReactNode }): React.JSX.Element {
-  return <p className="text-[10.5px] font-medium uppercase tracking-wide text-text-muted">{children}</p>
+  return <p className="text-[11px] font-medium text-text-muted">{children}</p>
 }
 
 function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }): React.JSX.Element {

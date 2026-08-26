@@ -58,7 +58,7 @@ describe('gitErrorMessage for a failed pull', () => {
 describe('gitErrorMessage for a failed commit', () => {
   it('explains that there was nothing to save', () => {
     expect(gitErrorMessage('commit', 'nothing to commit, working tree clean')).toBe(
-      'There was nothing to save — no files have changed.'
+      'There was nothing to save. No files have changed.'
     )
   })
 
