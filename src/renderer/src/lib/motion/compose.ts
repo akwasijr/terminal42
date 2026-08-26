@@ -34,6 +34,8 @@ export type ComposeOptions = {
    * cost more than everything else here put together.
    */
   skipStatic?: boolean
+  /** Where in the loop this frame is, which decides which layers are on screen. */
+  phase?: number
 }
 
 /** A scratch canvas for the card layer, kept between frames. */
@@ -105,7 +107,7 @@ export function composeFrame(
 
   if (!opts.skipStatic) {
     drawEffects(ctx, fx, width, height)
-    drawLogos(ctx, doc.visual.logos, opts.images ?? new Map(), width, height)
-    drawOverlay(ctx, doc.visual.text, width, height)
+    drawLogos(ctx, doc.visual.logos, opts.images ?? new Map(), width, height, opts.phase ?? 0)
+    drawOverlay(ctx, doc.visual.text, width, height, opts.phase ?? 0)
   }
 }

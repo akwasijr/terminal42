@@ -207,3 +207,55 @@ export function waveAt(w: Wave, x: number, y: number, p: number): number {
   const travel = p * Math.round(w.speed)
   return Math.sin((along * w.frequency + travel) * TAU) * w.depth
 }
+
+/**
+ * How visible a layer is at this point in the loop.
+ *
+ * A window with no bounds is the whole loop, which is what every layer meant
+ * before layers had timing at all — so an old piece opens looking exactly as
+ * it did. `from` above `to` reads as wrapping through the seam rather than
+ * as a mistake, because the seam is an arbitrary place to have to stop.
+ *
+ * The fade is on both ends and inside the window, so asking for a window
+ * always gives you at least that much of the layer at full strength in the
+ * middle of it rather than a window that is entirely ramp.
+ */
+/**
+ * Wrap an end position, but let the end of the loop stay the end of the loop.
+ *
+ * Plain wrapping sends 1 to 0, which would read a window covering the whole
+ * loop as one of no width — a layer that never appears. An end is the only
+ * place where the two ends of the loop are worth telling apart.
+ */
+function wrapEnd(v: number): number {
+  const w = wrap01(v)
+  return w === 0 && v !== 0 ? 1 : w
+}
+
+export function layerVisibility(
+  span: { from?: number; to?: number; fade?: number },
+  p: number
+): number {
+  const from = span.from
+  const to = span.to
+  if (from === undefined && to === undefined) return 1
+  const a = wrap01(from ?? 0)
+  const b = wrapEnd(to ?? 1)
+  // A window with no width is a layer that was dragged shut, not one that is
+  // open all the way round.
+  if (a === b) return 0
+
+  const width = b > a ? b - a : 1 - a + b
+  // Distance travelled into the window, which is the one number both the
+  // wrapped and unwrapped cases can be answered from.
+  const into = b > a
+    ? (p >= a && p <= b ? p - a : -1)
+    : (p >= a ? p - a : p <= b ? 1 - a + p : -1)
+  if (into < 0) return 0
+
+  const fade = Math.min(Math.max(span.fade ?? 0, 0), 0.5) * width
+  if (fade <= 0) return 1
+  const inAt = into / fade
+  const outAt = (width - into) / fade
+  return Math.min(1, Math.max(0, Math.min(inAt, outAt, 1)))
+}

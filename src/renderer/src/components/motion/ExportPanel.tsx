@@ -60,24 +60,10 @@ export function ExportPanel({
           ]}
           onChange={(v) => onChange({ export: { ...doc.export, resolution: Number(v) as MotionDoc['export']['resolution'] } })}
         />
-        <SegmentedRow
-          label="Frames per second"
-          value={String(doc.export.fps)}
-          options={[{ value: '24', label: '24' }, { value: '30', label: '30' }, { value: '60', label: '60' }]}
-          onChange={(v) => onChange({ export: { ...doc.export, fps: Number(v) as 24 | 30 | 60 } })}
-        />
         <ToggleRow
           label="Draw the grid behind the piece"
           value={doc.export.gridBehindComponent}
           onChange={(v) => onChange({ export: { ...doc.export, gridBehindComponent: v } })}
-        />
-        <SliderRow
-          label="Loop length in seconds"
-          value={doc.export.durationSec}
-          min={1}
-          max={20}
-          step={0.5}
-          onChange={(v) => onChange({ export: { ...doc.export, durationSec: v } })}
         />
         {support ? (
           <button

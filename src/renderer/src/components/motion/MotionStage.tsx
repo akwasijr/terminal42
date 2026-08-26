@@ -8,7 +8,7 @@
 
 import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from 'react'
 import type { CardOverride, MotionDoc } from '../../../../shared/motion/types'
-import { cardCountFor, emptyOverride } from '../../../../shared/motion/frame'
+import { cardCountFor, emptyOverride, layerVisibility } from '../../../../shared/motion/frame'
 import { placementsAt, totalDuration } from '../../../../shared/motion/entrance'
 import type { FrameFit } from './FrameToolbar'
 import { MotionEngine } from '../../lib/motion/engine'
@@ -88,6 +88,12 @@ export function MotionStage({
   // loop and as state for the one style that depends on it.
   const [fxLive, setFxLive] = useState(false)
   const fxLiveRef = useRef(false)
+  // Type and logos sit on a layer redrawn only when the document changes,
+  // which was true until a layer could come and go over the loop. Rather than
+  // give that up and pay for grain every frame, the loop watches for the
+  // moment a layer's visibility actually changes and asks for one redraw.
+  const [visTick, setVisTick] = useState(0)
+  const visRef = useRef('')
   const [hint, setHint] = useState<string | null>(null)
   const dragRef = useRef<DragState | null>(null)
   const sizeRef = useRef(size)
@@ -121,7 +127,7 @@ export function MotionStage({
       out.height = h
       const ctx = out.getContext('2d')
       if (!ctx) return null
-      composeFrame(ctx, doc, gl, w, h, { showGrid: doc.frame.gridVisible, images })
+      composeFrame(ctx, doc, gl, w, h, { showGrid: doc.frame.gridVisible, images, phase: phaseRef.current })
       return out.toDataURL('image/jpeg', 0.7)
     }
   }), [doc.frame, doc.visual.text, doc.visual.logos, doc.visual.effects, images, size])
@@ -201,11 +207,11 @@ export function MotionStage({
       if (ctx) {
         ctx.clearRect(0, 0, over.width, over.height)
         drawEffects(ctx, doc.visual.effects, over.width, over.height)
-        drawLogos(ctx, doc.visual.logos, images, over.width, over.height)
-        drawOverlay(ctx, doc.visual.text, over.width, over.height)
+        drawLogos(ctx, doc.visual.logos, images, over.width, over.height, phaseRef.current)
+        drawOverlay(ctx, doc.visual.text, over.width, over.height, phaseRef.current)
       }
     }
-  }, [size, ready, fontTick, doc.frame, doc.visual.text, doc.visual.logos, doc.visual.effects, images])
+  }, [size, ready, fontTick, visTick, doc.frame, doc.visual.text, doc.visual.logos, doc.visual.effects, images])
 
   // A webfont arrives after the frame it was first asked for has been painted,
   // and a canvas does not re-render itself the way the DOM does. Bumping this
@@ -465,7 +471,8 @@ export function MotionStage({
               // is redrawn only when the document changes. Reading back every
               // pixel for a texture that never moves would cost more each
               // frame than everything else here together.
-              skipStatic: true
+              skipStatic: true,
+              phase: phaseRef.current
             })
           } else if (fxLiveRef.current) {
             fctx.clearRect(0, 0, fxCanvas.width, fxCanvas.height)
@@ -475,6 +482,12 @@ export function MotionStage({
       if (fxLiveRef.current !== wants) {
         fxLiveRef.current = wants
         setFxLive(wants)
+      }
+
+      const vis = visibilitySignature(d, phaseRef.current)
+      if (vis !== visRef.current) {
+        visRef.current = vis
+        setVisTick((n) => n + 1)
       }
     }
     raf = requestAnimationFrame(tick)
@@ -543,6 +556,28 @@ type DragState = {
   baseOverride: CardOverride
   /** How far this drag has gone so far, in scene units and degrees. */
   acc: { x: number; y: number; z: number; rx: number; ry: number }
+}
+
+/**
+ * Which layers are on screen right now, as a string that changes when that
+ * changes and not otherwise.
+ *
+ * Rounded, because a fade is a continuous number and comparing it exactly
+ * would mean a redraw on every frame of every fade — which is the cost this
+ * exists to avoid. Two decimal places is finer than the eye reads on an
+ * opacity ramp and coarse enough to hold still.
+ */
+function visibilitySignature(doc: MotionDoc, phase: number): string {
+  let out = ''
+  for (const t of doc.visual.text) {
+    if (t.from === undefined && t.to === undefined) continue
+    out += `t${t.id}:${layerVisibility(t, phase).toFixed(2)};`
+  }
+  for (const l of doc.visual.logos) {
+    if (l.from === undefined && l.to === undefined) continue
+    out += `l${l.id}:${layerVisibility(l, phase).toFixed(2)};`
+  }
+  return out
 }
 
 function clamp(v: number, lo: number, hi: number): number {

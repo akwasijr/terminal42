@@ -49,7 +49,8 @@ function composite(
   composeFrame(ctx, doc, gl, width, height, {
     transparent,
     showGrid: doc.frame.gridInExport || doc.export.gridBehindComponent,
-    images: engine.sourceImages
+    images: engine.sourceImages,
+    phase
   })
 }
 

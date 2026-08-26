@@ -20,16 +20,17 @@ const ASPECTS: ReadonlyArray<{ id: FrameAspect; label: string }> = [
   { id: '9:16', label: '9:16' }
 ]
 
-// A short row of backgrounds you would actually reach for, dark to light with
-// two tinted neutrals. Anything else is a hex away.
+// A short row of backgrounds you would actually reach for, running dark to
+// light. Five, because they sit in the toolbar rather than behind it and the
+// toolbar is over the work — a longer row starts covering the thing you are
+// choosing a background for. Everything else is one click further, in the
+// picker, which is where the current colour lives when it is not one of these.
 const SWATCHES: ReadonlyArray<{ value: string; label: string }> = [
   { value: '#000000', label: 'Black' },
   { value: '#111113', label: 'Near black' },
   { value: '#3a3a3f', label: 'Slate' },
-  { value: '#8a8a90', label: 'Grey' },
   { value: '#cfcac2', label: 'Stone' },
-  { value: '#f2f0ec', label: 'Paper' },
-  { value: '#ffffff', label: 'White' }
+  { value: '#f2f0ec', label: 'Paper' }
 ]
 
 const GRID_PRESETS: ReadonlyArray<{ columns: number; rows: number }> = [
@@ -122,36 +123,7 @@ export function FrameToolbar({
 
         <Divider />
 
-        <Popover
-          open={openPop === 'background'}
-          onOpen={(o) => setOpenPop(o ? 'background' : null)}
-          label="Background"
-          trigger={
-            <span
-              className="block h-3.5 w-3.5 rounded-sm ring-1 ring-inset ring-border"
-              style={{ background: frame.background }}
-            />
-          }
-        >
-          <PopTitle>Background</PopTitle>
-          <div className="flex flex-wrap gap-1">
-            {SWATCHES.map((s) => (
-              <button
-                key={s.value}
-                type="button"
-                title={s.label}
-                aria-label={s.label}
-                aria-pressed={frame.background.toLowerCase() === s.value}
-                onClick={() => setFrame({ background: s.value })}
-                className={`h-5 w-5 rounded-sm ring-1 ring-inset transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                  frame.background.toLowerCase() === s.value ? 'ring-accent' : 'ring-border'
-                }`}
-                style={{ background: s.value }}
-              />
-            ))}
-          </div>
-          <HexField value={frame.background} onChange={(v) => setFrame({ background: v })} />
-        </Popover>
+        <BackgroundSwatches value={frame.background} onChange={(background) => setFrame({ background })} />
 
         <Divider />
 
@@ -456,4 +428,75 @@ function GlobeGlyph(): React.JSX.Element {
 }
 function ResetGlyph(): React.JSX.Element {
   return <svg {...S}><path d="M3 8a5 5 0 1 1 1.6 3.7" /><path d="M2 5v3.2h3.2" /></svg>
+}
+
+/**
+ * The backgrounds, in the toolbar rather than behind it.
+ *
+ * A background is judged against the work, and the work is right there, so
+ * the choice should be one click and not two. The last button is the current
+ * colour and opens the picker: when the background is one of the five it
+ * repeats it, and when it is not, it is the only place that colour is shown.
+ */
+function BackgroundSwatches({
+  value, onChange
+}: { value: string; onChange: (v: string) => void }): React.JSX.Element {
+  const openPicker = useColorPicker()
+  const custom = useRef<HTMLButtonElement>(null)
+  const safe = /^#[0-9a-fA-F]{6}$/.test(value) ? value : '#000000'
+  const current = safe.toLowerCase()
+
+  const open = (): void => {
+    const r = custom.current?.getBoundingClientRect()
+    if (!openPicker || !r) return
+    openPicker({
+      value: safe,
+      opacity: 1,
+      showAlpha: false,
+      anchor: { left: r.left, top: r.top, right: r.right, bottom: r.bottom },
+      onChange
+    })
+  }
+
+  return (
+    <div className="flex items-center gap-1" role="group" aria-label="Background">
+      {SWATCHES.map((s) => (
+        <button
+          key={s.value}
+          type="button"
+          // The hex is on the tooltip because the name is what you pick by and
+          // the number is what you need when you are matching something else.
+          title={`${s.label} · ${s.value.toUpperCase()}`}
+          aria-label={s.label}
+          aria-pressed={current === s.value}
+          onClick={() => onChange(s.value)}
+          className="h-4 w-4 shrink-0 rounded-[4px] transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          style={{
+            background: s.value,
+            boxShadow: current === s.value
+              ? '0 0 0 1.5px var(--color-accent), inset 0 0 0 1px rgb(255 255 255 / 0.14)'
+              : 'inset 0 0 0 1px rgb(255 255 255 / 0.14)'
+          }}
+        />
+      ))}
+      <button
+        ref={custom}
+        type="button"
+        onClick={open}
+        disabled={!openPicker}
+        title={`Pick a background · ${safe.toUpperCase()}`}
+        aria-label="Pick a background"
+        className="relative h-4 w-4 shrink-0 rounded-full transition-transform enabled:hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        style={{
+          background: `conic-gradient(from 0deg, #ff4d4d, #ffd24d, #4dff88, #4dd2ff, #8a4dff, #ff4dd2, #ff4d4d)`,
+          boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / 0.2)'
+        }}
+      >
+        <span
+          className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+          style={{ background: safe, boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / 0.25)' }}
+        />
+      </button>
+    </div>
+  )
 }

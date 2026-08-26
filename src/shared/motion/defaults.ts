@@ -411,6 +411,30 @@ function hydrateGlass(raw: unknown, base: GlassFx): GlassFx {
   }
 }
 
+/**
+ * The window a layer is on screen for, if it has one.
+ *
+ * Left absent rather than filled in with nought and one, because absent is
+ * what the rest of the code reads as "the whole loop" — writing the bounds
+ * out would make every layer look as though someone had set its timing.
+ */
+function hydrateSpan(raw: Partial<Record<'from' | 'to' | 'fade', unknown>>): {
+  from?: number
+  to?: number
+  fade?: number
+} {
+  const unit = (v: unknown): number | undefined =>
+    typeof v === 'number' && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : undefined
+  const span: { from?: number; to?: number; fade?: number } = {}
+  const from = unit(raw.from)
+  const to = unit(raw.to)
+  const fade = unit(raw.fade)
+  if (from !== undefined) span.from = from
+  if (to !== undefined) span.to = to
+  if (fade !== undefined) span.fade = Math.min(0.5, fade)
+  return span
+}
+
 function hydrateLogos(raw: unknown): LogoLayer[] {
   if (!Array.isArray(raw)) return []
   const out: LogoLayer[] = []
@@ -426,7 +450,8 @@ function hydrateLogos(raw: unknown): LogoLayer[] {
       size: num(l.size, 20, 1, 100),
       opacity: num(l.opacity, 100, 0, 100),
       x: num(l.x, 50, 0, 100),
-      y: num(l.y, 50, 0, 100)
+      y: num(l.y, 50, 0, 100),
+      ...hydrateSpan(l)
     })
   }
   return out

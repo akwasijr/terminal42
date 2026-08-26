@@ -58,6 +58,7 @@ export function MotionStudio({
   const [fit, setFit] = useState<FrameFit>('contain')
   const [leftWidth, setLeftWidth] = useStoredWidth('motion.leftPane', 240, 180, 420)
   const [rightWidth, setRightWidth] = useStoredWidth('motion.rightPane', 256, 200, 460)
+  const [panelOpen, setPanelOpen] = useState(true)
   // A replay is an event, not a state, so it travels as a counter the stage
   // watches: the same button pressed twice must fire twice.
   const [replayToken, setReplayToken] = useState(0)
@@ -65,6 +66,34 @@ export function MotionStudio({
   const [replayed, setReplayed] = useState(false)
   const stage = useRef<StageHandle | null>(null)
   const cancelRef = useRef({ cancelled: false })
+
+  // Reset is per tab because the tabs are what the panel is divided into, and
+  // one button that threw away the whole piece would be a different, much
+  // more frightening thing than the section resets it sits above.
+  const resetTab = useCallback((which: Tab) => {
+    setDoc((d) => {
+      const fresh = emptyDoc(d.componentId)
+      if (which === 'motion') {
+        return {
+          ...d,
+          params: {}, pose: fresh.pose, cardTilt: fresh.cardTilt,
+          displacement: fresh.displacement, transform: fresh.transform,
+          easing: fresh.easing, animation: fresh.animation,
+          overrides: {}, keys: undefined, animationEnabled: fresh.animationEnabled
+        }
+      }
+      if (which === 'visual') {
+        // The pictures stay. They were imported from somewhere, possibly a
+        // long way away, and no reset of how a card looks should mean going
+        // and finding them again.
+        return {
+          ...d,
+          visual: { ...fresh.visual, images: d.visual.images, imageOrder: d.visual.imageOrder }
+        }
+      }
+      return { ...d, export: fresh.export }
+    })
+  }, [])
 
   const patch = useCallback((p: Partial<MotionDoc>) => {
     setDoc((d) => ({ ...d, ...p }))
@@ -427,12 +456,22 @@ export function MotionStudio({
         ) : null}
       </section>
 
-      <ResizeHandle label="Resize the settings panel" width={rightWidth} onWidth={setRightWidth} side="right" min={200} max={460} />
+      {panelOpen ? (
+        <ResizeHandle label="Resize the settings panel" width={rightWidth} onWidth={setRightWidth} side="right" min={200} max={460} />
+      ) : null}
 
+      {panelOpen ? (
       <aside
         style={{ width: rightWidth }}
         className="flex h-full shrink-0 flex-col overflow-hidden rounded-panel bg-surface"
       >
+        <div className="flex shrink-0 items-center gap-1 px-2 pt-2">
+          <PanelIconButton label="Hide the settings" onClick={() => setPanelOpen(false)}>
+            <CollapseGlyph />
+          </PanelIconButton>
+          <div className="flex-1" />
+          <PanelReset tab={tab} onReset={() => resetTab(tab)} />
+        </div>
         <header className="m-2 flex shrink-0 items-center gap-0.5 rounded-lg bg-sunken p-0.5">
           {(['motion', 'visual', 'export'] as const).map((t) => (
             <button
@@ -465,6 +504,13 @@ export function MotionStudio({
           ) : null}
         </div>
       </aside>
+      ) : (
+        <aside className="flex h-full w-9 shrink-0 flex-col items-center gap-1 rounded-panel bg-surface py-2">
+          <PanelIconButton label="Show the settings" onClick={() => setPanelOpen(true)}>
+            <ExpandPanelGlyph />
+          </PanelIconButton>
+        </aside>
+      )}
       {pickerReq ? <ColorPicker req={pickerReq} /> : null}
     </div>
     </MotionPickerProvider>
@@ -473,4 +519,90 @@ export function MotionStudio({
 
 function slug(title: string): string {
   return title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'motion'
+}
+
+function PanelIconButton({
+  label, onClick, children
+}: { label: string; onClick: () => void; children: React.ReactNode }): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-text-muted transition-colors hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+    >
+      {children}
+    </button>
+  )
+}
+
+/**
+ * Reset for everything the current tab covers.
+ *
+ * It asks first. Motion has no undo, and this throws away more than any of
+ * the section resets below it — an accidental click would cost work that
+ * cannot be got back, and a second click is a very small price for that not
+ * being possible.
+ */
+function PanelReset({ tab, onReset }: { tab: Tab; onReset: () => void }): React.JSX.Element {
+  const [asking, setAsking] = useState(false)
+
+  useEffect(() => {
+    if (!asking) return
+    const t = setTimeout(() => setAsking(false), 4000)
+    return () => clearTimeout(t)
+  }, [asking])
+
+  // Changing tab while it is asking would leave the question pointing at
+  // something the user is no longer looking at.
+  useEffect(() => setAsking(false), [tab])
+
+  if (asking) {
+    return (
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => { onReset(); setAsking(false) }}
+          className="rounded-md bg-raised px-2 py-1 text-[10.5px] text-text-primary transition-colors hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+        >
+          Reset {tab}
+        </button>
+        <button
+          type="button"
+          onClick={() => setAsking(false)}
+          className="rounded-md px-1.5 py-1 text-[10.5px] text-text-muted transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+        >
+          Keep
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setAsking(true)}
+      title={`Reset everything under ${tab}`}
+      className="rounded-md px-1.5 py-1 text-[10.5px] text-text-muted transition-colors hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+    >
+      Reset
+    </button>
+  )
+}
+
+function CollapseGlyph(): React.JSX.Element {
+  return (
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M2.5 3v10M9.5 5.5 7 8l2.5 2.5M13.5 8H7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function ExpandPanelGlyph(): React.JSX.Element {
+  return (
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M13.5 3v10M6.5 5.5 9 8l-2.5 2.5M2.5 8H9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
 }

@@ -199,6 +199,17 @@ export type TextLayer = {
   opacity?: number
   /** Whether the words are drawn in capitals. */
   caps?: boolean
+  /**
+   * When in the loop this layer is on screen, as fractions of it.
+   *
+   * Absent means the whole loop, which is what every layer written before
+   * this existed meant. `from` above `to` wraps through the seam, so a layer
+   * can span the end of the loop without being split into two.
+   */
+  from?: number
+  to?: number
+  /** How long the layer takes to fade in and out, as a fraction of the loop. */
+  fade?: number
 }
 
 export type TextAlign = 'left' | 'center' | 'right'
@@ -216,8 +227,17 @@ export const TEXT_DEFAULTS = {
   caps: false
 } as const
 
-/** A text layer with every typographic field settled, for drawing. */
-export type ResolvedText = TextLayer & Required<Omit<TextLayer, 'id' | 'text' | 'size' | 'colour' | 'x' | 'y'>>
+/**
+ * A text layer with every typographic field settled, for drawing.
+ *
+ * Timing is left alone. Absent bounds mean the whole loop, and filling them
+ * in with numbers would turn "always" into a window that merely happens to
+ * cover everything — a difference that matters the moment the loop is
+ * measured against something else.
+ */
+export type ResolvedText =
+  TextLayer &
+  Required<Omit<TextLayer, 'id' | 'text' | 'size' | 'colour' | 'x' | 'y' | 'from' | 'to' | 'fade'>>
 
 export function resolvedText(layer: TextLayer): ResolvedText {
   return {
@@ -249,7 +269,21 @@ export type LogoLayer = {
   opacity: number
   x: number
   y: number
+  /** When in the loop this layer is on screen. See TextLayer.from. */
+  from?: number
+  to?: number
+  fade?: number
 }
+
+/**
+ * The frame rates worth offering.
+ *
+ * The film rate, the two broadcast rates and their doubled versions. Anything
+ * else is either a rate no delivery spec asks for or one this app cannot hit,
+ * and a free number here would mostly produce files that judder somewhere.
+ */
+export const FRAME_RATES = [24, 25, 30, 50, 60] as const
+export type FrameRate = (typeof FRAME_RATES)[number]
 
 /** How far a treatment reaches in from each edge, as a percentage of the frame. */
 export type EdgeAmounts = { top: number; bottom: number; left: number; right: number }
@@ -456,7 +490,7 @@ export type VideoFormat = 'mp4' | 'webm' | 'gif'
 export type ExportState = {
   resolution: 720 | 1080 | 1440 | 2160 | 4320
   format: VideoFormat
-  fps: 24 | 30 | 60
+  fps: FrameRate
   durationSec: number
   seamlessLoop: boolean
   gridBehindComponent: boolean

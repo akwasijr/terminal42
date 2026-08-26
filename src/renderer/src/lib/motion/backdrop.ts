@@ -10,6 +10,7 @@
 import type { FrameStyle, LogoLayer, MotionDoc, TextLayer } from '../../../../shared/motion/types'
 import { resolvedText } from '../../../../shared/motion/types'
 import { clipTimeline } from '../../../../shared/motion/entrance'
+import { layerVisibility } from '../../../../shared/motion/frame'
 import { fontByLabel } from '../freeformTypes'
 
 export function drawBackdrop(
@@ -98,10 +99,13 @@ export function drawOverlay(
   ctx: CanvasRenderingContext2D,
   layers: TextLayer[],
   width: number,
-  height: number
+  height: number,
+  phase = 0
 ): void {
   for (const raw of layers) {
     if (!raw.text.trim()) continue
+    const visible = layerVisibility(raw, phase)
+    if (visible <= 0) continue
     const layer = resolvedText(raw)
     if (layer.opacity <= 0) continue
 
@@ -111,7 +115,7 @@ export function drawOverlay(
     const step = px * layer.lineHeight
 
     ctx.save()
-    ctx.globalAlpha = layer.opacity / 100
+    ctx.globalAlpha = (layer.opacity / 100) * visible
     ctx.fillStyle = layer.colour
     ctx.textAlign = layer.align
     ctx.textBaseline = 'middle'
@@ -153,16 +157,19 @@ export function drawLogos(
   layers: LogoLayer[],
   images: Map<string, HTMLImageElement>,
   width: number,
-  height: number
+  height: number,
+  phase = 0
 ): void {
   for (const layer of layers) {
+    const visible = layerVisibility(layer, phase)
+    if (visible <= 0) continue
     const img = images.get(layer.imageId)
     if (!img || !img.complete || img.naturalWidth === 0) continue
     if (layer.opacity <= 0) continue
     const w = (layer.size / 100) * width
     const h = w * (img.naturalHeight / img.naturalWidth)
     ctx.save()
-    ctx.globalAlpha = Math.min(1, Math.max(0, layer.opacity / 100))
+    ctx.globalAlpha = Math.min(1, Math.max(0, layer.opacity / 100)) * visible
     ctx.drawImage(img, (layer.x / 100) * width - w / 2, (layer.y / 100) * height - h / 2, w, h)
     ctx.restore()
   }
