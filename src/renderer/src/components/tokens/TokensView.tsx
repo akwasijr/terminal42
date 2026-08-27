@@ -833,6 +833,13 @@ const STATE_NOTE: Record<string, string> = {
   off: 'Off. Press to export it.'
 }
 
+/** Tokens Studio writes `original`; CSS has no such word for "leave it". */
+function cssTextCase(v: string): 'none' | 'uppercase' | 'lowercase' | 'capitalize' {
+  const k = v.toLowerCase()
+  if (k === 'uppercase' || k === 'lowercase' || k === 'capitalize') return k
+  return 'none'
+}
+
 function shortValue(v: TokenValue | null): string {
   if (v === null) return 'unresolved'
   if (typeof v === 'object') return Object.values(v).slice(0, 3).join(' ')
@@ -981,6 +988,61 @@ function TokenMark({ token, value }: { token: Token; value: TokenValue | null })
             style={{ opacity: parseFloat(String(value)) || 0 }}
             className="block h-6 w-6 rounded-full bg-accent"
           />
+        </span>
+      )
+    case 'gradient':
+      return <span style={{ background: String(value) }} className="block h-12 rounded-md" />
+    case 'boolean': {
+      const on = String(value) === 'true' || value === 1
+      return (
+        <span className="grid h-12 place-items-center rounded-md bg-sunken">
+          <span
+            className={`block h-2.5 w-2.5 rounded-full ${on ? 'bg-accent' : 'bg-text-muted/40'}`}
+            aria-hidden="true"
+          />
+        </span>
+      )
+    }
+    case 'text':
+      return (
+        <span className="grid h-12 place-items-center overflow-hidden rounded-md bg-sunken px-2">
+          <span className="block truncate text-[12px] text-text-primary">{String(value) || '—'}</span>
+        </span>
+      )
+    case 'asset': {
+      // An asset is a path until it is a picture. Shown as the picture where
+      // it loads, because that is the only way to tell two logos apart.
+      const src = String(value)
+      return (
+        <span className="grid h-12 place-items-center overflow-hidden rounded-md bg-sunken px-1">
+          {/^(https?:|data:|file:|\/)/i.test(src) ? (
+            <img src={src} alt="" className="max-h-10 max-w-full object-contain" />
+          ) : (
+            <span className="block truncate font-mono text-[10px] text-text-secondary">{src || '—'}</span>
+          )}
+        </span>
+      )
+    }
+    case 'textCase':
+      return (
+        <span className="grid h-12 place-items-center rounded-md bg-sunken">
+          <span
+            style={{ textTransform: cssTextCase(String(value)) }}
+            className="text-[13px] leading-none text-text-primary"
+          >
+            Aa bc
+          </span>
+        </span>
+      )
+    case 'textDecoration':
+      return (
+        <span className="grid h-12 place-items-center rounded-md bg-sunken">
+          <span
+            style={{ textDecoration: String(value) === 'none' ? 'none' : String(value) }}
+            className="text-[13px] leading-none text-text-primary"
+          >
+            Aa bc
+          </span>
         </span>
       )
     default:

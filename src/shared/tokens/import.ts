@@ -61,14 +61,18 @@ const TYPE_ALIASES: Record<string, TokenType> = {
   transition: 'duration',
   cubicbezier: 'cubicBezier',
   number: 'number',
-  other: 'number',
-  text: 'number',
-  boolean: 'number',
-  asset: 'number'
+  other: 'text',
+  text: 'text',
+  string: 'text',
+  boolean: 'boolean',
+  asset: 'asset',
+  textcase: 'textCase',
+  textdecoration: 'textDecoration',
+  gradient: 'gradient'
 }
 
 /** The types we carry in under a different name, so the note can say so. */
-const NOT_OURS = new Set(['other', 'text', 'boolean', 'asset', 'transition'])
+const NOT_OURS = new Set(['other', 'string', 'transition', 'sizing', 'spacing', 'borderradius', 'borderwidth', 'paragraphspacing', 'paragraphindent', 'boxshadow', 'fontfamilies', 'fontweights', 'fontsizes', 'lineheights', 'colour', 'size', 'space'])
 
 type Leaf = { type: string | null; value: TokenValue; description?: string }
 
@@ -96,12 +100,14 @@ function typeFor(name: string | null, value: TokenValue): { type: TokenType; exa
   // Untyped files exist. Guess from the value rather than refuse the token.
   if (typeof value === 'string' && /^#|^rgb|^hsl/i.test(value.trim())) return { type: 'color', exact: false }
   if (typeof value === 'number') return { type: 'number', exact: false }
+  if (typeof value === 'boolean') return { type: 'boolean', exact: false }
   if (typeof value === 'object' && value !== null) {
     const keys = Object.keys(value)
     if (keys.includes('fontSize') || keys.includes('fontFamily')) return { type: 'typography', exact: false }
     if (keys.includes('blur') || keys.includes('spread')) return { type: 'shadow', exact: false }
   }
-  return { type: 'number', exact: false }
+  if (typeof value === 'string' && /gradient\(/i.test(value)) return { type: 'gradient', exact: false }
+  return { type: typeof value === 'string' ? 'text' : 'number', exact: false }
 }
 
 /**

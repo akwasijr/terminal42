@@ -38,7 +38,13 @@ const BY_TYPE: Partial<Record<TokenType, SectionId>> = {
   typography: 'type',
   shadow: 'elevation',
   duration: 'motion',
-  cubicBezier: 'motion'
+  cubicBezier: 'motion',
+  textCase: 'type',
+  textDecoration: 'type',
+  gradient: 'colour',
+  text: 'other',
+  boolean: 'other',
+  asset: 'other'
 }
 
 /** Dimensions that are about an edge rather than a distance between things. */

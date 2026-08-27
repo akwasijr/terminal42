@@ -92,7 +92,13 @@ const BLANK: Record<string, TokenValue> = {
   cubicBezier: '0.4, 0, 0.2, 1',
   shadow: { x: 0, y: 1, blur: 3, spread: 0, color: 'rgba(9,9,11,0.06)' },
   border: { width: 1, style: 'solid', color: '#e4e4e7' },
-  typography: { fontFamily: 'Geist', fontSize: 16, fontWeight: 400, lineHeight: 1.5 }
+  typography: { fontFamily: 'Geist', fontSize: 16, fontWeight: 400, lineHeight: 1.5 },
+  text: '',
+  boolean: 'false',
+  asset: '',
+  textCase: 'none',
+  textDecoration: 'none',
+  gradient: 'linear-gradient(180deg, #7c7c85 0%, #e4e4e7 100%)'
 }
 
 /** A sensible starting value for a type, so a new token is never empty. */

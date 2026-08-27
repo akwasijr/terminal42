@@ -231,6 +231,32 @@ function ValueField({
     )
   }
 
+  // Three types have a closed set of answers. A free text field there invites
+  // a typo that renders as nothing and reads as a broken token.
+  const CHOICES: Partial<Record<Token['type'], string[]>> = {
+    boolean: ['true', 'false'],
+    textCase: ['none', 'uppercase', 'lowercase', 'capitalize'],
+    textDecoration: ['none', 'underline', 'line-through', 'overline']
+  }
+  const choices = CHOICES[token.type]
+  if (choices) {
+    return (
+      <select
+        value={String(literal)}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label="Value"
+        className="w-full rounded-sm bg-sunken px-2 py-1.5 text-[12px] text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+      >
+        {choices.includes(String(literal)) ? null : <option value={String(literal)}>{String(literal)}</option>}
+        {choices.map((c) => (
+          <option key={c} value={c}>
+            {c}
+          </option>
+        ))}
+      </select>
+    )
+  }
+
   const numeric = ['dimension', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing', 'number', 'duration', 'opacity']
   if (numeric.includes(token.type)) {
     const step = token.type === 'lineHeight' || token.type === 'opacity' ? 0.05 : 1

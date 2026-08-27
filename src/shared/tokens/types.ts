@@ -30,7 +30,18 @@ export const TOKEN_TYPES = [
   'shadow',
   'border',
   'typography',
-  'opacity'
+  'opacity',
+  // The rest are what Tokens Studio writes and the draft does not name. They
+  // earn their place because there is no honest way to hold them otherwise: a
+  // label, a flag, an image, a gradient and the two typographic switches are
+  // all things teams do decide once and share, and forcing them into `number`
+  // or `color` would be a lie told in the data.
+  'text',
+  'boolean',
+  'asset',
+  'textCase',
+  'textDecoration',
+  'gradient'
 ] as const
 
 export type TokenType = (typeof TOKEN_TYPES)[number]

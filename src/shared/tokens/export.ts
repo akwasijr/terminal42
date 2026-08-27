@@ -131,6 +131,11 @@ function cssValue(type: TokenType, value: TokenValue): string {
     if (type === 'duration') return `${value}ms`
     return String(value)
   }
+  // An asset is a path in the library and a `url()` in a stylesheet; written
+  // bare it silently does nothing wherever it is used.
+  if (type === 'asset' && typeof value === 'string' && value.length > 0) {
+    return /^url\(/i.test(value) ? value : `url("${value}")`
+  }
   if (typeof value === 'string') return value
   if (type === 'shadow') {
     const s = value as Record<string, string | number>
