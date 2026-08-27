@@ -100,21 +100,21 @@ export function TokensView(): React.JSX.Element {
     <div>
       <div className="flex items-center justify-between gap-3 pb-3">
         <p className="text-[12.5px] text-text-muted">
-          Colours, sizes and type as named values, layered into themes.
+          One place your colours, sizes and type are decided, and everything else agrees with.
         </p>
         <button
           type="button"
           onClick={() => setSetupOpen(true)}
           className="shrink-0 rounded-md bg-action px-3 py-1.5 text-[13px] font-medium text-action-text hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
         >
-          New tokens
+          New basis
         </button>
       </div>
 
       {loading ? null : rows.length === 0 ? (
         <p className="rounded-panel bg-surface px-4 py-10 text-center text-[12.5px] text-text-muted">
-          Nothing yet. A set of tokens is where a look stops being a habit and starts being a
-          decision you can point at.
+          Nothing yet. A basis is where a look stops being a habit and starts being a decision
+          you can point at.
         </p>
       ) : (
         <ul className="grid grid-cols-2 gap-3 md:grid-cols-3">

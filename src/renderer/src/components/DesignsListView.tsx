@@ -278,7 +278,7 @@ export function DesignsListView({
   }, [scoped])
 
   const allLabel = scope === 'form' ? 'All forms' : 'All designs'
-  const heading = typeFilter === 'system' ? 'Design systems' : typeFilter === 'tokens' ? 'Tokens' : typeFilter === 'templates' ? 'Templates' : folderFilter !== 'all' ? folderFilter : allLabel
+  const heading = typeFilter === 'system' ? 'Design systems' : typeFilter === 'tokens' ? 'Basis' : typeFilter === 'templates' ? 'Templates' : folderFilter !== 'all' ? folderFilter : allLabel
 
   // Apply type + folder + search, then bucket by recency.
   const buckets = useMemo(() => {
@@ -374,7 +374,7 @@ export function DesignsListView({
               <>
                 <span className="mx-1.5" />
                 <ViewPill active={typeFilter === 'system'} onClick={() => setTypeFilter('system')}>Design systems</ViewPill>
-                <ViewPill active={typeFilter === 'tokens'} onClick={() => setTypeFilter('tokens')}>Tokens</ViewPill>
+                <ViewPill active={typeFilter === 'tokens'} onClick={() => setTypeFilter('tokens')}>Basis</ViewPill>
                 <ViewPill active={typeFilter === 'templates'} onClick={() => setTypeFilter('templates')}>Templates</ViewPill>
               </>
             )}

@@ -3197,10 +3197,10 @@ function BasisPicker({
 
   return (
     <div className="flex flex-wrap items-center gap-2 pt-1">
-      <span className="text-[12.5px] text-text-secondary">Token library</span>
+      <span className="text-[12.5px] text-text-secondary">Basis</span>
       <select
         value={basisId ?? ''}
-        aria-label="Token library"
+        aria-label="Basis"
         onChange={(e) => {
           const id = e.target.value || null
           const next = studios.find((s) => s.id === id) ?? null

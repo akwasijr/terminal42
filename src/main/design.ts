@@ -1150,7 +1150,7 @@ async function runAutoLint(win: BrowserWindow | null, designId: string): Promise
     fixText = [
       fixText || `The current design in ${latest.fileName} does not use the ${drift.name} library it is bound to.`,
       '',
-      `It is bound to the ${drift.name} token library, and these values are off it:`,
+      `It is bound to the ${drift.name} basis, and these values are off it:`,
       ...drift.lines.map((l) => `- ${l}`),
       '',
       `Replace each with the var(--…) it should have used, then save the result as ${nextFile}. The :root block in tokens.css defines every one of them; keep the layout, content and intent unchanged.`
