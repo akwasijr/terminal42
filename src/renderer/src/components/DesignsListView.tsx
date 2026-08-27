@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { takeTokensRequest } from '../lib/tokens/openLatch'
 import { formatAge } from '../lib/formatAge'
 import type { Design, DesignBrief, DesignGroup, TemplateInfo } from '../../../preload/index'
 import { DesignWizard } from './DesignWizard'
@@ -47,6 +48,17 @@ export function DesignsListView({
   const [searchOpen, setSearchOpen] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => (localStorage.getItem('t42-designs-view') === 'list' ? 'list' : 'grid'))
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
+
+  // Cross-tab trigger: anything, including a chat reply, can dispatch
+  // 't42:tokens-open' to land on the library list. The library is meant to be
+  // the answer to "what is our blue", and an answer you have to navigate to
+  // twice is one people stop asking for.
+  useEffect(() => {
+    if (takeTokensRequest()) setTypeFilter('tokens')
+    const onOpen = (): void => setTypeFilter('tokens')
+    window.addEventListener('t42:tokens-open', onOpen)
+    return () => window.removeEventListener('t42:tokens-open', onOpen)
+  }, [])
   // Project folders: client/project organisation, stored renderer-side.
   const [folderFilter, setFolderFilter] = useState<string>('all')
   const [folders, setFolders] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('t42-design-folders') || '[]') } catch { return [] } })

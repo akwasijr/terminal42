@@ -35,6 +35,8 @@ import {
 import { flatten, problems, resolve, type Problem } from '../../../../shared/tokens/resolve'
 import { familiesOf, leafOf, SECTIONS, sectionOf, type Family, type SectionId } from '../../../../shared/tokens/groups'
 import { addToken, blankValue, deleteToken, renameToken, setAlias, setTokenValue } from '../../../../shared/tokens/edit'
+import { bridgeSummary, brandItems } from '../../../../shared/tokens/bridges'
+import { publishToForm } from '../../lib/tokens/toForm'
 import { TokenInspector } from './TokenInspector'
 import { ColorPicker, type PickerRequest } from '../ColorPicker'
 
@@ -435,6 +437,10 @@ function StudioEditor({
             aria-label="Find a token"
             className="w-40 rounded-md bg-surface px-2.5 py-1 text-[11.5px] text-text-primary placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           />
+          <SendTo studio={studio} themeId={themeId} onDone={(msg) => {
+            setNote(msg)
+            window.setTimeout(() => setNote(null), 4000)
+          }} />
           <button
             type="button"
             onClick={() => void exportFiles()}
@@ -1030,6 +1036,99 @@ function TypeMenu({
           </li>
         ))}
       </ul>
+    </div>
+  )
+}
+
+/**
+ * Sending the library somewhere it will be used.
+ *
+ * A library nobody can reach from the screen they are working on is a second
+ * place to look rather than a single source of truth, so this is the door out.
+ * Each destination says what would arrive before it is chosen, because "send
+ * to Motion" and "send 14 colours and 3 typefaces to Motion" are different
+ * offers, and the second one is the only one somebody can decline sensibly.
+ *
+ * Both destinations replace rather than merge. Two half-updated palettes is
+ * the failure this whole feature exists to stop.
+ */
+function SendTo({
+  studio, themeId, onDone
+}: {
+  studio: TokenStudio
+  themeId: string | null
+  onDone: (message: string) => void
+}): React.JSX.Element {
+  const [open, setOpen] = useState(false)
+  const box = useRef<HTMLDivElement | null>(null)
+  const counts = useMemo(() => bridgeSummary(studio, themeId), [studio, themeId])
+
+  useEffect(() => {
+    if (!open) return
+    const away = (e: MouseEvent): void => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false)
+    }
+    const esc = (e: KeyboardEvent): void => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', away)
+    document.addEventListener('keydown', esc)
+    return () => {
+      document.removeEventListener('mousedown', away)
+      document.removeEventListener('keydown', esc)
+    }
+  }, [open])
+
+  const toForm = (): void => {
+    setOpen(false)
+    if (counts.variables === 0) { onDone('Nothing to send yet.'); return }
+    publishToForm(studio)
+    onDone(`Published to Form as ${studio.name}. Enable it from a file's Libraries panel.`)
+  }
+
+  const toMotion = async (): Promise<void> => {
+    setOpen(false)
+    const { colours, fonts } = brandItems(studio, themeId)
+    if (colours.length === 0 && fonts.length === 0) { onDone('Nothing to send yet.'); return }
+    const existing = await window.terminal42.motion.brandSets()
+    const put = async (kind: 'colours' | 'fonts', items: string[]): Promise<void> => {
+      if (!items.length) return
+      const was = existing.find((s) => s.kind === kind && s.name === studio.name)
+      await window.terminal42.motion.saveBrandSet({ id: was?.id, kind, name: studio.name, items })
+    }
+    await put('colours', colours)
+    await put('fonts', fonts)
+    onDone(`Sent ${counts.colours} colours and ${counts.fonts} typefaces to Motion.`)
+  }
+
+  const row = 'flex w-full items-baseline justify-between gap-3 rounded-sm px-2 py-1.5 text-left text-[11.5px] text-text-primary hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60'
+
+  return (
+    <div ref={box} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="rounded-md bg-surface px-2.5 py-1 text-[11.5px] text-text-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+      >
+        Send to
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="t42-menu absolute right-0 top-full z-30 mt-1 w-64 rounded-panel bg-elevated p-1 shadow-lg ring-1 ring-border"
+        >
+          <button type="button" role="menuitem" className={row} onClick={toForm}>
+            <span>Form</span>
+            <span className="text-[10.5px] text-text-muted">{counts.variables} variables</span>
+          </button>
+          <button type="button" role="menuitem" className={row} onClick={() => void toMotion()}>
+            <span>Motion</span>
+            <span className="text-[10.5px] text-text-muted">
+              {counts.colours} colours, {counts.fonts} typefaces
+            </span>
+          </button>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, lazy, Suspense } from 'react'
+import { requestTokens } from './lib/tokens/openLatch'
 import {
   IconTerminal, IconFolder, IconSparkle, IconCode,
   IconGear, IconTheme, IconPlus, IconBell, IconBrain, IconEdit, IconTrash, IconClock,
@@ -185,6 +186,22 @@ export function App() {
     }
     window.addEventListener('t42:open-design', onOpen as EventListener)
     return () => window.removeEventListener('t42:open-design', onOpen as EventListener)
+  }, [])
+
+  // Cross-tab trigger: land on the token library list. Dispatched by chat when
+  // a reply is about the shared library, and by anything else that would
+  // otherwise tell somebody to go and find it.
+  useEffect(() => {
+    const onOpen = (): void => {
+      requestTokens()
+      setActive('designs')
+      setActiveDesignId(null)
+      // Also fired, for the case where the list is already on screen and has
+      // no mount left to read the latch on.
+      window.dispatchEvent(new Event('t42:tokens-open'))
+    }
+    window.addEventListener('t42:open-tokens', onOpen)
+    return () => window.removeEventListener('t42:open-tokens', onOpen)
   }, [])
 
   // Cross-tab trigger: jump to the terminal tab (used by Quick Actions
