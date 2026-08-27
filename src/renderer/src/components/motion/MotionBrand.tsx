@@ -7,7 +7,7 @@
 
 import { useState } from 'react'
 import { FONTS } from '../../lib/freeformTypes'
-import { useBrandLibrary, type BrandKind, type BrandLibrary } from '../../lib/motion/brand'
+import { useBrandLibrary, isTokensSet, type BrandKind, type BrandLibrary } from '../../lib/motion/brand'
 import { useColorPicker } from './pickerContext'
 import { Section } from './controls'
 
@@ -33,9 +33,21 @@ function SetChooser({ lib, kind }: { lib: BrandLibrary; kind: BrandKind }): Reac
           onChange={(e) => lib.choose(e.target.value)}
           className="min-w-0 flex-1 rounded-sm bg-sunken px-1.5 py-1 text-[11.5px] text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
         >
-          {lib.sets.map((s) => (
-            <option key={s.id} value={s.id}>{s.name}</option>
-          ))}
+          {lib.sets
+            .filter((s) => !isTokensSet(s.id))
+            .map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          {/* Grouped apart because these are not sets you own — they are a
+              window onto a library, and picking one is a decision to follow
+              it rather than a decision to use these particular colours. */}
+          {lib.sets.some((s) => isTokensSet(s.id)) ? (
+            <optgroup label="From a token library">
+              {lib.sets.filter((s) => isTokensSet(s.id)).map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </optgroup>
+          ) : null}
         </select>
         <button
           type="button"
@@ -48,7 +60,13 @@ function SetChooser({ lib, kind }: { lib: BrandLibrary; kind: BrandKind }): Reac
           type="button"
           onClick={() => void lib.remove()}
           disabled={lib.readOnly}
-          title={lib.readOnly ? 'The system set cannot be deleted' : `Delete this ${label}`}
+          title={
+            isTokensSet(lib.activeId)
+              ? 'This belongs to a token library. Delete it there.'
+              : lib.readOnly
+                ? 'The system set cannot be deleted'
+                : `Delete this ${label}`
+          }
           className="rounded-sm px-2 py-1 text-[11px] text-text-muted enabled:hover:bg-raised enabled:hover:text-error disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
         >
           Delete
@@ -125,10 +143,8 @@ function ColourSets(): React.JSX.Element {
           </button>
         ) : null}
       </div>
-      {lib.readOnly ? (
-        <p className="text-[10.5px] text-text-muted">
-          The system set is always here and cannot be edited. Make a set of your own to add colours.
-        </p>
+      {lib.readOnlyWhy ? (
+        <p className="text-[10.5px] text-text-muted">{lib.readOnlyWhy}</p>
       ) : null}
     </div>
   )
