@@ -51,6 +51,8 @@ import {
   type BulkResult
 } from '../../../../shared/tokens/bulk'
 import { bridgeSummary, brandItems } from '../../../../shared/tokens/bridges'
+import { coverageOf, coverageScore, gapsBySection } from '../../../../shared/tokens/coverage'
+import { fillGaps, fillNote } from '../../../../shared/tokens/harden'
 import { cloneStudio } from '../../../../shared/tokens/scaffold'
 import {
   folderState,
@@ -537,6 +539,15 @@ function StudioEditor({
             placeholder="Find a token"
             aria-label="Find a token"
             className="w-40 rounded-md bg-elevated px-2.5 py-1.5 text-[12px] text-text-primary placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+          />
+          <GapsMenu
+            studio={studio}
+            themeId={themeId}
+            onFill={(next, msg) => {
+              onChange(next)
+              setNote(msg)
+              window.setTimeout(() => setNote(null), 5000)
+            }}
           />
           <EnforcementPicker studio={studio} onChange={onChange} />
           <SendTo studio={studio} themeId={themeId} onDone={(msg) => {
@@ -1858,6 +1869,120 @@ function EnforcementPicker({ studio, onChange }: { studio: TokenStudio; onChange
  * from the library as it will be written, because nobody can hold "camel plus
  * a prefix" in their head and be sure.
  */
+/**
+ * What the library has not decided yet.
+ *
+ * A library screen shows what is in it, which means the one thing it can
+ * never show is the gap: thirty swatches look finished whether or not any of
+ * them is a focus ring. This is the only part of the screen that reads the
+ * absence, so it leads with the count and says, for each thing missing, what
+ * will go wrong in the product without it rather than merely that it is
+ * absent.
+ */
+function GapsMenu({
+  studio,
+  themeId,
+  onFill
+}: {
+  studio: TokenStudio
+  themeId: string | null
+  onFill: (studio: TokenStudio, note: string) => void
+}): React.JSX.Element {
+  const [open, setOpen] = useState(false)
+  const box = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const away = (e: MouseEvent): void => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false)
+    }
+    const esc = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', away)
+    document.addEventListener('keydown', esc)
+    return () => {
+      document.removeEventListener('mousedown', away)
+      document.removeEventListener('keydown', esc)
+    }
+  }, [open])
+
+  const rows = useMemo(() => coverageOf(studio, themeId), [studio, themeId])
+  const score = coverageScore(rows)
+  const groups = useMemo(() => gapsBySection(rows), [rows])
+  const label = useMemo(() => new Map(SECTIONS.map((s) => [s.id, s.label])), [])
+
+  const fill = (): void => {
+    const result = fillGaps(studio, themeId)
+    if (result.added.length === 0) return
+    onFill(result.studio, fillNote(result))
+    setOpen(false)
+  }
+
+  const whole = score.met === score.total
+
+  return (
+    <div ref={box} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        title="What this library has not decided yet"
+        className="flex items-center gap-1.5 rounded-md bg-surface px-2.5 py-1 text-[11.5px] text-text-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+      >
+        <span
+          aria-hidden="true"
+          className={`h-1.5 w-1.5 rounded-full ${whole ? 'bg-success' : 'bg-warning'}`}
+        />
+        {whole ? 'Complete' : `${score.total - score.met} to decide`}
+      </button>
+      {open && (
+        <div className="t42-menu absolute right-0 top-full z-30 mt-1 w-[22rem] rounded-panel bg-elevated p-3 shadow-overlay ring-1 ring-border">
+          <p className="text-[12.5px] font-medium text-text-primary">
+            {whole ? 'Nothing left to decide' : `${score.met} of ${score.total} decided`}
+          </p>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-text-muted">
+            {whole
+              ? 'Every part a product reaches for is named here, so nothing has to be invented at the call site.'
+              : 'Anything not named here gets invented on whichever screen needs it first, and then twice.'}
+          </p>
+
+          {!whole && (
+            <div className="mt-2.5 max-h-72 overflow-y-auto pr-1">
+              {groups.map((g) => (
+                <div key={g.section} className="mb-2.5 last:mb-0">
+                  <p className="mb-1 text-[10.5px] uppercase tracking-wide text-text-muted">
+                    {label.get(g.section) ?? g.section}
+                  </p>
+                  <ul className="flex flex-col gap-1.5">
+                    {g.missing.map((m) => (
+                      <li key={m.check.id} className="rounded-md bg-bg px-2 py-1.5">
+                        <p className="text-[12px] text-text-primary">{m.check.label}</p>
+                        <p className="mt-0.5 text-[11px] leading-relaxed text-text-secondary">{m.check.why}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!whole && (
+            <button
+              type="button"
+              onClick={fill}
+              className="mt-2.5 w-full rounded-md bg-action px-3 py-1.5 text-[12px] font-medium text-action-text hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            >
+              Fill them from what is already here
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function CssOptionsMenu({
   options,
   onChange

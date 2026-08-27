@@ -23,6 +23,7 @@ export const SECTIONS = [
   { id: 'shape', label: 'Shape' },
   { id: 'elevation', label: 'Elevation' },
   { id: 'motion', label: 'Motion' },
+  { id: 'grid', label: 'Grid' },
   { id: 'other', label: 'Other' }
 ] as const
 
@@ -51,6 +52,16 @@ const BY_TYPE: Partial<Record<TokenType, SectionId>> = {
 const SHAPE_STEMS = ['radius', 'corner', 'stroke', 'border']
 
 /**
+ * Dimensions that describe the page rather than anything on it.
+ *
+ * A breakpoint and a gutter are both numbers in pixels, and filed under Space
+ * they sit among the paddings and read as one more gap somebody could reach
+ * for. They are not: nothing is ever `padding: 672px`. They belong to the
+ * grid, and the grid is a topic of its own.
+ */
+const GRID_STEMS = ['breakpoint', 'grid', 'column', 'gutter']
+
+/**
  * Which section a token belongs in.
  *
  * Type decides it wherever type is enough. It is not enough for `dimension`,
@@ -68,7 +79,14 @@ export function sectionOf(token: Pick<Token, 'path' | 'type'>): SectionId {
     // under Space, which is exactly the muddle this is meant to end.
     const parts = token.path.split('.')
     const said = [parts[0], parts[parts.length - 1]]
+    if (said.some((w) => GRID_STEMS.includes(w))) return 'grid'
     return said.some((w) => SHAPE_STEMS.includes(w)) ? 'shape' : 'space'
+  }
+  if (token.type === 'number') {
+    // A column count is a number rather than a dimension, and it belongs
+    // beside the widths it divides.
+    const parts = token.path.split('.')
+    if ([parts[0], parts[parts.length - 1]].some((w) => GRID_STEMS.includes(w))) return 'grid'
   }
   return 'other'
 }

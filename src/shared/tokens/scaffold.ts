@@ -218,16 +218,34 @@ function palette(feel: Feel): Token[] {
     )
   })
 
-  for (const [name, ms] of [['instant', 0], ['fast', 120], ['normal', 200], ['slow', 320]] as const) {
+  // Carbon's ladder, because a three-step one cannot tell a button's
+  // acknowledgement (70ms) from a panel's arrival (240ms) and so gives both
+  // the same 200 and makes one feel sluggish and the other abrupt.
+  for (const [name, ms] of [
+    ['instant', 0],
+    ['fast', 70],
+    ['quick', 110],
+    ['normal', 150],
+    ['moderate', 240],
+    ['slow', 400],
+    ['deliberate', 700]
+  ] as const) {
     out.push(tok(`time.${name}`, 'duration', 'primitive', ms))
   }
   // Motion without easings is half a system: a duration says how long, and
   // only the curve says whether it felt right.
+  //
+  // Two families, not one. A curve that is right for a dropdown is wrong for
+  // a page arriving, and a system with a single `ease-in-out` has no way to
+  // say which moment it is in. Productive is the everyday one; expressive is
+  // for the few moments meant to be noticed.
   for (const [name, c] of [
-    ['standard', [0.4, 0, 0.2, 1]],
-    ['in', [0.4, 0, 1, 1]],
-    ['out', [0, 0, 0.2, 1]],
-    ['emphasized', [0.2, 0, 0, 1]]
+    ['standard', [0.2, 0, 0.38, 0.9]],
+    ['entrance', [0, 0, 0.38, 0.9]],
+    ['exit', [0.2, 0, 1, 0.9]],
+    ['expressive.standard', [0.4, 0.14, 0.3, 1]],
+    ['expressive.entrance', [0, 0, 0.3, 1]],
+    ['expressive.exit', [0.4, 0.14, 1, 1]]
   ] as const) {
     out.push(tok(`ease.${name}`, 'cubicBezier', 'primitive', { x1: c[0], y1: c[1], x2: c[2], y2: c[3] }))
   }
@@ -274,7 +292,53 @@ function colours(dark: boolean): Token[] {
     ['colour.border.subtle', dark ? 'neutral.900' : 'neutral.100'],
     ['colour.border.default', dark ? 'neutral.800' : 'neutral.200'],
     ['colour.border.strong', dark ? 'neutral.700' : 'neutral.300'],
-    ['colour.border.focus', `brand.${step}`]
+    ['colour.border.focus', `brand.${step}`],
+
+    // Layers, which are what a surface token cannot say on its own. A card in
+    // a panel in a page is three depths, and with one `surface` they are all
+    // the same colour and the nesting disappears. Each step moves away from
+    // the canvas: lighter in the dark, darker in the light.
+    ['colour.layer.01', dark ? 'neutral.900' : 'white'],
+    ['colour.layer.02', dark ? 'neutral.800' : 'neutral.50'],
+    ['colour.layer.03', dark ? 'neutral.700' : 'neutral.100'],
+    ['colour.layer.hover', dark ? 'neutral.800' : 'neutral.100'],
+    ['colour.layer.active', dark ? 'neutral.700' : 'neutral.200'],
+
+    // A field is not a layer. An input has to stay legible as a place you can
+    // type on whichever depth it lands, so it steps with the layers it sits on.
+    ['colour.field.01', dark ? 'neutral.800' : 'neutral.100'],
+    ['colour.field.02', dark ? 'neutral.700' : 'white'],
+    ['colour.field.hover', dark ? 'neutral.700' : 'neutral.200'],
+
+    // Focus needs two colours, not one: the ring, and the hairline inside it
+    // that keeps the ring readable when the element it surrounds is the same
+    // colour as the ring.
+    ['colour.focus.ring', `brand.${step}`],
+    ['colour.focus.inset', dark ? 'neutral.950' : 'white'],
+    ['colour.focus.inverse', dark ? 'neutral.950' : 'white'],
+
+    // Icons carry their own strengths because an icon at 16px reads lighter
+    // than text at 16px, and reusing the text tokens makes every icon faint.
+    ['colour.icon.primary', dark ? 'neutral.50' : 'neutral.950'],
+    ['colour.icon.secondary', dark ? 'neutral.300' : 'neutral.700'],
+    ['colour.icon.disabled', dark ? 'neutral.700' : 'neutral.300'],
+    ['colour.icon.on', dark ? 'neutral.950' : 'white'],
+
+    ['colour.link.rest', `brand.${step}`],
+    ['colour.link.hover', dark ? 'brand.300' : 'brand.700'],
+    ['colour.link.visited', `accent.${dark ? '300' : '700'}`],
+    ['colour.link.inverse', dark ? 'brand.700' : 'brand.300'],
+
+    // The inverse surface: a tooltip or a toast is deliberately the opposite
+    // of the page so it reads as being on top of it rather than in it.
+    ['colour.inverse.bg', dark ? 'neutral.50' : 'neutral.900'],
+    ['colour.inverse.text', dark ? 'neutral.950' : 'neutral.50'],
+    ['colour.inverse.link', dark ? 'brand.700' : 'brand.300'],
+
+    // A skeleton is two colours: the ground it occupies and the shimmer that
+    // says it is loading rather than empty.
+    ['colour.skeleton.bg', dark ? 'neutral.800' : 'neutral.100'],
+    ['colour.skeleton.element', dark ? 'neutral.700' : 'neutral.200']
   ]
 
   // Each status is a small family rather than one colour, because that is the
@@ -326,6 +390,10 @@ function shape(): Token[] {
   text('type.heading', 'display', 'xl', 'semibold', 'snug', 'normal')
   text('type.subheading', 'sans', 'lg', 'medium', 'snug', 'normal')
   text('type.body', 'sans', 'md', 'regular', 'normal', 'normal')
+  // Long prose wants air between lines; a line of text inside a control wants
+  // none. One body style asked to do both makes buttons tall and paragraphs
+  // tight, which is why the compact one is a style rather than an override.
+  text('type.bodyCompact', 'sans', 'md', 'regular', 'snug', 'normal')
   text('type.bodyStrong', 'sans', 'md', 'semibold', 'normal', 'normal')
   text('type.caption', 'sans', 'sm', 'regular', 'normal', 'wide')
   text('type.code', 'mono', 'sm', 'regular', 'normal', 'normal')
@@ -344,10 +412,40 @@ function shape(): Token[] {
 
   out.push(tok('motion.fast', 'duration', 'semantic', '{time.fast}'))
   out.push(tok('motion.normal', 'duration', 'semantic', '{time.normal}'))
-  out.push(tok('motion.slow', 'duration', 'semantic', '{time.slow}'))
-  out.push(tok('motion.enter', 'cubicBezier', 'semantic', '{ease.out}'))
-  out.push(tok('motion.exit', 'cubicBezier', 'semantic', '{ease.in}'))
+  out.push(tok('motion.slow', 'duration', 'semantic', '{time.moderate}'))
+  out.push(tok('motion.deliberate', 'duration', 'semantic', '{time.slow}'))
+  out.push(tok('motion.enter', 'cubicBezier', 'semantic', '{ease.entrance}'))
+  out.push(tok('motion.exit', 'cubicBezier', 'semantic', '{ease.exit}'))
   out.push(tok('motion.move', 'cubicBezier', 'semantic', '{ease.standard}'))
+  // The expressive pair sits beside the productive one rather than replacing
+  // it, so choosing between them is a choice somebody makes on purpose.
+  out.push(tok('motion.expressive.enter', 'cubicBezier', 'semantic', '{ease.expressive.entrance}'))
+  out.push(tok('motion.expressive.exit', 'cubicBezier', 'semantic', '{ease.expressive.exit}'))
+  out.push(tok('motion.expressive.move', 'cubicBezier', 'semantic', '{ease.expressive.standard}'))
+
+  // Space between sections is not space inside a component, and one scale
+  // asked to do both ends up either cramping the page or bloating the card.
+  for (const [name, from] of [['xs', 4], ['sm', 6], ['md', 8], ['lg', 12], ['xl', 16], ['2xl', 24]] as const) {
+    out.push(tok(`layout.${name}`, 'dimension', 'semantic', `{space.${from}}`))
+  }
+
+  // The grid, which is the one part of a library that is about the page
+  // rather than anything drawn on it.
+  for (const [name, px] of [
+    ['sm', 320],
+    ['md', 672],
+    ['lg', 1056],
+    ['xl', 1312],
+    ['2xl', 1584]
+  ] as const) {
+    out.push(tok(`breakpoint.${name}`, 'dimension', 'primitive', px))
+  }
+  for (const [name, cols] of [['sm', 4], ['md', 8], ['lg', 16], ['xl', 16], ['2xl', 16]] as const) {
+    out.push(tok(`column.${name}`, 'number', 'primitive', cols))
+  }
+  out.push(tok('gutter.wide', 'dimension', 'semantic', '{space.4}'))
+  out.push(tok('gutter.narrow', 'dimension', 'semantic', '{space.2}'))
+  out.push(tok('gutter.condensed', 'dimension', 'semantic', '{space.0}'))
 
   return out
 }
