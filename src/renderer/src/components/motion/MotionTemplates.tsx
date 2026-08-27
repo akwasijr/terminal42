@@ -15,6 +15,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import type { MotionTemplate } from '../../../../shared/motion/templates'
 import { MOTION_TEMPLATES } from '../../../../shared/motion/templates'
 import { resolvedText } from '../../../../shared/motion/types'
+import { layerVisibility } from '../../../../shared/motion/frame'
 import { drawPresetThumb } from '../../lib/motion/thumb'
 import { requestTextFonts } from '../../lib/motion/fonts'
 import { fontByLabel } from '../../lib/freeformTypes'
@@ -73,6 +74,7 @@ function TemplateTile({ template, onPick }: { template: MotionTemplate; onPick: 
   // The document is the preview's only source of truth, so a tile cannot
   // drift from the piece it makes: change the template and the tile follows.
   const doc = useMemo(() => template.build([]), [template])
+  const phase = template.previewPhase ?? 0.18
   const ratio = ASPECT[doc.frame.aspect] ?? 16 / 9
   // The tile is a fixed landscape box and the frame is whatever the template
   // chose, so the frame is fitted inside it rather than stretched to it: a
@@ -102,9 +104,14 @@ function TemplateTile({ template, onPick }: { template: MotionTemplate; onPick: 
             containerType: 'size'
           }}
         >
-          <Outline doc={doc} swatch={template.swatch} phase={template.previewPhase ?? 0.18} />
+          <Outline doc={doc} swatch={template.swatch} phase={phase} />
           {doc.visual.text.map((raw) => {
             const layer = resolvedText(raw)
+            // A layer with a window is not on screen for the whole loop, and
+            // a tile that drew all three of a piece's captions at once would
+            // show a piece nobody wrote.
+            const seen = layerVisibility(raw, phase)
+            if (seen <= 0.01) return null
             return (
               <span
                 key={layer.id}
@@ -121,7 +128,7 @@ function TemplateTile({ template, onPick }: { template: MotionTemplate; onPick: 
                   fontStyle: layer.italic ? 'italic' : 'normal',
                   letterSpacing: `${layer.tracking / 100}em`,
                   color: layer.colour,
-                  opacity: layer.opacity / 100
+                  opacity: (layer.opacity / 100) * seen
                 }}
               >
                 {layer.text}

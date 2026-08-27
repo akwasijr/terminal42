@@ -84,6 +84,50 @@ describe('motion templates', () => {
         }
       })
 
+      it('keeps every timed layer inside the loop', () => {
+        for (const layer of doc.visual.text) {
+          for (const field of ['from', 'to', 'fade'] as const) {
+            const v = layer[field]
+            if (v === undefined) continue
+            expect(v, `${t.id}.${layer.id}.${field}`).toBeGreaterThanOrEqual(0)
+            expect(v, `${t.id}.${layer.id}.${field}`).toBeLessThanOrEqual(1)
+          }
+          // A window needs both ends. One alone reads as a half-written edit
+          // rather than a decision, and the drawing would treat it as always.
+          expect(layer.from === undefined, `${t.id}.${layer.id} half a window`).toBe(layer.to === undefined)
+          if (layer.fade !== undefined) expect(layer.fade).toBeLessThanOrEqual(0.5)
+        }
+      })
+
+      // The whole point of a template is that it looks finished. These are the
+      // cheapest mechanical stand-ins for that: type with a hierarchy rather
+      // than one line, and a frame with some depth to it.
+      it('sets more than one line of type', () => {
+        expect(doc.visual.text.length).toBeGreaterThanOrEqual(2)
+        const sizes = doc.visual.text.map((l) => l.size)
+        expect(Math.max(...sizes) / Math.min(...sizes)).toBeGreaterThan(1.2)
+      })
+
+      it('gives the frame some depth', () => {
+        const fx = doc.visual.effects
+        const treated =
+          fx.dropShadow.enabled || fx.edgeBlur.enabled || fx.edgeShade.enabled || fx.glass.enabled
+        const graded =
+          fx.grain > 0 || fx.vignette > 0 || fx.tintAmount > 0 || fx.saturation !== 100 || fx.contrast !== 100
+        expect(treated || graded, `${t.id} is untreated`).toBe(true)
+      })
+
+      // Transform is in scene units, not percentages, and the panel's own
+      // sliders are the honest statement of what is on screen. A template
+      // that moved the piece by 24 put it outside the frame entirely, and
+      // nothing but looking at it would have said so.
+      it('keeps the piece inside the frame', () => {
+        expect(Math.abs(doc.transform.positionX), `${t.id} moved across`).toBeLessThanOrEqual(8)
+        expect(Math.abs(doc.transform.positionY), `${t.id} moved up`).toBeLessThanOrEqual(8)
+        expect(doc.transform.scale).toBeGreaterThanOrEqual(0.1)
+        expect(doc.transform.scale).toBeLessThanOrEqual(3)
+      })
+
       it('arrives with its pictures on the cards', () => {
         expect(doc.visual.images).toEqual(IMAGES)
       })
@@ -99,6 +143,17 @@ describe('motion templates', () => {
           if (target.startsWith('param:')) {
             const key = target.slice('param:'.length)
             expect(schema.some((s) => s.key === key), `${t.id} keys unknown ${target}`).toBe(true)
+          } else if (target.startsWith('text:')) {
+            // A track naming a layer that is not there is a track that does
+            // nothing, and a typo in a layer id is invisible on screen.
+            const [, layerId, field] = target.split(':')
+            expect(doc.visual.text.some((l) => l.id === layerId), `${t.id} keys missing layer ${target}`).toBe(true)
+            expect(['size', 'x', 'y', 'opacity', 'tracking'], `${t.id}: ${target}`).toContain(field)
+          } else if (target.startsWith('fx:')) {
+            expect(
+              ['blur', 'grain', 'vignette', 'shadow', 'brightness', 'contrast', 'saturation', 'tintAmount'],
+              `${t.id}: ${target}`
+            ).toContain(target.slice('fx:'.length))
           } else {
             expect(target).toMatch(/^pose:tilt[XYZ]$/)
           }
