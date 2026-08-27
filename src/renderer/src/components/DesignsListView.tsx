@@ -48,6 +48,7 @@ export function DesignsListView({
   const [searchOpen, setSearchOpen] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => (localStorage.getItem('t42-designs-view') === 'list' ? 'list' : 'grid'))
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
+  const showsDesigns = typeFilter !== 'system' && typeFilter !== 'tokens' && typeFilter !== 'templates'
   // An open token library asks for the whole page, so the list chrome steps
   // aside rather than the library squeezing itself into what is left.
   const [tokensFull, setTokensFull] = useState(false)
@@ -385,7 +386,10 @@ export function DesignsListView({
           </div>
           )}
           <div className="ml-auto flex items-center gap-2">
-              {/* grid / list view toggle */}
+              {/* The toggle only means something where a list of designs is on
+                  screen; design systems, tokens and templates draw themselves
+                  and ignored it, which made the control look broken. */}
+              {showsDesigns && (
               <div className="inline-flex items-center gap-0.5 rounded-md bg-elevated p-0.5">
                 <button type="button" onClick={() => { setViewMode('grid'); localStorage.setItem('t42-designs-view', 'grid') }} title="Grid view" aria-label="Grid view"
                   className={['grid h-7 w-7 place-items-center rounded transition-colors', viewMode === 'grid' ? 'bg-bg text-text-primary shadow-sm' : 'text-text-muted hover:text-text-primary'].join(' ')}>
@@ -396,6 +400,7 @@ export function DesignsListView({
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M5 4h9M5 8h9M5 12h9" /><circle cx="2.5" cy="4" r="0.9" fill="currentColor" stroke="none" /><circle cx="2.5" cy="8" r="0.9" fill="currentColor" stroke="none" /><circle cx="2.5" cy="12" r="0.9" fill="currentColor" stroke="none" /></svg>
                 </button>
               </div>
+              )}
               <div
                 className={[
                   'flex items-center overflow-hidden rounded-md bg-elevated transition-[width,background-color] duration-300 ease-out',
