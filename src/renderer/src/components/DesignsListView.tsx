@@ -701,6 +701,7 @@ function DesignCard({ design, onOpen, onDelete, folders, folder, onAssign }: {
           </div>
         </div>
       </button>
+      <BasisFlag designId={design.id} />
       <div className="absolute right-2 top-2 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
         <FolderAssign id={design.id} current={folder} folders={folders} onAssign={onAssign} />
         <button
@@ -730,6 +731,7 @@ function DesignRow({ design, onOpen, onDelete, folders, folder, onAssign }: { de
   }, [design.id, design.currentVersion, design.lastActiveAt])
   return (
     <div className="group grid grid-cols-[minmax(0,1fr)_140px_140px_160px] items-center gap-4 rounded-lg px-3 py-2 transition-colors hover:bg-elevated">
+      <div className="flex min-w-0 items-center gap-2">
       <button type="button" onClick={onOpen} className="flex min-w-0 items-center gap-3 text-left">
         <span className="relative grid h-10 w-14 shrink-0 place-items-center overflow-hidden rounded-md bg-elevated text-text-muted">
           {previewUrl
@@ -738,6 +740,8 @@ function DesignRow({ design, onOpen, onDelete, folders, folder, onAssign }: { de
         </span>
         <span className="min-w-0 truncate text-[13.5px] font-medium text-text-primary">{design.title}</span>
       </button>
+      <BasisFlag designId={design.id} />
+      </div>
       <span className="truncate text-[12px] text-text-muted">{formatAge(design.lastActiveAt)}</span>
       <span className="truncate text-[12px] text-text-muted">{formatAge(design.createdAt)}</span>
       <div className="flex items-center justify-between gap-2">
@@ -753,6 +757,73 @@ function DesignRow({ design, onOpen, onDelete, folders, folder, onAssign }: { de
         </div>
       </div>
     </div>
+  )
+}
+
+/**
+ * Says so when the library a design was built against has moved since.
+ *
+ * Renders nothing at all in every other case, which is nearly every design
+ * nearly all of the time. A row that always carried a "library: fine" chip
+ * would train everyone to stop reading the column, and then the one row that
+ * mattered would be invisible too.
+ *
+ * Re-syncing rewrites the token files beside the design, which is the entire
+ * fix for a design that used the variables. One that inlined a hex instead
+ * cannot be fixed by new files, so what could not be relinked is reported
+ * rather than quietly dropped — the chip stays, saying how many, instead of
+ * disappearing and implying the job is done.
+ */
+function BasisFlag({ designId }: { designId: string }): JSX.Element | null {
+  const [moved, setMoved] = useState(false)
+  const [name, setName] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [stuck, setStuck] = useState<string[] | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void window.terminal42.designs.basisStatus(designId).then((s) => {
+      if (cancelled) return
+      setMoved(s.bound && s.moved)
+      setName(s.name)
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [designId])
+
+  const resync = async (): Promise<void> => {
+    setBusy(true)
+    try {
+      const r = await window.terminal42.designs.resyncBasis(designId)
+      if (r.ok) {
+        setMoved(false)
+        setStuck(r.stuck.length > 0 ? r.stuck : null)
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (stuck) {
+    return (
+      <span
+        title={stuck.join('\n')}
+        className="shrink-0 rounded-full bg-elevated px-2 py-0.5 text-[10.5px] text-text-secondary"
+      >
+        {stuck.length === 1 ? '1 value off the library' : `${stuck.length} values off the library`}
+      </span>
+    )
+  }
+  if (!moved) return null
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={(e) => { e.stopPropagation(); void resync() }}
+      title={name ? `${name} has changed since this design was built. Rewrite its token files.` : undefined}
+      className="shrink-0 rounded-full bg-elevated px-2 py-0.5 text-[10.5px] text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:opacity-60"
+    >
+      {busy ? 'Re-syncing…' : 'Library updated · Re-sync'}
+    </button>
   )
 }
 

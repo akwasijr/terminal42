@@ -13,6 +13,43 @@ import { exported, resolveAll } from './resolve'
 import { SECTIONS, sectionOf, type SectionId } from './groups'
 import type { TokenStudio, TokenType, TokenValue } from './types'
 
+/**
+ * A short, stable fingerprint of what a theme currently exports.
+ *
+ * The point is to be able to say "the library moved" about a design that was
+ * generated against it, without keeping a copy of the library on every design.
+ *
+ * It hashes the three exported files rather than the studio, because the
+ * question it answers is precisely "would re-exporting write different bytes
+ * beside this design?" — which is the same question the Re-sync button
+ * answers. All three, not just the stylesheet: tokens.json and tokens.md are
+ * written into the folder too, so a change that only reaches those still
+ * leaves the folder out of date. By the same token a change that reaches none
+ * of them, such as an edit to a theme that is not the one this design uses,
+ * correctly counts as no change at all. The exports are already sorted and
+ * free of timestamps for exactly this reason.
+ *
+ * FNV-1a rather than a real digest because this must run in the renderer as
+ * well as the main process, and node:crypto is not there. It guards against
+ * drift going unnoticed, not against anyone forging a match.
+ */
+export function basisHash(studio: TokenStudio, themeId: string | null): string {
+  const sep = '\u0000'
+  return fnv1a([toCSS(studio, themeId), toDTCG(studio, themeId), toMarkdown(studio, themeId)].join(sep))
+}
+
+function fnv1a(s: string): string {
+  let h = 0x811c9dc5
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i)
+    // The usual FNV prime multiply, spelled out in shifts. A plain `h * 16777619`
+    // overflows the 53 bits a double can hold exactly and starts losing the low
+    // end, which would make the hash depend on rounding rather than on the input.
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0
+  }
+  return h.toString(16).padStart(8, '0')
+}
+
 /** What the draft calls each of our types. Ours are already its names. */
 function dtcgType(type: TokenType): string {
   return type

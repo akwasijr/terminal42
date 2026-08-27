@@ -3,6 +3,8 @@ import { mkdtempSync, readFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { studioFromFeel, type Feel } from '../../src/shared/tokens/scaffold'
+import { basisHash } from '../../src/shared/tokens/export'
+import { hydrateStudio } from '../../src/shared/tokens/types'
 
 /**
  * Binding a design to a token library.
@@ -34,7 +36,7 @@ const store = { get: vi.fn((id: string) => (id === 'lib1' ? record : null)) }
 vi.mock('../../src/main/tokens', () => ({ getTokenStudio: (id: string) => store.get(id) }))
 vi.mock('electron', () => ({ app: { getPath: () => tmpdir() }, BrowserWindow: { getAllWindows: () => [] }, ipcMain: { handle: () => {} } }))
 
-const { buildBasisBlock, writeBasisFiles } = await import('../../src/main/design')
+const { buildBasisBlock, writeBasisFiles, basisHasMoved } = await import('../../src/main/design')
 
 const brief = (over: Record<string, unknown> = {}): never =>
   ({ basisId: 'lib1', basisThemeId: null, ...over }) as never
@@ -122,3 +124,72 @@ describe('a design bound to a library', () => {
     expect(existsSync(join(dir, 'tokens.css'))).toBe(false)
   })
 })
+
+/**
+ * Noticing that the library moved.
+ *
+ * The stamp exists so a design can be told its library has changed without
+ * every design keeping a copy of the library. That only works if the hash is
+ * quiet about things a design cannot see and loud about things it can.
+ */
+describe('the library stamp', () => {
+  const hydrated = hydrateStudio(JSON.parse(JSON.stringify(studio)))
+
+  it('is the same twice for the same library', () => {
+    expect(basisHash(hydrated, hydrated.activeTheme)).toBe(basisHash(hydrated, hydrated.activeTheme))
+  })
+
+  // Someone adding a second theme has not touched the one this design uses,
+  // so nothing would be rewritten beside it. Flagging every bound design stale
+  // because a colleague started a dark mode would teach everyone to ignore the
+  // flag, and then the row that mattered would be invisible too.
+  it('ignores a change that would not rewrite this design\u2019s files', () => {
+    const before = basisHash(hydrated, hydrated.activeTheme)
+    const edited = hydrateStudio(JSON.parse(JSON.stringify(studio)))
+    edited.themes.push({ id: 'later', name: 'Dark', sets: { ...edited.themes[0].sets } })
+    expect(basisHash(edited, edited.activeTheme)).toBe(before)
+  })
+
+  // The opposite case, and the reason all three files are hashed rather than
+  // just the stylesheet: a description reaches tokens.json and tokens.md, so
+  // the folder really is out of date even though the page renders the same.
+  it('notices a change that only reaches the written docs', () => {
+    const before = basisHash(hydrated, hydrated.activeTheme)
+    const edited = hydrateStudio(JSON.parse(JSON.stringify(studio)))
+    const token = edited.sets.flatMap((s) => s.tokens).find((tok) => tok.tier !== 'primitive')!
+    token.description = `${token.description ?? ''} (a note for whoever reads this)`
+    expect(basisHash(edited, edited.activeTheme)).not.toBe(before)
+  })
+
+  it('changes when a value the design uses changes', () => {
+    const before = basisHash(hydrated, hydrated.activeTheme)
+    const edited = hydrateStudio(JSON.parse(JSON.stringify(studio)))
+    const token = edited.sets.flatMap((s) => s.tokens).find((tok) => tok.type === 'color')!
+    token.value = '#123456'
+    expect(basisHash(edited, edited.activeTheme)).not.toBe(before)
+  })
+
+  it('is stamped by writing the files, and matches afterwards', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'basis-'))
+    const stamp = await writeBasisFiles(dir, brief())
+    expect(stamp).toBeTypeOf('string')
+    expect(basisHasMoved(brief({ basisStamp: stamp }))).toBe(false)
+  })
+
+  it('reports drift once the library has changed under a stamped design', () => {
+    expect(basisHasMoved(brief({ basisStamp: 'something-else' }))).toBe(true)
+  })
+
+  // Three ways of having nothing to say, all of which must read as "no
+  // opinion" rather than as drift: an unstamped design predates stamping, an
+  // unbound one never had a library, and a deleted library cannot be compared
+  // against. Claiming staleness on any of them spends the flag's only bit of
+  // attention on noise.
+  it('says nothing when it cannot know', () => {
+    expect(basisHasMoved(brief({ basisStamp: null }))).toBe(false)
+    expect(basisHasMoved(brief({ basisId: null, basisStamp: 'x' }))).toBe(false)
+    expect(basisHasMoved(brief({ basisId: 'gone', basisStamp: 'x' }))).toBe(false)
+    expect(basisHasMoved(null)).toBe(false)
+  })
+})
+

@@ -58,6 +58,16 @@ export type DesignBrief = {
    */
   basisId?: string | null
   basisThemeId?: string | null
+  /**
+   * The fingerprint of the library as it was when this design last had the
+   * files written beside it.
+   *
+   * Kept so the app can say "the library moved" without storing a copy of the
+   * library on every design. Absent on a design generated before stamping
+   * existed, which reads as "no opinion" rather than as drift: claiming a
+   * design is stale on no evidence is worse than saying nothing.
+   */
+  basisStamp?: string | null
   audience?: string | null
   paletteId?: string | null
   paletteLabel?: string | null
@@ -153,4 +163,17 @@ export type DesignProgressStep = {
   label: string
   status: 'running' | 'done' | 'error'
   startedAt: number
+}
+
+/**
+ * What the list needs to know about a design's library, and nothing more.
+ *
+ * `bound` is false for a design with no library and for one whose library has
+ * been deleted, because from the list's point of view they are the same thing:
+ * there is nothing to show and nothing to re-sync.
+ */
+export type BasisStatus = {
+  bound: boolean
+  name: string | null
+  moved: boolean
 }

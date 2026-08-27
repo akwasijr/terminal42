@@ -88,6 +88,13 @@ export type DesignVersion = {
   previewUrl?: string | null
 }
 
+/** Whether a design's token library has moved under it since it was built. */
+export type BasisStatus = {
+  bound: boolean
+  name: string | null
+  moved: boolean
+}
+
 export type DesignProgressStep = {
   id: string
   label: string
@@ -801,6 +808,11 @@ const api = {
       ipcRenderer.invoke('designs:figmaFromScratch', { designId, description, ...(opts ?? {}) }) as Promise<{ ok: boolean; error?: string }>,
     previewPrompt: (brief: DesignBrief | null) =>
       ipcRenderer.invoke('designs:previewPrompt', { brief }) as Promise<{ prompt: string }>,
+    basisStatus: (designId: string) =>
+      ipcRenderer.invoke('designs:basisStatus', designId) as Promise<BasisStatus>,
+    resyncBasis: (designId: string) =>
+      ipcRenderer.invoke('designs:resyncBasis', designId) as
+        Promise<{ ok: true; stuck: string[] } | { ok: false; error: string }>,
     cancel: (designId: string) => ipcRenderer.invoke('designs:cancel', designId) as Promise<{ ok: boolean }>,
     isBusy: (designId: string) => ipcRenderer.invoke('designs:isBusy', designId) as Promise<boolean>,
     history: (designId: string) => ipcRenderer.invoke('designs:history', designId) as Promise<DesignMessage[]>,

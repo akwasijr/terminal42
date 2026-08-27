@@ -12,7 +12,7 @@ import { lintHtml, buildFixPrompt } from './lintHtml'
 import { lintAgainstBasis, describeBasisFindings } from '../shared/tokens/lint'
 import { buildFoundationBlock } from './designFoundation'
 import { AI_RULES, formatRulesForPrompt } from '../renderer/src/lib/aiRules'
-import { formatBasisForPrompt, toCSS, toDTCG, toMarkdown } from '../shared/tokens/export'
+import { basisHash, formatBasisForPrompt, toCSS, toDTCG, toMarkdown } from '../shared/tokens/export'
 import { hydrateStudio } from '../shared/tokens/types'
 import { getTokenStudio } from './tokens'
 import { upsertManagedBlock } from './htmlBlocks'
@@ -55,7 +55,8 @@ import type {
   DesignGroup,
   DesignBrief,
   DesignVersion,
-  DesignProgressStep
+  DesignProgressStep,
+  BasisStatus
 } from './design.types'
 
 export type {
@@ -261,18 +262,43 @@ export function buildBasisBlock(brief: DesignBrief | null): string {
  * Failure is swallowed for the same reason the prompt block is: a library that
  * cannot be read is a reason to generate without it, not a reason to refuse.
  */
-export async function writeBasisFiles(cwd: string, brief: DesignBrief): Promise<void> {
-  if (!brief.basisId) return
+export async function writeBasisFiles(cwd: string, brief: DesignBrief): Promise<string | null> {
+  if (!brief.basisId) return null
   try {
     const record = getTokenStudio(brief.basisId)
-    if (!record) return
+    if (!record) return null
     const studio = hydrateStudio(record.studio)
     const themeId = brief.basisThemeId ?? studio.activeTheme
     await fs.writeFile(join(cwd, 'tokens.css'), toCSS(studio, themeId), 'utf8')
     await fs.writeFile(join(cwd, 'tokens.json'), toDTCG(studio, themeId), 'utf8')
     await fs.writeFile(join(cwd, 'tokens.md'), toMarkdown(studio, themeId), 'utf8')
+    // Returned rather than written here: what the files say is this module's
+    // business, but which design was built from them is the caller's.
+    return basisHash(studio, themeId)
   } catch (err) {
     console.error('[design] could not write the bound library:', err)
+    return null
+  }
+}
+
+/**
+ * Whether the library has moved since a design was last built against it.
+ *
+ * Says no whenever it cannot say yes. A design with no library, a library that
+ * has been deleted, and a design generated before stamping existed all read
+ * the same way: nothing to report. The flag exists to send someone to a
+ * Re-sync button, and sending them there on a guess wastes the one bit of
+ * attention the flag has.
+ */
+export function basisHasMoved(brief: DesignBrief | null): boolean {
+  if (!brief?.basisId || !brief.basisStamp) return false
+  try {
+    const record = getTokenStudio(brief.basisId)
+    if (!record) return false
+    const studio = hydrateStudio(record.studio)
+    return basisHash(studio, brief.basisThemeId ?? studio.activeTheme) !== brief.basisStamp
+  } catch {
+    return false
   }
 }
 
@@ -764,7 +790,23 @@ async function send(
   // nothing and the page renders unstyled. Refreshed every time so a design
   // generated after the library moved is built against the library as it is,
   // not as it was when the design was created.
-  if (!opts.skipPrefix && d.brief?.basisId) await writeBasisFiles(d.cwd, d.brief)
+  if (!opts.skipPrefix && d.brief?.basisId) {
+    const stamp = await writeBasisFiles(d.cwd, d.brief)
+    // Recorded against the design so a later change to the library can be
+    // noticed. Written even when it has not moved, because the alternative is
+    // a read-compare-write and this is one statement.
+    if (stamp && stamp !== d.brief.basisStamp) {
+      d.brief = { ...d.brief, basisStamp: stamp }
+      try {
+        getDb().prepare('UPDATE designs SET brief = ? WHERE id = ?')
+          .run(JSON.stringify(d.brief), designId)
+      } catch (err) {
+        // A stamp that failed to save costs a spurious "Library updated" at
+        // worst, which is not worth failing a generation over.
+        console.error('[design] could not stamp the bound library:', err)
+      }
+    }
+  }
 
   const isStarterFirstRun = !opts.skipPrefix
     && !!d.brief?.starterTemplateId
@@ -1746,6 +1788,49 @@ export function registerDesignIpc(getWin: () => BrowserWindow | null): void {
 
     return send(getWin(), args.designId, lines.join('\n'), { model: null, skipPrefix: true, useFigma: true, freshSession: true, displayText })
   } // end runFigmaFromScratch
+
+  // Whether the library a design was built against has moved since, and what
+  // to call it. Asked per design by the list, so it stays cheap: a hash of two
+  // already-sorted strings, no file reads.
+  ipcMain.handle('designs:basisStatus', (_e, designId: string): BasisStatus => {
+    const d = getDesign(designId)
+    const basisId = d?.brief?.basisId
+    if (!basisId) return { bound: false, name: null, moved: false }
+    const record = getTokenStudio(basisId)
+    if (!record) return { bound: false, name: null, moved: false }
+    return { bound: true, name: record.name, moved: basisHasMoved(d?.brief ?? null) }
+  })
+
+  // Bring a bound design back into line with its library.
+  //
+  // Rewriting the files is the whole fix for a design that used the variables,
+  // which is the common case and why this is worth offering as one click. A
+  // design that inlined a hex instead gets no benefit from new files, so the
+  // linter runs afterwards and says what it could not relink — the drift
+  // becomes visible rather than staying silent.
+  ipcMain.handle('designs:resyncBasis', async (_e, designId: string) => {
+    const d = getDesign(designId)
+    if (!d?.brief?.basisId) return { ok: false as const, error: 'This design is not bound to a library.' }
+    const stamp = await writeBasisFiles(d.cwd, d.brief)
+    if (!stamp) return { ok: false as const, error: 'That library could not be read.' }
+    const brief = { ...d.brief, basisStamp: stamp }
+    try {
+      getDb().prepare('UPDATE designs SET brief = ? WHERE id = ?').run(JSON.stringify(brief), designId)
+    } catch (err) {
+      return { ok: false as const, error: String(err) }
+    }
+    let stuck: string[] = []
+    try {
+      const versions = listVersions(designId)
+      const latest = versions[versions.length - 1]
+      if (latest && latest.kind === 'html') {
+        stuck = lintBasis(await fs.readFile(latest.filePath, 'utf8'), brief).lines
+      }
+    } catch {
+      // No readable version yet is not a failure: the files are still correct.
+    }
+    return { ok: true as const, stuck }
+  })
 
   ipcMain.handle('designs:cancel', (_e, designId: string) => ({ ok: cancel(designId) }))
   ipcMain.handle('designs:isBusy', (_e, designId: string) => running.has(designId))
