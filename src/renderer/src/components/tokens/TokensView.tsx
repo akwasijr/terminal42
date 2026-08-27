@@ -955,8 +955,16 @@ function TokenMark({ token, value }: { token: Token; value: TokenValue | null })
  * same goes for a family: "Aa" in Inter and "Aa" in Space Grotesk are the same
  * two letters, while the words "Space Grotesk" set in Space Grotesk say what
  * the token is and what it looks like at once.
+ *
+ * Motion is the same argument taken to its end. 200ms printed on a tile is a
+ * number nobody can feel, and a curve drawn as a line is a shape nobody can
+ * feel either. Both are decisions about time, so both are shown in time: the
+ * whole point of `time.slow` is that it is slower than `time.fast`, and you
+ * find that out by watching them next to each other.
  */
 const SPECIMEN = new Set<Token['type']>([
+  'duration',
+  'cubicBezier',
   'typography',
   'fontSize',
   'fontFamily',
@@ -980,9 +988,86 @@ const WEIGHT_NAME: Record<number, string> = {
 /** The largest a specimen is allowed to be drawn, so one token cannot own the screen. */
 const MAX_SPECIMEN = 46
 
+/**
+ * A dot that travels a rail, so a length of time can be watched rather than read.
+ *
+ * Every duration in a library travels the same rail, which is what makes the
+ * row comparable: the distance is fixed, so the only thing that differs
+ * between two tokens is how long the crossing takes. The pause afterwards is
+ * as long as the longest sensible duration, so a slow token and a fast one
+ * stay in step and the row reads as one clock rather than a dozen.
+ */
+function TimeRail({ ms, easing }: { ms: number; easing?: string }): React.JSX.Element {
+  const dot = useRef<HTMLSpanElement>(null)
+  useEffect(() => {
+    const el = dot.current
+    if (!el) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const travel = Math.max(60, Math.min(1200, ms))
+    const total = travel + 900
+    const anim = el.animate(
+      [
+        { left: '0%', offset: 0, easing: easing ?? 'linear' },
+        { left: '100%', offset: travel / total },
+        { left: '100%', offset: 1 }
+      ],
+      { duration: total, iterations: Infinity }
+    )
+    return () => anim.cancel()
+  }, [ms, easing])
+  return (
+    <span className="relative block h-1.5 w-full rounded-full bg-sunken">
+      <span
+        ref={dot}
+        className="absolute top-1/2 block h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent"
+        style={{ left: 0 }}
+      />
+    </span>
+  )
+}
+
+function bezier(v: TokenValue | null): { x1: number; y1: number; x2: number; y2: number } {
+  const c = (typeof v === 'object' && v ? v : {}) as Record<string, string | number>
+  return { x1: num(c.x1), y1: num(c.y1), x2: num(c.x2), y2: num(c.y2) }
+}
+
 function Specimen({ token, value }: { token: Token; value: TokenValue | null }): React.JSX.Element {
   const v = value ?? token.value
   switch (token.type) {
+    case 'duration': {
+      const ms = num(v as string | number)
+      return (
+        <span className="flex items-center gap-3 py-1">
+          <span className="w-12 shrink-0 tabular-nums text-[11px] text-text-secondary">{ms}ms</span>
+          <span className="min-w-0 max-w-[280px] flex-1">
+            <TimeRail ms={ms} />
+          </span>
+        </span>
+      )
+    }
+    case 'cubicBezier': {
+      const c = bezier(v)
+      const css = `cubic-bezier(${c.x1}, ${c.y1}, ${c.x2}, ${c.y2})`
+      // The curve and the movement together, because each answers what the
+      // other cannot: the drawing shows the shape of the whole crossing, the
+      // dot shows what that shape does to something you are watching.
+      return (
+        <span className="flex items-center gap-3 py-1">
+          <svg width="52" height="30" viewBox="0 0 60 40" fill="none" aria-hidden="true" className="shrink-0">
+            <path d="M 0 40 L 60 40" stroke="currentColor" strokeWidth="1" className="text-border" />
+            <path
+              d={`M 0 40 C ${c.x1 * 60} ${40 - c.y1 * 40} ${c.x2 * 60} ${40 - c.y2 * 40} 60 0`}
+              stroke="currentColor"
+              strokeWidth="1.5"
+              className="text-accent"
+            />
+          </svg>
+          <span className="min-w-0 max-w-[280px] flex-1">
+            <TimeRail ms={700} easing={css} />
+          </span>
+        </span>
+      )
+    }
     case 'fontSize': {
       const px = num(v as string | number)
       return (
