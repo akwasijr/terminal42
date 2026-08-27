@@ -11,7 +11,7 @@ import { getSettings } from './settings'
 import { lintHtml, buildFixPrompt } from './lintHtml'
 import { buildFoundationBlock } from './designFoundation'
 import { AI_RULES, formatRulesForPrompt } from '../renderer/src/lib/aiRules'
-import { formatBasisForPrompt } from '../shared/tokens/export'
+import { formatBasisForPrompt, toCSS, toDTCG, toMarkdown } from '../shared/tokens/export'
 import { hydrateStudio } from '../shared/tokens/types'
 import { getTokenStudio } from './tokens'
 import { upsertManagedBlock } from './htmlBlocks'
@@ -236,16 +236,42 @@ function enabledRuleIds(brief: DesignBrief | null): string[] {
  * Silent when there is no binding, when the library has been deleted, and when
  * it resolves to nothing. None of those is worth a sentence in a prompt.
  */
-function buildBasisBlock(brief: DesignBrief | null): string {
+export function buildBasisBlock(brief: DesignBrief | null): string {
   if (!brief?.basisId) return ''
   try {
     const record = getTokenStudio(brief.basisId)
     if (!record) return ''
     const studio = hydrateStudio(record.studio)
-    return formatBasisForPrompt(studio, brief.basisThemeId ?? studio.activeTheme)
+    const block = formatBasisForPrompt(studio, brief.basisThemeId ?? studio.activeTheme)
+    if (!block) return ''
+    // A design here is one self-contained file, so it cannot link the
+    // stylesheet the block refers to. The declarations have to come inside,
+    // which is a copy rather than a link and so has to be said out loud.
+    return `${block}\nThe file tokens.css sits in this folder and defines every property above. Because the page must stay self-contained, paste its :root block into the page\u2019s own <style> verbatim rather than linking it, then use the variables everywhere.`
   } catch {
     // A library that cannot be read is not a reason to refuse to generate.
     return ''
+  }
+}
+
+/**
+ * The bound library's three files, in the design's own folder.
+ *
+ * Failure is swallowed for the same reason the prompt block is: a library that
+ * cannot be read is a reason to generate without it, not a reason to refuse.
+ */
+export async function writeBasisFiles(cwd: string, brief: DesignBrief): Promise<void> {
+  if (!brief.basisId) return
+  try {
+    const record = getTokenStudio(brief.basisId)
+    if (!record) return
+    const studio = hydrateStudio(record.studio)
+    const themeId = brief.basisThemeId ?? studio.activeTheme
+    await fs.writeFile(join(cwd, 'tokens.css'), toCSS(studio, themeId), 'utf8')
+    await fs.writeFile(join(cwd, 'tokens.json'), toDTCG(studio, themeId), 'utf8')
+    await fs.writeFile(join(cwd, 'tokens.md'), toMarkdown(studio, themeId), 'utf8')
+  } catch (err) {
+    console.error('[design] could not write the bound library:', err)
   }
 }
 
@@ -706,6 +732,16 @@ async function send(
       pptxError = String(err).slice(0, 200)
     }
   }
+
+  // A bound design carries its library as files, refreshed on every run.
+  //
+  // Written rather than merely described because the page has to link
+  // something: a prompt can name `--colour-text-primary` all it likes, but
+  // unless tokens.css is on disk beside the HTML the variable resolves to
+  // nothing and the page renders unstyled. Refreshed every time so a design
+  // generated after the library moved is built against the library as it is,
+  // not as it was when the design was created.
+  if (!opts.skipPrefix && d.brief?.basisId) await writeBasisFiles(d.cwd, d.brief)
 
   const isStarterFirstRun = !opts.skipPrefix
     && !!d.brief?.starterTemplateId
