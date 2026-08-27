@@ -1061,6 +1061,13 @@ function num(v: TokenValue | string | number | undefined): number {
   return typeof v === 'number' ? v : parseFloat(String(v ?? 0)) || 0
 }
 
+/**
+ * The line under the library: a passing note, or what does not resolve.
+ *
+ * Silent when there is nothing wrong. An all-clear that is on screen all the
+ * time is not read as an all-clear, only as furniture — and it takes up the
+ * one place the app has to say something has broken.
+ */
 function ProblemLine({
   found,
   showing,
@@ -1071,7 +1078,7 @@ function ProblemLine({
   showing: boolean
   onToggle: () => void
   note: string | null
-}): React.JSX.Element {
+}): React.JSX.Element | null {
   if (note) {
     return (
       <p className="px-1 text-[11px] text-text-secondary" role="status">
@@ -1079,9 +1086,7 @@ function ProblemLine({
       </p>
     )
   }
-  if (found.length === 0) {
-    return <p className="px-1 text-[11px] text-text-muted">Everything resolves.</p>
-  }
+  if (found.length === 0) return null
   return (
     <div className="flex items-center gap-2 px-1">
       <button
