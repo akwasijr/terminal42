@@ -93,14 +93,14 @@ export function MotionView(): React.JSX.Element {
           <button
             type="button"
             onClick={() => setTemplatesOpen(true)}
-            className="whitespace-nowrap rounded-md bg-surface px-3 py-1.5 text-[13px] font-medium text-text-primary transition-colors hover:bg-elevated"
+            className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-md bg-surface px-3 text-[13px] font-medium text-text-primary ring-1 ring-inset ring-border transition-colors hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           >
             Templates
           </button>
           <button
             type="button"
             onClick={() => setSetupOpen(true)}
-            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md bg-action px-3 py-1.5 text-[13px] font-medium text-action-text transition-opacity hover:opacity-90"
+            className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-md bg-action px-3 text-[13px] font-medium text-action-text transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           >
             <IconPlus size={13} />
             <span>New motion</span>

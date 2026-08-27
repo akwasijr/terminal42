@@ -24,6 +24,7 @@ import {
 } from '../../../../shared/motion/keyframes'
 import { EasingEditor } from './EasingEditor'
 import type { Easing } from '../../../../shared/motion/types'
+import { Hint } from '../Hint'
 
 /** The three columns every row shares. Changing one here moves all of them. */
 const LABEL_W = 'w-[104px]'
@@ -128,8 +129,8 @@ export function MotionTimeline({
             <span className={`${LABEL_W} shrink-0 px-1 text-[10px] text-text-muted`}>
               {targets.length === 1 ? '1 animated value' : `${targets.length} animated values`}
             </span>
-            <span className="flex-1 text-[10px] text-text-muted">
-              Click a key to shape the segment after it, drag to move, right-click to remove, double-click a lane to add one.
+            <span className="flex flex-1 items-center">
+              <Hint label="Click a key to shape the segment after it, drag to move, right-click to remove, double-click a lane to add one." />
             </span>
             <button
               type="button"

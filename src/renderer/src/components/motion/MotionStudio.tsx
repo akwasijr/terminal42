@@ -24,6 +24,7 @@ import { FrameToolbar, type FrameFit } from './FrameToolbar'
 import { ResizeHandle } from './ResizeHandle'
 import { useStoredWidth } from '../../lib/motion/paneWidth'
 import { IconChevronRight } from '../icons'
+import { Hint } from '../Hint'
 
 type Tab = 'motion' | 'visual' | 'export'
 
@@ -433,7 +434,8 @@ export function MotionStudio({
         />
         {selected !== null ? (
           <div className="flex shrink-0 items-center gap-2 px-3 pb-2 text-[11px] text-text-secondary">
-            <span>Card {selected + 1} selected. Drag it to move, hold Alt to turn it, drop a picture on it.</span>
+            <span>Card {selected + 1} selected</span>
+            <Hint label="Drag it to move, hold Alt to turn it, drop a picture on it." />
             {!overrideIsEmpty(doc.overrides[String(selected)]) ? (
               <button
                 type="button"

@@ -50,7 +50,12 @@
   --shadow-row: 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.06);
   --shadow-float: 0 4px 16px rgba(0, 0, 0, 0.10);
-  --shadow-overlay: 0 8px 32px rgba(0, 0, 0, 0.14);
+  /* The hairline is part of the shadow so that every overlay in the app gets
+     an edge without forty class strings having to remember to ask for one.
+     It uses the strong border, not the quiet one: a panel floating over the
+     page is the one place a boundary genuinely has to be seen, otherwise a
+     menu and the thing behind it read as a single surface. */
+  --shadow-overlay: 0 0 0 1px rgb(var(--border-strong)), 0 8px 32px rgba(0, 0, 0, 0.14);
 }
 
 .dark {
@@ -76,7 +81,7 @@
   --shadow-row: 0 1px 2px rgba(0, 0, 0, 0.30);
   --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.40);
   --shadow-float: 0 4px 16px rgba(0, 0, 0, 0.55);
-  --shadow-overlay: 0 8px 32px rgba(0, 0, 0, 0.65);
+  --shadow-overlay: 0 0 0 1px rgb(var(--border-strong)), 0 8px 32px rgba(0, 0, 0, 0.65);
 }
 
 * { box-sizing: border-box; }

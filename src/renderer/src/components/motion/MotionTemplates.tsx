@@ -44,8 +44,20 @@ export function MotionTemplates({
   }, [onClose])
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-bg/95 backdrop-blur-sm">
-      <header className="flex flex-shrink-0 items-center justify-between gap-4 px-8 pb-4 pt-7">
+    // A scrim and a panel, not a takeover. Filling the window edge to edge
+    // left nothing to say the app was still behind it, so picking a template
+    // felt like leaving Motion rather than reaching into a drawer.
+    <div
+      className="fixed inset-0 z-40 grid place-items-center bg-black/40 p-6 backdrop-blur-sm"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Motion templates"
+        className="flex max-h-[82vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-bg shadow-overlay"
+      >
+      <header className="flex flex-shrink-0 items-center justify-between gap-4 px-6 pb-4 pt-6">
         <div>
           <h2 className="text-[17px] font-semibold text-text-primary">Templates</h2>
           <p className="mt-0.5 text-[12px] text-text-muted">Finished pieces to start from. Everything stays editable.</p>
@@ -59,12 +71,13 @@ export function MotionTemplates({
           <IconClose size={12} />
         </button>
       </header>
-      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-10">
-        <div className="mx-auto grid max-w-6xl gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {MOTION_TEMPLATES.map((t) => (
             <TemplateTile key={t.id} template={t} onPick={() => onPick(t)} />
           ))}
         </div>
+      </div>
       </div>
     </div>
   )
