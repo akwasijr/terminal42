@@ -10,6 +10,7 @@
 // trusts the diff any more. That means sorted keys and no timestamps.
 
 import { exported, resolveAll } from './resolve'
+import { SECTIONS, sectionOf, type SectionId } from './groups'
 import type { TokenStudio, TokenType, TokenValue } from './types'
 
 /** What the draft calls each of our types. Ours are already its names. */
@@ -85,7 +86,14 @@ function cssName(path: string): string {
 }
 
 function cssValue(type: TokenType, value: TokenValue): string {
-  if (typeof value === 'number') return type === 'dimension' || type === 'fontSize' ? `${value}px` : String(value)
+  if (typeof value === 'number') {
+    if (type === 'dimension' || type === 'fontSize') return `${value}px`
+    // A duration is a time, and CSS will not read a bare number as one: a
+    // `transition: 200` is simply ignored, which is the worst kind of wrong
+    // because the page still renders.
+    if (type === 'duration') return `${value}ms`
+    return String(value)
+  }
   if (typeof value === 'string') return value
   if (type === 'shadow') {
     const s = value as Record<string, string | number>
@@ -113,4 +121,105 @@ function px(v: string | number): string {
 /** Sorted, so two exports of the same studio are the same bytes. */
 function sortedPaths(studio: TokenStudio, themeId: string | null): string[] {
   return [...resolveAll(studio, themeId).keys()].sort()
+}
+
+/**
+ * The library as something a person, or a model, can read straight through.
+ *
+ * `tokens.json` is for other tools and `tokens.css` is for the browser; both
+ * are lists of values with no argument in them about which name to reach for.
+ * That argument is the whole point of a shared library, so it gets its own
+ * file: names grouped the way the screen groups them, each with the value it
+ * currently resolves to and the variable to write.
+ *
+ * Primitives are left out. They are the shelf the semantics are built from,
+ * and a page that reaches past `--text-primary` for `--neutral-900` has
+ * stopped using the library and started copying from it. Naming them here
+ * would be an invitation to do exactly that.
+ *
+ * Sorted and free of dates, like the other two, so a re-export of an unchanged
+ * library is a no-op in a diff.
+ */
+export function toMarkdown(studio: TokenStudio, themeId: string | null): string {
+  const theme = studio.themes.find((t) => t.id === themeId) ?? null
+  const all = resolveAll(studio, themeId)
+  const rows = new Map<SectionId, string[]>()
+
+  for (const path of sortedPaths(studio, themeId)) {
+    const hit = all.get(path)
+    if (!hit || !exported(theme, hit.setId)) continue
+    if (hit.token.tier === 'primitive') continue
+    const section = sectionOf(hit.token)
+    const line = `| \`--${cssName(path)}\` | ${escapeCell(cssValue(hit.token.type, hit.value))} | ${
+      escapeCell(hit.token.description ?? '')
+    } |`
+    const list = rows.get(section)
+    if (list) list.push(line)
+    else rows.set(section, [line])
+  }
+
+  const name = studio.name || 'Library'
+  const themeName = theme?.name ?? 'no theme'
+  const out: string[] = [
+    `# ${name} \u2014 ${themeName}`,
+    '',
+    'The shared library for this project. Use these custom properties; do not write',
+    'a raw colour, size or duration. If what you need is not here, take the closest',
+    'name rather than inventing a value.',
+    '',
+    '`tokens.css` defines every property below. Link it, then reference them.',
+    ''
+  ]
+  for (const section of SECTIONS) {
+    const list = rows.get(section.id)
+    if (!list || list.length === 0) continue
+    out.push(`## ${section.label}`, '', '| Variable | Value | Use for |', '| --- | --- | --- |', ...list, '')
+  }
+  return `${out.join('\n')}`
+}
+
+/** A pipe inside a cell would end the cell, and a newline would end the row. */
+function escapeCell(s: string): string {
+  return s.replace(/\|/g, '\\|').replace(/\s*\n\s*/g, ' ').trim()
+}
+
+/**
+ * The library as a paragraph to put in front of a model.
+ *
+ * The digest above is a table, which is the right shape for a file and the
+ * wrong shape for a prompt: a model reading a hundred rows of markdown spends
+ * its attention on the pipes. This is the same content as prose, capped, and
+ * only the names anyone should be typing.
+ *
+ * Empty string when there is nothing to say, so the caller can drop it into a
+ * prefix without checking.
+ */
+export function formatBasisForPrompt(studio: TokenStudio, themeId: string | null): string {
+  const theme = studio.themes.find((t) => t.id === themeId) ?? null
+  const all = resolveAll(studio, themeId)
+  const groups = new Map<SectionId, string[]>()
+  for (const path of sortedPaths(studio, themeId)) {
+    const hit = all.get(path)
+    if (!hit || !exported(theme, hit.setId)) continue
+    if (hit.token.tier === 'primitive') continue
+    const section = sectionOf(hit.token)
+    const entry = `--${cssName(path)} (${cssValue(hit.token.type, hit.value)})`
+    const list = groups.get(section)
+    if (list) list.push(entry)
+    else groups.set(section, [entry])
+  }
+  if (groups.size === 0) return ''
+
+  const lines = [
+    `Design tokens \u2014 ${studio.name || 'the shared library'}${theme ? `, ${theme.name}` : ''}.`,
+    'Use only these, as CSS custom properties from tokens.css. Never write a raw',
+    'hex, rgb, px size, radius or duration in the markup or the stylesheet. If a',
+    'value you want is missing, use the nearest token rather than inventing one.'
+  ]
+  for (const section of SECTIONS) {
+    const list = groups.get(section.id)
+    if (!list || list.length === 0) continue
+    lines.push(`${section.label}: ${list.join(', ')}`)
+  }
+  return lines.join('\n')
 }

@@ -15,7 +15,7 @@ import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { getDb } from './db'
-import { toCSS, toDTCG } from '../shared/tokens/export'
+import { toCSS, toDTCG, toMarkdown } from '../shared/tokens/export'
 import { hydrateStudio } from '../shared/tokens/types'
 
 export type TokenStudioRecord = {
@@ -98,9 +98,14 @@ export function registerTokensIpc(getWin: () => BrowserWindow | null): void {
     renameTokenStudio(args.id, args.name))
   ipcMain.handle('tokens:delete', (_e, id: string) => deleteTokenStudio(id))
 
-  // Writing the files. A directory is asked for once and both files are
-  // written into it, because a token set that ships as JSON but not CSS, or
-  // the other way round, is half a job and the second half is always forgotten.
+  // Writing the files. A directory is asked for once and all three are written
+  // into it, because a token set that ships as JSON but not CSS, or the other
+  // way round, is half a job and the second half is always forgotten.
+  //
+  // Three readers, three files. `tokens.json` is for other tools, `tokens.css`
+  // is for the page, and `tokens.md` is for whoever — or whatever — has to
+  // decide which name to reach for. That last one is the reason the library
+  // exists, so it ships beside the other two rather than on request.
   ipcMain.handle(
     'tokens:export',
     async (_e, args: { studio: unknown; themeId: string | null; dir?: string | null }) => {
@@ -118,11 +123,14 @@ export function registerTokensIpc(getWin: () => BrowserWindow | null): void {
         dir = res.filePaths[0]
       }
       try {
+        const themeId = args?.themeId ?? studio.activeTheme
         const json = join(dir, 'tokens.json')
         const css = join(dir, 'tokens.css')
-        await fs.writeFile(json, toDTCG(studio, args?.themeId ?? studio.activeTheme), 'utf8')
-        await fs.writeFile(css, toCSS(studio, args?.themeId ?? studio.activeTheme), 'utf8')
-        return { ok: true as const, paths: [json, css] }
+        const md = join(dir, 'tokens.md')
+        await fs.writeFile(json, toDTCG(studio, themeId), 'utf8')
+        await fs.writeFile(css, toCSS(studio, themeId), 'utf8')
+        await fs.writeFile(md, toMarkdown(studio, themeId), 'utf8')
+        return { ok: true as const, paths: [json, css, md] }
       } catch (e) {
         return { ok: false as const, error: e instanceof Error ? e.message : String(e) }
       }

@@ -49,6 +49,15 @@ export type DesignBrief = {
   lookLabel?: string | null
   designSystem?: string | null
   designSystemLabel?: string | null
+  /**
+   * The token library this design is bound to, and which of its themes.
+   *
+   * Optional because a design made before libraries existed has none and must
+   * keep generating exactly as it did. When present the generation prompt
+   * carries the library's names and the folder carries its files.
+   */
+  basisId?: string | null
+  basisThemeId?: string | null
   audience?: string | null
   paletteId?: string | null
   paletteLabel?: string | null

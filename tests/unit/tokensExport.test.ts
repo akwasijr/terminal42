@@ -1,7 +1,20 @@
 import { describe, it, expect } from 'vitest'
-import { toCSS, toDTCG } from '../../src/shared/tokens/export'
+import { formatBasisForPrompt, toCSS, toDTCG, toMarkdown } from '../../src/shared/tokens/export'
 import type { Token, TokenStudio } from '../../src/shared/tokens/types'
-import { studioFromFeel } from '../../src/shared/tokens/scaffold'
+
+const FEEL: Feel = {
+  name: 'Test',
+  primary: '#4338ca',
+  secondary: '#0a2540',
+  tertiary: '#06b6d4',
+  headingFont: 'Space Grotesk',
+  bodyFont: 'Inter',
+  corner: 'rounded',
+  density: 'comfortable',
+  scale: 'balanced',
+  elevation: 'subtle'
+}
+import { studioFromFeel, type Feel } from '../../src/shared/tokens/scaffold'
 
 const tok = (path: string, value: Token['value'], tier: Token['tier'] = 'primitive', type: Token['type'] = 'color'): Token =>
   ({ id: `k${path}`, path, value, tier, type })
@@ -95,5 +108,46 @@ describe('css names', () => {
     const css = toCSS(studio, 'light')
     expect(css).toContain('--button-primary-bg-hover')
     expect(css).not.toMatch(/--[a-z-]*[A-Z]/)
+  })
+})
+
+describe('toMarkdown', () => {
+  it('groups the referenceable names by section and leaves the shelf out', () => {
+    const studio = studioFromFeel('Test', FEEL)
+    const md = toMarkdown(studio, studio.activeTheme)
+    expect(md).toContain('## Colour')
+    expect(md).toContain('| Variable | Value | Use for |')
+    // A semantic name is there to be used.
+    expect(md).toMatch(/--colour-text-primary/)
+    // A primitive is the shelf it was built from, and naming it invites a page
+    // to reach past the library instead of into it.
+    expect(md).not.toMatch(/--neutral-900/)
+  })
+
+  it('writes the same bytes twice', () => {
+    const studio = studioFromFeel('Test', FEEL)
+    expect(toMarkdown(studio, studio.activeTheme)).toBe(toMarkdown(studio, studio.activeTheme))
+  })
+
+  it('never lets a value break the table it sits in', () => {
+    const studio = studioFromFeel('Test', FEEL)
+    const md = toMarkdown(studio, studio.activeTheme)
+    for (const line of md.split('\n').filter((l) => l.startsWith('| `--'))) {
+      expect(line.split('|').length).toBe(5)
+    }
+  })
+})
+
+describe('formatBasisForPrompt', () => {
+  it('tells the model what to use and what not to write', () => {
+    const studio = studioFromFeel('Test', FEEL)
+    const block = formatBasisForPrompt(studio, studio.activeTheme)
+    expect(block).toMatch(/Use only these/)
+    expect(block).toMatch(/never write a raw/i)
+    expect(block).toMatch(/--colour-text-primary \(#/)
+  })
+
+  it('is quiet when there is nothing to say', () => {
+    expect(formatBasisForPrompt({ id: 'x', name: 'x', sets: [], themes: [], activeTheme: null }, null)).toBe('')
   })
 })

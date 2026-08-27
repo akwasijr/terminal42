@@ -756,6 +756,9 @@ export type DesignBrief = {
   /** Established design system slug + label. */
   designSystem?: string | null
   designSystemLabel?: string | null
+  /** The token library this design is bound to, and which of its themes. */
+  basisId?: string | null
+  basisThemeId?: string | null
   audience?: string | null
   paletteId?: string | null
   paletteLabel?: string | null

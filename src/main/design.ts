@@ -11,6 +11,9 @@ import { getSettings } from './settings'
 import { lintHtml, buildFixPrompt } from './lintHtml'
 import { buildFoundationBlock } from './designFoundation'
 import { AI_RULES, formatRulesForPrompt } from '../renderer/src/lib/aiRules'
+import { formatBasisForPrompt } from '../shared/tokens/export'
+import { hydrateStudio } from '../shared/tokens/types'
+import { getTokenStudio } from './tokens'
 import { upsertManagedBlock } from './htmlBlocks'
 import { buildEngineBaseBlock, ENGINE_USAGE, ENGINE_BASE_ID, ENGINE_MOTION_ID } from './designAssets'
 import { pickVariety } from './designVariety'
@@ -223,6 +226,29 @@ function enabledRuleIds(brief: DesignBrief | null): string[] {
   return AI_RULES.map((r) => r.id)
 }
 
+/**
+ * The bound library, as a block for the prompt.
+ *
+ * Read at the moment of generation rather than stored on the design, because
+ * the library is the thing that moves: a design bound to it should be told
+ * what the names mean today, not what they meant when it was first made.
+ *
+ * Silent when there is no binding, when the library has been deleted, and when
+ * it resolves to nothing. None of those is worth a sentence in a prompt.
+ */
+function buildBasisBlock(brief: DesignBrief | null): string {
+  if (!brief?.basisId) return ''
+  try {
+    const record = getTokenStudio(brief.basisId)
+    if (!record) return ''
+    const studio = hydrateStudio(record.studio)
+    return formatBasisForPrompt(studio, brief.basisThemeId ?? studio.activeTheme)
+  } catch {
+    // A library that cannot be read is not a reason to refuse to generate.
+    return ''
+  }
+}
+
 function buildStarterPrefix(cwd: string, brief: DesignBrief): string {
   const blocks: string[] = []
   blocks.push(
@@ -235,6 +261,8 @@ function buildStarterPrefix(cwd: string, brief: DesignBrief): string {
   if (briefLines.length) blocks.push(['BRIEF', ...briefLines].join('\n'))
   const rules = formatRulesForPrompt(enabledRuleIds(brief))
   if (rules) blocks.push(rules)
+  const basis = buildBasisBlock(brief)
+  if (basis) blocks.push(basis)
   return blocks.filter(Boolean).join('\n\n')
 }
 
@@ -254,6 +282,11 @@ function buildPrefix(
 
   const rules = formatRulesForPrompt(enabledRuleIds(brief))
   if (rules) blocks.push(rules)
+
+  // After the rules, because it is the same kind of instruction and the same
+  // voice, and before the engine base, which the tokens are meant to feed.
+  const basis = buildBasisBlock(brief)
+  if (basis) blocks.push(basis)
 
   if (pptxFacts) {
     blocks.push('A reference template has been analyzed; its facts live in _tpl/_facts.md in this folder. Match its structure where it is relevant.')
