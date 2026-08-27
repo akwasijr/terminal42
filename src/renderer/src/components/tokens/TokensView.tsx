@@ -19,12 +19,17 @@ import {
   isAlias,
   aliasTarget,
   TIERS,
+  TOKEN_TYPES,
+  type TokenType,
   type Tier,
   type Token,
   type TokenStudio,
   type TokenValue
 } from '../../../../shared/tokens/types'
 import { flatten, problems, resolve, type Problem } from '../../../../shared/tokens/resolve'
+import { addToken, blankValue, deleteToken, renameToken, setAlias, setTokenValue } from '../../../../shared/tokens/edit'
+import { TokenInspector } from './TokenInspector'
+import { ColorPicker, type PickerRequest } from '../ColorPicker'
 
 type StudioRow = { id: string; name: string; studio: unknown; updatedAt: number }
 
@@ -185,6 +190,8 @@ function StudioEditor({
 }): React.JSX.Element {
   const [tier, setTier] = useState<Tier | 'all'>('all')
   const [selected, setSelected] = useState<string | null>(null)
+  const [picker, setPicker] = useState<PickerRequest | null>(null)
+  const [adding, setAdding] = useState<{ setId: string; rect: DOMRect } | null>(null)
   const [onlyProblems, setOnlyProblems] = useState(false)
   const [note, setNote] = useState<string | null>(null)
 
@@ -200,6 +207,13 @@ function StudioEditor({
       return true
     })
   }, [map, tier, onlyProblems, problemPaths])
+
+  const selectedToken = selected ? (map.get(selected) ?? null) : null
+  const selectedResolved = useMemo(() => {
+    if (!selected) return null
+    const r = resolve(map, selected)
+    return r.ok ? r.value : null
+  }, [map, selected])
 
   // What the selection points at, and what points at it. Everything else is
   // dimmed rather than hidden, so the shape of the set stays visible.
@@ -359,12 +373,20 @@ function StudioEditor({
                 return (
                   <li
                     key={s.id}
-                    className="flex items-center gap-1 rounded-sm px-1.5 py-1 hover:bg-raised"
+                    className="group/set flex items-center gap-1 rounded-sm px-1.5 py-1 hover:bg-raised"
                   >
                     <span className="min-w-0 flex-1 truncate text-[11.5px] text-text-secondary">
                       {s.name}
                     </span>
                     <span className="text-[10px] tabular-nums text-text-muted">{s.tokens.length}</span>
+                    <button
+                      type="button"
+                      onClick={(e) => setAdding({ setId: s.id, rect: e.currentTarget.getBoundingClientRect() })}
+                      aria-label={`Add a token to ${s.name}`}
+                      className="rounded-sm px-1 text-[12px] leading-none text-text-muted opacity-0 hover:text-text-primary focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 group-hover/set:opacity-100"
+                    >
+                      +
+                    </button>
                     <button
                       type="button"
                       onClick={() =>
@@ -399,6 +421,8 @@ function StudioEditor({
                   <li key={path}>
                     <button
                       type="button"
+                      data-token-swatch=""
+                      data-token-path={path}
                       onClick={() => setSelected((c) => (c === path ? null : path))}
                       aria-pressed={selected === path}
                       className={`w-full rounded-md p-1 text-left transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
@@ -422,6 +446,66 @@ function StudioEditor({
           )}
         </section>
       </div>
+
+      {selectedToken ? (
+        <TokenInspector
+          studio={studio}
+          token={selectedToken.token}
+          setName={studio.sets.find((x) => x.id === selectedToken.setId)?.name ?? ''}
+          resolved={selectedResolved}
+          onClose={() => setSelected(null)}
+          onPickColour={(hex, rect, cb) =>
+            setPicker({
+              value: hex,
+              opacity: 1,
+              anchor: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
+              onChange: (next) => cb(next),
+              onClose: () => setPicker(null)
+            })
+          }
+          edit={{
+            rename: (to) => onChange(renameToken(studio, selectedToken.setId, selectedToken.token.path, to)),
+            setValue: (v) => onChange(setTokenValue(studio, selectedToken.setId, selectedToken.token.path, v)),
+            setTarget: (target) =>
+              onChange(
+                setAlias(
+                  studio,
+                  selectedToken.setId,
+                  selectedToken.token.path,
+                  target,
+                  selectedResolved !== null && typeof selectedResolved !== 'object'
+                    ? selectedResolved
+                    : blankValue(selectedToken.token.type)
+                )
+              ),
+            remove: () => {
+              onChange(deleteToken(studio, selectedToken.setId, selectedToken.token.path))
+              setSelected(null)
+            }
+          }}
+        />
+      ) : null}
+
+      {adding ? (
+        <TypeMenu
+          rect={adding.rect}
+          onClose={() => setAdding(null)}
+          onPick={(type, tier) => {
+            const set = studio.sets.find((x) => x.id === adding.setId)
+            const stem = type === 'color' ? 'colour' : type === 'dimension' ? 'space' : type
+            const built = addToken(studio, adding.setId, type, tier, `${(set?.name ?? 'new').toLowerCase()}.${stem}`)
+            onChange(built.studio)
+            setAdding(null)
+            setSelected(built.path)
+          }}
+        />
+      ) : null}
+
+      {picker ? (
+        <div data-colour-picker="">
+          <ColorPicker req={picker} />
+        </div>
+      ) : null}
 
       <ProblemLine
         found={found}
@@ -583,6 +667,77 @@ function ProblemLine({
       <span className="truncate text-[11px] text-text-muted">
         {found[0].path}: {found[0].note}
       </span>
+    </div>
+  )
+}
+
+/**
+ * What kind of token to add.
+ *
+ * Type and tier together, because they are one decision: nobody adds a
+ * colour without already knowing whether it is a raw one or a named use.
+ */
+function TypeMenu({
+  rect,
+  onPick,
+  onClose
+}: {
+  rect: DOMRect
+  onPick: (type: TokenType, tier: Tier) => void
+  onClose: () => void
+}): React.JSX.Element {
+  const [tier, setTier] = useState<Tier>('primitive')
+  useEffect(() => {
+    const away = (): void => onClose()
+    const key = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') onClose()
+    }
+    // A frame late, so the click that opened this does not close it.
+    const t = window.setTimeout(() => window.addEventListener('mousedown', away), 0)
+    window.addEventListener('keydown', key)
+    return () => {
+      window.clearTimeout(t)
+      window.removeEventListener('mousedown', away)
+      window.removeEventListener('keydown', key)
+    }
+  }, [onClose])
+
+  return (
+    <div
+      role="dialog"
+      aria-label="Add a token"
+      onMouseDown={(e) => e.stopPropagation()}
+      style={{ left: rect.left, top: Math.min(rect.bottom + 6, window.innerHeight - 280), width: 200 }}
+      className="fixed z-40 rounded-panel bg-elevated p-2 shadow-lg"
+    >
+      <div className="flex items-center gap-1 px-1 pb-1.5">
+        {TIERS.map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTier(t)}
+            aria-pressed={tier === t}
+            className={`rounded-md px-1.5 py-0.5 text-[10.5px] capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+              tier === t ? 'bg-raised text-text-primary' : 'text-text-muted hover:bg-raised hover:text-text-secondary'
+            }`}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+      <ul className="grid max-h-52 grid-cols-2 gap-0.5 overflow-y-auto">
+        {TOKEN_TYPES.map((t) => (
+          <li key={t}>
+            <button
+              type="button"
+              onClick={() => onPick(t, tier)}
+              className="w-full truncate rounded-sm px-1.5 py-1 text-left text-[11px] text-text-secondary hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            >
+              {t}
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
