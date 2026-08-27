@@ -131,6 +131,10 @@ export type DesignBrief = {
   fidelity: DesignFidelity
   look?: string | null
   lookLabel?: string | null
+  /** The token library this design is bound to, and which of its themes. */
+  tokensId?: string | null
+  tokensThemeId?: string | null
+  tokensStamp?: string | null
   audience?: string | null
   paletteId?: string | null
   paletteLabel?: string | null
@@ -812,6 +816,10 @@ const api = {
       ipcRenderer.invoke('designs:previewPrompt', { brief }) as Promise<{ prompt: string }>,
     tokensStatus: (designId: string) =>
       ipcRenderer.invoke('designs:tokensStatus', designId) as Promise<TokensStatus>,
+    setTokens: (designId: string, tokensId: string | null, themeId: string | null) =>
+      ipcRenderer.invoke('designs:setTokens', { designId, tokensId, themeId }) as Promise<
+        { ok: true; brief: DesignBrief } | { ok: false; error: string }
+      >,
     resyncTokens: (designId: string) =>
       ipcRenderer.invoke('designs:resyncTokens', designId) as
         Promise<{ ok: true; stuck: string[] } | { ok: false; error: string }>,

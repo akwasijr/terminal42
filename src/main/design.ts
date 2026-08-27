@@ -1867,6 +1867,40 @@ export function registerDesignIpc(getWin: () => BrowserWindow | null): void {
     return { ok: true as const, stuck }
   })
 
+  /**
+   * Bind a design to a token library, or let it go.
+   *
+   * Separate from the wizard because binding is not only a thing you decide
+   * before anything exists. A form drawn last week is exactly the work that
+   * needs pulling back onto the team's colours, and it has no wizard to
+   * return to.
+   */
+  ipcMain.handle(
+    'designs:setTokens',
+    async (_e, args: { designId: string; tokensId: string | null; themeId: string | null }) => {
+      const d = getDesign(args.designId)
+      if (!d) return { ok: false as const, error: 'That design has gone.' }
+      const brief = {
+        ...(d.brief ?? ({ v: 1 } as unknown as DesignBrief)),
+        tokensId: args.tokensId,
+        tokensThemeId: args.themeId,
+        tokensStamp: null as string | null
+      }
+      if (args.tokensId) {
+        // Written now rather than at the next generation, so the folder and the
+        // prompt agree from the moment somebody says yes.
+        brief.tokensStamp = await writeTokensFiles(d.cwd, brief)
+        if (!brief.tokensStamp) return { ok: false as const, error: 'That library could not be read.' }
+      }
+      try {
+        getDb().prepare('UPDATE designs SET brief = ? WHERE id = ?').run(JSON.stringify(brief), args.designId)
+      } catch (err) {
+        return { ok: false as const, error: String(err) }
+      }
+      return { ok: true as const, brief }
+    }
+  )
+
   ipcMain.handle('designs:cancel', (_e, designId: string) => ({ ok: cancel(designId) }))
   ipcMain.handle('designs:isBusy', (_e, designId: string) => running.has(designId))
   ipcMain.handle('designs:history', (_e, designId: string) => loadHistory(designId))

@@ -48,6 +48,10 @@ export interface VariableCollection {
   /** mode used when resolving values for the canvas. */
   activeMode: string
   variables: Variable[]
+  /** When set, this collection is derived from the token library with this id
+   *  and is rebuilt from it every time the file opens. Editing it here would
+   *  be overwritten, which is the point: the library is the source of truth. */
+  fromTokens?: string
 }
 
 // ── id helpers ──────────────────────────────────────────────────────────────

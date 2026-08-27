@@ -90,6 +90,9 @@ import {
   applyColorStyle, applyTextStyle, applyEffectStyle, uniqueStyleName,
 } from '../lib/styles'
 import { type PublishedLibrary, loadLibraries, publishLibrary, deleteLibrary, mergeLibraryInto, totalAssets } from '../lib/library'
+import { syncTokensCollection, sameCollections } from '../lib/tokens/toForm'
+import { TokensPicker } from './tokens/TokensPicker'
+import { hydrateStudio } from '../../../shared/tokens/types'
 import { timelineKeyframeSel } from '../lib/timelineSelection'
 import { SHADERS, SHADER_CATEGORIES, shaderById, defaultShaderParams, ShaderLayer, type ShaderDef, type ShaderParam } from '../lib/shaders'
 import {
@@ -1532,6 +1535,38 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
     } catch { /* ignore a corrupt save */ }
     restoredRef.current = true
   }, [saveKey])
+
+  // ── The token library this file is bound to ──────────────────────────────────
+  // Rebuilt from the library every time the file opens, so a colour changed in
+  // the library is a colour changed here. The ids are derived from the token
+  // paths, so rebuilding does not unbind anything that was bound to them.
+  const [tokensBinding, setTokensBinding] = useState<{ id: string; themeId: string | null } | null>(null)
+  useEffect(() => {
+    let alive = true
+    void (async () => {
+      const design = await window.terminal42.designs.get(designId)
+      if (!alive) return
+      const id = design?.brief?.tokensId ?? null
+      setTokensBinding(id ? { id, themeId: design?.brief?.tokensThemeId ?? null } : null)
+    })()
+    return () => { alive = false }
+  }, [designId])
+
+  useEffect(() => {
+    if (!restoredRef.current) return
+    let alive = true
+    void (async () => {
+      const record = tokensBinding ? await window.terminal42.tokens.get(tokensBinding.id) : null
+      if (!alive) return
+      const studio = record ? hydrateStudio(record.studio) : null
+      if (studio && tokensBinding?.themeId) studio.activeTheme = tokensBinding.themeId
+      setCollections((cols) => {
+        const next = syncTokensCollection(cols, studio, tokensBinding?.id ?? null)
+        return sameCollections(cols, next) ? cols : next
+      })
+    })()
+    return () => { alive = false }
+  }, [tokensBinding])
   useEffect(() => {
     if (!restoredRef.current) return
     const t = setTimeout(() => {
@@ -3509,6 +3544,19 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
                 ))}
               </div>
               {varTabMode === 'variables' ? (
+                <>
+                <div className="shrink-0 px-1.5 pt-2">
+                  <TokensPicker
+                    label=""
+                    showThemes={false}
+                    tokensId={tokensBinding?.id ?? null}
+                    themeId={tokensBinding?.themeId ?? null}
+                    onChange={(id, themeId) => {
+                      setTokensBinding(id ? { id, themeId } : null)
+                      void window.terminal42.designs.setTokens(designId, id, themeId)
+                    }}
+                  />
+                </div>
                 <VariablesNav
                   collections={collections}
                   activeColId={varCol?.id ?? ''}
@@ -3519,6 +3567,7 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
                   removeCollection={removeCollection}
                   patchCollection={patchCollection}
                 />
+                </>
               ) : (
                 <StylesNav styles={styles} typeFilter={styleTypeFilter} setTypeFilter={setStyleTypeFilter} />
               )}

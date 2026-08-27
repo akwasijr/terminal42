@@ -9,7 +9,7 @@ import {
   type IconLibraryId
 } from '../lib/designBrief'
 import type { DesignBrief, TemplateInfo } from '../../../preload/index'
-import { hydrateStudio } from '../../../shared/tokens/types'
+import { TokensPicker } from './tokens/TokensPicker'
 import { IconClose } from './icons'
 import {
   AI_RULES, AI_RULE_GROUPS, disabledCount, saveGlobalAiRules,
@@ -1341,11 +1341,13 @@ function PageLook({ state, set }: PageProps): JSX.Element {
         </div>
       )}
 
+      <div className="pt-1">
       <TokensPicker
         tokensId={state.tokensId ?? null}
         themeId={state.tokensThemeId ?? null}
         onChange={(tokensId, tokensThemeId) => { set('tokensId', tokensId); set('tokensThemeId', tokensThemeId) }}
       />
+      </div>
 
       {mode === 'describe' && (
         <textarea
@@ -3160,67 +3162,3 @@ function cap(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
-/**
- * Binding this design to a token library.
- *
- * Sits below the look rather than beside it because they answer different
- * questions. A look is what this design should feel like; a library is what
- * the rest of the work already uses, and a design can perfectly well have a
- * vibe and still be held to the team's colours.
- *
- * Absent entirely when there are no libraries, since an empty select that
- * explains itself is a worse answer than no control at all.
- */
-function TokensPicker({
-  tokensId, themeId, onChange
-}: {
-  tokensId: string | null
-  themeId: string | null
-  onChange: (tokensId: string | null, themeId: string | null) => void
-}): JSX.Element | null {
-  const [studios, setStudios] = useState<Array<{ id: string; name: string; themes: Array<{ id: string; name: string }> }>>([])
-
-  useEffect(() => {
-    let alive = true
-    void window.terminal42.tokens.list().then((rows) => {
-      if (!alive) return
-      setStudios(rows.map((r) => {
-        const s = hydrateStudio(r.studio)
-        return { id: r.id, name: r.name, themes: s.themes.map((th) => ({ id: th.id, name: th.name })) }
-      }))
-    })
-    return () => { alive = false }
-  }, [])
-
-  if (studios.length === 0) return null
-  const chosen = studios.find((s) => s.id === tokensId) ?? null
-
-  return (
-    <div className="flex flex-wrap items-center gap-2 pt-1">
-      <span className="text-[12.5px] text-text-secondary">Tokens</span>
-      <select
-        value={tokensId ?? ''}
-        aria-label="Tokens"
-        onChange={(e) => {
-          const id = e.target.value || null
-          const next = studios.find((s) => s.id === id) ?? null
-          onChange(id, next?.themes[0]?.id ?? null)
-        }}
-        className="min-w-0 flex-1 rounded-md bg-elevated/60 px-3 py-2 text-[13px] text-text-primary focus:outline-none focus:ring-1 focus:ring-accent/40"
-      >
-        <option value="">None</option>
-        {studios.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-      </select>
-      {chosen && chosen.themes.length > 1 ? (
-        <select
-          value={themeId ?? chosen.themes[0]?.id ?? ''}
-          aria-label="Theme"
-          onChange={(e) => onChange(chosen.id, e.target.value || null)}
-          className="rounded-md bg-elevated/60 px-3 py-2 text-[13px] text-text-primary focus:outline-none focus:ring-1 focus:ring-accent/40"
-        >
-          {chosen.themes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-        </select>
-      ) : null}
-    </div>
-  )
-}

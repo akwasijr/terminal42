@@ -42,9 +42,15 @@ function literal(type: VarType, value: unknown): VarValue | null {
  * reached past the library into its workings, which is the habit the library
  * exists to break.
  */
-export function toFormCollection(studio: TokenStudio): VariableCollection {
+export function toFormCollection(studio: TokenStudio, libraryId?: string): VariableCollection {
   const themes = studio.themes.length ? studio.themes : [{ id: 'default', name: 'Default' }]
-  const modes: VarMode[] = themes.map((t) => ({ id: newModeId(), name: t.name }))
+  // Bound to a library, every id is derived from what it stands for, so
+  // rebuilding the collection tomorrow produces the same ids as today and the
+  // bindings a file already made keep pointing at the same colour. Random ids
+  // would make every re-sync a silent unbinding.
+  const modes: VarMode[] = themes.map((t) =>
+    libraryId ? { id: `tokmode:${libraryId}:${t.id}`, name: t.name } : { id: newModeId(), name: t.name }
+  )
 
   // Built per path so a token missing from one theme still lands, carrying the
   // value it does have. A hole in one mode is better than a missing variable.
@@ -66,19 +72,49 @@ export function toFormCollection(studio: TokenStudio): VariableCollection {
   const variables: Variable[] = [...rows.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([path, row]) => ({
-      id: newVariableId(),
+      id: libraryId ? `tokvar:${libraryId}:${path}` : newVariableId(),
       name: path.replace(/\./g, '/'),
       type: row.type,
       values: row.values
     }))
 
   return {
-    id: newCollectionId(),
+    id: libraryId ? `tokcol:${libraryId}` : newCollectionId(),
     name: studio.name,
     modes,
     activeMode: modes[themes.findIndex((t) => t.id === studio.activeTheme)]?.id ?? modes[0].id,
-    variables
+    variables,
+    ...(libraryId ? { fromTokens: libraryId } : {})
   }
+}
+
+/**
+ * Put a bound library into a file's collections, replacing the last copy.
+ *
+ * Matched on which library it came from rather than on name or id, so renaming
+ * the library updates the collection instead of growing a second one. The
+ * file's own collections are left exactly as they were.
+ */
+export function syncTokensCollection(
+  collections: VariableCollection[],
+  studio: TokenStudio | null,
+  libraryId: string | null
+): VariableCollection[] {
+  // Every derived collection goes, not just this library's: a file has one
+  // binding, so a collection from a library it is no longer bound to is a
+  // stale copy of somebody else's colours.
+  const kept = collections.filter((c) => !c.fromTokens)
+  if (!studio || !libraryId) return kept
+  const built = toFormCollection(studio, libraryId)
+  const at = collections.findIndex((c) => c.fromTokens === libraryId)
+  // Whatever mode the file was last looking at, not whatever the library screen
+  // happens to be showing: a file put into dark should stay in dark.
+  const before = at >= 0 ? collections[at] : null
+  if (before && built.modes.some((m) => m.id === before.activeMode)) built.activeMode = before.activeMode
+  if (at < 0) return [...kept, built]
+  const out = [...kept]
+  out.splice(Math.min(at, out.length), 0, built)
+  return out
 }
 
 /**
@@ -90,4 +126,15 @@ export function toFormCollection(studio: TokenStudio): VariableCollection {
  */
 export function publishToForm(studio: TokenStudio): PublishedLibrary[] {
   return publishLibrary(studio.name, [toFormCollection(studio)], { colors: [], text: [], effects: [] })
+}
+
+/**
+ * Whether a re-sync actually changed anything.
+ *
+ * Opening a file must not mark it as edited. Without this the sync writes an
+ * identical collection back on every open, the auto-save fires, and the file's
+ * modified time creeps forward for a change nobody made.
+ */
+export function sameCollections(a: VariableCollection[], b: VariableCollection[]): boolean {
+  return a.length === b.length && JSON.stringify(a) === JSON.stringify(b)
 }
