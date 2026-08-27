@@ -148,6 +148,20 @@ export function enforcementOf(studio: Pick<TokenStudio, 'enforcement'> | null | 
 }
 
 /**
+ * The theme a caller asked for, or the library's own if that one has gone.
+ *
+ * A design remembers which theme it was bound to by id, and a library can be
+ * regenerated underneath it — the AI rebuilding one hands back new sets and
+ * new themes. Resolving against an id that no longer exists switches every set
+ * off, so the design would silently be prompted, linted and exported against
+ * an empty library rather than told that its theme had gone.
+ */
+export function themeIdFor(studio: TokenStudio, wanted: string | null | undefined): string | null {
+  if (wanted && studio.themes.some((t) => t.id === wanted)) return wanted
+  return studio.activeTheme
+}
+
+/**
  * Fill in anything a stored studio is missing.
  *
  * A studio is written to the database as one JSON blob, so an old row can
@@ -179,12 +193,27 @@ export function hydrateStudio(raw: unknown): TokenStudio {
       ? r.activeTheme
       : (themes[0]?.id ?? null)
   const blank = emptyStudio(typeof r.name === 'string' ? r.name : 'Tokens')
+  // A studio with real sets and no theme cannot borrow the blank one. The blank
+  // theme switches on the blank set, which is not one of these, so every real
+  // set would resolve to off and the library would open, export and prompt with
+  // nothing in it — while still showing its sets in the sidebar. A theme made
+  // here has to name the sets that are actually present.
+  const filled: Theme[] =
+    themes.length > 0
+      ? themes
+      : sets.length > 0
+        ? [{
+            id: blank.themes[0].id,
+            name: blank.themes[0].name,
+            sets: Object.fromEntries(sets.map((s) => [s.id, 'enabled' as SetState]))
+          }]
+        : blank.themes
   return {
     id: typeof r.id === 'string' ? r.id : blank.id,
     name: typeof r.name === 'string' ? r.name : blank.name,
     sets: sets.length > 0 ? sets : blank.sets,
-    themes: themes.length > 0 ? themes : blank.themes,
-    activeTheme: sets.length > 0 && themes.length > 0 ? activeTheme : blank.activeTheme,
+    themes: filled,
+    activeTheme: themes.length > 0 ? activeTheme : filled[0].id,
     enforcement: enforcementOf(r)
   }
 }

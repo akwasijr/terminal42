@@ -16,7 +16,7 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { getDb } from './db'
 import { toCSS, toDTCG, toMarkdown } from '../shared/tokens/export'
-import { hydrateStudio } from '../shared/tokens/types'
+import { hydrateStudio, themeIdFor } from '../shared/tokens/types'
 
 export type TokenStudioRecord = {
   id: string
@@ -123,7 +123,7 @@ export function registerTokensIpc(getWin: () => BrowserWindow | null): void {
         dir = res.filePaths[0]
       }
       try {
-        const themeId = args?.themeId ?? studio.activeTheme
+        const themeId = themeIdFor(studio, args?.themeId)
         const json = join(dir, 'tokens.json')
         const css = join(dir, 'tokens.css')
         const md = join(dir, 'tokens.md')

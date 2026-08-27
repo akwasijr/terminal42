@@ -13,7 +13,7 @@ import { lintAgainstBasis, describeBasisFindings } from '../shared/tokens/lint'
 import { buildFoundationBlock } from './designFoundation'
 import { AI_RULES, formatRulesForPrompt } from '../renderer/src/lib/aiRules'
 import { basisHash, formatBasisForPrompt, toCSS, toDTCG, toMarkdown } from '../shared/tokens/export'
-import { enforcementOf, hydrateStudio, type Enforcement } from '../shared/tokens/types'
+import { enforcementOf, hydrateStudio, themeIdFor, type Enforcement } from '../shared/tokens/types'
 import { getTokenStudio } from './tokens'
 import { upsertManagedBlock } from './htmlBlocks'
 import { buildEngineBaseBlock, ENGINE_USAGE, ENGINE_BASE_ID, ENGINE_MOTION_ID } from './designAssets'
@@ -244,7 +244,7 @@ export function buildBasisBlock(brief: DesignBrief | null): string {
     const record = getTokenStudio(brief.basisId)
     if (!record) return ''
     const studio = hydrateStudio(record.studio)
-    const block = formatBasisForPrompt(studio, brief.basisThemeId ?? studio.activeTheme)
+    const block = formatBasisForPrompt(studio, themeIdFor(studio, brief.basisThemeId))
     if (!block) return ''
     // A design here is one self-contained file, so it cannot link the
     // stylesheet the block refers to. The declarations have to come inside,
@@ -268,7 +268,7 @@ export async function writeBasisFiles(cwd: string, brief: DesignBrief): Promise<
     const record = getTokenStudio(brief.basisId)
     if (!record) return null
     const studio = hydrateStudio(record.studio)
-    const themeId = brief.basisThemeId ?? studio.activeTheme
+    const themeId = themeIdFor(studio, brief.basisThemeId)
     await fs.writeFile(join(cwd, 'tokens.css'), toCSS(studio, themeId), 'utf8')
     await fs.writeFile(join(cwd, 'tokens.json'), toDTCG(studio, themeId), 'utf8')
     await fs.writeFile(join(cwd, 'tokens.md'), toMarkdown(studio, themeId), 'utf8')
@@ -296,7 +296,7 @@ export function basisHasMoved(brief: DesignBrief | null): boolean {
     const record = getTokenStudio(brief.basisId)
     if (!record) return false
     const studio = hydrateStudio(record.studio)
-    return basisHash(studio, brief.basisThemeId ?? studio.activeTheme) !== brief.basisStamp
+    return basisHash(studio, themeIdFor(studio, brief.basisThemeId)) !== brief.basisStamp
   } catch {
     return false
   }
@@ -317,7 +317,7 @@ function lintBasis(html: string, brief: DesignBrief | null): { name: string; lin
     const record = getTokenStudio(brief.basisId)
     if (!record) return empty
     const studio = hydrateStudio(record.studio)
-    const findings = lintAgainstBasis(html, studio, brief.basisThemeId ?? studio.activeTheme)
+    const findings = lintAgainstBasis(html, studio, themeIdFor(studio, brief.basisThemeId))
     return { name: record.name, lines: describeBasisFindings(findings.slice(0, 12), record.name) }
   } catch {
     return empty

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { aliasTarget, emptyStudio, hydrateStudio, type Token, type TokenStudio } from '../../src/shared/tokens/types'
+import { aliasTarget, emptyStudio, hydrateStudio, themeIdFor, type Token, type TokenStudio } from '../../src/shared/tokens/types'
 import { flatten, problems, resolve, resolveAll, exported } from '../../src/shared/tokens/resolve'
 
 const tok = (path: string, value: Token['value'], tier: Token['tier'] = 'primitive', type: Token['type'] = 'color'): Token =>
@@ -189,6 +189,24 @@ describe('opening a stored studio', () => {
     expect(s.sets[0].tokens.map((t) => t.path)).toEqual(['good'])
   })
 
+  it('switches on the sets it actually has when it arrives without a theme', () => {
+    // A studio saved with sets and no theme used to borrow the blank one,
+    // whose set map names a set that is not among these. Every real set then
+    // resolved to off, so the library opened showing its sets in the sidebar
+    // and exported, prompted and linted with nothing in it.
+    const s = hydrateStudio({
+      id: 'x', name: 'X',
+      sets: [
+        { id: 'a', name: 'A', order: 0, tokens: [tok('brand', '#f00')] },
+        { id: 'b', name: 'B', order: 1, tokens: [tok('text', '#000')] }
+      ]
+    })
+    expect(s.themes).toHaveLength(1)
+    expect(s.activeTheme).toBe(s.themes[0].id)
+    expect(s.themes[0].sets).toEqual({ a: 'enabled', b: 'enabled' })
+    expect([...resolveAll(s, s.activeTheme).keys()].sort()).toEqual(['brand', 'text'])
+  })
+
   it('points at a theme that exists', () => {
     const s = hydrateStudio({
       id: 'x', name: 'X',
@@ -202,5 +220,44 @@ describe('opening a stored studio', () => {
   it('round-trips a studio it has already opened', () => {
     const s = hydrateStudio(emptyStudio('Round'))
     expect(hydrateStudio(JSON.parse(JSON.stringify(s)))).toEqual(s)
+  })
+})
+
+describe('choosing which theme to resolve against', () => {
+  const studio = hydrateStudio({
+    id: 'x', name: 'X',
+    sets: [
+      { id: 'p', name: 'Palette', order: 0, tokens: [tok('palette.red', '#f00')] },
+      { id: 'l', name: 'Light', order: 1, tokens: [tok('bg', '#fff', 'semantic')] },
+      { id: 'd', name: 'Dark', order: 2, tokens: [tok('bg', '#000', 'semantic')] }
+    ],
+    themes: [
+      { id: 'light', name: 'Light', sets: { p: 'source', l: 'enabled', d: 'off' } },
+      { id: 'dark', name: 'Dark', sets: { p: 'source', l: 'off', d: 'enabled' } }
+    ],
+    activeTheme: 'light'
+  })
+
+  it('keeps the theme a design asked for', () => {
+    expect(themeIdFor(studio, 'dark')).toBe('dark')
+  })
+
+  it('falls back to the library when nothing was asked for', () => {
+    expect(themeIdFor(studio, null)).toBe('light')
+    expect(themeIdFor(studio, undefined)).toBe('light')
+  })
+
+  it('falls back when the theme a design remembers has gone', () => {
+    // A library can be rebuilt underneath a design, and the new one carries
+    // new theme ids. An id that matches nothing does not resolve to nothing —
+    // it resolves to no theme at all, which switches every set on at once. The
+    // design would then be prompted and linted against a library holding both
+    // the light and the dark value for the same name, with the raw palette
+    // that the theme marks source-only mixed in.
+    expect(themeIdFor(studio, 'a-theme-that-was-deleted')).toBe('light')
+    expect(resolveAll(studio, themeIdFor(studio, 'gone')).get('bg')?.value).toBe('#fff')
+    // What it would have been without the fallback: the last set wins, so a
+    // design bound to Light would quietly have been given the dark value.
+    expect(resolveAll(studio, 'gone').get('bg')?.value).toBe('#000')
   })
 })
