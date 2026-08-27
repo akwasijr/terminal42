@@ -38,6 +38,7 @@ import { flatten, problems, resolve, type Problem } from '../../../../shared/tok
 import { familiesOf, leafOf, SECTIONS, sectionOf, type Family, type SectionId } from '../../../../shared/tokens/groups'
 import { addToken, blankValue, deleteToken, renameToken, setAlias, setTokenValue } from '../../../../shared/tokens/edit'
 import { bridgeSummary, brandItems } from '../../../../shared/tokens/bridges'
+import { cloneStudio } from '../../../../shared/tokens/scaffold'
 import { publishToForm } from '../../lib/tokens/toForm'
 import { TokenInspector } from './TokenInspector'
 import { ColorPicker, type PickerRequest } from '../ColorPicker'
@@ -77,6 +78,14 @@ export function TokensView({ onFullPage }: { onFullPage?: (full: boolean) => voi
     await refresh()
     setOpenId(row.id)
     setStudio(built)
+  }
+
+  // Cloning is the third way a library starts, next to a feel and a brief:
+  // you liked one that exists and want to move away from it a little.
+  const duplicate = async (row: StudioRow): Promise<void> => {
+    const copy = cloneStudio(hydrateStudio(row.studio), `${row.name} copy`)
+    await window.terminal42.tokens.create(copy.name, copy)
+    await refresh()
   }
 
   const remove = async (id: string): Promise<void> => {
@@ -144,6 +153,14 @@ export function TokensView({ onFullPage }: { onFullPage?: (full: boolean) => voi
                 <StudioMark studio={hydrateStudio(r.studio)} />
                 <span className="mt-2 block truncate text-[12.5px] text-text-primary">{r.name}</span>
                 <span className="block text-[11px] text-text-muted">{countTokens(r.studio)} tokens</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => void duplicate(r)}
+                aria-label={`Duplicate ${r.name}`}
+                className="absolute right-16 top-2 rounded-sm px-1.5 py-1 text-[10.5px] text-text-muted opacity-0 hover:text-text-primary focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 group-hover:opacity-100"
+              >
+                Duplicate
               </button>
               <button
                 type="button"

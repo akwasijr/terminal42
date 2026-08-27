@@ -1,15 +1,18 @@
 // Starting a token studio the way Form starts an artboard.
 //
-// Two ways in, side by side, because they suit different moments. Either you
+// Three ways in, side by side, because they suit different moments. Either you
 // know the look and pick it off a shelf of nine, or you can only describe the
 // product, in which case a sentence is enough and the model picks the shelf
-// for you. Both land in the same place: a full three tier studio, never a
-// blank one.
+// for you. Both land in the same place: a full three tier studio.
+//
+// The third way is for a team that already knows its tokens and wants
+// somewhere to put them: the same five sets and two themes, empty.
 
 import { useState } from 'react'
 import { FEEL_PRESETS, type Vibe } from '../../lib/designSystem'
 import { buildFeelPrompt, parseFeelReply } from '../../lib/tokenBrief'
-import { ramp, studioFromFeel, type Feel } from '../../../../shared/tokens/scaffold'
+import { emptyStudio, ramp, studioFromFeel, type Feel } from '../../../../shared/tokens/scaffold'
+import { feelFromVibe } from '../../lib/tokens/feelFromVibe'
 import type { TokenStudio } from '../../../../shared/tokens/types'
 
 const VIBES: Vibe[] = [
@@ -23,23 +26,6 @@ const VIBES: Vibe[] = [
   'technical',
   'luxe'
 ]
-
-/** The design system's nine feels, said in the vocabulary the scaffold reads. */
-export function feelFromVibe(v: Vibe): Feel {
-  const p = FEEL_PRESETS[v]
-  return {
-    name: p.label,
-    primary: p.primary,
-    secondary: p.secondary,
-    tertiary: p.tertiary,
-    headingFont: p.headingFont,
-    bodyFont: p.bodyFont,
-    corner: p.cornerStyle === 'squircle' ? 'curved' : p.cornerStyle,
-    density: p.density,
-    scale: p.scale,
-    elevation: p.elevation
-  }
-}
 
 export function TokensSetup({
   onCancel,
@@ -134,6 +120,13 @@ export function TokensSetup({
         {note ? <p className="mt-2 text-[11px] text-text-muted">{note}</p> : null}
 
         <div className="mt-4 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => onCreate(emptyStudio('Untitled'))}
+            className="mr-auto rounded-md px-3 py-1.5 text-[12.5px] text-text-muted hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+          >
+            Start empty
+          </button>
           <button
             type="button"
             onClick={onCancel}

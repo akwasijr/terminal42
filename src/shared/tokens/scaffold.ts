@@ -453,3 +453,51 @@ export function studioFromFeel(name: string, feel: Feel): TokenStudio {
   // decides it wants to.
   return { id: id('ts'), name, sets, themes, activeTheme: 'light', enforcement: 'advise' }
 }
+
+/**
+ * The same shape, with nothing decided yet.
+ *
+ * Some teams already know their tokens and want somewhere to put them rather
+ * than a palette to argue with. They still get the five sets and the two
+ * themes, because the structure is the part that is hard to invent and the
+ * part everything else in the app reads; only the tokens are missing.
+ */
+export function emptyStudio(name: string): TokenStudio {
+  const scaffold = studioFromFeel(name, {
+    name,
+    primary: '#000000',
+    secondary: '#000000',
+    tertiary: '#000000',
+    headingFont: 'inherit',
+    bodyFont: 'inherit',
+    corner: 'slight',
+    density: 'cozy',
+    scale: 'balanced',
+    elevation: 'flat'
+  })
+  return { ...scaffold, sets: scaffold.sets.map((s) => ({ ...s, tokens: [] })) }
+}
+
+/**
+ * A copy that shares nothing with the original.
+ *
+ * Cloning is how most libraries actually start: a team likes one that exists
+ * and wants to move away from it a little. Set ids are regenerated and the
+ * themes are pointed at the new ids, so editing the copy cannot reach back
+ * into the library it came from.
+ */
+export function cloneStudio(studio: TokenStudio, name: string): TokenStudio {
+  const remap = new Map<string, string>()
+  const sets: TokenSet[] = studio.sets.map((s) => {
+    const next = id('s')
+    remap.set(s.id, next)
+    return { ...s, id: next, tokens: s.tokens.map((t) => ({ ...t })) }
+  })
+  const themes: Theme[] = studio.themes.map((t) => ({
+    ...t,
+    sets: Object.fromEntries(
+      Object.entries(t.sets).map(([setId, state]) => [remap.get(setId) ?? setId, state])
+    )
+  }))
+  return { ...studio, id: id('ts'), name, sets, themes }
+}
