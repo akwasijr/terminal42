@@ -33,8 +33,11 @@ import {
   type TokenValue,
   enforcementOf,
   type Enforcement,
-  type SetState
+  type SetState,
+  cssOptionsOf,
+  type CssOptions
 } from '../../../../shared/tokens/types'
+import { toCSS } from '../../../../shared/tokens/export'
 import { flatten, problems, resolve, type Problem } from '../../../../shared/tokens/resolve'
 import { familiesOf, leafOf, SECTIONS, sectionOf, type Family, type SectionId } from '../../../../shared/tokens/groups'
 import { addToken, blankValue, deleteToken, renameToken, setAlias, setDeprecated, setTokenValue } from '../../../../shared/tokens/edit'
@@ -540,6 +543,10 @@ function StudioEditor({
             setNote(msg)
             window.setTimeout(() => setNote(null), 4000)
           }} />
+          <CssOptionsMenu
+            options={cssOptionsOf(studio.css)}
+            onChange={(css) => onChange({ ...studio, css })}
+          />
           <button
             type="button"
             onClick={() => void exportFiles()}
@@ -1820,6 +1827,170 @@ function EnforcementPicker({ studio, onChange }: { studio: TokenStudio; onChange
         </button>
       ))}
     </div>
+  )
+}
+
+/**
+ * How the stylesheet gets written.
+ *
+ * A library is exported into a codebase that has already decided what its
+ * variables look like. Handing it names in our house style means the export
+ * is edited by hand once and then never re-exported, so the shape of the file
+ * is asked here rather than assumed. The line at the bottom shows a real name
+ * from the library as it will be written, because nobody can hold "camel plus
+ * a prefix" in their head and be sure.
+ */
+function CssOptionsMenu({
+  options,
+  onChange
+}: {
+  options: CssOptions
+  onChange: (o: CssOptions) => void
+}): React.JSX.Element {
+  const [open, setOpen] = useState(false)
+  const box = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const away = (e: MouseEvent): void => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false)
+    }
+    const esc = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', away)
+    document.addEventListener('keydown', esc)
+    return () => {
+      document.removeEventListener('mousedown', away)
+      document.removeEventListener('keydown', esc)
+    }
+  }, [open])
+
+  const field =
+    'w-full rounded-md border border-border bg-bg px-2 py-1 text-[11.5px] text-text-primary placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60'
+  const label = 'block text-[10.5px] text-text-muted'
+
+  return (
+    <div ref={box} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        title="How the stylesheet is written"
+        className="rounded-md bg-surface px-2.5 py-1 text-[11.5px] text-text-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+      >
+        CSS
+      </button>
+      {open && (
+        <div className="t42-menu absolute right-0 top-full z-30 mt-1 w-72 rounded-panel bg-elevated p-3 shadow-lg ring-1 ring-border">
+          <div className="flex flex-col gap-2.5">
+            <div className="flex gap-2">
+              <label className="min-w-0 flex-1">
+                <span className={label}>Prefix</span>
+                <input
+                  value={options.prefix}
+                  onChange={(e) => onChange({ ...options, prefix: e.target.value })}
+                  placeholder="none"
+                  aria-label="Variable prefix"
+                  className={field}
+                />
+              </label>
+              <label className="min-w-0 flex-1">
+                <span className={label}>Attached to</span>
+                <input
+                  value={options.selector}
+                  onChange={(e) => onChange({ ...options, selector: e.target.value })}
+                  placeholder=":root"
+                  aria-label="Root selector"
+                  className={field}
+                />
+              </label>
+            </div>
+
+            <div>
+              <span className={label}>Names</span>
+              <div className="mt-0.5 flex items-center gap-0.5 rounded-md bg-surface p-0.5">
+                {(['kebab', 'camel', 'snake'] as const).map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    aria-pressed={options.casing === c}
+                    onClick={() => onChange({ ...options, casing: c })}
+                    className={`flex-1 rounded-sm px-2 py-1 text-[11px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                      options.casing === c
+                        ? 'bg-raised text-text-primary'
+                        : 'text-text-muted hover:text-text-secondary'
+                    }`}
+                  >
+                    {CASE_LABEL[c]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <label>
+              <span className={label}>Cascade layer</span>
+              <input
+                value={options.layer}
+                onChange={(e) => onChange({ ...options, layer: e.target.value })}
+                placeholder="none"
+                aria-label="Cascade layer"
+                className={field}
+              />
+            </label>
+
+            <label className="flex items-start gap-2">
+              <input
+                type="checkbox"
+                checked={options.allThemes}
+                onChange={(e) => onChange({ ...options, allThemes: e.target.checked })}
+                className="mt-0.5 accent-accent"
+              />
+              <span className="text-[11.5px] text-text-secondary">
+                Write every theme
+                <span className="block text-[10.5px] text-text-muted">
+                  The others go under <code>[data-theme]</code>, which is how they are switched.
+                </span>
+              </span>
+            </label>
+
+            <p className="rounded-md bg-surface px-2 py-1.5 font-mono text-[10.5px] text-text-secondary">
+              {sampleCss(options)}
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+const CASE_LABEL: Record<string, string> = { kebab: 'a-b', camel: 'aB', snake: 'a_b' }
+
+/** One real name, spelled the way the options say, so the choice is legible. */
+function sampleCss(options: CssOptions): string {
+  const sample: TokenStudio = {
+    id: 'sample',
+    name: 'sample',
+    sets: [
+      {
+        id: 's',
+        name: 'S',
+        order: 0,
+        tokens: [
+          { id: '1', path: 'colour.text.primary', type: 'color', value: '#111111', tier: 'semantic' }
+        ]
+      }
+    ],
+    themes: [{ id: 't', name: 'Theme', sets: { s: 'enabled' } }],
+    activeTheme: 't',
+    css: options
+  }
+  return (
+    toCSS(sample, 't')
+      .split('\n')
+      .find((l) => l.includes('--'))
+      ?.trim() ?? ''
   )
 }
 

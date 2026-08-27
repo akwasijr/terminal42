@@ -129,6 +129,56 @@ export type Theme = {
  */
 export type Enforcement = 'advise' | 'check' | 'block'
 
+/**
+ * How the stylesheet should be written.
+ *
+ * A library is exported into somebody else's codebase, and that codebase has
+ * already decided what its variables look like. Handing it `--colour-text`
+ * when everything around it is `--ds_color_text` means the export gets edited
+ * by hand once, and then never re-exported.
+ */
+export type CssOptions = {
+  /** Put in front of every name, so `t42` gives `--t42-colour-text`. */
+  prefix: string
+  /** What the variables are attached to. */
+  selector: string
+  casing: 'kebab' | 'camel' | 'snake'
+  /** Wrapped in `@layer <name>` when set, so an app can order it. */
+  layer: string
+  /**
+   * Write every theme, not just the one on screen.
+   *
+   * The others go under an attribute selector named after the theme, which is
+   * how a theme is switched at runtime in every codebase that has more than
+   * one. Writing only the active theme makes the second theme somebody's
+   * afternoon.
+   */
+  allThemes: boolean
+}
+
+export const DEFAULT_CSS: CssOptions = {
+  prefix: '',
+  selector: ':root',
+  casing: 'kebab',
+  layer: '',
+  allThemes: false
+}
+
+/** What a library asks of the stylesheet, defaulting to what it used to do. */
+export function cssOptionsOf(raw: unknown): CssOptions {
+  const r = (raw ?? {}) as Partial<CssOptions>
+  return {
+    prefix: typeof r.prefix === 'string' ? r.prefix : DEFAULT_CSS.prefix,
+    selector:
+      typeof r.selector === 'string' && r.selector.trim().length > 0
+        ? r.selector.trim()
+        : DEFAULT_CSS.selector,
+    casing: r.casing === 'camel' || r.casing === 'snake' ? r.casing : 'kebab',
+    layer: typeof r.layer === 'string' ? r.layer.trim() : DEFAULT_CSS.layer,
+    allThemes: r.allThemes === true
+  }
+}
+
 export type TokenStudio = {
   id: string
   name: string
@@ -143,6 +193,8 @@ export type TokenStudio = {
    * `advise`, which is where a team should be asked to opt up from.
    */
   enforcement?: Enforcement
+  /** Absent on a library made before the options existed; read as the defaults. */
+  css?: CssOptions
 }
 
 const ALIAS = /^\{([^{}]+)\}$/
@@ -244,7 +296,8 @@ export function hydrateStudio(raw: unknown): TokenStudio {
     sets: sets.length > 0 ? sets : blank.sets,
     themes: filled,
     activeTheme: themes.length > 0 ? activeTheme : filled[0].id,
-    enforcement: enforcementOf(r)
+    enforcement: enforcementOf(r),
+    css: cssOptionsOf(r.css)
   }
 }
 

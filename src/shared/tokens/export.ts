@@ -11,7 +11,7 @@
 
 import { exported, resolveAll } from './resolve'
 import { SECTIONS, sectionOf, type SectionId } from './groups'
-import type { TokenStudio, TokenType, TokenValue } from './types'
+import { cssOptionsOf, type CssOptions, type TokenStudio, type TokenType, type TokenValue } from './types'
 
 /**
  * A short, stable fingerprint of what a theme currently exports.
@@ -104,31 +104,78 @@ function place(node: Node, parts: string[], leaf: Node[string]): void {
  * Dots become dashes, which is the convention everywhere, and a composite is
  * written as the one string CSS would want rather than as its parts, because
  * a `--shadow-card-blur` nobody can use is not worth the line.
+ *
+ * How the names are spelled, what they hang off and whether the other themes
+ * come too are all the receiving codebase's business, not ours, so they are
+ * asked rather than assumed.
  */
-export function toCSS(studio: TokenStudio, themeId: string | null, selector = ':root'): string {
-  const theme = studio.themes.find((t) => t.id === themeId) ?? null
-  const all = resolveAll(studio, themeId)
-  const lines: string[] = []
-  for (const path of sortedPaths(studio, themeId)) {
-    const hit = all.get(path)
-    if (!hit || !exported(theme, hit.setId)) continue
-    lines.push(`  --${cssName(path)}: ${cssValue(hit.token.type, hit.value)};`)
+export function toCSS(
+  studio: TokenStudio,
+  themeId: string | null,
+  options?: Partial<CssOptions> | string
+): string {
+  // The third argument used to be the selector. Keeping that reading costs
+  // one line and saves every existing caller.
+  const opts = cssOptionsOf(
+    typeof options === 'string' ? { ...studio.css, selector: options } : { ...studio.css, ...options }
+  )
+
+  const block = (id: string | null, selector: string): string => {
+    const theme = studio.themes.find((t) => t.id === id) ?? null
+    const all = resolveAll(studio, id)
+    const lines: string[] = []
+    for (const path of sortedPaths(studio, id)) {
+      const hit = all.get(path)
+      if (!hit || !exported(theme, hit.setId)) continue
+      lines.push(`  --${cssName(path, opts)}: ${cssValue(hit.token.type, hit.value)};`)
+    }
+    return `${selector} {\n${lines.join('\n')}\n}\n`
   }
-  return `${selector} {\n${lines.join('\n')}\n}\n`
+
+  const blocks = [block(themeId, opts.selector)]
+  if (opts.allThemes) {
+    for (const theme of studio.themes) {
+      if (theme.id === themeId) continue
+      blocks.push(block(theme.id, `[data-theme="${themeSlug(theme.name)}"]`))
+    }
+  }
+
+  const body = blocks.join('\n')
+  if (opts.layer.length === 0) return body
+  return `@layer ${opts.layer} {\n${body.replace(/^(?!$)/gm, '  ')}}\n`
+}
+
+/** A theme name as something that can sit in an attribute selector. */
+function themeSlug(name: string): string {
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  return slug.length > 0 ? slug : 'theme'
 }
 
 /**
  * A dot path as a custom property name.
  *
- * Kebab throughout, including inside a segment, because a file that mixes
- * `--colour-text-primary` with `--button-backgroundHover` reads as an
- * accident even though both work.
+ * Kebab throughout by default, including inside a segment, because a file
+ * that mixes `--colour-text-primary` with `--button-backgroundHover` reads as
+ * an accident even though both work. A codebase that spells its variables
+ * another way can say so, and then consistency with that file is what
+ * matters instead.
  */
-function cssName(path: string): string {
-  return path
-    .replace(/\./g, '-')
-    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
-    .toLowerCase()
+function cssName(path: string, opts: CssOptions): string {
+  const words = `${opts.prefix ? `${opts.prefix}.` : ''}${path}`
+    .split(/[.\-_\s]+/)
+    .flatMap((part) => part.replace(/([a-z0-9])([A-Z])/g, '$1 $2').split(' '))
+    .filter((w) => w.length > 0)
+  if (opts.casing === 'camel') {
+    return words
+      .map((w, i) => (i === 0 ? w.toLowerCase() : w[0].toUpperCase() + w.slice(1).toLowerCase()))
+      .join('')
+  }
+  const joined = words.map((w) => w.toLowerCase())
+  return joined.join(opts.casing === 'snake' ? '_' : '-')
 }
 
 function cssValue(type: TokenType, value: TokenValue): string {
@@ -192,6 +239,7 @@ function sortedPaths(studio: TokenStudio, themeId: string | null): string[] {
  * library is a no-op in a diff.
  */
 export function toMarkdown(studio: TokenStudio, themeId: string | null): string {
+  const opts = cssOptionsOf(studio.css)
   const theme = studio.themes.find((t) => t.id === themeId) ?? null
   const all = resolveAll(studio, themeId)
   const rows = new Map<SectionId, string[]>()
@@ -201,7 +249,7 @@ export function toMarkdown(studio: TokenStudio, themeId: string | null): string 
     if (!hit || !exported(theme, hit.setId)) continue
     if (hit.token.tier === 'primitive') continue
     const section = sectionOf(hit.token)
-    const line = `| \`--${cssName(path)}\` | ${escapeCell(cssValue(hit.token.type, hit.value))} | ${
+    const line = `| \`--${cssName(path, opts)}\` | ${escapeCell(cssValue(hit.token.type, hit.value))} | ${
       escapeCell(hit.token.description ?? '')
     } |`
     const list = rows.get(section)
@@ -246,6 +294,7 @@ function escapeCell(s: string): string {
  * prefix without checking.
  */
 export function formatTokensForPrompt(studio: TokenStudio, themeId: string | null): string {
+  const opts = cssOptionsOf(studio.css)
   const theme = studio.themes.find((t) => t.id === themeId) ?? null
   const all = resolveAll(studio, themeId)
   const groups = new Map<SectionId, string[]>()
@@ -258,7 +307,7 @@ export function formatTokensForPrompt(studio: TokenStudio, themeId: string | nul
     // only reliable way to stop it appearing in generated work.
     if (hit.token.deprecated) continue
     const section = sectionOf(hit.token)
-    const entry = `--${cssName(path)} (${cssValue(hit.token.type, hit.value)})`
+    const entry = `--${cssName(path, opts)} (${cssValue(hit.token.type, hit.value)})`
     const list = groups.get(section)
     if (list) list.push(entry)
     else groups.set(section, [entry])
