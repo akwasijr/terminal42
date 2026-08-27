@@ -51,7 +51,7 @@ import {
   type BulkResult
 } from '../../../../shared/tokens/bulk'
 import { bridgeSummary, brandItems } from '../../../../shared/tokens/bridges'
-import { coverageOf, coverageScore, gapsBySection } from '../../../../shared/tokens/coverage'
+import { coverageAcross, coverageScore, gapsBySection } from '../../../../shared/tokens/coverage'
 import { fillGaps, fillNote } from '../../../../shared/tokens/harden'
 import { cloneStudio } from '../../../../shared/tokens/scaffold'
 import {
@@ -1907,7 +1907,10 @@ function GapsMenu({
     }
   }, [open])
 
-  const rows = useMemo(() => coverageOf(studio, themeId), [studio, themeId])
+  // Every theme, not the one on screen: a library with layers in Light and
+  // none in Dark is not complete, and saying so only when somebody happens to
+  // switch theme is how the gap survives.
+  const rows = useMemo(() => coverageAcross(studio), [studio])
   const score = coverageScore(rows)
   const groups = useMemo(() => gapsBySection(rows), [rows])
   const label = useMemo(() => new Map(SECTIONS.map((s) => [s.id, s.label])), [])

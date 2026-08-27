@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CHECKS, coverageOf, coverageScore, gapsBySection } from '../../src/shared/tokens/coverage'
+import { CHECKS, coverageAcross, coverageOf, coverageScore, gapsBySection } from '../../src/shared/tokens/coverage'
 import { fillGaps, fillNote } from '../../src/shared/tokens/harden'
 import { studioFromFeel, emptyStudio } from '../../src/shared/tokens/scaffold'
 import { resolveAll } from '../../src/shared/tokens/resolve'
@@ -205,5 +205,99 @@ describe('filling the gaps', () => {
     const set = filled.studio.sets.find((s) => s.tokens.some((t) => t.path === 'colour.icon.primary'))
     const colours = set?.tokens.filter((t) => t.type === 'color').length ?? 0
     expect(colours).toBeGreaterThan(5)
+  })
+
+  it('does not park a token in a set the theme never exports', () => {
+    const { studio, theme } = dated()
+    const filled = fillGaps(studio, theme)
+    const active = filled.studio.themes.find((t) => t.id === theme)
+    const source = new Set(
+      Object.entries(active?.sets ?? {})
+        .filter(([, state]) => state !== 'enabled')
+        .map(([id]) => id)
+    )
+    // A breakpoint that only lives in a source set resolves perfectly and
+    // never reaches a stylesheet, which is not a filled gap.
+    for (const path of ['breakpoint.md', 'column.sm', 'gutter.wide']) {
+      const holders = filled.studio.sets.filter((s) => s.tokens.some((t) => t.path === path))
+      expect(holders.length, path).toBeGreaterThan(0)
+      expect(holders.some((s) => !source.has(s.id)), path).toBe(true)
+    }
+  })
+
+  it('fills every theme, not only the one it was asked about', () => {
+    const { studio, theme } = dated()
+    const filled = fillGaps(studio, theme)
+    for (const t of filled.studio.themes) {
+      expect(coverageScore(coverageOf(filled.studio, t.id)).percent, t.name).toBe(100)
+    }
+  })
+
+  it('reaches a theme that is missing what another theme already has', () => {
+    // The shape a library takes after a fill that only knew about one theme:
+    // complete in Light, short in Dark, and reporting itself finished.
+    const { studio, theme } = dated()
+    const once = fillGaps(studio, theme)
+    const light = once.studio.themes[0].id
+    const dark = once.studio.themes[1]?.id
+    if (!dark) return
+    const lightOnly: TokenStudio = {
+      ...once.studio,
+      sets: once.studio.sets.map((s) => ({
+        ...s,
+        tokens: once.studio.themes[1] && once.studio.themes[1].sets[s.id] === 'enabled'
+          ? s.tokens.filter((t) => !/^colour\.(icon|layer)\./.test(t.path))
+          : s.tokens
+      }))
+    }
+    expect(coverageScore(coverageOf(lightOnly, light)).percent).toBe(100)
+    expect(coverageScore(coverageOf(lightOnly, dark)).percent).toBeLessThan(100)
+
+    const again = fillGaps(lightOnly, light)
+    expect(again.added.length).toBeGreaterThan(0)
+    expect(coverageScore(coverageOf(again.studio, dark)).percent).toBe(100)
+  })
+
+  it('builds type styles for a library that only has loose numbers', () => {
+    const { studio, theme } = fresh()
+    const bare: TokenStudio = {
+      ...studio,
+      sets: studio.sets.map((s) => ({
+        ...s,
+        tokens: s.tokens.filter((t) => t.type !== 'typography')
+      }))
+    }
+    expect(coverageOf(bare, theme).find((r) => r.check.id === 'typeStyles')?.met).toBe(false)
+    const filled = fillGaps(bare, theme)
+    expect(coverageOf(filled.studio, theme).find((r) => r.check.id === 'typeStyles')?.met).toBe(true)
+    const body = resolveAll(filled.studio, theme).get('type.body')?.value as Record<string, unknown>
+    expect(typeof body.fontFamily).toBe('string')
+    expect(typeof body.fontSize).toBe('number')
+  })
+})
+
+describe('coverage across themes', () => {
+  it('a check met in one theme and not another is not met', () => {
+    const { studio } = fresh()
+    const light = studio.themes[0].id
+    const dark = studio.themes[1]?.id
+    if (!dark) return
+    const stripped: TokenStudio = {
+      ...studio,
+      sets: studio.sets.map((s) => ({
+        ...s,
+        tokens: studio.themes[1].sets[s.id] === 'enabled' && studio.themes[0].sets[s.id] !== 'enabled'
+          ? s.tokens.filter((t) => !/^colour\.icon\./.test(t.path))
+          : s.tokens
+      }))
+    }
+    expect(coverageOf(stripped, light).find((r) => r.check.id === 'icon')?.met).toBe(true)
+    expect(coverageAcross(stripped).find((r) => r.check.id === 'icon')?.met).toBe(false)
+  })
+
+  it('agrees with a single theme when there is only one', () => {
+    const { studio, theme } = fresh()
+    const one: TokenStudio = { ...studio, themes: studio.themes.slice(0, 1) }
+    expect(coverageScore(coverageAcross(one))).toEqual(coverageScore(coverageOf(one, theme)))
   })
 })

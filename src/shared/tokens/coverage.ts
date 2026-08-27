@@ -267,6 +267,28 @@ export function coverageOf(studio: TokenStudio, themeId: string | null): Coverag
   })
 }
 
+/**
+ * Every check answered against a library, across all of its themes.
+ *
+ * A check has to be met in every theme to count. Judged only against the
+ * theme on screen, a library that has layers in Light and none in Dark
+ * reports itself complete, and the gap stays hidden until somebody switches
+ * theme and finds half the product unstyled. The tokens listed are the ones
+ * from the weakest theme, since those are the ones a person would go and look
+ * at.
+ */
+export function coverageAcross(studio: TokenStudio): Coverage[] {
+  const themes = studio.themes.length > 0 ? studio.themes.map((t) => t.id) : [null]
+  const perTheme = themes.map((id) => coverageOf(studio, id))
+  return CHECKS.map((check, i) => {
+    let worst = perTheme[0][i]
+    for (const rows of perTheme) {
+      if (rows[i].found.length < worst.found.length) worst = rows[i]
+    }
+    return { check, found: worst.found, met: perTheme.every((rows) => rows[i].met) }
+  })
+}
+
 /** How much of the checklist a library answers, as a fraction and a count. */
 export function coverageScore(rows: Coverage[]): { met: number; total: number; percent: number } {
   const met = rows.filter((r) => r.met).length

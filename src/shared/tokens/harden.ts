@@ -22,7 +22,7 @@
 
 import type { Token, TokenStudio, TokenValue } from './types'
 import { resolveAll } from './resolve'
-import { coverageOf, type Coverage } from './coverage'
+import { coverageAcross, type Coverage } from './coverage'
 
 export type Filled = {
   studio: TokenStudio
@@ -71,7 +71,6 @@ function seedsFor(rows: Coverage[], tokens: Token[]): { seeds: Seed[]; skipped: 
   const seeds: Seed[] = []
   const skipped: Filled['skipped'] = []
   const gap = (id: string): boolean => rows.some((r) => r.check.id === id && !r.met)
-  const has = (path: string): boolean => tokens.some((t) => t.path === path)
   const ref = (path: string): string => `{${path}}`
 
   const surface = findPath(tokens, 'color', [/surface/i, /\bbg\b|background/i, /canvas/i])
@@ -84,8 +83,11 @@ function seedsFor(rows: Coverage[], tokens: Token[]): { seeds: Seed[]; skipped: 
   const focus = findPath(tokens, 'color', [/focus/i, /brand/i])
   const onBrand = findPath(tokens, 'color', [/brand\.on|\.on$/i, /text\.primary/i])
 
+  // Whether the path already exists is decided per set when the seed lands,
+  // not here. A colour that exists in Light and not in Dark has to be seeded
+  // so it can reach the theme that is missing it.
   const add = (path: string, type: Token['type'], tier: Token['tier'], value: TokenValue): void => {
-    if (has(path)) return
+    if (seeds.some((s) => s.path === path)) return
     seeds.push({ path, type, tier, value })
   }
 
@@ -172,8 +174,86 @@ function seedsFor(rows: Coverage[], tokens: Token[]): { seeds: Seed[]; skipped: 
         ...(body.value as Record<string, string | number>),
         ...(tight ? { lineHeight: ref(tight) } : { lineHeight: 1.35 })
       })
+    } else if (gap('typeStyles')) {
+      // The whole type section is missing rather than just this style, so it
+      // is built below and the compact one comes with it.
+      skipped.push({ id: 'typeCompact', reason: 'Built with the rest of the type styles.' })
     } else {
       skipped.push({ id: 'typeCompact', reason: 'The library has no body style to make a compact one from.' })
+    }
+  }
+
+  if (gap('typeStyles')) {
+    // A type style is a thing to point at; a size and a weight in separate
+    // tokens is six numbers to reassemble in your head every time. Built out
+    // of the library's own families and sizes so the scale stays the scale.
+    const families = tokens.filter((t) => t.type === 'fontFamily')
+    const sizes = tokens
+      .filter((t) => t.type === 'fontSize' && typeof t.value === 'number')
+      .sort((a, b) => (a.value as number) - (b.value as number))
+    const weights = tokens.filter((t) => t.type === 'fontWeight')
+    if (families.length > 0 && sizes.length >= 4) {
+      const heavy = weights.find((w) => Number(w.value) >= 600) ?? weights[weights.length - 1]
+      const plain = weights.find((w) => Number(w.value) === 400) ?? weights[0]
+      const display = families.find((f) => /display|heading|serif/i.test(f.path)) ?? families[0]
+      const sans = families.find((f) => /sans|body|base/i.test(f.path)) ?? families[0]
+      const at = (f: number): Token => sizes[Math.min(sizes.length - 1, Math.round(f * (sizes.length - 1)))]
+      const style = (
+        path: string,
+        family: Token,
+        size: Token,
+        weight: Token | undefined,
+        leading: number
+      ): void => {
+        const value: Record<string, string | number> = {
+          fontFamily: ref(family.path),
+          fontSize: ref(size.path),
+          lineHeight: leading
+        }
+        if (weight) value.fontWeight = ref(weight.path)
+        add(path, 'typography', 'semantic', value)
+      }
+      style('type.display', display, at(1), heavy, 1.2)
+      style('type.title', display, at(0.85), heavy, 1.2)
+      style('type.heading', display, at(0.7), heavy, 1.3)
+      style('type.body', sans, at(0.4), plain, 1.5)
+      style('type.bodyCompact', sans, at(0.4), plain, 1.35)
+      style('type.caption', sans, at(0.15), plain, 1.5)
+    } else {
+      skipped.push({ id: 'typeStyles', reason: 'The library has no font families and sizes to build styles from.' })
+    }
+  }
+
+  if (gap('tracking')) {
+    // Nothing in a library implies a tracking value, so these are literals:
+    // small text wants a little more, large text a little less.
+    add('tracking.tight', 'letterSpacing', 'primitive', '-0.01em')
+    add('tracking.normal', 'letterSpacing', 'primitive', '0em')
+    add('tracking.wide', 'letterSpacing', 'primitive', '0.02em')
+  }
+
+  if (gap('mono')) {
+    add('family.mono', 'fontFamily', 'primitive', 'ui-monospace, SFMono-Regular, Menlo, monospace')
+  }
+
+  if (gap('stroke')) {
+    add('stroke.none', 'dimension', 'primitive', 0)
+    add('stroke.hairline', 'dimension', 'primitive', 1)
+    add('stroke.thick', 'dimension', 'primitive', 2)
+  }
+
+  if (gap('disabled')) {
+    const muted = findPath(tokens, 'color', [/muted|tertiary/i, /secondary/i])
+    if (muted) add('colour.text.disabled', 'color', 'semantic', ref(muted))
+    else skipped.push({ id: 'disabled', reason: 'The library has no quiet text colour a disabled one could follow.' })
+  }
+
+  if (gap('status')) {
+    // The one place a literal is unavoidable and worth it: nothing in a
+    // library implies what its red is, and a product without one ends up
+    // with three.
+    for (const [name, hex] of [['success', '#16a34a'], ['warning', '#d97706'], ['danger', '#dc2626'], ['info', '#2563eb']] as const) {
+      add(`colour.${name}.fill`, 'color', 'semantic', hex)
     }
   }
 
@@ -233,29 +313,46 @@ function seedsFor(rows: Coverage[], tokens: Token[]): { seeds: Seed[]; skipped: 
 /**
  * Which set a new token should land in.
  *
- * The set that already holds most of what this token is like, because a
- * colour dropped into the type set is technically fine and practically lost.
- * Falling back to the largest set keeps a one-set library working.
+ * Two things decide it. First, the set has to be one the theme actually
+ * exports: a breakpoint dropped into the palette resolves perfectly and never
+ * reaches a stylesheet, because a source set is deliberately not written out,
+ * and a token nobody can use is not a filled gap. Second, among the sets that
+ * qualify, the one that already holds most of what this token is like, since
+ * a colour dropped into the type set is technically fine and practically lost.
  */
-function setFor(studio: TokenStudio, seed: Seed): string {
+function setFor(studio: TokenStudio, seed: Seed, themeId: string | null): string {
+  const theme = studio.themes.find((t) => t.id === themeId) ?? studio.themes[0]
+  const usable = studio.sets.filter((s) => (theme ? theme.sets[s.id] === 'enabled' : true))
+  const pool = usable.length > 0 ? usable : studio.sets
+
   let best: { id: string; score: number } | null = null
-  for (const set of studio.sets) {
+  for (const set of pool) {
     const stem = seed.path.split('.')[0]
     let score = set.tokens.filter((t) => t.type === seed.type).length
     score += set.tokens.filter((t) => t.path.split('.')[0] === stem).length * 10
     if (!best || score > best.score) best = { id: set.id, score }
   }
-  return best?.id ?? studio.sets[0]?.id ?? ''
+  return best?.id ?? pool[0]?.id ?? ''
 }
 
 /**
  * Add everything the checks found missing that the library can support.
  *
+ * A seed is placed once per theme, not once per library. Colour lives in a
+ * different set in each theme — that is the whole point of a theme — so a
+ * layer added only to Light leaves Dark without one, and the library reports
+ * itself complete while half of it is not. Because the seeds point at the
+ * library by alias rather than carrying a colour, the same token added to
+ * both sets resolves to the right value in each.
+ *
+ * A placement is refused where the thing it points at is not resolvable in
+ * that theme, since a dangling alias is worse than the gap it filled.
+ *
  * The studio comes back new rather than mutated, so a screen can show what
  * would happen before committing to it.
  */
 export function fillGaps(studio: TokenStudio, themeId: string | null): Filled {
-  const rows = coverageOf(studio, themeId)
+  const rows = coverageAcross(studio)
   const tokens = [...resolveAll(studio, themeId)].map(([, hit]) => hit.token)
   const { seeds, skipped } = seedsFor(rows, tokens)
 
@@ -265,15 +362,40 @@ export function fillGaps(studio: TokenStudio, themeId: string | null): Filled {
   const byId = new Map(sets.map((s) => [s.id, s]))
   const added: string[] = []
 
+  const themes = studio.themes.length > 0 ? studio.themes.map((t) => t.id) : [themeId]
+  const resolved = new Map(themes.map((t) => [t, resolveAll(studio, t)]))
+
   for (const seed of seeds) {
-    const target = byId.get(setFor(studio, seed))
-    if (!target) continue
-    if (target.tokens.some((t) => t.path === seed.path)) continue
-    target.tokens.push({ id: id(), path: seed.path, type: seed.type, tier: seed.tier, value: seed.value })
-    added.push(seed.path)
+    let landed = false
+    for (const theme of themes) {
+      const target = byId.get(setFor(studio, seed, theme))
+      if (!target) continue
+      if (target.tokens.some((t) => t.path === seed.path)) continue
+      const wants = aliasesIn(seed.value)
+      const here = resolved.get(theme)
+      if (here && wants.some((path) => !here.has(path))) continue
+      target.tokens.push({ id: id(), path: seed.path, type: seed.type, tier: seed.tier, value: seed.value })
+      landed = true
+    }
+    if (landed) added.push(seed.path)
   }
 
   return { studio: { ...studio, sets }, added, skipped }
+}
+
+/** Every token path a value points at, including inside a composite. */
+function aliasesIn(value: TokenValue): string[] {
+  const one = (v: TokenValue): string | null => {
+    const target = typeof v === 'string' ? v.trim() : ''
+    return /^\{[^{}]+\}$/.test(target) ? target.slice(1, -1).trim() : null
+  }
+  if (typeof value === 'object') {
+    return Object.values(value)
+      .map((v) => one(v))
+      .filter((v): v is string => v !== null)
+  }
+  const hit = one(value)
+  return hit ? [hit] : []
 }
 
 /** What the button should say it will do, before anybody presses it. */
