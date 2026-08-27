@@ -134,8 +134,17 @@ export function familiesOf(
     const i = ORDER.indexOf(leafOf(f.id))
     return i === -1 ? ORDER.length : i
   }
+  // A section's own tokens go first, before any named family inside it.
+  // Their family repeats the section's title, so the screen draws them
+  // without a heading; sitting after `Brand`, a headless row reads as more
+  // Brand. Sitting at the top, it reads as what the section is.
+  const bareRank = (f: Family): number => (f.id.includes('.') ? 1 : 0)
   return out.sort(
-    (a, b) => tierRank(a) - tierRank(b) || nameRank(a) - nameRank(b) || a.id.localeCompare(b.id)
+    (a, b) =>
+      tierRank(a) - tierRank(b)
+      || bareRank(a) - bareRank(b)
+      || nameRank(a) - nameRank(b)
+      || a.id.localeCompare(b.id)
   )
 }
 
