@@ -9,7 +9,7 @@
 
 import { chatActivityLabel, summarizeChatTools, type ChatToolGroup } from './chatActivity'
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import ReactMarkdown from 'react-markdown'
+import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import { IconBolt, IconCheck, IconChevronRight, IconClose, IconCopy } from './icons'
 import { BoxesThinking } from './PencilThinking'
 
@@ -256,12 +256,68 @@ export { ToolPill }
  */
 const InCodeBlock = createContext(false)
 
+/**
+ * Turns a `t42://` link in a reply into a jump inside the app.
+ *
+ * The app already listens for these moves on the window; until now nothing
+ * ever asked for one, so a reply could only tell somebody where to go and
+ * hope they went. A link is the right shape for the ask because a reply is
+ * markdown and markdown already has links: no new syntax to teach and no
+ * parsing of prose. Anything that is not our scheme falls through to a plain
+ * anchor, so an ordinary https link is untouched.
+ *
+ * Returns null when the href is not one of ours, which is also how the
+ * renderer decides between a button and an anchor.
+ */
+/**
+ * Lets a `t42://` link survive react-markdown's URL sanitising.
+ *
+ * The default transform blanks every scheme it does not recognise, which is
+ * the right instinct — it is what stops `javascript:` in a reply — but it also
+ * blanked ours, so the renderer below never saw an href to act on. Only our
+ * own scheme is added to the safe list; everything else still goes through the
+ * default, so the protection is unchanged for links from outside.
+ */
+function appUrlTransform(url: string): string {
+  return url.startsWith('t42://') ? url : defaultUrlTransform(url)
+}
+
+function appJump(href: string | undefined): (() => void) | null {
+  if (!href || !href.startsWith('t42://')) return null
+  const path = href.slice('t42://'.length).replace(/\/$/, '')
+  if (path === 'basis' || path === 'tokens') {
+    return () => window.dispatchEvent(new Event('t42:open-tokens'))
+  }
+  if (path === 'terminal') {
+    return () => window.dispatchEvent(new Event('t42:jump-to-terminal'))
+  }
+  const design = /^design\/(.+)$/.exec(path)
+  if (design) {
+    const designId = decodeURIComponent(design[1])
+    return () => window.dispatchEvent(new CustomEvent('t42:open-design', { detail: { designId } }))
+  }
+  return null
+}
+
 export function MarkdownContent({ content }: { content: string }): JSX.Element {
   // Memoise renderer config so streaming updates don't reconstruct components.
   const components = useMemo(() => ({
-    a: (props: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
-      <a {...props} target="_blank" rel="noreferrer noopener" className="text-accent underline hover:opacity-80" />
-    ),
+    a: (props: React.AnchorHTMLAttributes<HTMLAnchorElement>) => {
+      const jump = appJump(props.href)
+      if (jump) {
+        const { children } = props
+        return (
+          <button
+            type="button"
+            onClick={jump}
+            className="rounded-sm text-accent underline hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+          >
+            {children}
+          </button>
+        )
+      }
+      return <a {...props} target="_blank" rel="noreferrer noopener" className="text-accent underline hover:opacity-80" />
+    },
     pre: (props: React.HTMLAttributes<HTMLPreElement>) => {
       const { children, ...rest } = props
       return (
@@ -290,7 +346,7 @@ export function MarkdownContent({ content }: { content: string }): JSX.Element {
       <blockquote className="my-2 rounded-md bg-elevated/60 px-3 py-1.5 text-text-secondary" {...props} />
     )
   }), [])
-  return <ReactMarkdown components={components}>{content}</ReactMarkdown>
+  return <ReactMarkdown components={components} urlTransform={appUrlTransform}>{content}</ReactMarkdown>
 }
 
 /**

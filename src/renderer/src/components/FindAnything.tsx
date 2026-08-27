@@ -67,6 +67,7 @@ export function FindAnything({
                 <Item value="View brain" onSelect={() => { onSetView('brain'); onOpenChange(false) }}>Brain</Item>
                 <Item value="View activity" onSelect={() => { onSetView('activity'); onOpenChange(false) }}>Activity</Item>
                 <Item value="View settings" onSelect={() => { onSetView('settings'); onOpenChange(false) }}>Settings</Item>
+                <Item value="View basis tokens design shared library" onSelect={() => { window.dispatchEvent(new Event('t42:open-tokens')); onOpenChange(false) }}>Basis</Item>
               </Command.Group>
               <Command.Group heading="Actions">
                 <Item value="Add a folder" onSelect={() => { onAddProject(); onOpenChange(false) }}>Add a folder…</Item>

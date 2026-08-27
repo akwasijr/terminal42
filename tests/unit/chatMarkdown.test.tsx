@@ -58,6 +58,28 @@ describe('chat markdown', () => {
     expect(out).toContain('target="_blank"')
   })
 
+  // A reply could always say "open the Basis" but had no way to open it. The
+  // app scheme gives it one, and the anchor must not survive: an <a> would
+  // send the link to a browser, which has no idea what t42://basis means.
+  it('turns an app link into a button rather than an anchor', () => {
+    const out = html('Have a look at [the Basis](t42://basis).')
+    expect(out).toContain('<button')
+    expect(out).toContain('the Basis')
+    expect(out).not.toContain('href="t42://basis"')
+  })
+
+  it('leaves an ordinary link alone', () => {
+    const out = html('[docs](https://example.com/a)')
+    expect(out).toContain('href="https://example.com/a"')
+    expect(out).not.toContain('<button')
+  })
+
+  it('does not claim an unknown app path', () => {
+    const out = html('[nowhere](t42://not-a-place)')
+    expect(out).toContain('href="t42://not-a-place"')
+    expect(out).not.toContain('<button')
+  })
+
   it('renders several inline spans in one paragraph without any block', () => {
     const out = html('Use `a`, `b` and `c` together.')
     expect(out).not.toContain('<pre')
