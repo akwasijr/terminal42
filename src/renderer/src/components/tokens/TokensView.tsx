@@ -63,6 +63,7 @@ import {
   type SetNode
 } from '../../../../shared/tokens/sets'
 import { fromTokensText } from '../../../../shared/tokens/import'
+import { tokenLibrariesChanged } from '../../lib/tokens/useTokenLibraries'
 import { publishToForm } from '../../lib/tokens/toForm'
 import { TokenInspector } from './TokenInspector'
 import { ColorPicker, type PickerRequest } from '../ColorPicker'
@@ -81,6 +82,9 @@ export function TokensView({ onFullPage }: { onFullPage?: (full: boolean) => voi
     const list = (await window.terminal42.tokens.list()) as StudioRow[]
     setRows(list)
     setLoading(false)
+    // Chat, Motion and the canvas each hold their own copy of this list, and
+    // some of them mount once for a whole session. Tell them.
+    tokenLibrariesChanged()
   }
   useEffect(() => {
     void refresh()

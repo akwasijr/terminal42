@@ -5,6 +5,7 @@ import { DesignSystemWizard } from './DesignSystemWizard'
 import { DS_CATEGORIES, DS_COMPONENTS } from './dsComponents'
 import { DsIcon, ICON_SAMPLE, iconSnippet } from './dsIcons'
 import { studioFromDesignSystem } from '../lib/tokens/fromDesignSystem'
+import { tokenLibrariesChanged } from '../lib/tokens/useTokenLibraries'
 
 function fontStack(name: string): string {
   return FONT_OPTIONS.find((f) => f.id === name)?.stack ?? `'${name}', system-ui, sans-serif`
@@ -192,6 +193,7 @@ export function DesignSystemView({ openSystemId, onConsumeOpen }: { openSystemId
       const studio = studioFromDesignSystem(s)
       const row = await window.terminal42.tokens.create(s.name, studio)
       await window.terminal42.tokens.save(row.id, { ...studio, id: row.id })
+      tokenLibrariesChanged()
       setTokensNote(`\u201c${s.name}\u201d is now a token library. Find it under Design \u203a Tokens.`)
     } catch {
       setTokensNote('That library could not be made. Try again.')

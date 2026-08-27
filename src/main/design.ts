@@ -257,6 +257,27 @@ export function buildTokensBlock(brief: DesignBrief | null): string {
 }
 
 /**
+ * Whether a design is bound to a library that is no longer there.
+ *
+ * A binding that cannot be read is the one failure worth interrupting for.
+ * Everything downstream of it is written to carry on quietly — the prompt
+ * block returns an empty string, the files are not written, the stamp stays
+ * as it was — so without this the design would be generated with no token
+ * guidance at all and look, from the outside, exactly like a design that was
+ * never bound. The user would get invented hex values back and no reason why.
+ */
+export function libraryMissing(brief: DesignBrief | null): boolean {
+  if (!brief?.tokensId) return false
+  try {
+    return !getTokenStudio(brief.tokensId)
+  } catch {
+    // A database that will not answer is not the same as a deleted library,
+    // and guessing deleted here would cry wolf on every generation.
+    return false
+  }
+}
+
+/**
  * The bound library's three files, in the design's own folder.
  *
  * Failure is swallowed for the same reason the prompt block is: a library that
@@ -855,6 +876,20 @@ async function send(
       toolCalls: [], status: 'done', createdAt: Date.now()
     }
     insertMessage(sysMsg); emit(win, 'design:message', sysMsg)
+  }
+
+  // A binding to a library that has since been deleted is the one token
+  // failure that has to be said out loud. Every other path is deliberately
+  // quiet, so the result would otherwise be a design generated with no token
+  // guidance and nothing anywhere to say why.
+  if (!opts.skipPrefix && libraryMissing(d.brief)) {
+    const sysMsg: DesignMessage = {
+      id: randomUUID(), designId, role: 'system',
+      content: 'The token library this design was bound to no longer exists, so this run has nothing to build against. Bind another library from the design\u2019s settings, or the page will be made up of invented values.',
+      toolCalls: [], status: 'done', createdAt: Date.now()
+    }
+    insertMessage(sysMsg)
+    emit(win, 'design:message', sysMsg)
   }
 
   // First message of a design: surface the brief so the user can see what

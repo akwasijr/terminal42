@@ -36,7 +36,7 @@ const store = { get: vi.fn((id: string) => (id === 'lib1' ? record : null)) }
 vi.mock('../../src/main/tokens', () => ({ getTokenStudio: (id: string) => store.get(id) }))
 vi.mock('electron', () => ({ app: { getPath: () => tmpdir() }, BrowserWindow: { getAllWindows: () => [] }, ipcMain: { handle: () => {} } }))
 
-const { buildTokensBlock, writeTokensFiles, tokensHaveMoved } = await import('../../src/main/design')
+const { buildTokensBlock, writeTokensFiles, tokensHaveMoved, libraryMissing } = await import('../../src/main/design')
 
 const brief = (over: Record<string, unknown> = {}): never =>
   ({ tokensId: 'lib1', tokensThemeId: null, ...over }) as never
@@ -191,5 +191,32 @@ describe('the library stamp', () => {
     expect(tokensHaveMoved(brief({ tokensId: 'gone', tokensStamp: 'x' }))).toBe(false)
     expect(tokensHaveMoved(null)).toBe(false)
   })
-})
 
+  // Everything else about a missing library is deliberately quiet: the prompt
+  // block returns an empty string, the files are not written, drift reads as
+  // no opinion. That silence is right in each place on its own and wrong
+  // taken together, because the design still generates and the result looks
+  // exactly like one that was never bound. This is the flag that lets the run
+  // say so.
+  describe('a library that has been deleted underneath a design', () => {
+    it('is noticed', () => {
+      expect(libraryMissing(brief({ tokensId: 'gone' }))).toBe(true)
+    })
+
+    it('is not claimed for a design that never named one', () => {
+      expect(libraryMissing(brief({ tokensId: null }))).toBe(false)
+      expect(libraryMissing(null)).toBe(false)
+    })
+
+    it('is not claimed while the library is still there', () => {
+      expect(libraryMissing(brief())).toBe(false)
+    })
+
+    it('is not claimed when the store itself is the thing that failed', () => {
+      // A database that will not answer is not evidence the library is gone,
+      // and treating it as such would warn on every generation.
+      store.get.mockImplementation(() => { throw new Error('database is locked') })
+      expect(libraryMissing(brief())).toBe(false)
+    })
+  })
+})
