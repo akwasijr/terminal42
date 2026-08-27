@@ -39,6 +39,7 @@ import { familiesOf, leafOf, SECTIONS, sectionOf, type Family, type SectionId } 
 import { addToken, blankValue, deleteToken, renameToken, setAlias, setTokenValue } from '../../../../shared/tokens/edit'
 import { bridgeSummary, brandItems } from '../../../../shared/tokens/bridges'
 import { cloneStudio } from '../../../../shared/tokens/scaffold'
+import { fromTokensText } from '../../../../shared/tokens/import'
 import { publishToForm } from '../../lib/tokens/toForm'
 import { TokenInspector } from './TokenInspector'
 import { ColorPicker, type PickerRequest } from '../ColorPicker'
@@ -51,6 +52,7 @@ export function TokensView({ onFullPage }: { onFullPage?: (full: boolean) => voi
   const [studio, setStudio] = useState<TokenStudio | null>(null)
   const [loading, setLoading] = useState(true)
   const [setupOpen, setSetupOpen] = useState(false)
+  const [importNote, setImportNote] = useState<string | null>(null)
 
   const refresh = async (): Promise<void> => {
     const list = (await window.terminal42.tokens.list()) as StudioRow[]
@@ -86,6 +88,17 @@ export function TokensView({ onFullPage }: { onFullPage?: (full: boolean) => voi
     const copy = cloneStudio(hydrateStudio(row.studio), `${row.name} copy`)
     await window.terminal42.tokens.create(copy.name, copy)
     await refresh()
+  }
+
+  // A file is read here rather than through the main process: a token file is
+  // small, the renderer can read it, and one less hop is one less thing to
+  // keep in step.
+  const bringIn = async (file: File): Promise<void> => {
+    const name = file.name.replace(/\.json$/i, '') || 'Imported'
+    const { studio: built, notes } = fromTokensText(await file.text(), name)
+    setImportNote(notes.length > 0 ? notes.join(' ') : null)
+    if (built.sets.every((x) => x.tokens.length === 0)) return
+    await create(built)
   }
 
   const remove = async (id: string): Promise<void> => {
@@ -124,6 +137,19 @@ export function TokensView({ onFullPage }: { onFullPage?: (full: boolean) => voi
         <p className="text-[12.5px] text-text-muted">
           One place your colours, sizes and type are decided, and everything else agrees with.
         </p>
+        <label className="shrink-0 cursor-pointer rounded-md px-3 py-1.5 text-[13px] text-text-secondary hover:bg-raised hover:text-text-primary focus-within:ring-2 focus-within:ring-accent/60">
+          Import
+          <input
+            type="file"
+            accept="application/json,.json"
+            className="sr-only"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              e.target.value = ''
+              if (file) void bringIn(file)
+            }}
+          />
+        </label>
         <button
           type="button"
           onClick={() => setSetupOpen(true)}
@@ -132,6 +158,10 @@ export function TokensView({ onFullPage }: { onFullPage?: (full: boolean) => voi
           New library
         </button>
       </div>
+
+      {importNote ? (
+        <p className="mb-3 rounded-md bg-surface px-3 py-2 text-[11.5px] text-text-secondary">{importNote}</p>
+      ) : null}
 
       {loading ? null : rows.length === 0 ? (
         <p className="rounded-panel bg-surface px-4 py-10 text-center text-[12.5px] text-text-muted">
