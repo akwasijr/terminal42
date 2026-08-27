@@ -32,7 +32,8 @@ import {
   type TokenStudio,
   type TokenValue,
   enforcementOf,
-  type Enforcement
+  type Enforcement,
+  type SetState
 } from '../../../../shared/tokens/types'
 import { flatten, problems, resolve, type Problem } from '../../../../shared/tokens/resolve'
 import { familiesOf, leafOf, SECTIONS, sectionOf, type Family, type SectionId } from '../../../../shared/tokens/groups'
@@ -48,6 +49,14 @@ import {
 } from '../../../../shared/tokens/bulk'
 import { bridgeSummary, brandItems } from '../../../../shared/tokens/bridges'
 import { cloneStudio } from '../../../../shared/tokens/scaffold'
+import {
+  folderState,
+  renameFolder,
+  renameSet,
+  setFolderState,
+  treeOfSets,
+  type SetNode
+} from '../../../../shared/tokens/sets'
 import { fromTokensText } from '../../../../shared/tokens/import'
 import { publishToForm } from '../../lib/tokens/toForm'
 import { TokenInspector } from './TokenInspector'
@@ -572,52 +581,39 @@ function StudioEditor({
             Sets
           </button>
           {showSets ? (
-            <ul className="flex flex-col gap-0.5">
-              {[...studio.sets]
-                .sort((a, b) => a.order - b.order)
-                .map((s) => {
-                  const state = studio.themes.find((t) => t.id === themeId)?.sets[s.id] ?? 'off'
-                  return (
-                    <li
-                      key={s.id}
-                      className="group/set flex items-center gap-1 rounded-md px-2.5 py-1 hover:bg-elevated/60"
-                    >
-                      <span className="min-w-0 flex-1 truncate text-[11px] text-text-secondary">
-                        {s.name}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={(e) => setAdding({ setId: s.id, rect: e.currentTarget.getBoundingClientRect() })}
-                        aria-label={`Add a token to ${s.name}`}
-                        className="rounded-sm px-1 text-[12px] leading-none text-text-muted opacity-0 hover:text-text-primary focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 group-hover/set:opacity-100"
-                      >
-                        +
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setSetState(
-                            s.id,
-                            state === 'enabled' ? 'source' : state === 'source' ? 'off' : 'enabled'
-                          )
-                        }
-                        aria-label={`${s.name} is ${STATE_WORD[state]}`}
-                        title={STATE_NOTE[state]}
-                        className={`h-2.5 w-2.5 shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${STATE_DOT[state]}`}
-                      />
-                    </li>
+            <SetTree
+              nodes={treeOfSets(studio.sets)}
+              depth={0}
+              stateOf={(id) => studio.themes.find((t) => t.id === themeId)?.sets[id] ?? 'off'}
+              folderStateOf={(node) => folderState(studio, themeId, node)}
+              onCycleSet={(id, state) =>
+                setSetState(id, state === 'enabled' ? 'source' : state === 'source' ? 'off' : 'enabled')
+              }
+              onCycleFolder={(node, state) =>
+                onChange(
+                  setFolderState(
+                    studio,
+                    themeId,
+                    node,
+                    state === 'enabled' ? 'source' : state === 'source' ? 'off' : 'enabled'
                   )
-                })}
-              <li>
-                <button
-                  type="button"
-                  onClick={addSet}
-                  className="w-full rounded-md px-2.5 py-1 text-left text-[11px] text-text-muted hover:bg-elevated/60 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-                >
-                  Add a set
-                </button>
-              </li>
-            </ul>
+                )
+              }
+              onRenameSet={(id, to) => onChange(renameSet(studio, id, to))}
+              onRenameFolder={(path, to) => onChange(renameFolder(studio, path, to))}
+              onAdd={(id, rect) => setAdding({ setId: id, rect })}
+              trailing={
+                <li>
+                  <button
+                    type="button"
+                    onClick={addSet}
+                    className="w-full rounded-md px-2.5 py-1 text-left text-[11px] text-text-muted hover:bg-elevated/60 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                  >
+                    Add a set
+                  </button>
+                </li>
+              }
+            />
           ) : null}
         </nav>
 
@@ -1056,13 +1052,193 @@ function FamilyRow({
 const STATE_DOT: Record<string, string> = {
   enabled: 'bg-accent',
   source: 'bg-text-muted',
-  off: 'bg-transparent ring-1 ring-inset ring-border-strong'
+  off: 'bg-transparent ring-1 ring-inset ring-border-strong',
+  mixed: 'bg-gradient-to-br from-accent to-transparent ring-1 ring-inset ring-border-strong'
 }
-const STATE_WORD: Record<string, string> = { enabled: 'exported', source: 'a source', off: 'off' }
+const STATE_WORD: Record<string, string> = {
+  enabled: 'exported',
+  source: 'a source',
+  off: 'off',
+  mixed: 'part one thing and part another'
+}
 const STATE_NOTE: Record<string, string> = {
   enabled: 'Exported. Press to make it a source.',
   source: 'Resolvable but not exported. Press to switch it off.',
-  off: 'Off. Press to export it.'
+  off: 'Off. Press to export it.',
+  mixed: 'The sets inside disagree. Press to export them all.'
+}
+
+/**
+ * The sets, as folders.
+ *
+ * Drawn from the names rather than from any structure of its own, so the
+ * only way to move a set is to rename it, which is also the only way anyone
+ * would think to try.
+ */
+function SetTree({
+  nodes,
+  depth,
+  stateOf,
+  folderStateOf,
+  onCycleSet,
+  onCycleFolder,
+  onRenameSet,
+  onRenameFolder,
+  onAdd,
+  trailing
+}: {
+  nodes: SetNode[]
+  depth: number
+  stateOf: (setId: string) => SetState
+  folderStateOf: (node: SetNode) => SetState | 'mixed'
+  onCycleSet: (setId: string, state: SetState) => void
+  onCycleFolder: (node: SetNode, state: SetState | 'mixed') => void
+  onRenameSet: (setId: string, to: string) => void
+  onRenameFolder: (path: string, to: string) => void
+  onAdd: (setId: string, rect: DOMRect) => void
+  trailing?: React.ReactNode
+}): React.JSX.Element {
+  const [shut, setShut] = useState<Set<string>>(new Set())
+
+  return (
+    <ul className="flex flex-col gap-0.5">
+      {nodes.map((node) => {
+        const pad = { paddingLeft: `${10 + depth * 10}px` }
+        if (node.kind === 'folder') {
+          const state = folderStateOf(node)
+          const closed = shut.has(node.path)
+          return (
+            <li key={`f:${node.path}`}>
+              <div
+                className="group/set flex items-center gap-1 rounded-md py-1 pr-2.5 hover:bg-elevated/60"
+                style={pad}
+              >
+                <button
+                  type="button"
+                  onClick={() =>
+                    setShut((c) => {
+                      const next = new Set(c)
+                      if (next.has(node.path)) next.delete(node.path)
+                      else next.add(node.path)
+                      return next
+                    })
+                  }
+                  aria-expanded={!closed}
+                  aria-label={`${node.name} folder`}
+                  className="shrink-0 rounded-sm text-text-muted hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                >
+                  <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={`transition-transform duration-200 ${closed ? '' : 'rotate-90'}`}><path d="M6 3.5L10.5 8 6 12.5" /></svg>
+                </button>
+                <NameField
+                  value={node.name}
+                  label={`Folder name, ${node.path}`}
+                  onCommit={(to) => onRenameFolder(node.path, to)}
+                  className="font-medium text-text-primary"
+                />
+                <button
+                  type="button"
+                  onClick={() => onCycleFolder(node, state)}
+                  aria-label={`${node.name} is ${STATE_WORD[state]}`}
+                  title={STATE_NOTE[state]}
+                  className={`h-2.5 w-2.5 shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${STATE_DOT[state]}`}
+                />
+              </div>
+              {closed ? null : (
+                <SetTree
+                  nodes={node.children}
+                  depth={depth + 1}
+                  stateOf={stateOf}
+                  folderStateOf={folderStateOf}
+                  onCycleSet={onCycleSet}
+                  onCycleFolder={onCycleFolder}
+                  onRenameSet={onRenameSet}
+                  onRenameFolder={onRenameFolder}
+                  onAdd={onAdd}
+                />
+              )}
+            </li>
+          )
+        }
+
+        const state = stateOf(node.set.id)
+        return (
+          <li
+            key={node.set.id}
+            className="group/set flex items-center gap-1 rounded-md py-1 pr-2.5 hover:bg-elevated/60"
+            style={pad}
+          >
+            <NameField
+              value={node.set.name}
+              shown={node.name}
+              label={`Set name, ${node.set.name}`}
+              onCommit={(to) => onRenameSet(node.set.id, to)}
+              className="text-text-secondary"
+            />
+            <button
+              type="button"
+              onClick={(e) => onAdd(node.set.id, e.currentTarget.getBoundingClientRect())}
+              aria-label={`Add a token to ${node.name}`}
+              className="rounded-sm px-1 text-[12px] leading-none text-text-muted opacity-0 hover:text-text-primary focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 group-hover/set:opacity-100"
+            >
+              +
+            </button>
+            <button
+              type="button"
+              onClick={() => onCycleSet(node.set.id, state)}
+              aria-label={`${node.name} is ${STATE_WORD[state]}`}
+              title={STATE_NOTE[state]}
+              className={`h-2.5 w-2.5 shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${STATE_DOT[state]}`}
+            />
+          </li>
+        )
+      })}
+      {trailing}
+    </ul>
+  )
+}
+
+/**
+ * A name you can edit in place.
+ *
+ * It shows the short name and offers the full path once you are in it, so a
+ * set reads as `Light` in its folder but can still be moved somewhere else
+ * by typing where it should go.
+ */
+function NameField({
+  value,
+  shown,
+  label,
+  onCommit,
+  className
+}: {
+  value: string
+  shown?: string
+  label: string
+  onCommit: (to: string) => void
+  className: string
+}): React.JSX.Element {
+  const [draft, setDraft] = useState<string | null>(null)
+
+  return (
+    <input
+      value={draft ?? shown ?? value}
+      aria-label={label}
+      onFocus={() => setDraft(value)}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        if (draft !== null && draft !== value) onCommit(draft)
+        setDraft(null)
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur()
+        if (e.key === 'Escape') {
+          setDraft(value)
+          e.currentTarget.blur()
+        }
+      }}
+      className={`min-w-0 flex-1 truncate rounded-sm bg-transparent px-1 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${className}`}
+    />
+  )
 }
 
 /** Tokens Studio writes `original`; CSS has no such word for "leave it". */
