@@ -87,6 +87,39 @@ export function drawCardFace(
     ctx.fillStyle = g
     ctx.fillRect(0, 0, w, h)
   }
+
+  strokeBorder(ctx, style, w, h, radius)
+}
+
+/**
+ * The outline, drawn last so nothing sits on top of it.
+ *
+ * Stroked at twice the asked-for width while the rounded path is still
+ * clipping. Half of a stroke falls outside its path, and that half is thrown
+ * away by the clip, which leaves a band of exactly the requested width lying
+ * inside the edge and following the corner radius precisely. Insetting a
+ * second path instead would need its own smaller radius, and the two curves
+ * would not stay concentric as the corner setting changed.
+ */
+function strokeBorder(
+  ctx: CanvasRenderingContext2D,
+  style: CardStyle,
+  w: number,
+  h: number,
+  radius: number
+): void {
+  const pct = style.borderWidth ?? 0
+  const alpha = (style.borderOpacity ?? 100) / 100
+  if (pct <= 0 || alpha <= 0) return
+  const width = (Math.min(w, h) * pct) / 100
+  if (width < 0.5) return
+  ctx.save()
+  ctx.globalAlpha = alpha
+  ctx.strokeStyle = style.borderColour ?? '#ffffff'
+  ctx.lineWidth = width * 2
+  roundedPath(ctx, 0, 0, w, h, radius)
+  ctx.stroke()
+  ctx.restore()
 }
 
 function roundedPath(

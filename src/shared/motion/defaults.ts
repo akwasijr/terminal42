@@ -55,7 +55,10 @@ export function emptyDoc(componentId: ComponentId = 'carousel'): MotionDoc {
         gradient: true,
         gradientOpacity: 20,
         gradientSide: 'both',
-        backOpacity: 20
+        backOpacity: 20,
+        borderWidth: 0,
+        borderColour: '#ffffff',
+        borderOpacity: 100
       },
       images: [],
       imageOrder: 'in-order',

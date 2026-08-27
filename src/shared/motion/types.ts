@@ -143,6 +143,18 @@ export type CardStyle = {
   gradientOpacity: number
   gradientSide: 'front' | 'back' | 'both'
   backOpacity: number
+  /**
+   * An outline drawn inside the card's own edge.
+   *
+   * Inside rather than around it, because the card is a plane in a scene: a
+   * stroke that straddled the edge would be half in front of the card and half
+   * in mid-air, and would thicken and thin as the card turned. Width is a
+   * percentage of the short side so it survives a change of card shape and a
+   * change of export size.
+   */
+  borderWidth: number
+  borderColour: string
+  borderOpacity: number
 }
 
 export type FrameAspect = '16:9' | '4:5' | '9:16' | '1:1' | '4:3'

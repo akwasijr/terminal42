@@ -262,6 +262,13 @@ export function VisualPanel({
           </>
         ) : null}
         <SliderRow label="Back of card" value={card.backOpacity} min={0} max={100} step={1} onChange={(v) => setCard({ backOpacity: v })} />
+        <SliderRow label="Outline" value={card.borderWidth ?? 0} min={0} max={4} step={0.1} onChange={(v) => setCard({ borderWidth: v })} />
+        {(card.borderWidth ?? 0) > 0 ? (
+          <>
+            <ColorRow label="Outline colour" value={card.borderColour ?? '#ffffff'} onChange={(v) => setCard({ borderColour: v })} />
+            <SliderRow label="Outline opacity" value={card.borderOpacity ?? 100} min={0} max={100} step={1} onChange={(v) => setCard({ borderOpacity: v })} />
+          </>
+        ) : null}
       </Section>
 
       <Section title="Text" defaultOpen={false} reveal={selected?.kind === 'text'}>

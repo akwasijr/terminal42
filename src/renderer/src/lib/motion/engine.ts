@@ -207,6 +207,7 @@ export class MotionEngine {
     const c = doc.visual.card
     return [
       c.aspect, c.corner, c.gradient, c.gradientOpacity, c.gradientSide, c.backOpacity,
+      c.borderWidth, c.borderColour, c.borderOpacity,
       doc.visual.imageOrder,
       doc.visual.images.map((i) => i.id).join(',')
     ].join('|')
