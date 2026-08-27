@@ -20,6 +20,7 @@ import { beforeCardsFilter, drawEffects } from '../../lib/motion/effects'
 import { composeFrame, releaseComposeScratch } from '../../lib/motion/compose'
 import { needsPixelPass, releaseFxScratches } from '../../lib/motion/frameFx'
 import { ensureTextFonts } from '../../lib/motion/fonts'
+import { boxFor, drawPickOutline, pickOverlay, samePick, type Pick } from '../../lib/motion/overlayPick'
 
 export type StageHandle = {
   engine: () => MotionEngine | null
@@ -54,9 +55,9 @@ export function MotionStage({
   phase: number
   onPhase: (p: number) => void
   handleRef?: Ref<StageHandle>
-  /** Index of the card the user is working on, or null. */
-  selected: number | null
-  onSelect: (index: number | null) => void
+  /** What the user is working on: a card, a text layer, a logo, or nothing. */
+  selected: Pick | null
+  onSelect: (pick: Pick | null) => void
   onPatch: (patch: Partial<MotionDoc>) => void
   /** Pictures dragged in from the desktop, with the card they landed on. */
   onDropFiles: (files: File[], cardIndex: number | null) => void
@@ -96,6 +97,20 @@ export function MotionStage({
   // give that up and pay for grain every frame, the loop watches for the
   // moment a layer's visibility actually changes and asks for one redraw.
   const [visTick, setVisTick] = useState(0)
+  // The marquee is drawn on a canvas, which cannot read a CSS variable, so the
+  // accent is fetched once and kept. A ref rather than state because nothing
+  // should re-render when the theme changes; the next paint simply uses it.
+  const accentRef = useRef('rgb(14 165 233)')
+  useEffect(() => {
+    const read = (): void => {
+      const v = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()
+      if (v) accentRef.current = `rgb(${v})`
+    }
+    read()
+    const mo = new MutationObserver(read)
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] })
+    return () => mo.disconnect()
+  }, [])
   const visRef = useRef('')
   const [hint, setHint] = useState<string | null>(null)
   const dragRef = useRef<DragState | null>(null)
@@ -213,9 +228,14 @@ export function MotionStage({
         drawEffects(ctx, resolvedEffects(doc, p), over.width, over.height)
         drawLogos(ctx, resolvedLogoLayers(doc, p), images, over.width, over.height, p)
         drawOverlay(ctx, resolvedTextLayers(doc, p), over.width, over.height, p)
+        // The marquee is painted here rather than in the DOM because the layer
+        // it surrounds is canvas: an HTML box over the top would need the same
+        // measurements anyway, and would lag the frame by a render.
+        const box = boxFor(ctx, doc, images, over.width, over.height, p, selected)
+        if (box) drawPickOutline(ctx, box, accentRef.current)
       }
     }
-  }, [size, ready, fontTick, visTick, doc.frame, doc.visual.text, doc.visual.logos, doc.visual.effects, images])
+  }, [size, ready, fontTick, visTick, selected, doc.frame, doc.visual.text, doc.visual.logos, doc.visual.effects, images])
 
   // A webfont arrives after the frame it was first asked for has been painted,
   // and a canvas does not re-render itself the way the DOM does. Bumping this
@@ -236,7 +256,7 @@ export function MotionStage({
   }, [images])
 
   useEffect(() => {
-    engineRef.current?.setSelected(selected)
+    engineRef.current?.setSelected(selected?.kind === 'card' ? selected.index : null)
   }, [selected])
 
   // Play means "show me the entrance again". The token is a counter rather
@@ -263,10 +283,56 @@ export function MotionStage({
     return [((e.clientX - r.left) / r.width) * 2 - 1, -(((e.clientY - r.top) / r.height) * 2 - 1)]
   }
 
+  /** Where the pointer is on the overlay canvas, in its own pixels. */
+  const overlayPoint = (
+    e: { clientX: number; clientY: number }, el: HTMLElement
+  ): { x: number; y: number; ctx: CanvasRenderingContext2D } | null => {
+    const over = overRef.current
+    const ctx = over?.getContext('2d')
+    if (!over || !ctx) return null
+    const r = el.getBoundingClientRect()
+    if (r.width === 0 || r.height === 0) return null
+    return { x: ((e.clientX - r.left) / r.width) * over.width, y: ((e.clientY - r.top) / r.height) * over.height, ctx }
+  }
+
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>): void => {
     const engine = engineRef.current
     if (!engine) return
     const at = ndc(e, e.currentTarget)
+    // Flat layers are asked first. They are painted over everything else, so
+    // the thing the user can see at that point is the thing they mean; a card
+    // behind a caption is still reachable by clicking anywhere else on it.
+    const over = overlayPoint(e, e.currentTarget)
+    const flat = !poseRef.current && over && !e.shiftKey && !e.metaKey && !e.ctrlKey
+      ? pickOverlay(over.ctx, docRef.current, images, over.ctx.canvas.width, over.ctx.canvas.height, phaseRef.current, over.x, over.y)
+      : null
+    if (flat) {
+      const d0 = docRef.current
+      const src = flat.kind === 'text'
+        ? d0.visual.text.find((l) => l.id === flat.id)
+        : flat.kind === 'logo' ? d0.visual.logos.find((l) => l.id === flat.id) : undefined
+      if (src) {
+        dragRef.current = {
+          mode: 'layer',
+          index: null,
+          layer: { pick: flat, x: src.x, y: src.y },
+          from: at,
+          last: at,
+          startX: e.clientX,
+          startPhase: phaseRef.current,
+          rotate: false,
+          moved: false,
+          basePose: { ...d0.pose },
+          baseTransform: { ...d0.transform },
+          baseOverride: emptyOverride(),
+          acc: { x: 0, y: 0, z: 0, rx: 0, ry: 0 }
+        }
+        if (!samePick(selected, flat)) onSelect(flat)
+        try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* still draggable */ }
+        setHint(flat.kind === 'text' ? 'Moving this text' : 'Moving this logo')
+        return
+      }
+    }
     const hit = engine.pick(at[0], at[1])
     // Pose is a mode because there is nowhere else to put it: the same drag
     // has to mean "turn the piece" and "pick up that card", and a modifier
@@ -294,7 +360,7 @@ export function MotionStage({
       baseOverride: { ...(d.overrides[String(hit)] ?? emptyOverride()) },
       acc: { x: 0, y: 0, z: 0, rx: 0, ry: 0 }
     }
-    if (mode === 'card' && hit !== null) onSelect(hit)
+    if (mode === 'card' && hit !== null) onSelect({ kind: 'card', index: hit })
     // Capture keeps a fast drag from escaping the frame. It throws if the
     // pointer has already gone, which is not a reason to lose the drag.
     try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* no capture, still draggable */ }
@@ -317,7 +383,20 @@ export function MotionStage({
     if (Math.abs(dxNdc) + Math.abs(dyNdc) > 0.0005) drag.moved = true
     const d = docRef.current
 
-    if (drag.mode === 'scrub') {
+    if (drag.mode === 'layer' && drag.layer) {
+      // Moved in the frame's own percentages rather than in pixels, so a layer
+      // dragged on a small preview lands in the same place in a 4K export.
+      const dx = ((at[0] - drag.from[0]) / 2) * 100
+      const dy = (-(at[1] - drag.from[1]) / 2) * 100
+      const x = clamp(drag.layer.x + dx, -20, 120)
+      const y = clamp(drag.layer.y + dy, -20, 120)
+      const pick = drag.layer.pick
+      if (pick.kind === 'text') {
+        onPatch({ visual: { ...d.visual, text: d.visual.text.map((l) => (l.id === pick.id ? { ...l, x, y } : l)) } })
+      } else if (pick.kind === 'logo') {
+        onPatch({ visual: { ...d.visual, logos: d.visual.logos.map((l) => (l.id === pick.id ? { ...l, x, y } : l)) } })
+      }
+    } else if (drag.mode === 'scrub') {
       const width = Math.max(1, sizeRef.current.width)
       const next = (((drag.startPhase + (e.clientX - drag.startX) / width) % 1) + 1) % 1
       phaseRef.current = next
@@ -393,7 +472,7 @@ export function MotionStage({
     } catch { /* nothing to release */ }
     // A click that went nowhere is a click, and clicking the backdrop is how
     // you put a card down.
-    if (drag && !drag.moved && drag.mode !== 'scrub' && drag.index === null) onSelect(null)
+    if (drag && !drag.moved && drag.mode !== 'scrub' && drag.mode !== 'layer' && drag.index === null) onSelect(null)
   }
 
   const onWheel = (e: React.WheelEvent<HTMLCanvasElement>): void => {
@@ -553,8 +632,10 @@ export function MotionStage({
 }
 
 type DragState = {
-  mode: 'orbit' | 'card' | 'scrub' | 'scale' | 'move'
+  mode: 'orbit' | 'card' | 'scrub' | 'scale' | 'move' | 'layer'
   index: number | null
+  /** The flat layer being dragged, and where it started, in percentages. */
+  layer?: { pick: Pick; x: number; y: number }
   from: [number, number]
   last: [number, number]
   startX: number

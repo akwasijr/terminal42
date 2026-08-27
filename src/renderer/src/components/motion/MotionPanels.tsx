@@ -8,6 +8,8 @@
 import type {
   CardStyle, ComponentId, MotionDoc, ParamSpec, ParamValue
 } from '../../../../shared/motion/types'
+import { useCallback } from 'react'
+import type { Pick } from '../../lib/motion/overlayPick'
 import { componentFor } from '../../../../shared/motion/registry'
 import { emptyDoc, paramsFor } from '../../../../shared/motion/defaults'
 import { paramAffectsCount } from '../../../../shared/motion/frame'
@@ -198,15 +200,34 @@ function ParamControl({
 }
 
 export function VisualPanel({
-  doc, onChange, onImportImages, busy, phase
+  doc, onChange, onImportImages, busy, phase, selected = null, onSelect
 }: {
   doc: MotionDoc
   onChange: (patch: Partial<MotionDoc>) => void
   onImportImages: () => void
   busy: boolean
   phase: number
+  /** What is picked on the frame, so its editor can show itself. */
+  selected?: Pick | null
+  onSelect?: (pick: Pick | null) => void
 }): React.JSX.Element {
   const keyer = makeKeyer(doc, phase, onChange)
+  // A callback ref rather than an effect: the node it wants is the one that
+  // just became the selected layer, and asking for it as it mounts is the
+  // only moment we are certain which node that is.
+  //
+  // Only the panel's own scroller is moved. `scrollIntoView` would walk every
+  // scrollable ancestor and drag the whole workspace along with it.
+  const revealRef = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return
+    let box: HTMLElement | null = el.parentElement
+    while (box && box.scrollHeight <= box.clientHeight) box = box.parentElement
+    if (!box) return
+    const top = el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop
+    if (top < box.scrollTop || top + el.offsetHeight > box.scrollTop + box.clientHeight) {
+      box.scrollTo({ top: top - 8, behavior: 'smooth' })
+    }
+  }, [])
   const card = doc.visual.card
   const setCard = (patch: Partial<CardStyle>): void =>
     onChange({ visual: { ...doc.visual, card: { ...card, ...patch } } })
@@ -243,7 +264,7 @@ export function VisualPanel({
         <SliderRow label="Back of card" value={card.backOpacity} min={0} max={100} step={1} onChange={(v) => setCard({ backOpacity: v })} />
       </Section>
 
-      <Section title="Text" defaultOpen={false}>
+      <Section title="Text" defaultOpen={false} reveal={selected?.kind === 'text'}>
         <button
           type="button"
           onClick={() => onChange({
@@ -270,8 +291,14 @@ export function VisualPanel({
               text: doc.visual.text.map((l, j) => (j === i ? { ...l, ...patch } : l))
             }
           })
+          const isPicked = selected?.kind === 'text' && selected.id === layer.id
           return (
-            <div key={layer.id} className="flex flex-col gap-2 rounded-md bg-sunken p-2">
+            <div
+              key={layer.id}
+              ref={isPicked ? revealRef : undefined}
+              onPointerDownCapture={() => onSelect?.({ kind: 'text', id: layer.id })}
+              className={`flex flex-col gap-2 rounded-md bg-sunken p-2 ${isPicked ? 'ring-1 ring-accent/60' : ''}`}
+            >
               <div className="flex items-center gap-1">
                 <textarea
                   value={layer.text}
@@ -348,7 +375,7 @@ export function VisualPanel({
         })}
       </Section>
 
-      <LogoSection doc={doc} onChange={onChange} keyer={keyer} />
+      <LogoSection doc={doc} onChange={onChange} keyer={keyer} selected={selected} onSelect={onSelect} />
 
       <EffectsSection doc={doc} onChange={onChange} keyer={keyer} />
 

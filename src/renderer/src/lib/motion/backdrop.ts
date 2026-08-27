@@ -11,7 +11,8 @@ import type { FrameStyle, LogoLayer, MotionDoc, TextLayer } from '../../../../sh
 import { resolvedText } from '../../../../shared/motion/types'
 import { clipTimeline } from '../../../../shared/motion/entrance'
 import { layerVisibility } from '../../../../shared/motion/frame'
-import { fontByLabel } from '../freeformTypes'
+
+import { textFont } from './overlayPick'
 
 export function drawBackdrop(
   ctx: CanvasRenderingContext2D,
@@ -119,7 +120,7 @@ export function drawOverlay(
     ctx.fillStyle = layer.colour
     ctx.textAlign = layer.align
     ctx.textBaseline = 'middle'
-    ctx.font = `${layer.italic ? 'italic ' : ''}${layer.weight} ${px}px ${fontByLabel(layer.font).stack}`
+    ctx.font = textFont(layer, px)
     // Chromium has honoured this since 99, but it is still not everywhere, and
     // assigning an unknown property would silently do nothing rather than warn.
     if ('letterSpacing' in ctx) ctx.letterSpacing = `${(layer.tracking / 100) * px}px`

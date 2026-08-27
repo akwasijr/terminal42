@@ -19,6 +19,7 @@ import { ExportPanel } from './ExportPanel'
 import { ParamsPanel, VisualPanel } from './MotionPanels'
 import { MotionTimeline } from './MotionTimeline'
 import { MotionPickerProvider, type OpenColorPicker } from './pickerContext'
+import type { Pick } from '../../lib/motion/overlayPick'
 import { ColorPicker, type PickerRequest } from '../ColorPicker'
 import { FrameToolbar, type FrameFit } from './FrameToolbar'
 import { ResizeHandle } from './ResizeHandle'
@@ -52,7 +53,7 @@ export function MotionStudio({
   const [busyImages, setBusyImages] = useState(false)
   const [images, setImages] = useState<Map<string, HTMLImageElement>>(new Map())
   const [layouts, setLayouts] = useState<SavedLayout[]>([])
-  const [selected, setSelected] = useState<number | null>(null)
+  const [selected, setSelected] = useState<Pick | null>(null)
   const [naming, setNaming] = useState(false)
   const [layoutName, setLayoutName] = useState('')
   const [poseMode, setPoseMode] = useState(false)
@@ -153,14 +154,44 @@ export function MotionStudio({
       if (e.key === 'Escape') setSelected(null)
       if ((e.key === 'Backspace' || e.key === 'Delete') && selected !== null) {
         e.preventDefault()
-        const next = { ...doc.overrides }
-        delete next[String(selected)]
-        patch({ overrides: next })
+        // Delete means different things to the two kinds of thing that can be
+        // selected, and both are what the word means there. A card cannot be
+        // removed — the pattern says how many there are — so it goes back to
+        // where the pattern put it. A layer the user added is simply gone.
+        if (selected.kind === 'card') {
+          const next = { ...doc.overrides }
+          delete next[String(selected.index)]
+          patch({ overrides: next })
+        } else {
+          removeLayer(selected)
+        }
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selected, doc.overrides, patch])
+  }, [selected, doc.overrides, doc.visual, patch])
+
+  // Picking a caption on the frame and being left looking at the motion tab
+  // would be the app agreeing that the layer is selected and then refusing to
+  // say anything about it. The panel follows the selection to where its
+  // controls live; it does not follow a card, because a card's controls are
+  // the drag itself.
+  useEffect(() => {
+    if (selected && selected.kind !== 'card') {
+      setTab('visual')
+      setPanelOpen(true)
+    }
+  }, [selected])
+
+  const removeLayer = (pick: Pick): void => {
+    if (pick.kind === 'card') return
+    setSelected(null)
+    if (pick.kind === 'text') {
+      patch({ visual: { ...doc.visual, text: doc.visual.text.filter((l) => l.id !== pick.id) } })
+    } else {
+      patch({ visual: { ...doc.visual, logos: doc.visual.logos.filter((l) => l.id !== pick.id) } })
+    }
+  }
 
   const pickComponent = (componentId: ComponentId): void => {
     // A hand edit is a note about card 7 of *this* pattern, so it does not
@@ -199,7 +230,7 @@ export function MotionStudio({
         // Dropping onto a card means that card, not "somewhere in the deck".
         const key = String(cardIndex)
         overrides[key] = { ...(overrides[key] ?? emptyOverride()), imageId: added[0].id }
-        setSelected(cardIndex)
+        setSelected({ kind: 'card', index: cardIndex })
       }
       patch({ overrides, visual: { ...doc.visual, images: [...doc.visual.images, ...added] } })
     } finally {
@@ -431,20 +462,37 @@ export function MotionStudio({
           phase={phase}
           onPhase={(p) => { setPlaying(false); setPhase(p) }}
           onChange={patch}
+          selected={selected}
+          onSelect={setSelected}
+          onRemove={removeLayer}
         />
         {selected !== null ? (
           <div className="flex shrink-0 items-center gap-2 px-3 pb-2 text-[11px] text-text-secondary">
-            <span>Card {selected + 1} selected</span>
-            <Hint label="Drag it to move, hold Alt to turn it, drop a picture on it." />
-            {!overrideIsEmpty(doc.overrides[String(selected)]) ? (
+            <span>{selectionLabel(doc, selected)}</span>
+            <Hint
+              label={selected.kind === 'card'
+                ? 'Drag it to move, hold Alt to turn it, drop a picture on it.'
+                : 'Drag it to move it. Delete removes it. Its settings are in the panel.'}
+            />
+            {selected.kind === 'card' ? (
+              !overrideIsEmpty(doc.overrides[String(selected.index)]) ? (
+                <button
+                  type="button"
+                  onClick={() => resetCard(selected.index)}
+                  className="rounded-sm px-1.5 py-0.5 text-text-muted hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                >
+                  Put it back
+                </button>
+              ) : null
+            ) : (
               <button
                 type="button"
-                onClick={() => resetCard(selected)}
-                className="rounded-sm px-1.5 py-0.5 text-text-muted hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                onClick={() => removeLayer(selected)}
+                className="rounded-sm px-1.5 py-0.5 text-text-muted hover:bg-raised hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
               >
-                Put it back
+                Remove
               </button>
-            ) : null}
+            )}
           </div>
         ) : null}
         {note ? (
@@ -486,7 +534,15 @@ export function MotionStudio({
         <div className="min-h-0 flex-1 overflow-y-auto">
           {tab === 'motion' ? <ParamsPanel doc={doc} onChange={patch} phase={phase} /> : null}
           {tab === 'visual' ? (
-            <VisualPanel doc={doc} onChange={patch} onImportImages={() => void importImages()} busy={busyImages} phase={phase} />
+            <VisualPanel
+              doc={doc}
+              onChange={patch}
+              onImportImages={() => void importImages()}
+              busy={busyImages}
+              phase={phase}
+              selected={selected}
+              onSelect={setSelected}
+            />
           ) : null}
           {tab === 'export' ? (
             <ExportPanel
@@ -601,4 +657,16 @@ function ExpandPanelGlyph(): React.JSX.Element {
       <path d="M13.5 3v10M6.5 5.5 9 8l-2.5 2.5M2.5 8H9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
+}
+
+/** What the status line says about the thing in hand. */
+function selectionLabel(doc: MotionDoc, pick: Pick): string {
+  if (pick.kind === 'card') return `Card ${pick.index + 1} selected`
+  if (pick.kind === 'text') {
+    const layer = doc.visual.text.find((l) => l.id === pick.id)
+    const first = layer?.text.trim().split('\n')[0] ?? ''
+    return first ? `Text: ${first.length > 32 ? `${first.slice(0, 32)}\u2026` : first}` : 'Text selected'
+  }
+  const i = doc.visual.logos.findIndex((l) => l.id === pick.id)
+  return `Logo ${i + 1} selected`
 }

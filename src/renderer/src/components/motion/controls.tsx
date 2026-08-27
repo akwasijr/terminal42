@@ -9,13 +9,13 @@
 // component declare its own parameters and get a working panel without any
 // panel code knowing it exists.
 
-import { useCallback, useId, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { IconChevronRight } from '../icons'
 import { useColorPicker } from './pickerContext'
 import { useBrandColours } from '../../lib/motion/brand'
 
 export function Section({
-  title, children, defaultOpen = false, onReset, right, badge
+  title, children, defaultOpen = false, onReset, right, badge, reveal = false
 }: {
   title: string
   children: ReactNode
@@ -23,8 +23,18 @@ export function Section({
   onReset?: () => void
   right?: ReactNode
   badge?: string
+  /**
+   * While true the section stays open regardless of what the user last did
+   * with it. Something outside the panel is pointing at what is inside — a
+   * layer picked on the frame — and a shut section would hide the very
+   * controls that selection was asking for.
+   */
+  reveal?: boolean
 }): React.JSX.Element {
   const [open, setOpen] = useState(defaultOpen)
+  useEffect(() => {
+    if (reveal) setOpen(true)
+  }, [reveal])
   return (
     <section className="flex flex-col">
       {/* The header is the whole row, so the target is the width of the panel

@@ -8,13 +8,17 @@
 import type { LogoLayer, MotionDoc } from '../../../../shared/motion/types'
 import { Section, SliderRow } from './controls'
 import type { Keyer } from '../../lib/motion/keying'
+import type { Pick } from '../../lib/motion/overlayPick'
 
 export function LogoSection({
-  doc, onChange, keyer
+  doc, onChange, keyer, selected = null, onSelect
 }: {
   doc: MotionDoc
   onChange: (patch: Partial<MotionDoc>) => void
   keyer?: Keyer
+  /** What is picked on the frame, so the matching logo shows itself. */
+  selected?: Pick | null
+  onSelect?: (pick: Pick | null) => void
 }): React.JSX.Element {
   const logos = doc.visual.logos
   const setLogos = (next: LogoLayer[]): void => onChange({ visual: { ...doc.visual, logos: next } })
@@ -24,6 +28,7 @@ export function LogoSection({
     <Section
       title="Logo"
       defaultOpen={false}
+      reveal={selected?.kind === 'logo'}
       right={
         <button
           type="button"
@@ -50,8 +55,13 @@ export function LogoSection({
       {logos.map((layer, i) => {
         const setLayer = (patch: Partial<LogoLayer>): void =>
           setLogos(logos.map((l, j) => (j === i ? { ...l, ...patch } : l)))
+        const isPicked = selected?.kind === 'logo' && selected.id === layer.id
         return (
-          <div key={layer.id} className="flex flex-col gap-2 rounded-md bg-sunken p-2">
+          <div
+            key={layer.id}
+            onPointerDownCapture={() => onSelect?.({ kind: 'logo', id: layer.id })}
+            className={`flex flex-col gap-2 rounded-md bg-sunken p-2 ${isPicked ? 'ring-1 ring-accent/60' : ''}`}
+          >
             <div className="flex items-center gap-1">
               <select
                 value={layer.imageId}

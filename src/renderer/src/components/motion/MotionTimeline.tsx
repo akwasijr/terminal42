@@ -25,22 +25,32 @@ import {
 import { EasingEditor } from './EasingEditor'
 import type { Easing } from '../../../../shared/motion/types'
 import { Hint } from '../Hint'
+import { samePick, type Pick } from '../../lib/motion/overlayPick'
 
 /** The three columns every row shares. Changing one here moves all of them. */
 const LABEL_W = 'w-[104px]'
-const TAIL_W = 'w-12'
+const TAIL_W = 'w-[68px]'
 
 export function MotionTimeline({
-  doc, phase, onPhase, onChange
+  doc, phase, onPhase, onChange, selected = null, onSelect, onRemove
 }: {
   doc: MotionDoc
   phase: number
   onPhase: (p: number) => void
   onChange: (patch: Partial<MotionDoc>) => void
+  /** What is selected on the frame, so the list can say which row that is. */
+  selected?: Pick | null
+  onSelect?: (pick: Pick | null) => void
+  onRemove?: (pick: Pick) => void
 }): React.JSX.Element {
   const targets = keyedTargets(doc.keys)
   const keys: Keyframes = doc.keys ?? {}
   const [open, setOpen] = useState(false)
+  // Selecting a caption on the frame and finding the layer list still closed
+  // would leave the app quietly disagreeing with itself about what is in hand.
+  useEffect(() => {
+    if (selected && selected.kind !== 'card') setOpen(true)
+  }, [selected])
 
   const text = doc.visual.text
   const logos = doc.visual.logos
@@ -96,6 +106,9 @@ export function MotionTimeline({
               span={t}
               phase={phase}
               onSpan={(patch) => setText(t.id, patch)}
+              selected={samePick(selected, { kind: 'text', id: t.id })}
+              onSelect={onSelect ? () => onSelect({ kind: 'text', id: t.id }) : undefined}
+              onRemove={onRemove ? () => onRemove({ kind: 'text', id: t.id }) : undefined}
             />
           ))}
           {logos.map((l, i) => (
@@ -106,6 +119,9 @@ export function MotionTimeline({
               span={l}
               phase={phase}
               onSpan={(patch) => setLogo(l.id, patch)}
+              selected={samePick(selected, { kind: 'logo', id: l.id })}
+              onSelect={onSelect ? () => onSelect({ kind: 'logo', id: l.id }) : undefined}
+              onRemove={onRemove ? () => onRemove({ kind: 'logo', id: l.id }) : undefined}
             />
           ))}
         </>
@@ -512,13 +528,16 @@ type LayerSpan = { from?: number; to?: number; fade?: number }
  * one span and reading it as two would suggest it could be moved apart.
  */
 function LayerRow({
-  label, kind, span, phase, onSpan
+  label, kind, span, phase, onSpan, selected = false, onSelect, onRemove
 }: {
   label: string
   kind: string
   span: LayerSpan
   phase: number
   onSpan: (patch: LayerSpan) => void
+  selected?: boolean
+  onSelect?: () => void
+  onRemove?: () => void
 }): React.JSX.Element {
   const lane = useRef<HTMLDivElement>(null)
   const drag = useRef<{ edge: 'from' | 'to' | 'body'; grabbed: number; from: number; to: number } | null>(null)
@@ -572,12 +591,20 @@ function LayerRow({
 
   return (
     <div className="flex items-center gap-2">
-      <span
+      <button
+        type="button"
+        onClick={onSelect}
+        disabled={!onSelect}
+        aria-pressed={selected}
         title={`${kind}: ${label}`}
-        className={`${LABEL_W} shrink-0 truncate px-1 text-[10.5px] ${on ? 'text-text-secondary' : 'text-text-muted'}`}
+        className={`${LABEL_W} shrink-0 truncate rounded-sm px-1 text-left text-[10.5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+          selected
+            ? 'bg-accent/15 text-accent'
+            : `${on ? 'text-text-secondary' : 'text-text-muted'} enabled:hover:bg-raised enabled:hover:text-text-primary`
+        }`}
       >
         {label}
-      </span>
+      </button>
       <div ref={lane} className="relative h-5 flex-1 overflow-hidden rounded-sm bg-sunken">
         {pieces.map((p, i) => (
           <span
@@ -633,8 +660,29 @@ function LayerRow({
         >
           ×
         </button>
+        {onRemove ? (
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label={`Delete ${label}`}
+            title={`Delete ${label}`}
+            className="rounded-sm px-0.5 py-0.5 leading-none text-text-muted hover:bg-raised hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+          >
+            <BinGlyph />
+          </button>
+        ) : null}
       </div>
     </div>
+  )
+}
+
+/** A bin, drawn small enough to sit in a lane's tail beside the other two. */
+function BinGlyph(): React.JSX.Element {
+  return (
+    <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden>
+      <path d="M2.5 3.5h7M5 3.5V2.5h2v1M3.5 3.5l.4 6a1 1 0 0 0 1 .9h2.2a1 1 0 0 0 1-.9l.4-6"
+        stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   )
 }
 
