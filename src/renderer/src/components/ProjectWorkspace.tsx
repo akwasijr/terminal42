@@ -392,7 +392,7 @@ export function ProjectWorkspace({
                 busy={busy}
                 hasMessages={hasMessages}
                 onCancel={() => { void window.terminal42.chat.cancel(active.id) }}
-                onSend={(text, agentMode) => { void window.terminal42.chat.send(active.id, text, model, null, agentMode) }}
+                onSend={(text, agentMode, prefix) => { void window.terminal42.chat.send(active.id, text, model, prefix, agentMode) }}
                 onAttachFile={() => void attach(active.id, false)}
                 onAttachImage={() => void attach(active.id, true)}
               />

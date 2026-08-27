@@ -8,6 +8,7 @@ import { useVoiceInput, formatVoiceTime, isVoiceInputSupported } from '../lib/vo
 import { analyzeGoalQuality, shouldShowGoalQualityHint } from '../../../shared/goalQuality'
 import { GoalHint } from './GoalHint'
 import { COMPOSER_FILL_EVENT } from './composerFill'
+import { TokensChip, useChatTokens } from './tokens/TokensChip'
 
 // Legacy local 2-mode type kept as a no-op so old localStorage entries don't crash.
 type Mode = AgentMode
@@ -35,11 +36,16 @@ export function Composer({
   busy?: boolean
   /** Switches the placeholder to a follow-up prompt once a turn has happened. */
   hasMessages?: boolean
-  onSend: (text: string, mode: AgentMode) => void
+  /**
+   * The prefix carries the attached token library. It is sent but not shown,
+   * so the transcript stays the conversation rather than the briefing.
+   */
+  onSend: (text: string, mode: AgentMode, prefix: string | null) => void
   onCancel?: () => void
   onAttachFile?: () => void
   onAttachImage?: () => void
 }) {
+  const tokens = useChatTokens(sessionId)
   const [body, setBody] = useState('')
   const [history, setHistory] = useState<string[]>([])
   const [historyIndex, setHistoryIndex] = useState<number | null>(null)
@@ -125,7 +131,7 @@ export function Composer({
   const send = async () => {
     const trimmed = body.trim()
     if (!trimmed) return
-    onSend(trimmed, mode)
+    onSend(trimmed, mode, tokens.prefix)
     await window.terminal42.composer.pushHistory(sessionId, trimmed)
     await window.terminal42.composer.saveDraft(sessionId, '')
     setHistory((h) => [trimmed, ...h])
@@ -231,6 +237,7 @@ export function Composer({
           ) : (
             <>
               {(onAttachFile || onAttachImage) && <AttachMenu onAttachFile={onAttachFile} onAttachImage={onAttachImage} />}
+              <TokensChip libraries={tokens.libraries} chosen={tokens.chosen} onChoose={tokens.choose} />
               <ModePicker value={mode} onChange={setMode} />
               <ModelDropdown
                 value={model}
