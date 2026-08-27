@@ -9,6 +9,7 @@ import { extractPptxFacts, pptxFactsToPrompt, type PptxFacts } from './pptx'
 import { pptxToPdf } from './render'
 import { getSettings } from './settings'
 import { lintHtml, buildFixPrompt } from './lintHtml'
+import { lintAgainstBasis, describeBasisFindings } from '../shared/tokens/lint'
 import { buildFoundationBlock } from './designFoundation'
 import { AI_RULES, formatRulesForPrompt } from '../renderer/src/lib/aiRules'
 import { formatBasisForPrompt, toCSS, toDTCG, toMarkdown } from '../shared/tokens/export'
@@ -272,6 +273,28 @@ export async function writeBasisFiles(cwd: string, brief: DesignBrief): Promise<
     await fs.writeFile(join(cwd, 'tokens.md'), toMarkdown(studio, themeId), 'utf8')
   } catch (err) {
     console.error('[design] could not write the bound library:', err)
+  }
+}
+
+/**
+ * What the finished page did with the library it was handed.
+ *
+ * Capped, because the point of the report is that somebody acts on it: a page
+ * that ignored the library entirely produces a hundred findings, and a hundred
+ * findings is the same as none. The loudest dozen are the ones worth fixing,
+ * and fixing them usually removes the rest.
+ */
+function lintBasis(html: string, brief: DesignBrief | null): { name: string; lines: string[] } {
+  const empty = { name: '', lines: [] as string[] }
+  if (!brief?.basisId) return empty
+  try {
+    const record = getTokenStudio(brief.basisId)
+    if (!record) return empty
+    const studio = hydrateStudio(record.studio)
+    const findings = lintAgainstBasis(html, studio, brief.basisThemeId ?? studio.activeTheme)
+    return { name: record.name, lines: describeBasisFindings(findings.slice(0, 12), record.name) }
+  } catch {
+    return empty
   }
 }
 
@@ -1117,11 +1140,22 @@ async function runAutoLint(win: BrowserWindow | null, designId: string): Promise
     ? Object.keys(d.brief.aiRules).filter((id) => d.brief!.aiRules![id] !== false)
     : null
   const violations = lintHtml(html, enforcedRules)
-  if (violations.length === 0) return
+  const drift = lintBasis(html, d.brief ?? null)
+  if (violations.length === 0 && drift.lines.length === 0) return
 
   const nextNum = (parseInt(latest.id.slice(1), 10) || 0) + 1
   const nextFile = `v${String(nextNum).padStart(3, '0')}.html`
-  const fixText = buildFixPrompt(violations, latest.fileName, nextFile)
+  let fixText = buildFixPrompt(violations, latest.fileName, nextFile)
+  if (drift.lines.length) {
+    fixText = [
+      fixText || `The current design in ${latest.fileName} does not use the ${drift.name} library it is bound to.`,
+      '',
+      `It is bound to the ${drift.name} token library, and these values are off it:`,
+      ...drift.lines.map((l) => `- ${l}`),
+      '',
+      `Replace each with the var(--…) it should have used, then save the result as ${nextFile}. The :root block in tokens.css defines every one of them; keep the layout, content and intent unchanged.`
+    ].join('\n')
+  }
 
   // Surface the lint result in the chat as a system message so the user
   // can see what was caught and what's being auto-corrected.
@@ -1129,7 +1163,13 @@ async function runAutoLint(win: BrowserWindow | null, designId: string): Promise
     id: randomUUID(),
     designId,
     role: 'system',
-    content: `Auto-fix: ${violations.length} style-rule violation${violations.length === 1 ? '' : 's'} detected in ${latest.fileName}. Generating ${nextFile} with corrections…\n\n${violations.map((v) => '• ' + v.message).join('\n')}`,
+    content: (() => {
+      const counted: string[] = []
+      if (violations.length) counted.push(`${violations.length} style-rule violation${violations.length === 1 ? '' : 's'}`)
+      if (drift.lines.length) counted.push(`${drift.lines.length} value${drift.lines.length === 1 ? '' : 's'} off the ${drift.name} library`)
+      const bullets = [...violations.map((v) => '• ' + v.message), ...drift.lines.map((l) => '• ' + l)]
+      return `Auto-fix: ${counted.join(' and ')} detected in ${latest.fileName}. Generating ${nextFile} with corrections…\n\n${bullets.join('\n')}`
+    })(),
     toolCalls: [],
     status: 'done',
     createdAt: Date.now(),
