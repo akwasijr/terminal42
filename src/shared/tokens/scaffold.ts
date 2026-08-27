@@ -449,5 +449,7 @@ export function studioFromFeel(name: string, feel: Feel): TokenStudio {
     }
   ]
 
-  return { id: id('ts'), name, sets, themes, activeTheme: 'light' }
+  // New libraries start at the bottom of the ladder; a team opts up when it
+  // decides it wants to.
+  return { id: id('ts'), name, sets, themes, activeTheme: 'light', enforcement: 'advise' }
 }

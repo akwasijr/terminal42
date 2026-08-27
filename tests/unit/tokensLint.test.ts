@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { lintAgainstBasis, describeBasisFindings, toRGB } from '../../src/shared/tokens/lint'
 import { studioFromFeel, type Feel } from '../../src/shared/tokens/scaffold'
 import { toCSS } from '../../src/shared/tokens/export'
+import { enforcementOf, emptyStudio, hydrateStudio } from '../../src/shared/tokens/types'
 
 /**
  * Reading a page back against its library.
@@ -135,5 +136,36 @@ describe('reading a colour', () => {
     expect(toRGB('teal')).toBeNull()
     expect(toRGB('#zzz')).toBeNull()
     expect(toRGB('')).toBeNull()
+  })
+})
+
+/**
+ * The enforcement ladder.
+ *
+ * The setting decides how far a finding travels, so the only thing worth
+ * pinning is the default, which is the one value nobody chooses on purpose.
+ */
+describe('what a library asks of its designs', () => {
+  it('reads a library made before the ladder existed as the strictest rung', () => {
+    // Not because strict is better, but because it is what the app already did
+    // to every bound design. Relaxing it silently while nobody was looking
+    // would be a worse surprise than a setting that appears already on.
+    expect(enforcementOf({})).toBe('block')
+    expect(enforcementOf(null)).toBe('block')
+    expect(enforcementOf({ enforcement: undefined })).toBe('block')
+  })
+
+  it('starts a new library at the bottom of the ladder', () => {
+    expect(enforcementOf(emptyStudio('New'))).toBe('advise')
+    expect(enforcementOf(studioFromFeel('New', FEEL))).toBe('advise')
+  })
+
+  it('keeps a choice through a save and a reload', () => {
+    const chosen = { ...emptyStudio('New'), enforcement: 'check' as const }
+    expect(enforcementOf(hydrateStudio(JSON.parse(JSON.stringify(chosen))))).toBe('check')
+  })
+
+  it('ignores a value that is not one of the three', () => {
+    expect(enforcementOf({ enforcement: 'whatever' as never })).toBe('block')
   })
 })

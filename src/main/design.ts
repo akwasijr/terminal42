@@ -13,7 +13,7 @@ import { lintAgainstBasis, describeBasisFindings } from '../shared/tokens/lint'
 import { buildFoundationBlock } from './designFoundation'
 import { AI_RULES, formatRulesForPrompt } from '../renderer/src/lib/aiRules'
 import { basisHash, formatBasisForPrompt, toCSS, toDTCG, toMarkdown } from '../shared/tokens/export'
-import { hydrateStudio } from '../shared/tokens/types'
+import { enforcementOf, hydrateStudio, type Enforcement } from '../shared/tokens/types'
 import { getTokenStudio } from './tokens'
 import { upsertManagedBlock } from './htmlBlocks'
 import { buildEngineBaseBlock, ENGINE_USAGE, ENGINE_BASE_ID, ENGINE_MOTION_ID } from './designAssets'
@@ -1182,8 +1182,18 @@ async function runAutoLint(win: BrowserWindow | null, designId: string): Promise
     ? Object.keys(d.brief.aiRules).filter((id) => d.brief!.aiRules![id] !== false)
     : null
   const violations = lintHtml(html, enforcedRules)
-  const drift = lintBasis(html, d.brief ?? null)
+  // The library's own setting decides how far its findings travel. Advise
+  // means the prompt was the whole of it, so there is nothing to look at
+  // afterwards; check and block both look, and only block acts.
+  const level = basisEnforcement(d.brief ?? null)
+  const drift = level === 'advise' ? { name: '', lines: [] as string[] } : lintBasis(html, d.brief ?? null)
   if (violations.length === 0 && drift.lines.length === 0) return
+
+  // Nothing to fix by hand and nothing the library wants fixed for us: report
+  // what was found and leave the design alone. Without this a library set to
+  // check would still spend a turn, which is the difference between the two
+  // rungs.
+  const fixing = violations.length > 0 || level === 'block'
 
   const nextNum = (parseInt(latest.id.slice(1), 10) || 0) + 1
   const nextFile = `v${String(nextNum).padStart(3, '0')}.html`
@@ -1210,7 +1220,10 @@ async function runAutoLint(win: BrowserWindow | null, designId: string): Promise
       if (violations.length) counted.push(`${violations.length} style-rule violation${violations.length === 1 ? '' : 's'}`)
       if (drift.lines.length) counted.push(`${drift.lines.length} value${drift.lines.length === 1 ? '' : 's'} off the ${drift.name} library`)
       const bullets = [...violations.map((v) => '• ' + v.message), ...drift.lines.map((l) => '• ' + l)]
-      return `Auto-fix: ${counted.join(' and ')} detected in ${latest.fileName}. Generating ${nextFile} with corrections…\n\n${bullets.join('\n')}`
+      const head = fixing
+        ? `Auto-fix: ${counted.join(' and ')} detected in ${latest.fileName}. Generating ${nextFile} with corrections…`
+        : `${counted.join(' and ')} in ${latest.fileName}. ${drift.name} is set to check, so this is a report rather than a change.`
+      return `${head}\n\n${bullets.join('\n')}`
     })(),
     toolCalls: [],
     status: 'done',
@@ -1219,7 +1232,26 @@ async function runAutoLint(win: BrowserWindow | null, designId: string): Promise
   insertMessage(sysMsg)
   emit(win, 'design:message', sysMsg)
 
+  if (!fixing) return
   await send(win, designId, fixText, { skipPrefix: true, isAutoFix: true })
+}
+
+/**
+ * What the library a design is bound to asks of it.
+ *
+ * `advise` for a design with no library, because a design that was never told
+ * anything cannot have disobeyed. Anything unreadable falls back the same way
+ * a missing library does elsewhere: quietly, without failing the run.
+ */
+function basisEnforcement(brief: DesignBrief | null): Enforcement {
+  if (!brief?.basisId) return 'advise'
+  try {
+    const record = getTokenStudio(brief.basisId)
+    if (!record) return 'advise'
+    return enforcementOf(hydrateStudio(record.studio))
+  } catch {
+    return 'advise'
+  }
 }
 
 function cancel(designId: string): boolean {

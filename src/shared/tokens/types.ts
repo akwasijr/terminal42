@@ -82,12 +82,37 @@ export type Theme = {
   sets: Record<string, SetState>
 }
 
+/**
+ * How hard a library leans on a design that is bound to it.
+ *
+ * There is no way to constrain what a language model emits, so "enforce"
+ * cannot mean guarantee. It means three escalating amounts of insistence, and
+ * a team picks which one it wants:
+ *
+ * - `advise`  — the names go into the prompt and that is all. The model is
+ *               told, and usually complies.
+ * - `check`   — after generating, the linter runs and what came out off-library
+ *               is counted and named on the design. It still saves.
+ * - `block`   — the same check, but the design is not left alone with it: a
+ *               follow-up turn is sent asking for the off-library values to be
+ *               replaced with the tokens they should have been.
+ */
+export type Enforcement = 'advise' | 'check' | 'block'
+
 export type TokenStudio = {
   id: string
   name: string
   sets: TokenSet[]
   themes: Theme[]
   activeTheme: string | null
+  /**
+   * Absent on a library made before the ladder existed, which is read as
+   * `block` — that is what the app already did to every bound design, and
+   * quietly relaxing it while nobody was looking would be a worse surprise
+   * than the setting appearing already switched on. New libraries start at
+   * `advise`, which is where a team should be asked to opt up from.
+   */
+  enforcement?: Enforcement
 }
 
 const ALIAS = /^\{([^{}]+)\}$/
@@ -111,8 +136,15 @@ export function emptyStudio(name: string): TokenStudio {
     name,
     sets: [{ id: setId, name: 'Core', order: 0, tokens: [] }],
     themes: [{ id: themeId, name: 'Default', sets: { [setId]: 'enabled' } }],
-    activeTheme: themeId
+    activeTheme: themeId,
+    enforcement: 'advise'
   }
+}
+
+/** What a library asks of its designs, defaulting the way an old one behaved. */
+export function enforcementOf(studio: Pick<TokenStudio, 'enforcement'> | null | undefined): Enforcement {
+  const e = studio?.enforcement
+  return e === 'advise' || e === 'check' || e === 'block' ? e : 'block'
 }
 
 /**
@@ -152,7 +184,8 @@ export function hydrateStudio(raw: unknown): TokenStudio {
     name: typeof r.name === 'string' ? r.name : blank.name,
     sets: sets.length > 0 ? sets : blank.sets,
     themes: themes.length > 0 ? themes : blank.themes,
-    activeTheme: sets.length > 0 && themes.length > 0 ? activeTheme : blank.activeTheme
+    activeTheme: sets.length > 0 && themes.length > 0 ? activeTheme : blank.activeTheme,
+    enforcement: enforcementOf(r)
   }
 }
 

@@ -30,7 +30,9 @@ import {
   type Tier,
   type Token,
   type TokenStudio,
-  type TokenValue
+  type TokenValue,
+  enforcementOf,
+  type Enforcement
 } from '../../../../shared/tokens/types'
 import { flatten, problems, resolve, type Problem } from '../../../../shared/tokens/resolve'
 import { familiesOf, leafOf, SECTIONS, sectionOf, type Family, type SectionId } from '../../../../shared/tokens/groups'
@@ -443,6 +445,7 @@ function StudioEditor({
             aria-label="Find a token"
             className="w-40 rounded-md bg-surface px-2.5 py-1 text-[11.5px] text-text-primary placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           />
+          <EnforcementPicker studio={studio} onChange={onChange} />
           <SendTo studio={studio} themeId={themeId} onDone={(msg) => {
             setNote(msg)
             window.setTimeout(() => setNote(null), 4000)
@@ -1183,6 +1186,44 @@ function TypeMenu({
  * Both destinations replace rather than merge. Two half-updated palettes is
  * the failure this whole feature exists to stop.
  */
+/**
+ * How hard this library leans on the designs bound to it.
+ *
+ * Three words rather than a switch, because the middle rung is the point: a
+ * two-state "enforce on/off" would force a team to choose between being told
+ * nothing and having a turn spent on their behalf, and most teams want to see
+ * the drift first and decide.
+ *
+ * Worded as what happens, not as a level name, because "check" means nothing
+ * on its own and the whole feature turns on knowing what it does.
+ */
+function EnforcementPicker({ studio, onChange }: { studio: TokenStudio; onChange: (s: TokenStudio) => void }): JSX.Element {
+  const current = enforcementOf(studio)
+  const options: { id: Enforcement; label: string; hint: string }[] = [
+    { id: 'advise', label: 'Advise', hint: 'Put the token names in the prompt and leave it there.' },
+    { id: 'check', label: 'Check', hint: 'Also count and name anything that came out off the library.' },
+    { id: 'block', label: 'Fix', hint: 'Also ask for the off-library values to be replaced.' }
+  ]
+  return (
+    <div className="flex items-center gap-0.5 rounded-md bg-surface p-0.5">
+      {options.map((o) => (
+        <button
+          key={o.id}
+          type="button"
+          title={o.hint}
+          aria-pressed={o.id === current}
+          onClick={() => onChange({ ...studio, enforcement: o.id })}
+          className={`rounded-sm px-2 py-1 text-[11px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+            o.id === current ? 'bg-raised text-text-primary' : 'text-text-muted hover:text-text-secondary'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function SendTo({
   studio, themeId, onDone
 }: {
