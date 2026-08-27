@@ -60,6 +60,18 @@ export type Tier = (typeof TIERS)[number]
  */
 export type TokenValue = string | number | Record<string, string | number>
 
+/**
+ * A token that still works but should stop being reached for.
+ *
+ * Deleting it would break every design that already names it, so the honest
+ * move is to leave it standing and say so. The message is the whole point:
+ * "don't use this" without "use that instead" is a dead end.
+ */
+export type Deprecation = {
+  severity: 'warning' | 'error'
+  message?: string
+}
+
 export type Token = {
   id: string
   /** Dot path. The path is the name. */
@@ -68,6 +80,13 @@ export type Token = {
   value: TokenValue
   description?: string
   tier: Tier
+  deprecated?: Deprecation
+  /**
+   * Anything another tool hung on this token. Carried in and back out
+   * untouched, because a field we do not understand is still somebody's
+   * Figma mapping and dropping it on a round trip loses their work.
+   */
+  extensions?: Record<string, unknown>
 }
 
 export type TokenSet = {

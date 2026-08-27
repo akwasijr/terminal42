@@ -16,12 +16,13 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { aliasCandidates, blankValue } from '../../../../shared/tokens/edit'
-import { aliasTarget, type Token, type TokenStudio, type TokenValue } from '../../../../shared/tokens/types'
+import { aliasTarget, type Deprecation, type Token, type TokenStudio, type TokenValue } from '../../../../shared/tokens/types'
 
 export type TokenEdit = {
   rename: (to: string) => void
   setValue: (v: TokenValue) => void
   setTarget: (target: string | null) => void
+  setDeprecated: (d: Deprecation | null) => void
   remove: () => void
 }
 
@@ -147,6 +148,34 @@ export function TokenInspector({
           which is {typeof resolved === 'object' ? 'a compound value' : String(resolved)}
         </p>
       ) : null}
+
+      {/* Retiring beats deleting: every design that already names this token
+          would break, and the point of saying so is to name the replacement. */}
+      <div className="mt-3">
+        <label className="flex items-center gap-2 text-[10.5px] text-text-secondary">
+          <input
+            type="checkbox"
+            checked={token.deprecated !== undefined}
+            onChange={(e) => edit.setDeprecated(e.target.checked ? { severity: 'warning' } : null)}
+            className="h-3 w-3 accent-current"
+          />
+          Stop reaching for this
+        </label>
+        {token.deprecated ? (
+          <input
+            value={token.deprecated.message ?? ''}
+            onChange={(e) =>
+              edit.setDeprecated({
+                severity: token.deprecated?.severity ?? 'warning',
+                ...(e.target.value ? { message: e.target.value } : {})
+              })
+            }
+            placeholder="Use colour.text.primary instead"
+            aria-label="What to use instead"
+            className="mt-1.5 w-full rounded-sm bg-sunken px-2 py-1.5 text-[11.5px] text-text-primary placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+          />
+        ) : null}
+      </div>
 
       <button
         type="button"

@@ -6,7 +6,7 @@
 // token that other tokens point at being the worst of them, can be tested
 // without a screen.
 
-import { aliasTarget, type Token, type TokenStudio, type TokenType, type TokenValue } from './types'
+import { aliasTarget, type Deprecation, type Token, type TokenStudio, type TokenType, type TokenValue } from './types'
 
 function mapSet(
   studio: TokenStudio,
@@ -116,6 +116,25 @@ export function addToken(
   const path = freePath(studio, setId, wantedPath)
   const token: Token = { id: path, path, type, tier, value: blankValue(type) }
   return { studio: mapSet(studio, setId, (tokens) => [...tokens, token]), path }
+}
+
+/** Mark a token as one to stop reaching for, or take the mark off again. */
+export function setDeprecated(
+  studio: TokenStudio,
+  setId: string,
+  path: string,
+  deprecated: Deprecation | null
+): TokenStudio {
+  return mapSet(studio, setId, (tokens) =>
+    tokens.map((t) => {
+      if (t.path !== path) return t
+      if (!deprecated) {
+        const { deprecated: _gone, ...rest } = t
+        return rest
+      }
+      return { ...t, deprecated }
+    })
+  )
 }
 
 /** Point a token at another one, or cut it loose with a literal of its own. */

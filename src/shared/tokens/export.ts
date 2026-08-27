@@ -55,7 +55,14 @@ function dtcgType(type: TokenType): string {
   return type
 }
 
-type Node = { [k: string]: Node | { $type: string; $value: TokenValue; $description?: string } }
+type Leaf = {
+  $type: string
+  $value: TokenValue
+  $description?: string
+  $deprecated?: { severity: string; message?: string }
+  $extensions?: Record<string, unknown>
+}
+type Node = { [k: string]: Node | Leaf }
 
 /**
  * The theme as a DTCG document.
@@ -73,7 +80,9 @@ export function toDTCG(studio: TokenStudio, themeId: string | null): string {
     place(root, path.split('.'), {
       $type: dtcgType(hit.token.type),
       $value: hit.value,
-      ...(hit.token.description ? { $description: hit.token.description } : {})
+      ...(hit.token.description ? { $description: hit.token.description } : {}),
+      ...(hit.token.deprecated ? { $deprecated: hit.token.deprecated } : {}),
+      ...(hit.token.extensions ? { $extensions: hit.token.extensions } : {})
     })
   }
   return `${JSON.stringify(root, null, 2)}\n`
@@ -244,6 +253,10 @@ export function formatTokensForPrompt(studio: TokenStudio, themeId: string | nul
     const hit = all.get(path)
     if (!hit || !exported(theme, hit.setId)) continue
     if (hit.token.tier === 'primitive') continue
+    // A deprecated token is left out of the prompt entirely. Naming it and
+    // asking the model not to use it is an invitation; not naming it is the
+    // only reliable way to stop it appearing in generated work.
+    if (hit.token.deprecated) continue
     const section = sectionOf(hit.token)
     const entry = `--${cssName(path)} (${cssValue(hit.token.type, hit.value)})`
     const list = groups.get(section)

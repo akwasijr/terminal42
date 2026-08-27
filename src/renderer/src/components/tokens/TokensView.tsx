@@ -36,7 +36,7 @@ import {
 } from '../../../../shared/tokens/types'
 import { flatten, problems, resolve, type Problem } from '../../../../shared/tokens/resolve'
 import { familiesOf, leafOf, SECTIONS, sectionOf, type Family, type SectionId } from '../../../../shared/tokens/groups'
-import { addToken, blankValue, deleteToken, renameToken, setAlias, setTokenValue } from '../../../../shared/tokens/edit'
+import { addToken, blankValue, deleteToken, renameToken, setAlias, setDeprecated, setTokenValue } from '../../../../shared/tokens/edit'
 import { bridgeSummary, brandItems } from '../../../../shared/tokens/bridges'
 import { cloneStudio } from '../../../../shared/tokens/scaffold'
 import { fromTokensText } from '../../../../shared/tokens/import'
@@ -658,6 +658,8 @@ function StudioEditor({
                       : blankValue(selectedToken.token.type)
                   )
                 ),
+              setDeprecated: (d) =>
+                onChange(setDeprecated(studio, selectedToken.setId, selectedToken.token.path, d)),
               remove: () => {
                 onChange(deleteToken(studio, selectedToken.setId, selectedToken.token.path))
                 setSelected(null)
@@ -787,7 +789,14 @@ function FamilyRow({
                       <Specimen token={hit.token} value={r.ok ? r.value : null} />
                     </span>
                     <span className="shrink-0 text-right">
-                      <span className="block text-[10.5px] text-text-secondary">{leafOf(path)}</span>
+                      <span
+                        className={`block text-[10.5px] ${
+                          hit.token.deprecated ? 'text-text-muted line-through' : 'text-text-secondary'
+                        }`}
+                        title={hit.token.deprecated?.message ?? undefined}
+                      >
+                        {leafOf(path)}
+                      </span>
                       <span className="block text-[9.5px] text-text-muted">{caption}</span>
                     </span>
                   </button>
@@ -807,7 +816,12 @@ function FamilyRow({
                   } ${selected === path ? 'bg-raised' : 'hover:bg-raised'}`}
                 >
                   <TokenMark token={hit.token} value={r.ok ? r.value : null} />
-                  <span className="mt-1.5 block truncate text-[10.5px] text-text-secondary">
+                  <span
+                    className={`mt-1.5 block truncate text-[10.5px] ${
+                      hit.token.deprecated ? 'text-text-muted line-through' : 'text-text-secondary'
+                    }`}
+                    title={hit.token.deprecated?.message ?? undefined}
+                  >
                     {leafOf(path)}
                   </span>
                   <span className="block truncate text-[9.5px] text-text-muted">{caption}</span>

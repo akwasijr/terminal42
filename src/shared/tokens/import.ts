@@ -74,7 +74,13 @@ const TYPE_ALIASES: Record<string, TokenType> = {
 /** The types we carry in under a different name, so the note can say so. */
 const NOT_OURS = new Set(['other', 'string', 'transition', 'sizing', 'spacing', 'borderradius', 'borderwidth', 'paragraphspacing', 'paragraphindent', 'boxshadow', 'fontfamilies', 'fontweights', 'fontsizes', 'lineheights', 'colour', 'size', 'space'])
 
-type Leaf = { type: string | null; value: TokenValue; description?: string }
+type Leaf = {
+  type: string | null
+  value: TokenValue
+  description?: string
+  deprecated?: { severity: 'warning' | 'error'; message?: string }
+  extensions?: Record<string, unknown>
+}
 
 /** Whether an object is a token rather than a group of tokens. */
 function leafOf(node: Record<string, unknown>): Leaf | null {
@@ -83,11 +89,29 @@ function leafOf(node: Record<string, unknown>): Leaf | null {
   if (value === undefined) return null
   const rawType = has('$type') ? node.$type : has('type') ? node.type : null
   const desc = has('$description') ? node.$description : has('description') ? node.description : undefined
+  const dep = has('$deprecated') ? node.$deprecated : has('deprecated') ? node.deprecated : undefined
+  const ext = has('$extensions') ? node.$extensions : has('extensions') ? node.extensions : undefined
   return {
     type: typeof rawType === 'string' ? rawType : null,
     value: value as TokenValue,
-    description: typeof desc === 'string' && desc.length > 0 ? desc : undefined
+    description: typeof desc === 'string' && desc.length > 0 ? desc : undefined,
+    deprecated: deprecationOf(dep),
+    extensions: typeof ext === 'object' && ext !== null ? (ext as Record<string, unknown>) : undefined
   }
+}
+
+/**
+ * A deprecation, however the file spelled it.
+ *
+ * `true` is the short form some files use, and it means the same thing at the
+ * lower severity; anything unreadable is dropped rather than guessed at.
+ */
+function deprecationOf(raw: unknown): { severity: 'warning' | 'error'; message?: string } | undefined {
+  if (raw === true) return { severity: 'warning' }
+  if (typeof raw !== 'object' || raw === null) return undefined
+  const d = raw as Record<string, unknown>
+  const message = typeof d.message === 'string' && d.message.length > 0 ? d.message : undefined
+  return { severity: d.severity === 'error' ? 'error' : 'warning', ...(message ? { message } : {}) }
 }
 
 /** Our type for a file's type name, and whether the name was one of ours. */
@@ -159,7 +183,9 @@ function tokensFrom(leaves: Map<string, Leaf>, notes: Set<string>): Token[] {
       type,
       value: leaf.value,
       tier: tierFor(leaf.value, isAliasPath),
-      ...(leaf.description ? { description: leaf.description } : {})
+      ...(leaf.description ? { description: leaf.description } : {}),
+      ...(leaf.deprecated ? { deprecated: leaf.deprecated } : {}),
+      ...(leaf.extensions ? { extensions: leaf.extensions } : {})
     })
   }
   return out.sort((a, b) => a.path.localeCompare(b.path))
