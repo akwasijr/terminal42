@@ -52,7 +52,7 @@ describe('studioFromFeel', () => {
   const studio = studioFromFeel('Test', FEEL)
 
   it('builds four sets and two themes', () => {
-    expect(studio.sets.map((s) => s.name)).toEqual(['Palette', 'Light', 'Dark', 'Parts'])
+    expect(studio.sets.map((s) => s.name)).toEqual(['Palette', 'Shape', 'Light', 'Dark', 'Parts'])
     expect(studio.themes.map((t) => t.name)).toEqual(['Light', 'Dark'])
   })
 
@@ -65,7 +65,14 @@ describe('studioFromFeel', () => {
     for (const set of studio.sets) {
       for (const t of set.tokens) {
         if (t.tier === 'primitive') continue
-        expect(isAlias(t.value), `${t.path} is a literal`).toBe(true)
+        // A composite counts as pointing somewhere if any of its fields does:
+        // `type.body` names a family, a size and a weight by their token names.
+        const points =
+          isAlias(t.value) ||
+          (typeof t.value === 'object' &&
+            t.value !== null &&
+            Object.values(t.value).some((v) => isAlias(v)))
+        expect(points, `${t.path} is a literal`).toBe(true)
       }
     }
   })
@@ -82,8 +89,8 @@ describe('studioFromFeel', () => {
   it('gives the two themes different backgrounds from the same token', () => {
     const light = flatten(studio, 'light')
     const dark = flatten(studio, 'dark')
-    const a = resolve(light, 'colour.background')
-    const b = resolve(dark, 'colour.background')
+    const a = resolve(light, 'colour.bg.canvas')
+    const b = resolve(dark, 'colour.bg.canvas')
     expect(a.ok && b.ok && a.value !== b.value).toBe(true)
   })
 
@@ -95,7 +102,7 @@ describe('studioFromFeel', () => {
       return r.ok ? r.value : null
     }
     expect(Number(at(tight, 'corner.control'))).toBeLessThan(Number(at(round, 'corner.control')))
-    expect(Number(at(tight, 'gap.wide'))).toBeLessThan(Number(at(round, 'gap.wide')))
+    expect(Number(at(tight, 'gap.xl'))).toBeLessThan(Number(at(round, 'gap.xl')))
   })
 
   it('does not export the palette, only what points at it', () => {
@@ -106,5 +113,54 @@ describe('studioFromFeel', () => {
 
   it('exports the same bytes twice running', () => {
     expect(toDTCG(studio, 'light')).toBe(toDTCG(studioFromFeel('Test', FEEL), 'light'))
+  })
+
+  it('keeps the colour shelf to a size a person could name', () => {
+    // The complaint that started this: seventy-seven shades, most of which
+    // nobody chose on purpose. Full ramps only where you truly step through
+    // them, five steps everywhere else.
+    const primitives = studio.sets[0].tokens.filter((t) => t.type === 'color')
+    expect(primitives.length).toBeLessThan(55)
+    const stepsOf = (name: string): number =>
+      primitives.filter((t) => t.path.startsWith(`palette.${name}.`)).length
+    expect(stepsOf('neutral')).toBe(11)
+    expect(stepsOf('brand')).toBe(11)
+    for (const n of ['accent', 'success', 'warning', 'danger', 'info']) {
+      expect(stepsOf(n), n).toBe(5)
+    }
+  })
+
+  it('says every text style as one thing rather than five', () => {
+    const shape = studio.sets.find((s) => s.name === 'Shape')
+    const body = shape?.tokens.find((t) => t.path === 'type.body')
+    expect(body?.type).toBe('typography')
+    expect(Object.keys(body?.value as object).sort()).toEqual([
+      'fontFamily',
+      'fontSize',
+      'fontWeight',
+      'letterSpacing',
+      'lineHeight'
+    ])
+  })
+
+  it('changes only colour between the two themes', () => {
+    // The point of a separate Shape set: a change to the type scale is made
+    // once, and light and dark cannot drift apart on anything but colour.
+    const only = (theme: string): string[] =>
+      studio.sets
+        .filter((s) => studio.themes.find((t) => t.id === theme)?.sets[s.id] === 'enabled')
+        .map((s) => s.name)
+        .sort()
+    const light = only('light')
+    const dark = only('dark')
+    expect(light.filter((n) => !dark.includes(n))).toEqual(['Light'])
+    expect(dark.filter((n) => !light.includes(n))).toEqual(['Dark'])
+  })
+
+  it('gives motion a curve as well as a length', () => {
+    const map = flatten(studio, 'light')
+    const r = resolve(map, 'motion.enter')
+    expect(r.ok).toBe(true)
+    expect(r.ok && typeof r.value === 'object').toBe(true)
   })
 })

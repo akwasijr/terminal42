@@ -1,18 +1,24 @@
-// The token studio: a grid of what the tokens look like, not a tree of names.
+// Basis: the shared library a team and its agents both work from.
 //
 // A token is a value with a name, and of the two the value is the one you
 // recognise. So a colour is drawn as a colour, a spacing as a bar at its true
 // width, a size as a line of type set at it. The name goes underneath, small.
 // A tree of dot paths would be truthful and useless.
 //
-// Tier is a filter rather than a folder, because a token belongs to exactly
-// one tier and nothing on screen is ever more than one level deep.
+// The screen is organised by category, not by tier, because nobody arrives
+// thinking "show me the semantic tier": they arrive needing a colour, or
+// wanting to know what the body font is. Tier is a lens inside each category
+// instead, and it opens on the names people actually reference rather than on
+// the raw shelf underneath them.
+//
+// A family is drawn once. Eleven steps of a ramp are one strip, not eleven
+// tiles, which is the difference between a library and a wall of colour.
 //
 // Selecting a token dims everything except what it points at and what points
 // at it. That one gesture is the whole idea of aliasing, and it teaches it
 // faster than any amount of writing on the subject.
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { TokensSetup } from './TokensSetup'
 import {
   hydrateStudio,
@@ -27,6 +33,7 @@ import {
   type TokenValue
 } from '../../../../shared/tokens/types'
 import { flatten, problems, resolve, type Problem } from '../../../../shared/tokens/resolve'
+import { familiesOf, leafOf, SECTIONS, sectionOf, type Family, type SectionId } from '../../../../shared/tokens/groups'
 import { addToken, blankValue, deleteToken, renameToken, setAlias, setTokenValue } from '../../../../shared/tokens/edit'
 import { TokenInspector } from './TokenInspector'
 import { ColorPicker, type PickerRequest } from '../ColorPicker'
@@ -177,6 +184,35 @@ function StudioMark({ studio }: { studio: TokenStudio }): React.JSX.Element {
   )
 }
 
+/**
+ * How tall the editor can be without the page scrolling behind it.
+ *
+ * The shell has to be pinned for any of this to work, and pinning needs a
+ * definite height. The surrounding page is a normal scrolling document, so
+ * rather than guess at a constant that breaks the moment a header changes,
+ * the editor measures where it starts and takes the rest of the window.
+ */
+function useFillHeight(): [React.RefObject<HTMLDivElement>, number | undefined] {
+  const ref = useRef<HTMLDivElement>(null)
+  const [h, setH] = useState<number | undefined>(undefined)
+  useEffect(() => {
+    const read = (): void => {
+      const el = ref.current
+      if (!el) return
+      setH(Math.max(360, window.innerHeight - el.getBoundingClientRect().top - 24))
+    }
+    read()
+    window.addEventListener('resize', read)
+    return () => window.removeEventListener('resize', read)
+  }, [])
+  return [ref, h]
+}
+
+/** The three ways to look at a category. `use` is the default and the point. */
+type Lens = 'use' | 'raw' | 'all'
+
+const LENS_LABEL: Record<Lens, string> = { use: 'In use', raw: 'Raw', all: 'All' }
+
 function StudioEditor({
   studio,
   onChange,
@@ -188,25 +224,22 @@ function StudioEditor({
   onRename: (name: string) => void
   onClose: () => void
 }): React.JSX.Element {
-  const [tier, setTier] = useState<Tier | 'all'>('all')
+  const [lens, setLens] = useState<Record<string, Lens>>({})
   const [selected, setSelected] = useState<string | null>(null)
   const [picker, setPicker] = useState<PickerRequest | null>(null)
   const [adding, setAdding] = useState<{ setId: string; rect: DOMRect } | null>(null)
   const [onlyProblems, setOnlyProblems] = useState(false)
+  const [search, setSearch] = useState('')
   const [note, setNote] = useState<string | null>(null)
+  const [showSets, setShowSets] = useState(false)
+  const [here, setHere] = useState<SectionId>('colour')
+  const [shell, height] = useFillHeight()
+  const scroller = useRef<HTMLDivElement>(null)
 
   const themeId = studio.activeTheme
   const map = useMemo(() => flatten(studio, themeId), [studio, themeId])
   const found = useMemo(() => problems(studio, themeId), [studio, themeId])
   const problemPaths = useMemo(() => new Set(found.map((p) => p.path)), [found])
-
-  const paths = useMemo(() => {
-    return [...map.keys()].sort().filter((p) => {
-      if (onlyProblems && !problemPaths.has(p)) return false
-      if (tier !== 'all' && map.get(p)?.token.tier !== tier) return false
-      return true
-    })
-  }, [map, tier, onlyProblems, problemPaths])
 
   const selectedToken = selected ? (map.get(selected) ?? null) : null
   const selectedResolved = useMemo(() => {
@@ -237,6 +270,72 @@ function StudioEditor({
     }
     return set
   }, [map, selected])
+
+  /** Every token of the theme, split into the sections, before the lens. */
+  const sections = useMemo(() => {
+    const by = new Map<SectionId, Array<{ path: string; type: TokenType; tier: Tier }>>()
+    const needle = search.trim().toLowerCase()
+    for (const [path, hit] of map) {
+      if (onlyProblems && !problemPaths.has(path)) continue
+      if (needle && !path.toLowerCase().includes(needle)) continue
+      const id = sectionOf(hit.token)
+      const list = by.get(id)
+      const entry = { path, type: hit.token.type, tier: hit.token.tier }
+      if (list) list.push(entry)
+      else by.set(id, [entry])
+    }
+    return by
+  }, [map, onlyProblems, problemPaths, search])
+
+  const lensOf = (id: SectionId): Lens => lens[id] ?? 'use'
+
+  const visible = (id: SectionId): Family[] => {
+    const all = sections.get(id) ?? []
+    const l = lensOf(id)
+    const kept =
+      l === 'all'
+        ? all
+        : l === 'raw'
+          ? all.filter((t) => t.tier === 'primitive')
+          : all.filter((t) => t.tier !== 'primitive')
+    // A search or a problem filter is an explicit request; honouring the lens
+    // on top of it would hide the very thing that was asked for.
+    return familiesOf(kept.length === 0 && (search || onlyProblems) ? all : kept)
+  }
+
+  const jump = (id: SectionId): void => {
+    setHere(id)
+    const root = scroller.current
+    const el = root?.querySelector<HTMLElement>(`#basis-${id}`)
+    if (!root || !el) return
+    // Scrolled by hand rather than with scrollIntoView, which walks every
+    // scrollable ancestor and so dragged the whole page up, taking the header
+    // and the nav with it. Only this box should move.
+    root.scrollTo({ top: el.offsetTop - root.offsetTop, behavior: 'smooth' })
+  }
+
+  // Which section the reader is actually in, so the nav is a position rather
+  // than a memory of the last thing clicked.
+  //
+  // Read from the scroll position rather than from an intersection observer:
+  // "the last section whose top has passed the top of the view" is exactly
+  // the question being asked, and an observer only ever answers it indirectly,
+  // through a margin that has to be tuned and is wrong on the first paint.
+  useEffect(() => {
+    const root = scroller.current
+    if (!root) return
+    const read = (): void => {
+      const edge = root.getBoundingClientRect().top + 4
+      let at: SectionId | null = null
+      for (const el of root.querySelectorAll<HTMLElement>('[id^="basis-"]')) {
+        if (el.getBoundingClientRect().top <= edge) at = el.id.replace('basis-', '') as SectionId
+      }
+      setHere(at ?? (root.querySelector('[id^="basis-"]')?.id.replace('basis-', '') as SectionId))
+    }
+    read()
+    root.addEventListener('scroll', read, { passive: true })
+    return () => root.removeEventListener('scroll', read)
+  }, [sections])
 
   const setSetState = (setId: string, state: 'off' | 'source' | 'enabled'): void => {
     onChange({
@@ -283,9 +382,11 @@ function StudioEditor({
     window.setTimeout(() => setNote(null), 4000)
   }
 
+  const filled = SECTIONS.filter((s) => (sections.get(s.id) ?? []).length > 0)
+
   return (
-    <div className="flex flex-col gap-3">
-      <header className="flex items-center gap-2">
+    <div ref={shell} style={{ height }} className="flex flex-col gap-2">
+      <header className="flex shrink-0 items-center gap-2">
         <button
           type="button"
           onClick={onClose}
@@ -296,11 +397,11 @@ function StudioEditor({
         <input
           value={studio.name}
           onChange={(e) => onRename(e.target.value)}
-          aria-label="Studio name"
-          className="w-56 min-w-0 rounded-sm bg-transparent px-1 py-0.5 text-[13px] text-text-primary hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+          aria-label="Library name"
+          className="w-52 min-w-0 rounded-sm bg-transparent px-1 py-0.5 text-[13px] text-text-primary hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
         />
 
-        <div className="ml-2 flex items-center gap-1">
+        <div className="ml-1 flex items-center gap-1">
           {studio.themes.map((t) => (
             <button
               key={t.id}
@@ -326,165 +427,191 @@ function StudioEditor({
           </button>
         </div>
 
-        <div className="ml-auto flex items-center gap-1">
-          {(['all', ...TIERS] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTier(t)}
-              aria-pressed={tier === t}
-              className={`rounded-md px-2 py-1 text-[11px] capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
-                tier === t
-                  ? 'bg-raised text-text-primary'
-                  : 'text-text-muted hover:bg-raised hover:text-text-secondary'
-              }`}
-            >
-              {t}
-            </button>
-          ))}
+        <div className="ml-auto flex items-center gap-1.5">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Find a token"
+            aria-label="Find a token"
+            className="w-40 rounded-md bg-surface px-2.5 py-1 text-[11.5px] text-text-primary placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+          />
           <button
             type="button"
             onClick={() => void exportFiles()}
-            className="ml-2 rounded-md bg-action px-2.5 py-1 text-[11.5px] font-medium text-action-text hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            className="rounded-md bg-action px-2.5 py-1 text-[11.5px] font-medium text-action-text hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           >
             Export
           </button>
         </div>
       </header>
 
-      <div className="flex min-h-0 gap-3">
-        <aside className="w-48 shrink-0 rounded-panel bg-surface p-2">
-          <div className="flex items-center justify-between px-1 pb-1">
-            <span className="text-[11px] text-text-secondary">Sets</span>
+      <div className="flex min-h-0 flex-1 gap-2">
+        <nav
+          aria-label="Sections"
+          className="flex w-36 shrink-0 flex-col gap-0.5 overflow-y-auto rounded-panel bg-surface p-2"
+        >
+          {filled.map((s) => (
             <button
+              key={s.id}
               type="button"
-              onClick={addSet}
-              aria-label="Add a set"
-              className="rounded-sm px-1.5 text-[12px] leading-none text-text-muted hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+              onClick={() => jump(s.id)}
+              aria-current={here === s.id ? 'true' : undefined}
+              className={`rounded-sm px-2 py-1 text-left text-[11.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                here === s.id
+                  ? 'bg-raised text-text-primary'
+                  : 'text-text-muted hover:bg-raised hover:text-text-secondary'
+              }`}
             >
-              +
+              {s.label}
             </button>
-          </div>
-          <ul className="flex flex-col gap-0.5">
-            {[...studio.sets]
-              .sort((a, b) => a.order - b.order)
-              .map((s) => {
-                const state = studio.themes.find((t) => t.id === themeId)?.sets[s.id] ?? 'off'
-                return (
-                  <li
-                    key={s.id}
-                    className="group/set flex items-center gap-1 rounded-sm px-1.5 py-1 hover:bg-raised"
-                  >
-                    <span className="min-w-0 flex-1 truncate text-[11.5px] text-text-secondary">
-                      {s.name}
-                    </span>
-                    <span className="text-[10px] tabular-nums text-text-muted">{s.tokens.length}</span>
-                    <button
-                      type="button"
-                      onClick={(e) => setAdding({ setId: s.id, rect: e.currentTarget.getBoundingClientRect() })}
-                      aria-label={`Add a token to ${s.name}`}
-                      className="rounded-sm px-1 text-[12px] leading-none text-text-muted opacity-0 hover:text-text-primary focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 group-hover/set:opacity-100"
-                    >
-                      +
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setSetState(
-                          s.id,
-                          state === 'enabled' ? 'source' : state === 'source' ? 'off' : 'enabled'
-                        )
-                      }
-                      aria-label={`${s.name} is ${STATE_WORD[state]}`}
-                      title={STATE_NOTE[state]}
-                      className={`h-3 w-3 shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${STATE_DOT[state]}`}
-                    />
-                  </li>
-                )
-              })}
-          </ul>
-        </aside>
+          ))}
 
-        <section className="min-w-0 flex-1 rounded-panel bg-surface p-3">
-          {paths.length === 0 ? (
-            <p className="px-2 py-10 text-center text-[12px] text-text-muted">
-              {onlyProblems ? 'Nothing wrong here.' : 'No tokens in this theme yet.'}
+          <button
+            type="button"
+            onClick={() => setShowSets((v) => !v)}
+            aria-expanded={showSets}
+            className="mt-3 rounded-sm px-2 py-1 text-left text-[11.5px] text-text-muted transition-colors hover:bg-raised hover:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+          >
+            Sets
+          </button>
+          {showSets ? (
+            <ul className="flex flex-col gap-0.5">
+              {[...studio.sets]
+                .sort((a, b) => a.order - b.order)
+                .map((s) => {
+                  const state = studio.themes.find((t) => t.id === themeId)?.sets[s.id] ?? 'off'
+                  return (
+                    <li
+                      key={s.id}
+                      className="group/set flex items-center gap-1 rounded-sm px-2 py-1 hover:bg-raised"
+                    >
+                      <span className="min-w-0 flex-1 truncate text-[11px] text-text-secondary">
+                        {s.name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => setAdding({ setId: s.id, rect: e.currentTarget.getBoundingClientRect() })}
+                        aria-label={`Add a token to ${s.name}`}
+                        className="rounded-sm px-1 text-[12px] leading-none text-text-muted opacity-0 hover:text-text-primary focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 group-hover/set:opacity-100"
+                      >
+                        +
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSetState(
+                            s.id,
+                            state === 'enabled' ? 'source' : state === 'source' ? 'off' : 'enabled'
+                          )
+                        }
+                        aria-label={`${s.name} is ${STATE_WORD[state]}`}
+                        title={STATE_NOTE[state]}
+                        className={`h-2.5 w-2.5 shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${STATE_DOT[state]}`}
+                      />
+                    </li>
+                  )
+                })}
+              <li>
+                <button
+                  type="button"
+                  onClick={addSet}
+                  className="w-full rounded-sm px-2 py-1 text-left text-[11px] text-text-muted hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                >
+                  Add a set
+                </button>
+              </li>
+            </ul>
+          ) : null}
+        </nav>
+
+        <div
+          ref={scroller}
+          className="min-w-0 flex-1 overflow-y-auto rounded-panel bg-surface"
+        >
+          {filled.length === 0 ? (
+            <p className="px-2 py-16 text-center text-[12px] text-text-muted">
+              {onlyProblems ? 'Nothing wrong here.' : search ? 'No token by that name.' : 'Nothing in this theme yet.'}
             </p>
           ) : (
-            <ul className="grid grid-cols-[repeat(auto-fill,minmax(96px,1fr))] gap-3">
-              {paths.map((path) => {
-                const hit = map.get(path)
-                if (!hit) return null
-                const r = resolve(map, path)
-                const dim = related !== null && !related.has(path)
-                return (
-                  <li key={path}>
-                    <button
-                      type="button"
-                      data-token-swatch=""
-                      data-token-path={path}
-                      onClick={() => setSelected((c) => (c === path ? null : path))}
-                      aria-pressed={selected === path}
-                      className={`w-full rounded-md p-1 text-left transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
-                        dim ? 'opacity-25' : 'opacity-100'
-                      } ${selected === path ? 'bg-raised' : 'hover:bg-raised'}`}
-                    >
-                      <TokenMark token={hit.token} value={r.ok ? r.value : null} />
-                      <span className="mt-1.5 block truncate text-[10.5px] text-text-secondary">
-                        {leaf(path)}
-                      </span>
-                      <span className="block truncate text-[9.5px] text-text-muted">
-                        {isAlias(hit.token.value)
-                          ? aliasTarget(hit.token.value)
-                          : shortValue(r.ok ? r.value : hit.token.value)}
-                      </span>
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
+            filled.map((s) => (
+              <section key={s.id} id={`basis-${s.id}`}>
+                <div className="sticky top-0 z-10 flex items-center gap-2 bg-surface px-3 py-2">
+                  <h2 className="text-[12.5px] font-medium text-text-primary">{s.label}</h2>
+                  <div className="ml-auto flex items-center gap-0.5">
+                    {(['use', 'raw', 'all'] as const).map((l) => (
+                      <button
+                        key={l}
+                        type="button"
+                        onClick={() => setLens((c) => ({ ...c, [s.id]: l }))}
+                        aria-pressed={lensOf(s.id) === l}
+                        className={`rounded-sm px-1.5 py-0.5 text-[10.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                          lensOf(s.id) === l
+                            ? 'bg-raised text-text-primary'
+                            : 'text-text-muted hover:text-text-secondary'
+                        }`}
+                      >
+                        {LENS_LABEL[l]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-3 px-3 pb-5">
+                  {visible(s.id).map((f) => (
+                    <FamilyRow
+                      key={f.id}
+                      family={f}
+                      hideLabel={f.label.toLowerCase() === s.label.toLowerCase()}
+                      map={map}
+                      related={related}
+                      selected={selected}
+                      onSelect={(p) => setSelected((c) => (c === p ? null : p))}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))
           )}
-        </section>
-      </div>
+        </div>
 
-      {selectedToken ? (
-        <TokenInspector
-          studio={studio}
-          token={selectedToken.token}
-          setName={studio.sets.find((x) => x.id === selectedToken.setId)?.name ?? ''}
-          resolved={selectedResolved}
-          onClose={() => setSelected(null)}
-          onPickColour={(hex, rect, cb) =>
-            setPicker({
-              value: hex,
-              opacity: 1,
-              anchor: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
-              onChange: (next) => cb(next),
-              onClose: () => setPicker(null)
-            })
-          }
-          edit={{
-            rename: (to) => onChange(renameToken(studio, selectedToken.setId, selectedToken.token.path, to)),
-            setValue: (v) => onChange(setTokenValue(studio, selectedToken.setId, selectedToken.token.path, v)),
-            setTarget: (target) =>
-              onChange(
-                setAlias(
-                  studio,
-                  selectedToken.setId,
-                  selectedToken.token.path,
-                  target,
-                  selectedResolved !== null && typeof selectedResolved !== 'object'
-                    ? selectedResolved
-                    : blankValue(selectedToken.token.type)
-                )
-              ),
-            remove: () => {
-              onChange(deleteToken(studio, selectedToken.setId, selectedToken.token.path))
-              setSelected(null)
+        {selectedToken ? (
+          <TokenInspector
+            studio={studio}
+            token={selectedToken.token}
+            setName={studio.sets.find((x) => x.id === selectedToken.setId)?.name ?? ''}
+            resolved={selectedResolved}
+            onClose={() => setSelected(null)}
+            onPickColour={(hex, rect, cb) =>
+              setPicker({
+                value: hex,
+                opacity: 1,
+                anchor: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
+                onChange: (next) => cb(next),
+                onClose: () => setPicker(null)
+              })
             }
-          }}
-        />
-      ) : null}
+            edit={{
+              rename: (to) => onChange(renameToken(studio, selectedToken.setId, selectedToken.token.path, to)),
+              setValue: (v) => onChange(setTokenValue(studio, selectedToken.setId, selectedToken.token.path, v)),
+              setTarget: (target) =>
+                onChange(
+                  setAlias(
+                    studio,
+                    selectedToken.setId,
+                    selectedToken.token.path,
+                    target,
+                    selectedResolved !== null && typeof selectedResolved !== 'object'
+                      ? selectedResolved
+                      : blankValue(selectedToken.token.type)
+                  )
+                ),
+              remove: () => {
+                onChange(deleteToken(studio, selectedToken.setId, selectedToken.token.path))
+                setSelected(null)
+              }
+            }}
+          />
+        ) : null}
+      </div>
 
       {adding ? (
         <TypeMenu
@@ -517,6 +644,108 @@ function StudioEditor({
   )
 }
 
+type Hits = Map<string, { token: Token; setId: string }>
+
+/**
+ * One family, drawn once.
+ *
+ * A ramp is a strip of fused segments rather than eleven tiles, because a
+ * ramp is one decision and eleven tiles is eleven. Everything else is a row
+ * of marks with their names under them.
+ */
+function FamilyRow({
+  family,
+  hideLabel,
+  map,
+  related,
+  selected,
+  onSelect
+}: {
+  family: Family
+  /** True when the family name only repeats the section name above it. */
+  hideLabel?: boolean
+  map: Hits
+  related: Set<string> | null
+  selected: string | null
+  onSelect: (path: string) => void
+}): React.JSX.Element {
+  // A family with nothing to do with the selection is left alone rather than
+  // greyed. Dimming every unrelated token across six sections made the whole
+  // library look switched off; dimming only inside a family that is partly
+  // involved says the useful half of the same thing.
+  const involved = related !== null && family.paths.some((p) => related.has(p))
+  const dimmed = (p: string): boolean => involved && !related.has(p)
+
+  return (
+    <div>
+      {hideLabel ? null : <p className="mb-1 text-[10.5px] text-text-muted">{family.label}</p>}
+      {family.ramp ? (
+        <div className="flex h-9 overflow-hidden rounded-md">
+          {family.paths.map((path) => {
+            const r = resolve(map, path)
+            const hex = r.ok && typeof r.value === 'string' ? r.value : 'transparent'
+            return (
+              <button
+                key={path}
+                type="button"
+                data-token-swatch=""
+                data-token-path={path}
+                title={`${path} · ${hex}`}
+                onClick={() => onSelect(path)}
+                aria-label={`${path}, ${hex}`}
+                aria-pressed={selected === path}
+                style={{ background: hex }}
+                className={`group/step relative min-w-0 flex-1 transition-opacity focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/60 ${
+                  dimmed(path) ? 'opacity-40' : 'opacity-100'
+                } ${selected === path ? 'ring-2 ring-inset ring-accent' : ''}`}
+              >
+                <span className="pointer-events-none absolute inset-x-0 bottom-1 text-center text-[8.5px] font-medium text-text-primary opacity-0 mix-blend-difference transition-opacity group-hover/step:opacity-100">
+                  {leafOf(path)}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      ) : (
+        <ul className="flex flex-wrap gap-2">
+          {family.paths.map((path) => {
+            const hit = map.get(path)
+            if (!hit) return null
+            const r = resolve(map, path)
+            const wide = hit.token.type === 'typography'
+            return (
+              <li key={path} className={wide ? 'w-full' : ''}>
+                <button
+                  type="button"
+                  data-token-swatch=""
+                  data-token-path={path}
+                  onClick={() => onSelect(path)}
+                  aria-pressed={selected === path}
+                  className={`rounded-md p-1.5 text-left transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                    wide ? 'w-full' : 'w-[104px]'
+                  } ${dimmed(path) ? 'opacity-40' : 'opacity-100'} ${
+                    selected === path ? 'bg-raised' : 'hover:bg-raised'
+                  }`}
+                >
+                  <TokenMark token={hit.token} value={r.ok ? r.value : null} />
+                  <span className="mt-1.5 block truncate text-[10.5px] text-text-secondary">
+                    {leafOf(path)}
+                  </span>
+                  <span className="block truncate text-[9.5px] text-text-muted">
+                    {isAlias(hit.token.value)
+                      ? aliasTarget(hit.token.value)
+                      : shortValue(r.ok ? r.value : hit.token.value)}
+                  </span>
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 const STATE_DOT: Record<string, string> = {
   enabled: 'bg-accent',
   source: 'bg-text-muted',
@@ -527,12 +756,6 @@ const STATE_NOTE: Record<string, string> = {
   enabled: 'Exported. Press to make it a source.',
   source: 'Resolvable but not exported. Press to switch it off.',
   off: 'Off. Press to export it.'
-}
-
-/** Enough of a dot path to tell two tokens apart, without the whole of it. */
-function leaf(path: string): string {
-  const parts = path.split('.')
-  return parts.length > 1 ? parts.slice(-2).join('.') : path
 }
 
 function shortValue(v: TokenValue | null): string {
@@ -558,14 +781,39 @@ function TokenMark({ token, value }: { token: Token; value: TokenValue | null })
           className="block h-12 rounded-md ring-1 ring-inset ring-black/10"
         />
       )
-    case 'dimension':
+    case 'dimension': {
+      // A corner is not a distance between two things, so drawing it as a bar
+      // says nothing. Drawn as the corner it is, you can see the difference
+      // between 8 and 12 without reading either number.
+      if (sectionOf(token) === 'shape') {
+        const r = Math.min(24, Math.abs(num(value)))
+        return (
+          <span className="grid h-12 place-items-center rounded-md bg-sunken">
+            <span
+              style={{ borderRadius: r }}
+              className="block h-8 w-8 bg-accent/25 ring-1 ring-inset ring-accent"
+            />
+          </span>
+        )
+      }
+      return (
+        <span className="flex h-12 items-center rounded-md bg-sunken px-1.5">
+          <span
+            style={{ width: Math.max(2, Math.min(72, Math.abs(num(value)))) }}
+            className="block h-1.5 rounded-full bg-accent"
+          />
+        </span>
+      )
+    }
     case 'letterSpacing':
       return (
         <span className="flex h-12 items-center rounded-md bg-sunken px-1.5">
           <span
-            style={{ width: Math.max(2, Math.min(72, Math.abs(parseFloat(String(value))) || 0)) }}
-            className="block h-1.5 rounded-full bg-accent"
-          />
+            style={{ letterSpacing: String(value) }}
+            className="text-[13px] text-text-primary"
+          >
+            Aa
+          </span>
         </span>
       )
     case 'fontSize':
@@ -598,6 +846,50 @@ function TokenMark({ token, value }: { token: Token; value: TokenValue | null })
           </span>
         </span>
       )
+    case 'typography': {
+      // A text style only means anything set. Six numbers on a tile is a
+      // puzzle; one line of real words in the actual family, size, weight,
+      // leading and tracking is the decision itself.
+      const t = (typeof value === 'object' ? value : {}) as Record<string, string | number>
+      const size = Math.min(44, num(t.fontSize) || 16)
+      return (
+        <span className="flex min-h-12 items-center overflow-hidden rounded-md bg-sunken px-3 py-2">
+          <span
+            style={{
+              fontFamily: String(t.fontFamily ?? 'inherit'),
+              fontSize: size,
+              fontWeight: num(t.fontWeight) || 400,
+              lineHeight: num(t.lineHeight) || 1.4,
+              letterSpacing: String(t.letterSpacing ?? 'normal')
+            }}
+            className="block truncate text-text-primary"
+          >
+            The quick brown fox
+          </span>
+        </span>
+      )
+    }
+    case 'cubicBezier': {
+      // The curve, drawn. A list of four numbers says nothing about whether a
+      // move will feel like it starts fast or ends soft.
+      const c = (typeof value === 'object' ? value : {}) as Record<string, string | number>
+      const path = `M 0 40 C ${num(c.x1) * 60} ${40 - num(c.y1) * 40} ${num(c.x2) * 60} ${40 - num(c.y2) * 40} 60 0`
+      return (
+        <span className="grid h-12 place-items-center rounded-md bg-sunken">
+          <svg width="60" height="40" viewBox="0 0 60 40" fill="none" aria-hidden="true">
+            <path d={path} stroke="currentColor" strokeWidth="1.5" className="text-accent" />
+          </svg>
+        </span>
+      )
+    }
+    case 'duration': {
+      const ms = num(value)
+      return (
+        <span className="grid h-12 place-items-center rounded-md bg-sunken">
+          <span className="text-[13px] tabular-nums text-text-primary">{ms}ms</span>
+        </span>
+      )
+    }
     case 'shadow': {
       const s = (typeof value === 'object' ? value : {}) as Record<string, string | number>
       const shadow = `${num(s.x)}px ${num(s.y)}px ${num(s.blur)}px ${num(s.spread)}px ${s.color ?? 'transparent'}`
@@ -625,7 +917,7 @@ function TokenMark({ token, value }: { token: Token; value: TokenValue | null })
   }
 }
 
-function num(v: string | number | undefined): number {
+function num(v: TokenValue | string | number | undefined): number {
   return typeof v === 'number' ? v : parseFloat(String(v ?? 0)) || 0
 }
 

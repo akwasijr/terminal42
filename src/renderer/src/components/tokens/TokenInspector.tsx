@@ -1,44 +1,22 @@
-// Editing one token, next to the token.
+// Editing one token.
 //
-// A separate inspector column would mean the thing you are changing and the
-// control changing it are a screen apart, and with swatches this small that
-// is a lot of eye travel for one number. So the panel opens over the grid,
-// anchored to the swatch, the way the segment shape does on the timeline.
+// This began as a panel that floated over the grid, anchored to the swatch
+// you clicked. It read well until the grid scrolled: the panel then had to
+// chase its swatch on every scroll event, and any moment it lagged it was
+// pointing confidently at the wrong token, which is worse than not being
+// there at all.
+//
+// So it is docked. It sits in its own column that does not scroll, the
+// selection is shown at the top of it, and the machinery that measured a
+// moving target is gone.
 //
 // The important control is not the value, it is the choice between holding a
-// value and pointing at one. That sits at the top, because a semantic token
+// value and pointing at one. That sits near the top, because a semantic token
 // holding a literal is the single mistake this whole idea exists to prevent.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { aliasCandidates, blankValue } from '../../../../shared/tokens/edit'
 import { aliasTarget, type Token, type TokenStudio, type TokenValue } from '../../../../shared/tokens/types'
-
-const WIDTH = 244
-
-/**
- * Where the swatch is now, not where it was when it was clicked.
- *
- * The grid scrolls, and a panel that stayed at the coordinates of a swatch
- * that has since moved is worse than no panel: it points confidently at the
- * wrong token. So the rect is read from the live element on every scroll.
- */
-function useAnchorRect(path: string): DOMRect | null {
-  const [rect, setRect] = useState<DOMRect | null>(null)
-  useEffect(() => {
-    const read = (): void => {
-      const el = document.querySelector(`[data-token-path="${CSS.escape(path)}"]`)
-      setRect(el ? el.getBoundingClientRect() : null)
-    }
-    read()
-    window.addEventListener('scroll', read, true)
-    window.addEventListener('resize', read)
-    return () => {
-      window.removeEventListener('scroll', read, true)
-      window.removeEventListener('resize', read)
-    }
-  }, [path])
-  return rect
-}
 
 export type TokenEdit = {
   rename: (to: string) => void
@@ -66,28 +44,19 @@ export function TokenInspector({
 }): React.JSX.Element {
   const box = useRef<HTMLDivElement | null>(null)
   const [name, setNameDraft] = useState(token.path)
-  const anchor = useAnchorRect(token.path)
 
   useEffect(() => setNameDraft(token.path), [token.path])
 
   useEffect(() => {
-    const away = (e: MouseEvent): void => {
-      const el = e.target as HTMLElement | null
-      if (box.current?.contains(el as Node)) return
-      // A click on another swatch is a change of selection, not a dismissal,
-      // and a click inside the colour picker is not a click away at all.
-      if (el?.closest('[data-token-swatch], [data-colour-picker]')) return
-      onClose()
-    }
+    // No click-away: a docked panel is not in anyone's way, and dismissing it
+    // because a click landed elsewhere would close it every time you reached
+    // for the next token. Escape is the only way out, which is the one people
+    // reach for anyway.
     const key = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') onClose()
     }
-    window.addEventListener('mousedown', away)
     window.addEventListener('keydown', key)
-    return () => {
-      window.removeEventListener('mousedown', away)
-      window.removeEventListener('keydown', key)
-    }
+    return () => window.removeEventListener('keydown', key)
   }, [onClose])
 
   const target = aliasTarget(token.value)
@@ -101,23 +70,24 @@ export function TokenInspector({
     [studio, token.path, token.type]
   )
 
-  if (!anchor) return <></>
-
-  const left = Math.max(12, Math.min(window.innerWidth - WIDTH - 12, anchor.left + anchor.width / 2 - WIDTH / 2))
-  const below = anchor.bottom + 8
-  const openUp = below + 250 > window.innerHeight
-  const style = openUp
-    ? { left, bottom: window.innerHeight - anchor.top + 8, width: WIDTH }
-    : { left, top: below, width: WIDTH }
-
   return (
     <div
       ref={box}
-      style={style}
-      className="fixed z-40 rounded-panel bg-elevated p-3 shadow-lg"
-      role="dialog"
+      className="flex h-full min-h-0 w-64 shrink-0 flex-col overflow-y-auto rounded-panel bg-surface p-3"
+      role="region"
       aria-label={`Edit ${token.path}`}
     >
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-[11px] text-text-secondary">Selected</span>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Clear the selection"
+          className="rounded-sm px-1.5 text-[12px] leading-none text-text-muted hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+        >
+          ×
+        </button>
+      </div>
       <input
         value={name}
         onChange={(e) => setNameDraft(e.target.value)}

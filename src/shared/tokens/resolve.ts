@@ -145,6 +145,28 @@ export function problems(studio: TokenStudio, themeId: string | null): Problem[]
       continue
     }
 
+    // A composite is a literal only if none of its fields points anywhere. A
+    // `type.body` that names a family, a size and a weight by their token
+    // names is doing exactly what a semantic token should, even though its
+    // value happens to be an object rather than a string.
+    if (typeof token.value === 'object' && token.value !== null) {
+      let anyAlias = false
+      for (const [field, v] of Object.entries(token.value)) {
+        const t = aliasTarget(v)
+        if (t === null) continue
+        anyAlias = true
+        const to = map.get(t)
+        if (!to) {
+          out.push({
+            path,
+            kind: 'missing',
+            note: `Its ${field} points at ${t}, which is not in this theme.`
+          })
+        }
+      }
+      if (anyAlias) continue
+    }
+
     if (token.tier !== 'primitive') {
       out.push({
         path,

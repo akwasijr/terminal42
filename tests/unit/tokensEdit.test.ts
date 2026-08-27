@@ -38,7 +38,7 @@ describe('setTokenValue', () => {
   it('changes one token and leaves the rest alone', () => {
     const s = base()
     const next = setTokenValue(s, setNamed(s, 'Palette'), 'palette.brand.600', '#ff0000')
-    expect(valueOf(next, 'colour.brand')).toBe('#ff0000')
+    expect(valueOf(next, 'colour.brand.rest')).toBe('#ff0000')
     expect(valueOf(next, 'colour.accent')).toBe(valueOf(s, 'colour.accent'))
   })
 
@@ -55,7 +55,7 @@ describe('renameToken', () => {
     const s = base()
     const next = renameToken(s, setNamed(s, 'Palette'), 'palette.brand.600', 'palette.hero.600')
     expect(problems(next, 'light')).toEqual([])
-    expect(valueOf(next, 'colour.brand')).toBe(valueOf(s, 'colour.brand'))
+    expect(valueOf(next, 'colour.brand.rest')).toBe(valueOf(s, 'colour.brand.rest'))
   })
 
   it('repoints aliases in sets that are switched off too', () => {
@@ -77,7 +77,7 @@ describe('deleteToken', () => {
     const s = base()
     const next = deleteToken(s, setNamed(s, 'Palette'), 'palette.brand.600')
     const found = problems(next, 'light')
-    expect(found.some((p) => p.path === 'colour.brand' && p.kind === 'missing')).toBe(true)
+    expect(found.some((p) => p.path === 'colour.brand.rest' && p.kind === 'missing')).toBe(true)
   })
 })
 
@@ -113,14 +113,14 @@ describe('freePath', () => {
 describe('setAlias', () => {
   it('points a token at another one', () => {
     const s = base()
-    const next = setAlias(s, setNamed(s, 'Light'), 'colour.brand', 'palette.support.600', '#000')
-    expect(valueOf(next, 'colour.brand')).toBe(valueOf(s, 'colour.support'))
+    const next = setAlias(s, setNamed(s, 'Light'), 'colour.brand.rest', 'palette.accent.700', '#000')
+    expect(valueOf(next, 'colour.brand.rest')).toBe(valueOf(s, 'colour.accent.rest'))
   })
 
   it('cuts it loose with a literal', () => {
     const s = base()
-    const next = setAlias(s, setNamed(s, 'Light'), 'colour.brand', null, '#123456')
-    expect(valueOf(next, 'colour.brand')).toBe('#123456')
+    const next = setAlias(s, setNamed(s, 'Light'), 'colour.brand.rest', null, '#123456')
+    expect(valueOf(next, 'colour.brand.rest')).toBe('#123456')
   })
 })
 
@@ -128,22 +128,22 @@ describe('aliasCandidates', () => {
   const s = base()
 
   it('offers only the same type', () => {
-    const list = aliasCandidates(s, 'colour.brand', 'color')
-    expect(list).toContain('palette.support.600')
+    const list = aliasCandidates(s, 'colour.brand.rest', 'color')
+    expect(list).toContain('palette.accent.700')
     expect(list).not.toContain('space.4')
   })
 
   it('never offers itself', () => {
-    expect(aliasCandidates(s, 'colour.brand', 'color')).not.toContain('colour.brand')
+    expect(aliasCandidates(s, 'colour.brand.rest', 'color')).not.toContain('colour.brand.rest')
   })
 
   it('never offers something that already reaches it', () => {
-    const list = aliasCandidates(s, 'colour.brand', 'color')
+    const list = aliasCandidates(s, 'colour.brand.rest', 'color')
     expect(list).not.toContain('button.background')
   })
 
   it('comes back sorted, so the list does not jump about', () => {
-    const list = aliasCandidates(s, 'colour.brand', 'color')
+    const list = aliasCandidates(s, 'colour.brand.rest', 'color')
     expect(list).toEqual([...list].sort())
   })
 })

@@ -95,6 +95,10 @@ function cssValue(type: TokenType, value: TokenValue): string {
     const b = value as Record<string, string | number>
     return `${px(b.width ?? 1)} ${b.style ?? 'solid'} ${b.color ?? 'currentColor'}`
   }
+  if (type === 'cubicBezier') {
+    const c = value as Record<string, string | number>
+    return `cubic-bezier(${c.x1 ?? 0}, ${c.y1 ?? 0}, ${c.x2 ?? 1}, ${c.y2 ?? 1})`
+  }
   if (type === 'typography') {
     const t = value as Record<string, string | number>
     return `${t.fontWeight ?? 400} ${px(t.fontSize ?? 16)}/${t.lineHeight ?? 1.5} ${t.fontFamily ?? 'sans-serif'}`

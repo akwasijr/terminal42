@@ -93,7 +93,7 @@ describe('css names', () => {
       elevation: 'flat'
     })
     const css = toCSS(studio, 'light')
-    expect(css).toContain('--button-background-hover')
+    expect(css).toContain('--button-primary-bg-hover')
     expect(css).not.toMatch(/--[a-z-]*[A-Z]/)
   })
 })
