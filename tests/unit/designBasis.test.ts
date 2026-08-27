@@ -39,7 +39,10 @@ const { buildBasisBlock, writeBasisFiles } = await import('../../src/main/design
 const brief = (over: Record<string, unknown> = {}): never =>
   ({ basisId: 'lib1', basisThemeId: null, ...over }) as never
 
-beforeEach(() => { store.get.mockClear() })
+beforeEach(() => {
+  store.get.mockReset()
+  store.get.mockImplementation((id: string) => (id === 'lib1' ? record : null))
+})
 
 describe('a design bound to a library', () => {
   it('carries the library into the prompt', () => {
@@ -69,6 +72,48 @@ describe('a design bound to a library', () => {
     expect(existsSync(join(dir, 'tokens.md'))).toBe(true)
     expect(readFileSync(join(dir, 'tokens.css'), 'utf8')).toContain(':root')
     expect(JSON.parse(readFileSync(join(dir, 'tokens.json'), 'utf8'))).toBeTypeOf('object')
+  })
+
+  // A primitive exists so a semantic token can point
+  // at it; naming one in the prompt invites the model to reach past the
+  // semantic layer, which is the single thing a shared library exists to
+  // prevent. The stylesheet may still declare them — a declaration nobody is
+  // told about costs a line and breaks nothing — so the two are checked
+  // against each other rather than in isolation.
+  it('withholds the raw palette from the prompt even when the theme exports it', async () => {
+    const open = JSON.parse(JSON.stringify(studio))
+    // The palette is the set the primitives live in; switching it on is a
+    // toggle away in the themes screen, so this is a state a user can reach.
+    const palette = open.sets.find(
+      (s: { tokens: { tier?: string }[] }) => s.tokens.some((tok) => tok.tier === 'primitive')
+    )
+    for (const theme of open.themes) theme.sets[palette.id] = 'enabled'
+    store.get.mockImplementation(() => ({ ...record, studio: open }))
+
+    const dir = mkdtempSync(join(tmpdir(), 'basis-'))
+    await writeBasisFiles(dir, brief())
+    const css = readFileSync(join(dir, 'tokens.css'), 'utf8')
+    const declared = new Set(Array.from(css.matchAll(/(--[\w-]+)\s*:/g), (m) => m[1]))
+    const named = new Set(Array.from(buildBasisBlock(brief()).matchAll(/--[\w-]+/g), (m) => m[0]))
+
+    // Named from the studio rather than by spelling, so a renamed palette
+    // does not quietly turn this into a test of nothing.
+    const primitives = new Set(
+      (open.sets as { tokens: { path: string; tier?: string }[] }[])
+        .flatMap((set) => set.tokens)
+        .filter((tok) => tok.tier === 'primitive')
+        .map((tok) => `--${tok.path.replace(/\./g, '-').replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()}`)
+    )
+    expect(primitives.size).toBeGreaterThan(0)
+
+    // The gate really is open: the palette reached the stylesheet.
+    expect([...primitives].filter((n) => declared.has(n)).length).toBeGreaterThan(0)
+    // And was still kept out of the prompt.
+    expect([...named].filter((n) => primitives.has(n))).toEqual([])
+    // Everything the prompt does name is declared, so nothing resolves to
+    // nothing.
+    expect(named.size).toBeGreaterThan(5)
+    expect([...named].filter((n) => !declared.has(n))).toEqual([])
   })
 
   it('writes nothing, and does not throw, when the library has been deleted', async () => {
