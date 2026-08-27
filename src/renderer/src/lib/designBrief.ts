@@ -636,8 +636,8 @@ export type DesignWizardState = {
    *  overrides the per-axis shape/density/motion answers. */
   designSystem: string | null
   /** The token library this design is held to, and which of its themes. */
-  basisId: string | null
-  basisThemeId: string | null
+  tokensId: string | null
+  tokensThemeId: string | null
   audience: string | null
   paletteId: string | null
   primaryColor: string | null
@@ -727,7 +727,7 @@ export type DesignWizardState = {
 export function emptyDesignState(): DesignWizardState {
   return {
     category: null, kind: null, subtype: null, surface: null, fidelity: 'highfidelity',
-    look: null, customLook: null, designSystem: null, basisId: null, basisThemeId: null, audience: null,
+    look: null, customLook: null, designSystem: null, tokensId: null, tokensThemeId: null, audience: null,
     paletteId: null, primaryColor: null, secondaryColor: null, accentColor: null,
     fontPairId: null, fontPrimary: null, fontSecondary: null, fontTertiary: null, customFonts: null, iconLibraryId: null, iconStyleId: null, theme: null, density: null, spacing: null, grid: null, motion: null, customMotion: null,
     stack: null, customStack: null,
@@ -760,8 +760,8 @@ export type DesignBrief = {
   designSystem?: string | null
   designSystemLabel?: string | null
   /** The token library this design is bound to, and which of its themes. */
-  basisId?: string | null
-  basisThemeId?: string | null
+  tokensId?: string | null
+  tokensThemeId?: string | null
   audience?: string | null
   paletteId?: string | null
   paletteLabel?: string | null
@@ -869,8 +869,8 @@ export function stateToBrief(s: DesignWizardState): DesignBrief | null {
     fidelity,
     look: hasLk ? s.look : null,
     lookLabel: (s.customLook && s.customLook.trim()) || (lookDef?.label ?? null),
-    basisId: s.basisId,
-    basisThemeId: s.basisThemeId,
+    tokensId: s.tokensId,
+    tokensThemeId: s.tokensThemeId,
     designSystem: hasLk ? s.designSystem : null,
     designSystemLabel: hasLk && s.designSystem
       ? (DESIGN_SYSTEMS.find((d) => d.id === s.designSystem)?.label ?? s.designSystem)

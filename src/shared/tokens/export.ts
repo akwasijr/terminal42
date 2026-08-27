@@ -33,7 +33,7 @@ import type { TokenStudio, TokenType, TokenValue } from './types'
  * well as the main process, and node:crypto is not there. It guards against
  * drift going unnoticed, not against anyone forging a match.
  */
-export function basisHash(studio: TokenStudio, themeId: string | null): string {
+export function tokensHash(studio: TokenStudio, themeId: string | null): string {
   const sep = '\u0000'
   return fnv1a([toCSS(studio, themeId), toDTCG(studio, themeId), toMarkdown(studio, themeId)].join(sep))
 }
@@ -231,7 +231,7 @@ function escapeCell(s: string): string {
  * Empty string when there is nothing to say, so the caller can drop it into a
  * prefix without checking.
  */
-export function formatBasisForPrompt(studio: TokenStudio, themeId: string | null): string {
+export function formatTokensForPrompt(studio: TokenStudio, themeId: string | null): string {
   const theme = studio.themes.find((t) => t.id === themeId) ?? null
   const all = resolveAll(studio, themeId)
   const groups = new Map<SectionId, string[]>()

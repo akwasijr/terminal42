@@ -1341,10 +1341,10 @@ function PageLook({ state, set }: PageProps): JSX.Element {
         </div>
       )}
 
-      <BasisPicker
-        basisId={state.basisId ?? null}
-        themeId={state.basisThemeId ?? null}
-        onChange={(basisId, basisThemeId) => { set('basisId', basisId); set('basisThemeId', basisThemeId) }}
+      <TokensPicker
+        tokensId={state.tokensId ?? null}
+        themeId={state.tokensThemeId ?? null}
+        onChange={(tokensId, tokensThemeId) => { set('tokensId', tokensId); set('tokensThemeId', tokensThemeId) }}
       />
 
       {mode === 'describe' && (
@@ -3171,12 +3171,12 @@ function cap(s: string): string {
  * Absent entirely when there are no libraries, since an empty select that
  * explains itself is a worse answer than no control at all.
  */
-function BasisPicker({
-  basisId, themeId, onChange
+function TokensPicker({
+  tokensId, themeId, onChange
 }: {
-  basisId: string | null
+  tokensId: string | null
   themeId: string | null
-  onChange: (basisId: string | null, themeId: string | null) => void
+  onChange: (tokensId: string | null, themeId: string | null) => void
 }): JSX.Element | null {
   const [studios, setStudios] = useState<Array<{ id: string; name: string; themes: Array<{ id: string; name: string }> }>>([])
 
@@ -3193,14 +3193,14 @@ function BasisPicker({
   }, [])
 
   if (studios.length === 0) return null
-  const chosen = studios.find((s) => s.id === basisId) ?? null
+  const chosen = studios.find((s) => s.id === tokensId) ?? null
 
   return (
     <div className="flex flex-wrap items-center gap-2 pt-1">
-      <span className="text-[12.5px] text-text-secondary">Basis</span>
+      <span className="text-[12.5px] text-text-secondary">Tokens</span>
       <select
-        value={basisId ?? ''}
-        aria-label="Basis"
+        value={tokensId ?? ''}
+        aria-label="Tokens"
         onChange={(e) => {
           const id = e.target.value || null
           const next = studios.find((s) => s.id === id) ?? null

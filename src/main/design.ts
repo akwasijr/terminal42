@@ -9,10 +9,10 @@ import { extractPptxFacts, pptxFactsToPrompt, type PptxFacts } from './pptx'
 import { pptxToPdf } from './render'
 import { getSettings } from './settings'
 import { lintHtml, buildFixPrompt } from './lintHtml'
-import { lintAgainstBasis, describeBasisFindings } from '../shared/tokens/lint'
+import { lintAgainstTokens, describeTokensFindings } from '../shared/tokens/lint'
 import { buildFoundationBlock } from './designFoundation'
 import { AI_RULES, formatRulesForPrompt } from '../renderer/src/lib/aiRules'
-import { basisHash, formatBasisForPrompt, toCSS, toDTCG, toMarkdown } from '../shared/tokens/export'
+import { tokensHash, formatTokensForPrompt, toCSS, toDTCG, toMarkdown } from '../shared/tokens/export'
 import { enforcementOf, hydrateStudio, themeIdFor, type Enforcement } from '../shared/tokens/types'
 import { getTokenStudio } from './tokens'
 import { upsertManagedBlock } from './htmlBlocks'
@@ -56,7 +56,7 @@ import type {
   DesignBrief,
   DesignVersion,
   DesignProgressStep,
-  BasisStatus
+  TokensStatus
 } from './design.types'
 
 export type {
@@ -238,13 +238,13 @@ function enabledRuleIds(brief: DesignBrief | null): string[] {
  * Silent when there is no binding, when the library has been deleted, and when
  * it resolves to nothing. None of those is worth a sentence in a prompt.
  */
-export function buildBasisBlock(brief: DesignBrief | null): string {
-  if (!brief?.basisId) return ''
+export function buildTokensBlock(brief: DesignBrief | null): string {
+  if (!brief?.tokensId) return ''
   try {
-    const record = getTokenStudio(brief.basisId)
+    const record = getTokenStudio(brief.tokensId)
     if (!record) return ''
     const studio = hydrateStudio(record.studio)
-    const block = formatBasisForPrompt(studio, themeIdFor(studio, brief.basisThemeId))
+    const block = formatTokensForPrompt(studio, themeIdFor(studio, brief.tokensThemeId))
     if (!block) return ''
     // A design here is one self-contained file, so it cannot link the
     // stylesheet the block refers to. The declarations have to come inside,
@@ -262,19 +262,19 @@ export function buildBasisBlock(brief: DesignBrief | null): string {
  * Failure is swallowed for the same reason the prompt block is: a library that
  * cannot be read is a reason to generate without it, not a reason to refuse.
  */
-export async function writeBasisFiles(cwd: string, brief: DesignBrief): Promise<string | null> {
-  if (!brief.basisId) return null
+export async function writeTokensFiles(cwd: string, brief: DesignBrief): Promise<string | null> {
+  if (!brief.tokensId) return null
   try {
-    const record = getTokenStudio(brief.basisId)
+    const record = getTokenStudio(brief.tokensId)
     if (!record) return null
     const studio = hydrateStudio(record.studio)
-    const themeId = themeIdFor(studio, brief.basisThemeId)
+    const themeId = themeIdFor(studio, brief.tokensThemeId)
     await fs.writeFile(join(cwd, 'tokens.css'), toCSS(studio, themeId), 'utf8')
     await fs.writeFile(join(cwd, 'tokens.json'), toDTCG(studio, themeId), 'utf8')
     await fs.writeFile(join(cwd, 'tokens.md'), toMarkdown(studio, themeId), 'utf8')
     // Returned rather than written here: what the files say is this module's
     // business, but which design was built from them is the caller's.
-    return basisHash(studio, themeId)
+    return tokensHash(studio, themeId)
   } catch (err) {
     console.error('[design] could not write the bound library:', err)
     return null
@@ -290,13 +290,13 @@ export async function writeBasisFiles(cwd: string, brief: DesignBrief): Promise<
  * Re-sync button, and sending them there on a guess wastes the one bit of
  * attention the flag has.
  */
-export function basisHasMoved(brief: DesignBrief | null): boolean {
-  if (!brief?.basisId || !brief.basisStamp) return false
+export function tokensHaveMoved(brief: DesignBrief | null): boolean {
+  if (!brief?.tokensId || !brief.tokensStamp) return false
   try {
-    const record = getTokenStudio(brief.basisId)
+    const record = getTokenStudio(brief.tokensId)
     if (!record) return false
     const studio = hydrateStudio(record.studio)
-    return basisHash(studio, themeIdFor(studio, brief.basisThemeId)) !== brief.basisStamp
+    return tokensHash(studio, themeIdFor(studio, brief.tokensThemeId)) !== brief.tokensStamp
   } catch {
     return false
   }
@@ -310,15 +310,15 @@ export function basisHasMoved(brief: DesignBrief | null): boolean {
  * findings is the same as none. The loudest dozen are the ones worth fixing,
  * and fixing them usually removes the rest.
  */
-function lintBasis(html: string, brief: DesignBrief | null): { name: string; lines: string[] } {
+function lintTokens(html: string, brief: DesignBrief | null): { name: string; lines: string[] } {
   const empty = { name: '', lines: [] as string[] }
-  if (!brief?.basisId) return empty
+  if (!brief?.tokensId) return empty
   try {
-    const record = getTokenStudio(brief.basisId)
+    const record = getTokenStudio(brief.tokensId)
     if (!record) return empty
     const studio = hydrateStudio(record.studio)
-    const findings = lintAgainstBasis(html, studio, themeIdFor(studio, brief.basisThemeId))
-    return { name: record.name, lines: describeBasisFindings(findings.slice(0, 12), record.name) }
+    const findings = lintAgainstTokens(html, studio, themeIdFor(studio, brief.tokensThemeId))
+    return { name: record.name, lines: describeTokensFindings(findings.slice(0, 12), record.name) }
   } catch {
     return empty
   }
@@ -336,8 +336,8 @@ function buildStarterPrefix(cwd: string, brief: DesignBrief): string {
   if (briefLines.length) blocks.push(['BRIEF', ...briefLines].join('\n'))
   const rules = formatRulesForPrompt(enabledRuleIds(brief))
   if (rules) blocks.push(rules)
-  const basis = buildBasisBlock(brief)
-  if (basis) blocks.push(basis)
+  const tokens = buildTokensBlock(brief)
+  if (tokens) blocks.push(tokens)
   return blocks.filter(Boolean).join('\n\n')
 }
 
@@ -360,8 +360,8 @@ function buildPrefix(
 
   // After the rules, because it is the same kind of instruction and the same
   // voice, and before the engine base, which the tokens are meant to feed.
-  const basis = buildBasisBlock(brief)
-  if (basis) blocks.push(basis)
+  const tokens = buildTokensBlock(brief)
+  if (tokens) blocks.push(tokens)
 
   if (pptxFacts) {
     blocks.push('A reference template has been analyzed; its facts live in _tpl/_facts.md in this folder. Match its structure where it is relevant.')
@@ -790,13 +790,13 @@ async function send(
   // nothing and the page renders unstyled. Refreshed every time so a design
   // generated after the library moved is built against the library as it is,
   // not as it was when the design was created.
-  if (!opts.skipPrefix && d.brief?.basisId) {
-    const stamp = await writeBasisFiles(d.cwd, d.brief)
+  if (!opts.skipPrefix && d.brief?.tokensId) {
+    const stamp = await writeTokensFiles(d.cwd, d.brief)
     // Recorded against the design so a later change to the library can be
     // noticed. Written even when it has not moved, because the alternative is
     // a read-compare-write and this is one statement.
-    if (stamp && stamp !== d.brief.basisStamp) {
-      d.brief = { ...d.brief, basisStamp: stamp }
+    if (stamp && stamp !== d.brief.tokensStamp) {
+      d.brief = { ...d.brief, tokensStamp: stamp }
       try {
         getDb().prepare('UPDATE designs SET brief = ? WHERE id = ?')
           .run(JSON.stringify(d.brief), designId)
@@ -1185,8 +1185,8 @@ async function runAutoLint(win: BrowserWindow | null, designId: string): Promise
   // The library's own setting decides how far its findings travel. Advise
   // means the prompt was the whole of it, so there is nothing to look at
   // afterwards; check and block both look, and only block acts.
-  const level = basisEnforcement(d.brief ?? null)
-  const drift = level === 'advise' ? { name: '', lines: [] as string[] } : lintBasis(html, d.brief ?? null)
+  const level = tokensEnforcement(d.brief ?? null)
+  const drift = level === 'advise' ? { name: '', lines: [] as string[] } : lintTokens(html, d.brief ?? null)
   if (violations.length === 0 && drift.lines.length === 0) return
 
   // Nothing to fix by hand and nothing the library wants fixed for us: report
@@ -1202,7 +1202,7 @@ async function runAutoLint(win: BrowserWindow | null, designId: string): Promise
     fixText = [
       fixText || `The current design in ${latest.fileName} does not use the ${drift.name} library it is bound to.`,
       '',
-      `It is bound to the ${drift.name} basis, and these values are off it:`,
+      `It is bound to the ${drift.name} token library, and these values are off it:`,
       ...drift.lines.map((l) => `- ${l}`),
       '',
       `Replace each with the var(--…) it should have used, then save the result as ${nextFile}. The :root block in tokens.css defines every one of them; keep the layout, content and intent unchanged.`
@@ -1243,10 +1243,10 @@ async function runAutoLint(win: BrowserWindow | null, designId: string): Promise
  * anything cannot have disobeyed. Anything unreadable falls back the same way
  * a missing library does elsewhere: quietly, without failing the run.
  */
-function basisEnforcement(brief: DesignBrief | null): Enforcement {
-  if (!brief?.basisId) return 'advise'
+function tokensEnforcement(brief: DesignBrief | null): Enforcement {
+  if (!brief?.tokensId) return 'advise'
   try {
-    const record = getTokenStudio(brief.basisId)
+    const record = getTokenStudio(brief.tokensId)
     if (!record) return 'advise'
     return enforcementOf(hydrateStudio(record.studio))
   } catch {
@@ -1824,16 +1824,16 @@ export function registerDesignIpc(getWin: () => BrowserWindow | null): void {
   // Whether the library a design was built against has moved since, and what
   // to call it. Asked per design by the list, so it stays cheap: a hash of two
   // already-sorted strings, no file reads.
-  ipcMain.handle('designs:basisStatus', (_e, designId: string): BasisStatus => {
+  ipcMain.handle('designs:tokensStatus', (_e, designId: string): TokensStatus => {
     const d = getDesign(designId)
-    const basisId = d?.brief?.basisId
-    if (!basisId) return { bound: false, name: null, moved: false, missing: false }
-    const record = getTokenStudio(basisId)
+    const tokensId = d?.brief?.tokensId
+    if (!tokensId) return { bound: false, name: null, moved: false, missing: false }
+    const record = getTokenStudio(tokensId)
     // Bound to something that is gone. Generation carries on without it by
     // design, so this is the only place that can say the binding has stopped
     // meaning anything.
     if (!record) return { bound: true, name: null, moved: false, missing: true }
-    return { bound: true, name: record.name, moved: basisHasMoved(d?.brief ?? null), missing: false }
+    return { bound: true, name: record.name, moved: tokensHaveMoved(d?.brief ?? null), missing: false }
   })
 
   // Bring a bound design back into line with its library.
@@ -1843,12 +1843,12 @@ export function registerDesignIpc(getWin: () => BrowserWindow | null): void {
   // design that inlined a hex instead gets no benefit from new files, so the
   // linter runs afterwards and says what it could not relink — the drift
   // becomes visible rather than staying silent.
-  ipcMain.handle('designs:resyncBasis', async (_e, designId: string) => {
+  ipcMain.handle('designs:resyncTokens', async (_e, designId: string) => {
     const d = getDesign(designId)
-    if (!d?.brief?.basisId) return { ok: false as const, error: 'This design is not bound to a library.' }
-    const stamp = await writeBasisFiles(d.cwd, d.brief)
+    if (!d?.brief?.tokensId) return { ok: false as const, error: 'This design is not bound to a library.' }
+    const stamp = await writeTokensFiles(d.cwd, d.brief)
     if (!stamp) return { ok: false as const, error: 'That library could not be read.' }
-    const brief = { ...d.brief, basisStamp: stamp }
+    const brief = { ...d.brief, tokensStamp: stamp }
     try {
       getDb().prepare('UPDATE designs SET brief = ? WHERE id = ?').run(JSON.stringify(brief), designId)
     } catch (err) {
@@ -1859,7 +1859,7 @@ export function registerDesignIpc(getWin: () => BrowserWindow | null): void {
       const versions = listVersions(designId)
       const latest = versions[versions.length - 1]
       if (latest && latest.kind === 'html') {
-        stuck = lintBasis(await fs.readFile(latest.filePath, 'utf8'), brief).lines
+        stuck = lintTokens(await fs.readFile(latest.filePath, 'utf8'), brief).lines
       }
     } catch {
       // No readable version yet is not a failure: the files are still correct.

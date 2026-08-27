@@ -26,7 +26,7 @@
 import type { TokenStudio, TokenValue } from './types'
 import { resolveAll } from './resolve'
 
-export type BasisFinding = {
+export type TokensFinding = {
   /** What kind of value this is, in the words a person would use. */
   kind: 'colour' | 'radius' | 'spacing' | 'text size' | 'typeface'
   /** The literal exactly as it appears in the page. */
@@ -75,8 +75,8 @@ const SPACING_PROPS = new Set([
  * radius and a gap are both dimensions and offering a gap as the nearest match
  * for a corner is worse than offering nothing.
  */
-function shelves(studio: TokenStudio, themeId: string | null): Record<BasisFinding['kind'], Entry[]> {
-  const out: Record<BasisFinding['kind'], Entry[]> = {
+function shelves(studio: TokenStudio, themeId: string | null): Record<TokensFinding['kind'], Entry[]> {
+  const out: Record<TokensFinding['kind'], Entry[]> = {
     colour: [], radius: [], spacing: [], 'text size': [], typeface: []
   }
   for (const [path, hit] of resolveAll(studio, themeId)) {
@@ -141,16 +141,16 @@ function declarations(html: string): Array<[string, string]> {
 
 const COLOUR_LITERAL = /#[0-9a-f]{3,8}\b|\brgba?\([^)]*\)|\bhsla?\([^)]*\)/gi
 
-export function lintAgainstBasis(
+export function lintAgainstTokens(
   html: string,
   studio: TokenStudio,
   themeId: string | null
-): BasisFinding[] {
+): TokensFinding[] {
   if (!html) return []
   const shelf = shelves(studio, themeId)
-  const seen = new Map<string, BasisFinding>()
+  const seen = new Map<string, TokensFinding>()
 
-  const note = (kind: BasisFinding['kind'], literal: string): void => {
+  const note = (kind: TokensFinding['kind'], literal: string): void => {
     const key = `${kind}|${literal.toLowerCase()}`
     const already = seen.get(key)
     if (already) { already.count += 1; return }
@@ -208,7 +208,7 @@ function pxParts(value: string): string[] {
 }
 
 function nearest(
-  kind: BasisFinding['kind'],
+  kind: TokensFinding['kind'],
   literal: string,
   entries: Entry[]
 ): { entry: Entry; exact: boolean } | null {
@@ -274,7 +274,7 @@ export function toRGB(input: string): RGB | null {
  * Deliberately not one line per finding: a page with forty hardcoded greys
  * produces a wall nobody reads. The count carries the weight instead.
  */
-export function describeBasisFindings(findings: BasisFinding[], libraryName: string): string[] {
+export function describeTokensFindings(findings: TokensFinding[], libraryName: string): string[] {
   return findings.map((f) => {
     const times = f.count === 1 ? '' : ` (${f.count} times)`
     if (f.exact && f.nearest) {

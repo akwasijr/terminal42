@@ -844,7 +844,7 @@ function relativeTimeShort(at: number): string {
 function SystemMessage({ message }: { message: DesignMessage }): JSX.Element {
   return (
     <div className="flex select-text items-start gap-2 text-[11.5px] leading-relaxed text-text-muted">
-      <span className="mt-2 flex-shrink-0 grow-0 basis-3" />
+      <span className="mt-2 flex-shrink-0 grow-0 tokens-3" />
       <span className="flex-1">{message.content}</span>
     </div>
   )

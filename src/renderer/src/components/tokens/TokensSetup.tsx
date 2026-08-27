@@ -70,9 +70,9 @@ export function TokensSetup({
   }
 
   return (
-    <div className="t42-scrim fixed inset-0 z-50 grid place-items-center bg-black/40 p-6" role="dialog" aria-label="New basis">
+    <div className="t42-scrim fixed inset-0 z-50 grid place-items-center bg-black/40 p-6" role="dialog" aria-label="New token library">
       <div className="w-full max-w-2xl rounded-panel bg-elevated p-5">
-        <h2 className="text-[15px] font-medium text-text-primary">New basis</h2>
+        <h2 className="text-[15px] font-medium text-text-primary">New token library</h2>
         <p className="mt-1 text-[12px] text-text-muted">
           A studio arrives with a palette, two themes and the parts already wired up.
         </p>

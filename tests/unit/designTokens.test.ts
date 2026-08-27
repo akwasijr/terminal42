@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { studioFromFeel, type Feel } from '../../src/shared/tokens/scaffold'
-import { basisHash } from '../../src/shared/tokens/export'
+import { tokensHash } from '../../src/shared/tokens/export'
 import { hydrateStudio } from '../../src/shared/tokens/types'
 
 /**
@@ -36,10 +36,10 @@ const store = { get: vi.fn((id: string) => (id === 'lib1' ? record : null)) }
 vi.mock('../../src/main/tokens', () => ({ getTokenStudio: (id: string) => store.get(id) }))
 vi.mock('electron', () => ({ app: { getPath: () => tmpdir() }, BrowserWindow: { getAllWindows: () => [] }, ipcMain: { handle: () => {} } }))
 
-const { buildBasisBlock, writeBasisFiles, basisHasMoved } = await import('../../src/main/design')
+const { buildTokensBlock, writeTokensFiles, tokensHaveMoved } = await import('../../src/main/design')
 
 const brief = (over: Record<string, unknown> = {}): never =>
-  ({ basisId: 'lib1', basisThemeId: null, ...over }) as never
+  ({ tokensId: 'lib1', tokensThemeId: null, ...over }) as never
 
 beforeEach(() => {
   store.get.mockReset()
@@ -48,27 +48,27 @@ beforeEach(() => {
 
 describe('a design bound to a library', () => {
   it('carries the library into the prompt', () => {
-    const block = buildBasisBlock(brief())
+    const block = buildTokensBlock(brief())
     expect(block).toContain('--')
     expect(block.length).toBeGreaterThan(80)
   })
 
   it('tells the model to paste the declarations rather than link them', () => {
-    expect(buildBasisBlock(brief())).toContain('paste its :root block')
+    expect(buildTokensBlock(brief())).toContain('paste its :root block')
   })
 
   it('says nothing at all when no library is named', () => {
-    expect(buildBasisBlock(brief({ basisId: null }))).toBe('')
-    expect(buildBasisBlock(null)).toBe('')
+    expect(buildTokensBlock(brief({ tokensId: null }))).toBe('')
+    expect(buildTokensBlock(null)).toBe('')
   })
 
   it('says nothing when the library has been deleted', () => {
-    expect(buildBasisBlock(brief({ basisId: 'gone' }))).toBe('')
+    expect(buildTokensBlock(brief({ tokensId: 'gone' }))).toBe('')
   })
 
   it('writes all three files into the design folder', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'basis-'))
-    await writeBasisFiles(dir, brief())
+    const dir = mkdtempSync(join(tmpdir(), 'tokens-'))
+    await writeTokensFiles(dir, brief())
     expect(existsSync(join(dir, 'tokens.css'))).toBe(true)
     expect(existsSync(join(dir, 'tokens.json'))).toBe(true)
     expect(existsSync(join(dir, 'tokens.md'))).toBe(true)
@@ -92,11 +92,11 @@ describe('a design bound to a library', () => {
     for (const theme of open.themes) theme.sets[palette.id] = 'enabled'
     store.get.mockImplementation(() => ({ ...record, studio: open }))
 
-    const dir = mkdtempSync(join(tmpdir(), 'basis-'))
-    await writeBasisFiles(dir, brief())
+    const dir = mkdtempSync(join(tmpdir(), 'tokens-'))
+    await writeTokensFiles(dir, brief())
     const css = readFileSync(join(dir, 'tokens.css'), 'utf8')
     const declared = new Set(Array.from(css.matchAll(/(--[\w-]+)\s*:/g), (m) => m[1]))
-    const named = new Set(Array.from(buildBasisBlock(brief()).matchAll(/--[\w-]+/g), (m) => m[0]))
+    const named = new Set(Array.from(buildTokensBlock(brief()).matchAll(/--[\w-]+/g), (m) => m[0]))
 
     // Named from the studio rather than by spelling, so a renamed palette
     // does not quietly turn this into a test of nothing.
@@ -119,8 +119,8 @@ describe('a design bound to a library', () => {
   })
 
   it('writes nothing, and does not throw, when the library has been deleted', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'basis-'))
-    await writeBasisFiles(dir, brief({ basisId: 'gone' }))
+    const dir = mkdtempSync(join(tmpdir(), 'tokens-'))
+    await writeTokensFiles(dir, brief({ tokensId: 'gone' }))
     expect(existsSync(join(dir, 'tokens.css'))).toBe(false)
   })
 })
@@ -136,7 +136,7 @@ describe('the library stamp', () => {
   const hydrated = hydrateStudio(JSON.parse(JSON.stringify(studio)))
 
   it('is the same twice for the same library', () => {
-    expect(basisHash(hydrated, hydrated.activeTheme)).toBe(basisHash(hydrated, hydrated.activeTheme))
+    expect(tokensHash(hydrated, hydrated.activeTheme)).toBe(tokensHash(hydrated, hydrated.activeTheme))
   })
 
   // Someone adding a second theme has not touched the one this design uses,
@@ -144,40 +144,40 @@ describe('the library stamp', () => {
   // because a colleague started a dark mode would teach everyone to ignore the
   // flag, and then the row that mattered would be invisible too.
   it('ignores a change that would not rewrite this design\u2019s files', () => {
-    const before = basisHash(hydrated, hydrated.activeTheme)
+    const before = tokensHash(hydrated, hydrated.activeTheme)
     const edited = hydrateStudio(JSON.parse(JSON.stringify(studio)))
     edited.themes.push({ id: 'later', name: 'Dark', sets: { ...edited.themes[0].sets } })
-    expect(basisHash(edited, edited.activeTheme)).toBe(before)
+    expect(tokensHash(edited, edited.activeTheme)).toBe(before)
   })
 
   // The opposite case, and the reason all three files are hashed rather than
   // just the stylesheet: a description reaches tokens.json and tokens.md, so
   // the folder really is out of date even though the page renders the same.
   it('notices a change that only reaches the written docs', () => {
-    const before = basisHash(hydrated, hydrated.activeTheme)
+    const before = tokensHash(hydrated, hydrated.activeTheme)
     const edited = hydrateStudio(JSON.parse(JSON.stringify(studio)))
     const token = edited.sets.flatMap((s) => s.tokens).find((tok) => tok.tier !== 'primitive')!
     token.description = `${token.description ?? ''} (a note for whoever reads this)`
-    expect(basisHash(edited, edited.activeTheme)).not.toBe(before)
+    expect(tokensHash(edited, edited.activeTheme)).not.toBe(before)
   })
 
   it('changes when a value the design uses changes', () => {
-    const before = basisHash(hydrated, hydrated.activeTheme)
+    const before = tokensHash(hydrated, hydrated.activeTheme)
     const edited = hydrateStudio(JSON.parse(JSON.stringify(studio)))
     const token = edited.sets.flatMap((s) => s.tokens).find((tok) => tok.type === 'color')!
     token.value = '#123456'
-    expect(basisHash(edited, edited.activeTheme)).not.toBe(before)
+    expect(tokensHash(edited, edited.activeTheme)).not.toBe(before)
   })
 
   it('is stamped by writing the files, and matches afterwards', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'basis-'))
-    const stamp = await writeBasisFiles(dir, brief())
+    const dir = mkdtempSync(join(tmpdir(), 'tokens-'))
+    const stamp = await writeTokensFiles(dir, brief())
     expect(stamp).toBeTypeOf('string')
-    expect(basisHasMoved(brief({ basisStamp: stamp }))).toBe(false)
+    expect(tokensHaveMoved(brief({ tokensStamp: stamp }))).toBe(false)
   })
 
   it('reports drift once the library has changed under a stamped design', () => {
-    expect(basisHasMoved(brief({ basisStamp: 'something-else' }))).toBe(true)
+    expect(tokensHaveMoved(brief({ tokensStamp: 'something-else' }))).toBe(true)
   })
 
   // Three ways of having nothing to say, all of which must read as "no
@@ -186,10 +186,10 @@ describe('the library stamp', () => {
   // against. Claiming staleness on any of them spends the flag's only bit of
   // attention on noise.
   it('says nothing when it cannot know', () => {
-    expect(basisHasMoved(brief({ basisStamp: null }))).toBe(false)
-    expect(basisHasMoved(brief({ basisId: null, basisStamp: 'x' }))).toBe(false)
-    expect(basisHasMoved(brief({ basisId: 'gone', basisStamp: 'x' }))).toBe(false)
-    expect(basisHasMoved(null)).toBe(false)
+    expect(tokensHaveMoved(brief({ tokensStamp: null }))).toBe(false)
+    expect(tokensHaveMoved(brief({ tokensId: null, tokensStamp: 'x' }))).toBe(false)
+    expect(tokensHaveMoved(brief({ tokensId: 'gone', tokensStamp: 'x' }))).toBe(false)
+    expect(tokensHaveMoved(null)).toBe(false)
   })
 })
 

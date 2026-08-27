@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatBasisForPrompt, toCSS, toDTCG, toMarkdown } from '../../src/shared/tokens/export'
+import { formatTokensForPrompt, toCSS, toDTCG, toMarkdown } from '../../src/shared/tokens/export'
 import type { Token, TokenStudio } from '../../src/shared/tokens/types'
 
 const FEEL: Feel = {
@@ -138,16 +138,16 @@ describe('toMarkdown', () => {
   })
 })
 
-describe('formatBasisForPrompt', () => {
+describe('formatTokensForPrompt', () => {
   it('tells the model what to use and what not to write', () => {
     const studio = studioFromFeel('Test', FEEL)
-    const block = formatBasisForPrompt(studio, studio.activeTheme)
+    const block = formatTokensForPrompt(studio, studio.activeTheme)
     expect(block).toMatch(/Use only these/)
     expect(block).toMatch(/never write a raw/i)
     expect(block).toMatch(/--colour-text-primary \(#/)
   })
 
   it('is quiet when there is nothing to say', () => {
-    expect(formatBasisForPrompt({ id: 'x', name: 'x', sets: [], themes: [], activeTheme: null }, null)).toBe('')
+    expect(formatTokensForPrompt({ id: 'x', name: 'x', sets: [], themes: [], activeTheme: null }, null)).toBe('')
   })
 })

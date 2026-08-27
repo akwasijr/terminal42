@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { lintAgainstBasis, describeBasisFindings, toRGB } from '../../src/shared/tokens/lint'
+import { lintAgainstTokens, describeTokensFindings, toRGB } from '../../src/shared/tokens/lint'
 import { studioFromFeel, type Feel } from '../../src/shared/tokens/scaffold'
 import { toCSS } from '../../src/shared/tokens/export'
 import { enforcementOf, emptyStudio, hydrateStudio } from '../../src/shared/tokens/types'
@@ -39,84 +39,84 @@ const known = (): string => {
 
 describe('reading a page against its library', () => {
   it('finds nothing in a page that only uses variables', () => {
-    const out = lintAgainstBasis(page('.a{color:var(--colour-text-primary);padding:var(--space-4)}'), studio, theme)
+    const out = lintAgainstTokens(page('.a{color:var(--colour-text-primary);padding:var(--space-4)}'), studio, theme)
     expect(out).toEqual([])
   })
 
   it('ignores zero, none and the other words that mean nothing', () => {
-    const out = lintAgainstBasis(page('.a{border:none;margin:0;color:inherit;background:transparent}'), studio, theme)
+    const out = lintAgainstTokens(page('.a{border:none;margin:0;color:inherit;background:transparent}'), studio, theme)
     expect(out).toEqual([])
   })
 
   it('calls a hardcoded library colour a missed reference', () => {
     const hex = known()
-    const out = lintAgainstBasis(page(`.a{color:${hex}}`), studio, theme)
+    const out = lintAgainstTokens(page(`.a{color:${hex}}`), studio, theme)
     expect(out).toHaveLength(1)
     expect(out[0].exact).toBe(true)
     expect(out[0].nearest).toMatch(/^--/)
-    expect(describeBasisFindings(out, 'Calm')[0]).toContain('written out by hand')
+    expect(describeTokensFindings(out, 'Calm')[0]).toContain('written out by hand')
   })
 
   it('calls an invented colour a drift and names the closest token', () => {
-    const out = lintAgainstBasis(page('.a{color:#ff00aa}'), studio, theme)
+    const out = lintAgainstTokens(page('.a{color:#ff00aa}'), studio, theme)
     expect(out).toHaveLength(1)
     expect(out[0].exact).toBe(false)
     expect(out[0].nearest).toMatch(/^--/)
     expect(out[0].nearestValue).toBeTruthy()
-    expect(describeBasisFindings(out, 'Calm')[0]).toContain('closest is')
+    expect(describeTokensFindings(out, 'Calm')[0]).toContain('closest is')
   })
 
   it('counts a literal once, however often it appears', () => {
-    const out = lintAgainstBasis(page('.a{color:#ff00aa}.b{color:#FF00AA}.c{background-color:#ff00aa}'), studio, theme)
+    const out = lintAgainstTokens(page('.a{color:#ff00aa}.b{color:#FF00AA}.c{background-color:#ff00aa}'), studio, theme)
     expect(out).toHaveLength(1)
     expect(out[0].count).toBe(3)
   })
 
   it('reads colours out of a shadow, where they hide', () => {
-    const out = lintAgainstBasis(page('.a{box-shadow:0 1px 3px rgba(1,2,3,0.2)}'), studio, theme)
+    const out = lintAgainstTokens(page('.a{box-shadow:0 1px 3px rgba(1,2,3,0.2)}'), studio, theme)
     expect(out.some((f) => f.kind === 'colour' && f.literal.startsWith('rgba'))).toBe(true)
   })
 
   it('reads an inline style attribute as well as a stylesheet', () => {
-    const out = lintAgainstBasis('<div style="color:#ff00aa"></div>', studio, theme)
+    const out = lintAgainstTokens('<div style="color:#ff00aa"></div>', studio, theme)
     expect(out).toHaveLength(1)
   })
 
   it('reports both lengths in a shorthand', () => {
-    const out = lintAgainstBasis(page('.a{padding:17px 23px}'), studio, theme)
+    const out = lintAgainstTokens(page('.a{padding:17px 23px}'), studio, theme)
     const spacing = out.filter((f) => f.kind === 'spacing').map((f) => f.literal).sort()
     expect(spacing).toEqual(['17px', '23px'])
   })
 
   it('offers a radius for a corner and never a gap', () => {
-    const out = lintAgainstBasis(page('.a{border-radius:7px}'), studio, theme)
+    const out = lintAgainstTokens(page('.a{border-radius:7px}'), studio, theme)
     const hit = out.find((f) => f.kind === 'radius')
     expect(hit).toBeTruthy()
     expect(hit?.nearest).toMatch(/radius|corner|round/i)
   })
 
   it('notices a typeface the library does not have', () => {
-    const out = lintAgainstBasis(page('.a{font-family:Comic Sans MS, sans-serif}'), studio, theme)
+    const out = lintAgainstTokens(page('.a{font-family:Comic Sans MS, sans-serif}'), studio, theme)
     const hit = out.find((f) => f.kind === 'typeface')
     expect(hit).toBeTruthy()
     expect(hit?.exact).toBe(false)
   })
 
   it('accepts a typeface the library does have', () => {
-    const out = lintAgainstBasis(page(`.a{font-family:Inter, sans-serif}`), studio, theme)
+    const out = lintAgainstTokens(page(`.a{font-family:Inter, sans-serif}`), studio, theme)
     const hit = out.find((f) => f.kind === 'typeface')
     expect(hit?.exact).toBe(true)
   })
 
   it('puts drifts above missed references', () => {
-    const out = lintAgainstBasis(page(`.a{color:${known()}}.b{color:#ff00aa}`), studio, theme)
+    const out = lintAgainstTokens(page(`.a{color:${known()}}.b{color:#ff00aa}`), studio, theme)
     expect(out[0].exact).toBe(false)
     expect(out[1].exact).toBe(true)
   })
 
   it('says nothing about a page with no CSS at all', () => {
-    expect(lintAgainstBasis('<p>hello</p>', studio, theme)).toEqual([])
-    expect(lintAgainstBasis('', studio, theme)).toEqual([])
+    expect(lintAgainstTokens('<p>hello</p>', studio, theme)).toEqual([])
+    expect(lintAgainstTokens('', studio, theme)).toEqual([])
   })
 })
 

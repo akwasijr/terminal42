@@ -48,6 +48,9 @@ export function DesignsListView({
   const [searchOpen, setSearchOpen] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => (localStorage.getItem('t42-designs-view') === 'list' ? 'list' : 'grid'))
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
+  // An open token library asks for the whole page, so the list chrome steps
+  // aside rather than the library squeezing itself into what is left.
+  const [tokensFull, setTokensFull] = useState(false)
 
   // Cross-tab trigger: anything, including a chat reply, can dispatch
   // 't42:tokens-open' to land on the library list. The library is meant to be
@@ -278,7 +281,7 @@ export function DesignsListView({
   }, [scoped])
 
   const allLabel = scope === 'form' ? 'All forms' : 'All designs'
-  const heading = typeFilter === 'system' ? 'Design systems' : typeFilter === 'tokens' ? 'Basis' : typeFilter === 'templates' ? 'Templates' : folderFilter !== 'all' ? folderFilter : allLabel
+  const heading = typeFilter === 'system' ? 'Design systems' : typeFilter === 'tokens' ? 'Tokens' : typeFilter === 'templates' ? 'Templates' : folderFilter !== 'all' ? folderFilter : allLabel
 
   // Apply type + folder + search, then bucket by recency.
   const buckets = useMemo(() => {
@@ -318,8 +321,9 @@ export function DesignsListView({
   }, [scoped, search, typeFilter, folderFilter, designFolders])
 
   return (
-    <div className="h-full w-full overflow-y-auto overflow-x-hidden bg-bg">
-      <div className="mx-auto max-w-6xl px-8 pt-10">
+    <div className={['h-full w-full bg-bg', tokensFull ? 'overflow-hidden' : 'overflow-y-auto overflow-x-hidden'].join(' ')}>
+      <div className={tokensFull ? 'flex h-full min-h-0 flex-col' : 'mx-auto max-w-6xl px-8 pt-10'}>
+        {!tokensFull && (
         <div className="sticky top-0 z-10 bg-bg pb-4">
           <header className="mb-4 flex items-center justify-between gap-4">
           <div>
@@ -374,7 +378,7 @@ export function DesignsListView({
               <>
                 <span className="mx-1.5" />
                 <ViewPill active={typeFilter === 'system'} onClick={() => setTypeFilter('system')}>Design systems</ViewPill>
-                <ViewPill active={typeFilter === 'tokens'} onClick={() => setTypeFilter('tokens')}>Basis</ViewPill>
+                <ViewPill active={typeFilter === 'tokens'} onClick={() => setTypeFilter('tokens')}>Tokens</ViewPill>
                 <ViewPill active={typeFilter === 'templates'} onClick={() => setTypeFilter('templates')}>Templates</ViewPill>
               </>
             )}
@@ -455,12 +459,13 @@ export function DesignsListView({
           </div>
         )}
         </div>
+        )}
 
-        <div className="pb-10">
+        <div className={tokensFull ? 'min-h-0 flex-1' : 'pb-10'}>
         {typeFilter === 'system' ? (
           <DesignSystemView openSystemId={pendingDsId} onConsumeOpen={() => setPendingDsId(null)} />
         ) : typeFilter === 'tokens' ? (
-          <TokensView />
+          <TokensView onFullPage={setTokensFull} />
         ) : typeFilter === 'templates' ? (
           <TemplatesGallery onUse={createFromTemplate} />
         ) : designs.length === 0 ? (
@@ -701,7 +706,7 @@ function DesignCard({ design, onOpen, onDelete, folders, folder, onAssign }: {
           </div>
         </div>
       </button>
-      <BasisFlag designId={design.id} />
+      <TokensFlag designId={design.id} />
       <div className="absolute right-2 top-2 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
         <FolderAssign id={design.id} current={folder} folders={folders} onAssign={onAssign} />
         <button
@@ -740,7 +745,7 @@ function DesignRow({ design, onOpen, onDelete, folders, folder, onAssign }: { de
         </span>
         <span className="min-w-0 truncate text-[13.5px] font-medium text-text-primary">{design.title}</span>
       </button>
-      <BasisFlag designId={design.id} />
+      <TokensFlag designId={design.id} />
       </div>
       <span className="truncate text-[12px] text-text-muted">{formatAge(design.lastActiveAt)}</span>
       <span className="truncate text-[12px] text-text-muted">{formatAge(design.createdAt)}</span>
@@ -774,7 +779,7 @@ function DesignRow({ design, onOpen, onDelete, folders, folder, onAssign }: { de
  * rather than quietly dropped — the chip stays, saying how many, instead of
  * disappearing and implying the job is done.
  */
-function BasisFlag({ designId }: { designId: string }): JSX.Element | null {
+function TokensFlag({ designId }: { designId: string }): JSX.Element | null {
   const [moved, setMoved] = useState(false)
   const [missing, setMissing] = useState(false)
   const [name, setName] = useState<string | null>(null)
@@ -783,7 +788,7 @@ function BasisFlag({ designId }: { designId: string }): JSX.Element | null {
 
   useEffect(() => {
     let cancelled = false
-    void window.terminal42.designs.basisStatus(designId).then((s) => {
+    void window.terminal42.designs.tokensStatus(designId).then((s) => {
       if (cancelled) return
       setMoved(s.bound && s.moved)
       setMissing(s.missing)
@@ -795,7 +800,7 @@ function BasisFlag({ designId }: { designId: string }): JSX.Element | null {
   const resync = async (): Promise<void> => {
     setBusy(true)
     try {
-      const r = await window.terminal42.designs.resyncBasis(designId)
+      const r = await window.terminal42.designs.resyncTokens(designId)
       if (r.ok) {
         setMoved(false)
         setStuck(r.stuck.length > 0 ? r.stuck : null)

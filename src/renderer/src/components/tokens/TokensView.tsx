@@ -1,4 +1,4 @@
-// Basis: the shared library a team and its agents both work from.
+// Tokens: the shared library a team and its agents both work from.
 //
 // A token is a value with a name, and of the two the value is the one you
 // recognise. So a colour is drawn as a colour, a spacing as a bar at its true
@@ -44,7 +44,7 @@ import { ColorPicker, type PickerRequest } from '../ColorPicker'
 
 type StudioRow = { id: string; name: string; studio: unknown; updatedAt: number }
 
-export function TokensView(): React.JSX.Element {
+export function TokensView({ onFullPage }: { onFullPage?: (full: boolean) => void }): React.JSX.Element {
   const [rows, setRows] = useState<StudioRow[]>([])
   const [openId, setOpenId] = useState<string | null>(null)
   const [studio, setStudio] = useState<TokenStudio | null>(null)
@@ -59,6 +59,17 @@ export function TokensView(): React.JSX.Element {
   useEffect(() => {
     void refresh()
   }, [])
+
+  // An open library takes the whole page: the surrounding tab chrome belongs to
+  // a list of designs, and a library is not one of them. Told, not assumed, so
+  // the page that owns the padding is the page that drops it.
+  const full = openId !== null && studio !== null
+  const tellFull = useRef(onFullPage)
+  tellFull.current = onFullPage
+  useEffect(() => {
+    tellFull.current?.(full)
+    return () => tellFull.current?.(false)
+  }, [full])
 
   const create = async (built: TokenStudio): Promise<void> => {
     const row = await window.terminal42.tokens.create(built.name, built)
@@ -109,13 +120,13 @@ export function TokensView(): React.JSX.Element {
           onClick={() => setSetupOpen(true)}
           className="shrink-0 rounded-md bg-action px-3 py-1.5 text-[13px] font-medium text-action-text hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
         >
-          New basis
+          New library
         </button>
       </div>
 
       {loading ? null : rows.length === 0 ? (
         <p className="rounded-panel bg-surface px-4 py-10 text-center text-[12.5px] text-text-muted">
-          Nothing yet. A basis is where a look stops being a habit and starts being a decision
+          Nothing yet. A token library is where a look stops being a habit and starts being a decision
           you can point at.
         </p>
       ) : (
@@ -188,30 +199,6 @@ function StudioMark({ studio }: { studio: TokenStudio }): React.JSX.Element {
   )
 }
 
-/**
- * How tall the editor can be without the page scrolling behind it.
- *
- * The shell has to be pinned for any of this to work, and pinning needs a
- * definite height. The surrounding page is a normal scrolling document, so
- * rather than guess at a constant that breaks the moment a header changes,
- * the editor measures where it starts and takes the rest of the window.
- */
-function useFillHeight(): [React.RefObject<HTMLDivElement>, number | undefined] {
-  const ref = useRef<HTMLDivElement>(null)
-  const [h, setH] = useState<number | undefined>(undefined)
-  useEffect(() => {
-    const read = (): void => {
-      const el = ref.current
-      if (!el) return
-      setH(Math.max(360, window.innerHeight - el.getBoundingClientRect().top - 24))
-    }
-    read()
-    window.addEventListener('resize', read)
-    return () => window.removeEventListener('resize', read)
-  }, [])
-  return [ref, h]
-}
-
 /** The three ways to look at a category. `use` is the default and the point. */
 type Lens = 'use' | 'raw' | 'all'
 
@@ -237,7 +224,6 @@ function StudioEditor({
   const [note, setNote] = useState<string | null>(null)
   const [showSets, setShowSets] = useState(false)
   const [here, setHere] = useState<SectionId>('colour')
-  const [shell, height] = useFillHeight()
   const scroller = useRef<HTMLDivElement>(null)
 
   const themeId = studio.activeTheme
@@ -310,7 +296,7 @@ function StudioEditor({
   const jump = (id: SectionId): void => {
     setHere(id)
     const root = scroller.current
-    const el = root?.querySelector<HTMLElement>(`#basis-${id}`)
+    const el = root?.querySelector<HTMLElement>(`#tokens-${id}`)
     if (!root || !el) return
     // Scrolled by hand rather than with scrollIntoView, which walks every
     // scrollable ancestor and so dragged the whole page up, taking the header
@@ -337,10 +323,10 @@ function StudioEditor({
     const read = (): void => {
       const edge = root.getBoundingClientRect().top + 4
       let at: SectionId | null = null
-      for (const el of root.querySelectorAll<HTMLElement>('[id^="basis-"]')) {
-        if (el.getBoundingClientRect().top <= edge) at = el.id.replace('basis-', '') as SectionId
+      for (const el of root.querySelectorAll<HTMLElement>('[id^="tokens-"]')) {
+        if (el.getBoundingClientRect().top <= edge) at = el.id.replace('tokens-', '') as SectionId
       }
-      setHere(at ?? (root.querySelector('[id^="basis-"]')?.id.replace('basis-', '') as SectionId))
+      setHere(at ?? (root.querySelector('[id^="tokens-"]')?.id.replace('tokens-', '') as SectionId))
     }
     read()
     root.addEventListener('scroll', read, { passive: true })
@@ -395,33 +381,37 @@ function StudioEditor({
   const filled = SECTIONS.filter((s) => (sections.get(s.id) ?? []).length > 0)
 
   return (
-    <div ref={shell} style={{ height }} className="flex flex-col gap-2">
-      <header className="flex shrink-0 items-center gap-2">
+    <div className="flex h-full min-h-0 flex-col bg-bg">
+      <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border/60 px-6 py-3">
         <button
           type="button"
           onClick={onClose}
-          className="rounded-sm px-1.5 py-1 text-[11.5px] text-text-muted hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+          className="-ml-1.5 inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-[12.5px] font-medium text-text-muted transition-colors hover:bg-elevated hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
         >
-          Back
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M9.5 3.5L5 8l4.5 4.5" />
+          </svg>
+          Tokens
         </button>
+        <span aria-hidden="true" className="h-4 w-px shrink-0 bg-border" />
         <input
           value={studio.name}
           onChange={(e) => onRename(e.target.value)}
           aria-label="Library name"
-          className="w-52 min-w-0 rounded-sm bg-transparent px-1 py-0.5 text-[13px] text-text-primary hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+          className="w-44 min-w-0 rounded-md bg-transparent px-1.5 py-1 text-[15px] font-semibold text-text-primary hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
         />
 
-        <div className="ml-1 flex items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1 rounded-lg bg-sunken p-1">
           {studio.themes.map((t) => (
             <button
               key={t.id}
               type="button"
               onClick={() => onChange({ ...studio, activeTheme: t.id })}
               aria-pressed={t.id === themeId}
-              className={`rounded-full px-2.5 py-1 text-[11px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+              className={`rounded-md px-2.5 py-1 text-[11.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
                 t.id === themeId
-                  ? 'bg-raised text-text-primary'
-                  : 'text-text-muted hover:bg-raised hover:text-text-secondary'
+                  ? 'bg-bg text-text-primary shadow-sm'
+                  : 'text-text-muted hover:text-text-primary'
               }`}
             >
               {t.name}
@@ -431,7 +421,8 @@ function StudioEditor({
             type="button"
             onClick={addTheme}
             aria-label="Add a theme"
-            className="rounded-full px-2 py-1 text-[12px] leading-none text-text-muted hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            title="Add a theme"
+            className="rounded-md px-2 py-1 text-[12px] leading-none text-text-muted hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           >
             +
           </button>
@@ -443,7 +434,7 @@ function StudioEditor({
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Find a token"
             aria-label="Find a token"
-            className="w-40 rounded-md bg-surface px-2.5 py-1 text-[11.5px] text-text-primary placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            className="w-40 rounded-md bg-elevated px-2.5 py-1.5 text-[12px] text-text-primary placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           />
           <EnforcementPicker studio={studio} onChange={onChange} />
           <SendTo studio={studio} themeId={themeId} onDone={(msg) => {
@@ -453,17 +444,17 @@ function StudioEditor({
           <button
             type="button"
             onClick={() => void exportFiles()}
-            className="rounded-md bg-action px-2.5 py-1 text-[11.5px] font-medium text-action-text hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            className="rounded-md bg-action px-3 py-1.5 text-[12px] font-medium text-action-text hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           >
             Export
           </button>
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1 gap-2">
+      <div className="flex min-h-0 flex-1 gap-4 px-6 py-4">
         <nav
           aria-label="Sections"
-          className="flex w-36 shrink-0 flex-col gap-0.5 overflow-y-auto rounded-panel bg-surface p-2"
+          className="flex w-44 shrink-0 flex-col gap-0.5 overflow-y-auto"
         >
           {filled.map((s) => (
             <button
@@ -471,10 +462,10 @@ function StudioEditor({
               type="button"
               onClick={() => jump(s.id)}
               aria-current={here === s.id ? 'true' : undefined}
-              className={`rounded-sm px-2 py-1 text-left text-[11.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+              className={`rounded-md px-2.5 py-1.5 text-left text-[12.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
                 here === s.id
-                  ? 'bg-raised text-text-primary'
-                  : 'text-text-muted hover:bg-raised hover:text-text-secondary'
+                  ? 'bg-elevated font-medium text-text-primary'
+                  : 'text-text-muted hover:bg-elevated/60 hover:text-text-primary'
               }`}
             >
               {s.label}
@@ -485,8 +476,9 @@ function StudioEditor({
             type="button"
             onClick={() => setShowSets((v) => !v)}
             aria-expanded={showSets}
-            className="mt-3 rounded-sm px-2 py-1 text-left text-[11.5px] text-text-muted transition-colors hover:bg-raised hover:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            className="mt-4 flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-text-muted transition-colors hover:bg-elevated/60 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           >
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={`transition-transform duration-200 ${showSets ? 'rotate-90' : ''}`}><path d="M6 3.5L10.5 8 6 12.5" /></svg>
             Sets
           </button>
           {showSets ? (
@@ -498,7 +490,7 @@ function StudioEditor({
                   return (
                     <li
                       key={s.id}
-                      className="group/set flex items-center gap-1 rounded-sm px-2 py-1 hover:bg-raised"
+                      className="group/set flex items-center gap-1 rounded-md px-2.5 py-1 hover:bg-elevated/60"
                     >
                       <span className="min-w-0 flex-1 truncate text-[11px] text-text-secondary">
                         {s.name}
@@ -530,7 +522,7 @@ function StudioEditor({
                 <button
                   type="button"
                   onClick={addSet}
-                  className="w-full rounded-sm px-2 py-1 text-left text-[11px] text-text-muted hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                  className="w-full rounded-md px-2.5 py-1 text-left text-[11px] text-text-muted hover:bg-elevated/60 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
                 >
                   Add a set
                 </button>
@@ -541,7 +533,7 @@ function StudioEditor({
 
         <div
           ref={scroller}
-          className="min-w-0 flex-1 overflow-y-auto rounded-panel bg-surface"
+          className="min-w-0 flex-1 overflow-y-auto rounded-panel bg-surface pb-2"
         >
           {filled.length === 0 ? (
             <p className="px-2 py-16 text-center text-[12px] text-text-muted">
@@ -549,9 +541,9 @@ function StudioEditor({
             </p>
           ) : (
             filled.map((s) => (
-              <section key={s.id} id={`basis-${s.id}`}>
-                <div className="sticky top-0 z-10 flex items-center gap-2 bg-surface px-3 py-2">
-                  <h2 className="text-[12.5px] font-medium text-text-primary">{s.label}</h2>
+              <section key={s.id} id={`tokens-${s.id}`}>
+                <div className="sticky top-0 z-10 flex items-center gap-2 bg-surface px-4 py-3">
+                  <h2 className="text-[13px] font-semibold text-text-primary">{s.label}</h2>
                   <div className="ml-auto flex items-center gap-0.5">
                     {(['use', 'raw', 'all'] as const).map((l) => (
                       <button
@@ -570,7 +562,7 @@ function StudioEditor({
                     ))}
                   </div>
                 </div>
-                <div className="flex flex-col gap-3 px-3 pb-5">
+                <div className="flex flex-col gap-4 px-4 pb-6">
                   {visible(s.id).map((f) => (
                     <FamilyRow
                       key={f.id}
@@ -1081,14 +1073,14 @@ function ProblemLine({
 }): React.JSX.Element | null {
   if (note) {
     return (
-      <p className="px-1 text-[11px] text-text-secondary" role="status">
+      <p className="shrink-0 border-t border-border/60 px-6 py-2 text-[11.5px] text-text-secondary" role="status">
         {note}
       </p>
     )
   }
   if (found.length === 0) return null
   return (
-    <div className="flex items-center gap-2 px-1">
+    <div className="flex shrink-0 items-center gap-2 border-t border-border/60 px-6 py-2">
       <button
         type="button"
         onClick={onToggle}

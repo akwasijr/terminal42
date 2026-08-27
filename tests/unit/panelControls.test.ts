@@ -31,7 +31,7 @@ describe('SegmentedRow', () => {
   const row = body.slice(0, body.indexOf('\n}\n'))
 
   // "Front" rendered as "Fr…" and "9:16" as "9:…" because each option was
-  // flex-1 (basis 0), so options shrank to nothing rather than wrapping.
+  // flex-1 (tokens 0), so options shrank to nothing rather than wrapping.
   it('never truncates an option', () => {
     expect(row).not.toMatch(/\btruncate\b/)
     expect(row).not.toMatch(/\bflex-1\b/)

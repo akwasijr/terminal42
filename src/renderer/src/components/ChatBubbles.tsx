@@ -285,7 +285,7 @@ function appUrlTransform(url: string): string {
 function appJump(href: string | undefined): (() => void) | null {
   if (!href || !href.startsWith('t42://')) return null
   const path = href.slice('t42://'.length).replace(/\/$/, '')
-  if (path === 'basis' || path === 'tokens') {
+  if (path === 'tokens' || path === 'tokens') {
     return () => window.dispatchEvent(new Event('t42:open-tokens'))
   }
   if (path === 'terminal') {

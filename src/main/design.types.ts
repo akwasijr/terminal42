@@ -56,8 +56,8 @@ export type DesignBrief = {
    * keep generating exactly as it did. When present the generation prompt
    * carries the library's names and the folder carries its files.
    */
-  basisId?: string | null
-  basisThemeId?: string | null
+  tokensId?: string | null
+  tokensThemeId?: string | null
   /**
    * The fingerprint of the library as it was when this design last had the
    * files written beside it.
@@ -67,7 +67,7 @@ export type DesignBrief = {
    * existed, which reads as "no opinion" rather than as drift: claiming a
    * design is stale on no evidence is worse than saying nothing.
    */
-  basisStamp?: string | null
+  tokensStamp?: string | null
   audience?: string | null
   paletteId?: string | null
   paletteLabel?: string | null
@@ -172,7 +172,7 @@ export type DesignProgressStep = {
  * been deleted, because from the list's point of view they are the same thing:
  * there is nothing to show and nothing to re-sync.
  */
-export type BasisStatus = {
+export type TokensStatus = {
   bound: boolean
   name: string | null
   moved: boolean

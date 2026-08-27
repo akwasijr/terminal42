@@ -37,11 +37,31 @@ export function rowToDesign(row: {
   current_version: string | null; brief: string | null; created_at: number; last_active_at: number
 }): Design {
   let brief: DesignBrief | null = null
-  if (row.brief) { try { brief = JSON.parse(row.brief) as DesignBrief } catch {} }
+  if (row.brief) { try { brief = carryOldNames(JSON.parse(row.brief) as DesignBrief) } catch {} }
   return {
     id: row.id, title: row.title, cwd: row.cwd, copilotSessionId: row.copilot_session_id,
     currentVersion: row.current_version, brief,
     createdAt: row.created_at, lastActiveAt: row.last_active_at
+  }
+}
+
+/**
+ * Briefs written before the feature went back to being called Tokens.
+ *
+ * The three fields were spelled `basis*`. Renaming the code does not rename
+ * what is already on disk, and a design that quietly forgets which library it
+ * was bound to is worse than the old name, so the old spelling is still read.
+ * It is never written again: the first save of such a brief carries the new
+ * names, and the old keys go with it.
+ */
+function carryOldNames(brief: DesignBrief): DesignBrief {
+  const old = brief as unknown as Record<string, unknown>
+  if (old.basisId === undefined && old.basisThemeId === undefined && old.basisStamp === undefined) return brief
+  return {
+    ...brief,
+    tokensId: brief.tokensId ?? (old.basisId as string | null | undefined) ?? null,
+    tokensThemeId: brief.tokensThemeId ?? (old.basisThemeId as string | null | undefined) ?? null,
+    tokensStamp: brief.tokensStamp ?? (old.basisStamp as string | null | undefined) ?? null
   }
 }
 
