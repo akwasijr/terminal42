@@ -37,6 +37,15 @@ import {
 import { flatten, problems, resolve, type Problem } from '../../../../shared/tokens/resolve'
 import { familiesOf, leafOf, SECTIONS, sectionOf, type Family, type SectionId } from '../../../../shared/tokens/groups'
 import { addToken, blankValue, deleteToken, renameToken, setAlias, setDeprecated, setTokenValue } from '../../../../shared/tokens/edit'
+import {
+  bulkDelete,
+  bulkMove,
+  bulkRename,
+  bulkRetire,
+  bulkRetype,
+  sweepNote,
+  type BulkResult
+} from '../../../../shared/tokens/bulk'
 import { bridgeSummary, brandItems } from '../../../../shared/tokens/bridges'
 import { cloneStudio } from '../../../../shared/tokens/scaffold'
 import { fromTokensText } from '../../../../shared/tokens/import'
@@ -270,6 +279,7 @@ function StudioEditor({
   const [search, setSearch] = useState('')
   const [note, setNote] = useState<string | null>(null)
   const [showSets, setShowSets] = useState(false)
+  const [marked, setMarked] = useState<Set<string>>(new Set())
   const [here, setHere] = useState<SectionId>('colour')
   const scroller = useRef<HTMLDivElement>(null)
 
@@ -427,8 +437,41 @@ function StudioEditor({
 
   const filled = SECTIONS.filter((s) => (sections.get(s.id) ?? []).length > 0)
 
+  // Gathering tokens up for a sweep. A gathered token is not the selection:
+  // the inspector is for one token at a time and showing it alongside a
+  // sweep would be two answers to the question of what "this" means.
+  const picks = useMemo(
+    () =>
+      [...marked].flatMap((path) => {
+        const hit = map.get(path)
+        return hit ? [{ setId: hit.setId, path }] : []
+      }),
+    [marked, map]
+  )
+
+  const shown = useMemo(
+    () => filled.flatMap((s) => visible(s.id).flatMap((f) => f.paths)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sections, lens, search, onlyProblems]
+  )
+
+  const mark = (path: string): void =>
+    setMarked((c) => {
+      const next = new Set(c)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+
+  const sweep = (result: BulkResult, verb: string): void => {
+    onChange(result.studio)
+    setMarked(new Set())
+    setNote(sweepNote(result, verb))
+    window.setTimeout(() => setNote(null), 5000)
+  }
+
   return (
-    <div className="flex h-full min-h-0 flex-col bg-bg">
+    <div className="relative flex h-full min-h-0 flex-col bg-bg">
       <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border/60 px-6 py-3">
         <button
           type="button"
@@ -498,7 +541,7 @@ function StudioEditor({
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1 gap-4 px-6 py-4">
+      <div className="relative flex min-h-0 flex-1 gap-4 px-6 py-4">
         <nav
           aria-label="Sections"
           className="flex w-44 shrink-0 flex-col gap-0.5 overflow-y-auto"
@@ -618,7 +661,15 @@ function StudioEditor({
                       map={map}
                       related={related}
                       selected={selected}
-                      onSelect={(p) => setSelected((c) => (c === p ? null : p))}
+                      marked={marked}
+                      onSelect={(p, additive) => {
+                        if (additive || marked.size > 0) {
+                          setSelected(null)
+                          mark(p)
+                          return
+                        }
+                        setSelected((c) => (c === p ? null : p))
+                      }}
                     />
                   ))}
                 </div>
@@ -669,6 +720,22 @@ function StudioEditor({
         ) : null}
       </div>
 
+      {marked.size > 0 ? (
+        <SweepBar
+          count={marked.size}
+          sets={studio.sets.map((s) => ({ id: s.id, name: s.name }))}
+          onSelectAll={() => setMarked(new Set(shown))}
+          onClear={() => setMarked(new Set())}
+          onDelete={() => sweep(bulkDelete(studio, picks), 'Deleted')}
+          onRetire={(message) =>
+            sweep(bulkRetire(studio, picks, { severity: 'warning', message }), 'Retired')
+          }
+          onMove={(setId) => sweep(bulkMove(studio, picks, setId), 'Moved')}
+          onRetype={(type) => sweep(bulkRetype(studio, picks, type), 'Retyped')}
+          onRename={(from, to) => sweep(bulkRename(studio, picks, from, to), 'Renamed')}
+        />
+      ) : null}
+
       {adding ? (
         <TypeMenu
           rect={adding.rect}
@@ -703,6 +770,147 @@ function StudioEditor({
 type Hits = Map<string, { token: Token; setId: string }>
 
 /**
+ * The bar that appears once tokens have been gathered up.
+ *
+ * It sits over the library rather than beside it, because a sweep is a thing
+ * you are in the middle of, not a panel you consult. Each action that needs
+ * an answer opens a small tray in place: asking for the answer up front, in
+ * five permanent fields, would make the common case — retire these, delete
+ * these — read like a form.
+ */
+function SweepBar({
+  count,
+  sets,
+  onSelectAll,
+  onClear,
+  onDelete,
+  onRetire,
+  onMove,
+  onRetype,
+  onRename
+}: {
+  count: number
+  sets: { id: string; name: string }[]
+  onSelectAll: () => void
+  onClear: () => void
+  onDelete: () => void
+  onRetire: (message: string) => void
+  onMove: (setId: string) => void
+  onRetype: (type: TokenType) => void
+  onRename: (from: string, to: string) => void
+}): React.JSX.Element {
+  const [open, setOpen] = useState<'move' | 'type' | 'name' | 'retire' | null>(null)
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+  const [why, setWhy] = useState('')
+
+  const tray = (which: typeof open): void => setOpen((c) => (c === which ? null : which))
+
+  const action =
+    'rounded-md px-2.5 py-1 text-[11.5px] text-text-secondary transition-colors hover:bg-elevated hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60'
+  const field =
+    'w-32 rounded-md border border-border bg-bg px-2 py-1 text-[11.5px] text-text-primary placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60'
+  const go =
+    'rounded-md bg-accent px-2.5 py-1 text-[11.5px] font-medium text-accent-text transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:opacity-40'
+
+  return (
+    <div className="pointer-events-none absolute inset-x-0 bottom-5 z-30 flex justify-center px-6">
+      <div className="pointer-events-auto max-w-full rounded-panel border border-border bg-surface shadow-overlay">
+        <div className="flex flex-wrap items-center gap-1 px-3 py-2">
+          <span className="mr-1 text-[11.5px] font-medium text-text-primary">
+            {count === 1 ? '1 token' : `${count} tokens`}
+          </span>
+          <button type="button" className={action} onClick={() => tray('move')} aria-expanded={open === 'move'}>
+            Move
+          </button>
+          <button type="button" className={action} onClick={() => tray('type')} aria-expanded={open === 'type'}>
+            Type
+          </button>
+          <button type="button" className={action} onClick={() => tray('name')} aria-expanded={open === 'name'}>
+            Rename
+          </button>
+          <button type="button" className={action} onClick={() => tray('retire')} aria-expanded={open === 'retire'}>
+            Retire
+          </button>
+          <button
+            type="button"
+            className="rounded-md px-2.5 py-1 text-[11.5px] text-error transition-colors hover:bg-error/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            onClick={onDelete}
+          >
+            Delete
+          </button>
+          <span aria-hidden="true" className="mx-1 h-4 w-px bg-border" />
+          <button type="button" className={action} onClick={onSelectAll}>
+            All shown
+          </button>
+          <button type="button" className={action} onClick={onClear}>
+            Done
+          </button>
+        </div>
+
+        {open === 'move' ? (
+          <div className="flex flex-wrap items-center gap-1 border-t border-border/60 px-3 py-2">
+            {sets.map((s) => (
+              <button key={s.id} type="button" className={action} onClick={() => onMove(s.id)}>
+                {s.name}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {open === 'type' ? (
+          <div className="flex max-h-32 flex-wrap items-center gap-1 overflow-y-auto border-t border-border/60 px-3 py-2">
+            {TOKEN_TYPES.map((t) => (
+              <button key={t} type="button" className={action} onClick={() => onRetype(t)}>
+                {t}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {open === 'name' ? (
+          <div className="flex flex-wrap items-center gap-2 border-t border-border/60 px-3 py-2">
+            <input
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              placeholder="brand."
+              aria-label="Text to replace"
+              className={field}
+            />
+            <span className="text-[11.5px] text-text-muted">becomes</span>
+            <input
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              placeholder="accent."
+              aria-label="Text to put there instead"
+              className={field}
+            />
+            <button type="button" className={go} disabled={from.length === 0} onClick={() => onRename(from, to)}>
+              Rename
+            </button>
+          </div>
+        ) : null}
+
+        {open === 'retire' ? (
+          <div className="flex flex-wrap items-center gap-2 border-t border-border/60 px-3 py-2">
+            <input
+              value={why}
+              onChange={(e) => setWhy(e.target.value)}
+              placeholder="Use colour.text instead"
+              aria-label="What to use instead"
+              className={`${field} w-56`}
+            />
+            <button type="button" className={go} onClick={() => onRetire(why)}>
+              Retire
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+/**
  * One family, drawn once.
  *
  * A ramp is a strip of fused segments rather than eleven tiles, because a
@@ -715,6 +923,7 @@ function FamilyRow({
   map,
   related,
   selected,
+  marked,
   onSelect
 }: {
   family: Family
@@ -723,7 +932,9 @@ function FamilyRow({
   map: Hits
   related: Set<string> | null
   selected: string | null
-  onSelect: (path: string) => void
+  /** Paths gathered up for a sweep. Empty when nothing is being gathered. */
+  marked: Set<string>
+  onSelect: (path: string, additive: boolean) => void
 }): React.JSX.Element {
   // A family with nothing to do with the selection is left alone rather than
   // greyed. Dimming every unrelated token across six sections made the whole
@@ -731,6 +942,13 @@ function FamilyRow({
   // involved says the useful half of the same thing.
   const involved = related !== null && family.paths.some((p) => related.has(p))
   const dimmed = (p: string): boolean => involved && !related.has(p)
+  const on = (p: string): boolean => marked.has(p)
+  // A gathered token is ringed the same way a selected one is, since it is
+  // the same statement — "this one" — made about several at once.
+  const ring = (p: string): string =>
+    selected === p || on(p) ? 'ring-2 ring-inset ring-accent' : ''
+  const press = (e: React.MouseEvent, path: string): void =>
+    onSelect(path, e.metaKey || e.ctrlKey || e.shiftKey)
 
   return (
     <div>
@@ -747,13 +965,13 @@ function FamilyRow({
                 data-token-swatch=""
                 data-token-path={path}
                 title={`${path} · ${hex}`}
-                onClick={() => onSelect(path)}
+                onClick={(e) => press(e, path)}
                 aria-label={`${path}, ${hex}`}
-                aria-pressed={selected === path}
+                aria-pressed={selected === path || on(path)}
                 style={{ background: hex }}
                 className={`group/step relative min-w-0 flex-1 transition-opacity focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/60 ${
                   dimmed(path) ? 'opacity-40' : 'opacity-100'
-                } ${selected === path ? 'ring-2 ring-inset ring-accent' : ''}`}
+                } ${ring(path)}`}
               >
                 <span className="pointer-events-none absolute inset-x-0 bottom-1 text-center text-[8.5px] font-medium text-text-primary opacity-0 mix-blend-difference transition-opacity group-hover/step:opacity-100">
                   {leafOf(path)}
@@ -779,11 +997,11 @@ function FamilyRow({
                     type="button"
                     data-token-swatch=""
                     data-token-path={path}
-                    onClick={() => onSelect(path)}
-                    aria-pressed={selected === path}
+                    onClick={(e) => press(e, path)}
+                    aria-pressed={selected === path || on(path)}
                     className={`flex w-full items-baseline gap-3 rounded-md px-2 py-1.5 text-left transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
                       dimmed(path) ? 'opacity-40' : 'opacity-100'
-                    } ${selected === path ? 'bg-raised' : 'hover:bg-raised'}`}
+                    } ${selected === path || on(path) ? 'bg-raised' : 'hover:bg-raised'} ${on(path) ? 'ring-2 ring-inset ring-accent' : ''}`}
                   >
                     <span className="min-w-0 flex-1 overflow-hidden">
                       <Specimen token={hit.token} value={r.ok ? r.value : null} />
@@ -809,11 +1027,11 @@ function FamilyRow({
                   type="button"
                   data-token-swatch=""
                   data-token-path={path}
-                  onClick={() => onSelect(path)}
-                  aria-pressed={selected === path}
+                  onClick={(e) => press(e, path)}
+                  aria-pressed={selected === path || on(path)}
                   className={`w-[104px] rounded-md p-1.5 text-left transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
                     dimmed(path) ? 'opacity-40' : 'opacity-100'
-                  } ${selected === path ? 'bg-raised' : 'hover:bg-raised'}`}
+                  } ${selected === path || on(path) ? 'bg-raised' : 'hover:bg-raised'} ${on(path) ? 'ring-2 ring-inset ring-accent' : ''}`}
                 >
                   <TokenMark token={hit.token} value={r.ok ? r.value : null} />
                   <span
