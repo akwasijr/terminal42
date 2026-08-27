@@ -5,7 +5,7 @@
 // people want "ease out" and not a cubic Bézier; the handles exist because the
 // people who do want a specific curve cannot get it from a menu.
 
-import { useCallback, useRef } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import type { Easing } from '../../../../shared/motion/types'
 
 const PRESETS: Array<{ label: string; value: Easing }> = [
@@ -88,6 +88,11 @@ export function EasingEditor({ easing, onChange }: { easing: Easing; onChange: (
           )
         })}
       </svg>
+      <div className="flex gap-1">
+        {(['x1', 'y1', 'x2', 'y2'] as const).map((k) => (
+          <Coord key={k} name={k} value={easing[k]} onChange={(v) => onChange({ ...easing, [k]: v })} />
+        ))}
+      </div>
       <div className="flex flex-wrap gap-1">
         {PRESETS.map((p) => {
           const active = same(p.value, easing)
@@ -107,6 +112,46 @@ export function EasingEditor({ easing, onChange }: { easing: Easing; onChange: (
         })}
       </div>
     </div>
+  )
+}
+
+/**
+ * One of the four numbers, typed rather than dragged.
+ *
+ * Handles are how you find a curve; numbers are how you repeat one. Somebody
+ * copying cubic-bezier(0.42, 0, 0.58, 1) out of a spec cannot drag their way
+ * to it, and somebody who found a curve by dragging needs to be able to read
+ * back what they landed on.
+ *
+ * Kept as text while the field has focus, because a controlled number input
+ * that reformats mid-keystroke eats the decimal point the moment you type it.
+ */
+function Coord({
+  name, value, onChange
+}: {
+  name: 'x1' | 'y1' | 'x2' | 'y2'
+  value: number
+  onChange: (v: number) => void
+}): React.JSX.Element {
+  const [draft, setDraft] = useState<string | null>(null)
+  const clamp = name.startsWith('x') ? clamp01 : clampY
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      aria-label={name}
+      value={draft ?? value.toFixed(2)}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        if (draft !== null) {
+          const n = parseFloat(draft)
+          if (Number.isFinite(n)) onChange(clamp(n))
+        }
+        setDraft(null)
+      }}
+      onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+      className="min-w-0 flex-1 rounded-sm bg-sunken px-1.5 py-1 text-center text-[11px] tabular-nums text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+    />
   )
 }
 
