@@ -371,9 +371,17 @@ export function DesignsListView({
         <div className="mb-3 flex flex-wrap items-center gap-2">
           {(scope === 'design' || presentTypes.groups.length > 0) && (
           <div className="inline-flex shrink-0 flex-wrap items-center gap-1 rounded-lg bg-sunken p-1">
-            <ViewPill active={typeFilter === 'all'} onClick={() => setTypeFilter('all')}>{allLabel}</ViewPill>
-            {presentTypes.groups.map((g) => (
-              <ViewPill key={g} active={typeFilter === g} onClick={() => setTypeFilter(g)}>{GROUP_LABEL[g]}</ViewPill>
+            {/* No "all" pill and no "other" pill: everything is showing until
+                you narrow it, and pressing the pill you are on widens it back,
+                so the row carries only the kinds you actually have. */}
+            {presentTypes.groups.filter((g) => g !== 'other').map((g) => (
+              <ViewPill
+                key={g}
+                active={typeFilter === g}
+                onClick={() => setTypeFilter(typeFilter === g ? 'all' : g)}
+              >
+                {GROUP_LABEL[g]}
+              </ViewPill>
             ))}
             {scope === 'design' && (
               <>
