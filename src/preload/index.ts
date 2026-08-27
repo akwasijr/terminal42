@@ -93,6 +93,8 @@ export type BasisStatus = {
   bound: boolean
   name: string | null
   moved: boolean
+  /** The design names a library that is no longer there. */
+  missing: boolean
 }
 
 export type DesignProgressStep = {

@@ -1827,10 +1827,13 @@ export function registerDesignIpc(getWin: () => BrowserWindow | null): void {
   ipcMain.handle('designs:basisStatus', (_e, designId: string): BasisStatus => {
     const d = getDesign(designId)
     const basisId = d?.brief?.basisId
-    if (!basisId) return { bound: false, name: null, moved: false }
+    if (!basisId) return { bound: false, name: null, moved: false, missing: false }
     const record = getTokenStudio(basisId)
-    if (!record) return { bound: false, name: null, moved: false }
-    return { bound: true, name: record.name, moved: basisHasMoved(d?.brief ?? null) }
+    // Bound to something that is gone. Generation carries on without it by
+    // design, so this is the only place that can say the binding has stopped
+    // meaning anything.
+    if (!record) return { bound: true, name: null, moved: false, missing: true }
+    return { bound: true, name: record.name, moved: basisHasMoved(d?.brief ?? null), missing: false }
   })
 
   // Bring a bound design back into line with its library.

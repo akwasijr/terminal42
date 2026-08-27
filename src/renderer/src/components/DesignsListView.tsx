@@ -776,6 +776,7 @@ function DesignRow({ design, onOpen, onDelete, folders, folder, onAssign }: { de
  */
 function BasisFlag({ designId }: { designId: string }): JSX.Element | null {
   const [moved, setMoved] = useState(false)
+  const [missing, setMissing] = useState(false)
   const [name, setName] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [stuck, setStuck] = useState<string[] | null>(null)
@@ -785,6 +786,7 @@ function BasisFlag({ designId }: { designId: string }): JSX.Element | null {
     void window.terminal42.designs.basisStatus(designId).then((s) => {
       if (cancelled) return
       setMoved(s.bound && s.moved)
+      setMissing(s.missing)
       setName(s.name)
     }).catch(() => {})
     return () => { cancelled = true }
@@ -807,9 +809,21 @@ function BasisFlag({ designId }: { designId: string }): JSX.Element | null {
     return (
       <span
         title={stuck.join('\n')}
-        className="shrink-0 rounded-full bg-elevated px-2 py-0.5 text-[10.5px] text-text-secondary"
+        className="shrink-0 self-start rounded-full bg-elevated px-2 py-0.5 text-[10.5px] text-text-secondary"
       >
         {stuck.length === 1 ? '1 value off the library' : `${stuck.length} values off the library`}
+      </span>
+    )
+  }
+  if (missing) {
+    // Not a button: there is nothing here to put right in one click, since the
+    // library it wants no longer exists. Saying so is the whole job.
+    return (
+      <span
+        title="This design is bound to a library that has been deleted, so nothing from it is being put in the prompt or checked. Bind it to another one."
+        className="shrink-0 self-start rounded-full bg-elevated px-2 py-0.5 text-[10.5px] text-text-secondary"
+      >
+        Library missing
       </span>
     )
   }
@@ -820,7 +834,7 @@ function BasisFlag({ designId }: { designId: string }): JSX.Element | null {
       disabled={busy}
       onClick={(e) => { e.stopPropagation(); void resync() }}
       title={name ? `${name} has changed since this design was built. Rewrite its token files.` : undefined}
-      className="shrink-0 rounded-full bg-elevated px-2 py-0.5 text-[10.5px] text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:opacity-60"
+      className="shrink-0 self-start rounded-full bg-elevated px-2 py-0.5 text-[10.5px] text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:opacity-60"
     >
       {busy ? 'Re-syncing…' : 'Library updated · Re-sync'}
     </button>

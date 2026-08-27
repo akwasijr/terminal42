@@ -176,4 +176,13 @@ export type BasisStatus = {
   bound: boolean
   name: string | null
   moved: boolean
+  /**
+   * The design names a library that is no longer there.
+   *
+   * Distinct from `bound: false`, which means nobody ever asked for one. A
+   * design in this state still says it is bound everywhere else in the app,
+   * while nothing is being put in its prompt and nothing is being checked, so
+   * it has to be able to say so.
+   */
+  missing: boolean
 }
