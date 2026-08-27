@@ -313,7 +313,13 @@ function StudioEditor({
     // Scrolled by hand rather than with scrollIntoView, which walks every
     // scrollable ancestor and so dragged the whole page up, taking the header
     // and the nav with it. Only this box should move.
-    root.scrollTo({ top: el.offsetTop - root.offsetTop, behavior: 'smooth' })
+    //
+    // Measured from the rendered rectangles rather than from offsetTop, which
+    // is quoted against whichever ancestor happens to be positioned. The
+    // section headers are sticky, and sticky is positioned, so the two figures
+    // are read from different origins.
+    const delta = el.getBoundingClientRect().top - root.getBoundingClientRect().top
+    root.scrollTo({ top: root.scrollTop + delta, behavior: 'smooth' })
   }
 
   // Which section the reader is actually in, so the nav is a position rather
@@ -718,30 +724,51 @@ function FamilyRow({
             const hit = map.get(path)
             if (!hit) return null
             const r = resolve(map, path)
-            const wide = hit.token.type === 'typography'
+            const wide = SPECIMEN.has(hit.token.type)
+            const caption = isAlias(hit.token.value)
+              ? aliasTarget(hit.token.value)
+              : shortValue(r.ok ? r.value : hit.token.value)
+            if (wide) {
+              return (
+                <li key={path} className="w-full">
+                  <button
+                    type="button"
+                    data-token-swatch=""
+                    data-token-path={path}
+                    onClick={() => onSelect(path)}
+                    aria-pressed={selected === path}
+                    className={`flex w-full items-baseline gap-3 rounded-md px-2 py-1.5 text-left transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                      dimmed(path) ? 'opacity-40' : 'opacity-100'
+                    } ${selected === path ? 'bg-raised' : 'hover:bg-raised'}`}
+                  >
+                    <span className="min-w-0 flex-1 overflow-hidden">
+                      <Specimen token={hit.token} value={r.ok ? r.value : null} />
+                    </span>
+                    <span className="shrink-0 text-right">
+                      <span className="block text-[10.5px] text-text-secondary">{leafOf(path)}</span>
+                      <span className="block text-[9.5px] text-text-muted">{caption}</span>
+                    </span>
+                  </button>
+                </li>
+              )
+            }
             return (
-              <li key={path} className={wide ? 'w-full' : ''}>
+              <li key={path}>
                 <button
                   type="button"
                   data-token-swatch=""
                   data-token-path={path}
                   onClick={() => onSelect(path)}
                   aria-pressed={selected === path}
-                  className={`rounded-md p-1.5 text-left transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
-                    wide ? 'w-full' : 'w-[104px]'
-                  } ${dimmed(path) ? 'opacity-40' : 'opacity-100'} ${
-                    selected === path ? 'bg-raised' : 'hover:bg-raised'
-                  }`}
+                  className={`w-[104px] rounded-md p-1.5 text-left transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                    dimmed(path) ? 'opacity-40' : 'opacity-100'
+                  } ${selected === path ? 'bg-raised' : 'hover:bg-raised'}`}
                 >
                   <TokenMark token={hit.token} value={r.ok ? r.value : null} />
                   <span className="mt-1.5 block truncate text-[10.5px] text-text-secondary">
                     {leafOf(path)}
                   </span>
-                  <span className="block truncate text-[9.5px] text-text-muted">
-                    {isAlias(hit.token.value)
-                      ? aliasTarget(hit.token.value)
-                      : shortValue(r.ok ? r.value : hit.token.value)}
-                  </span>
+                  <span className="block truncate text-[9.5px] text-text-muted">{caption}</span>
                 </button>
               </li>
             )
@@ -920,6 +947,110 @@ function TokenMark({ token, value }: { token: Token; value: TokenValue | null })
           {shortValue(value)}
         </span>
       )
+  }
+}
+
+/**
+ * Token types that are shown as a specimen across the full width rather than
+ * on a tile.
+ *
+ * A type scale is the one thing in a library whose whole meaning is relative.
+ * Set eight sizes in eight equal squares, each clamped to fit, and the ramp —
+ * the only decision the scale records — is the first thing thrown away. The
+ * same goes for a family: "Aa" in Inter and "Aa" in Space Grotesk are the same
+ * two letters, while the words "Space Grotesk" set in Space Grotesk say what
+ * the token is and what it looks like at once.
+ */
+const SPECIMEN = new Set<Token['type']>([
+  'typography',
+  'fontSize',
+  'fontFamily',
+  'fontWeight',
+  'lineHeight',
+  'letterSpacing'
+])
+
+const WEIGHT_NAME: Record<number, string> = {
+  100: 'Thin',
+  200: 'Extra light',
+  300: 'Light',
+  400: 'Regular',
+  500: 'Medium',
+  600: 'Semibold',
+  700: 'Bold',
+  800: 'Extra bold',
+  900: 'Black'
+}
+
+/** The largest a specimen is allowed to be drawn, so one token cannot own the screen. */
+const MAX_SPECIMEN = 46
+
+function Specimen({ token, value }: { token: Token; value: TokenValue | null }): React.JSX.Element {
+  const v = value ?? token.value
+  switch (token.type) {
+    case 'fontSize': {
+      const px = num(v as string | number)
+      return (
+        <span
+          style={{ fontSize: Math.min(MAX_SPECIMEN, px || 12) }}
+          className="block truncate leading-tight text-text-primary"
+        >
+          The quick brown fox
+        </span>
+      )
+    }
+    case 'fontFamily': {
+      const family = String(v)
+      return (
+        <span style={{ fontFamily: family }} className="block truncate text-[22px] leading-tight text-text-primary">
+          {family.split(',')[0].replace(/["']/g, '')}
+        </span>
+      )
+    }
+    case 'fontWeight': {
+      const w = num(v as string | number) || 400
+      return (
+        <span style={{ fontWeight: w }} className="block truncate text-[20px] leading-tight text-text-primary">
+          {WEIGHT_NAME[w] ?? String(w)}
+        </span>
+      )
+    }
+    case 'lineHeight': {
+      // Leading is a gap between lines, so it takes two lines to show one.
+      const lh = num(v as string | number) || 1.4
+      return (
+        <span style={{ lineHeight: lh }} className="block text-[12px] text-text-primary">
+          Leading is the space a paragraph
+          <br />
+          leaves between one line and the next.
+        </span>
+      )
+    }
+    case 'letterSpacing':
+      return (
+        <span style={{ letterSpacing: String(v) }} className="block truncate text-[20px] leading-tight text-text-primary">
+          Tracking
+        </span>
+      )
+    case 'typography': {
+      const s = (typeof v === 'object' ? v : {}) as Record<string, string | number>
+      return (
+        <span
+          style={{
+            fontFamily: String(s.fontFamily ?? 'inherit'),
+            fontSize: Math.min(MAX_SPECIMEN, num(s.fontSize) || 16),
+            fontWeight: num(s.fontWeight) || 400,
+            lineHeight: num(s.lineHeight) || 1.3,
+            letterSpacing: String(s.letterSpacing ?? 'normal')
+          }}
+          className="block truncate text-text-primary"
+        >
+          The quick brown fox
+        </span>
+      )
+    }
+    default:
+      return <TokenMark token={token} value={value} />
   }
 }
 
