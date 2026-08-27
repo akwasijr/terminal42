@@ -173,6 +173,36 @@ export function removeKey(keys: Keyframes, target: TrackTarget, id: string): Key
 }
 
 /** Move a key to a different instant, keeping the track sorted. */
+/**
+ * How the segment starting at one key is travelled.
+ *
+ * Undefined clears it back to linear rather than storing a straight-line
+ * curve, so a document only carries the easing somebody actually chose.
+ */
+export function setKeyEasing(
+  keys: Keyframes,
+  target: TrackTarget,
+  id: string,
+  easing: Easing | undefined
+): Keyframes {
+  const track = keys[target]
+  if (!track) return keys
+  return {
+    ...keys,
+    [target]: {
+      ...track,
+      keys: track.keys.map((k) => {
+        if (k.id !== id) return k
+        if (!easing) {
+          const { easing: _drop, ...rest } = k
+          return rest
+        }
+        return { ...k, easing }
+      })
+    }
+  }
+}
+
 export function moveKey(keys: Keyframes, target: TrackTarget, id: string, t: number): Keyframes {
   const track = keys[target]
   if (!track) return keys

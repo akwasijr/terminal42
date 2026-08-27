@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  sampleTrack, setKey, removeKey, moveKey, removeTrack, setMuted,
+  sampleTrack, setKey, removeKey, moveKey, removeTrack, setMuted, setKeyEasing,
   valueAt, isKeyed, keyedTargets, emptyKeyframes, type Track
 } from '../../src/shared/motion/keyframes'
 import { computePlacements, paramAffectsCount } from '../../src/shared/motion/frame'
@@ -248,5 +248,36 @@ describe('keys are read at the loop position, not the eased one', () => {
     // At half way round, the keyed document must look exactly like one whose
     // slider is simply parked at the keyed value.
     expect(computePlacements(keyed, 0.5)).toEqual(computePlacements(fixed, 0.5))
+  })
+})
+
+describe('shaping one segment', () => {
+  const EASE_OUT = { x1: 0, y1: 0, x2: 0.58, y2: 1 }
+  const built = (): ReturnType<typeof setKey> =>
+    setKey(setKey(emptyKeyframes(), 'param:radius', 0, 0), 'param:radius', 0.5, 10)
+
+  it('bends the segment it is set on and no other', () => {
+    const keys = built()
+    const eased = setKeyEasing(keys, 'param:radius', keys['param:radius'].keys[0].id, EASE_OUT)
+    const flat = sampleTrack(keys['param:radius'], 0.25, 0)
+    const bent = sampleTrack(eased['param:radius'], 0.25, 0)
+    expect(bent).toBeGreaterThan(flat)
+    // The segment on the other side of the second key is untouched.
+    expect(sampleTrack(eased['param:radius'], 0.75, 0)).toBe(sampleTrack(keys['param:radius'], 0.75, 0))
+  })
+
+  it('clears back to a straight line rather than storing one', () => {
+    const keys = built()
+    const id = keys['param:radius'].keys[0].id
+    const eased = setKeyEasing(keys, 'param:radius', id, EASE_OUT)
+    const cleared = setKeyEasing(eased, 'param:radius', id, undefined)
+    expect(cleared['param:radius'].keys[0]).not.toHaveProperty('easing')
+    expect(cleared).toEqual(keys)
+  })
+
+  it('leaves a track it does not have alone', () => {
+    const keys = built()
+    expect(setKeyEasing(keys, 'param:nothing', 'k1', EASE_OUT)).toBe(keys)
+    expect(setKeyEasing(keys, 'param:radius', 'no-such-key', EASE_OUT)).toEqual(keys)
   })
 })

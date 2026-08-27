@@ -19,9 +19,11 @@ import { FRAME_RATES } from '../../../../shared/motion/types'
 import { componentFor } from '../../../../shared/motion/registry'
 import { layerVisibility } from '../../../../shared/motion/frame'
 import {
-  keyedTargets, moveKey, removeKey, removeTrack, sampleTrack, setKey, setMuted,
+  keyedTargets, moveKey, removeKey, removeTrack, sampleTrack, setKey, setKeyEasing, setMuted,
   type Keyframes, type TrackTarget
 } from '../../../../shared/motion/keyframes'
+import { EasingEditor } from './EasingEditor'
+import type { Easing } from '../../../../shared/motion/types'
 
 /** The three columns every row shares. Changing one here moves all of them. */
 const LABEL_W = 'w-[104px]'
@@ -127,7 +129,7 @@ export function MotionTimeline({
               {targets.length === 1 ? '1 animated value' : `${targets.length} animated values`}
             </span>
             <span className="flex-1 text-[10px] text-text-muted">
-              Drag a key to move it, right-click to remove it, double-click a lane to add one.
+              Click a key to shape the segment after it, drag to move, right-click to remove, double-click a lane to add one.
             </span>
             <button
               type="button"
@@ -265,6 +267,9 @@ function TrackRow({
   const lane = useRef<HTMLDivElement>(null)
   const drag = useRef<{ id: string; moved: boolean } | null>(null)
   const [dragging, setDragging] = useState(false)
+  // Which key's segment is being shaped. One at a time, and never while
+  // dragging, so a nudge along the lane cannot open a panel over the lane.
+  const [shaping, setShaping] = useState<string | null>(null)
 
   /** Where along the lane a pointer is, as a fraction of the loop. */
   const tAt = useCallback((clientX: number): number => {
@@ -294,8 +299,13 @@ function TrackRow({
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
     // A press that never moved is a request to go to that key, not a nudge of
     // it back to where it already was.
-    if (d && !d.moved) onPhase(t)
+    if (d && !d.moved) {
+      onPhase(t)
+      setShaping((cur) => (cur === d.id ? null : d.id))
+    }
   }
+
+  const shapingKey = (track?.keys ?? []).find((k) => k.id === shaping) ?? null
 
   return (
     <div className="flex items-center gap-2">
@@ -334,14 +344,24 @@ function TrackRow({
             onPointerMove={move}
             onPointerUp={(e) => up(e, k.t)}
             onPointerCancel={(e) => up(e, k.t)}
-            onContextMenu={(e) => { e.preventDefault(); onKeys(removeKey(keys, target, k.id)) }}
-            title={`${Math.round(k.t * 100)}% — ${round(k.v)}. Drag to move, right-click to remove.`}
+            onContextMenu={(e) => { e.preventDefault(); setShaping(null); onKeys(removeKey(keys, target, k.id)) }}
+            title={`${Math.round(k.t * 100)}% — ${round(k.v)}. Click to shape the segment after it, drag to move, right-click to remove.`}
             className={`absolute top-1/2 h-[9px] w-[9px] -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
               dragging ? 'cursor-grabbing' : 'cursor-grab'
-            } ${track?.muted ? 'bg-text-muted' : 'bg-accent'}`}
+            } ${track?.muted ? 'bg-text-muted' : 'bg-accent'} ${
+              shaping === k.id ? 'ring-2 ring-accent ring-offset-1 ring-offset-sunken' : ''
+            } ${k.easing && shaping !== k.id ? 'ring-1 ring-accent/50 ring-offset-1 ring-offset-sunken' : ''}`}
             style={{ left: `${k.t * 100}%` }}
           />
         ))}
+        {shapingKey ? (
+          <SegmentShape
+            at={shapingKey.t}
+            easing={shapingKey.easing}
+            onChange={(e) => onKeys(setKeyEasing(keys, target, shapingKey.id, e))}
+            onClose={() => setShaping(null)}
+          />
+        ) : null}
       </div>
       <button
         type="button"
@@ -355,6 +375,57 @@ function TrackRow({
     </div>
   )
 }
+
+/**
+ * The curve one segment is travelled on, over the lane it belongs to.
+ *
+ * It is the same editor the whole loop uses, because a segment's easing is the
+ * same kind of thing as the loop's and learning two of them would be a tax.
+ * It opens upward: the timeline sits at the foot of the window and a panel
+ * dropping down would be off-screen.
+ */
+function SegmentShape({
+  at, easing, onChange, onClose
+}: {
+  /** Where in the loop the key sits, so the panel opens next to it. */
+  at: number
+  easing: Easing | undefined
+  onChange: (e: Easing | undefined) => void
+  onClose: () => void
+}): React.JSX.Element {
+  // Held away from the ends so a key at 0 or 1 does not push the panel out of
+  // the window; it still reads as belonging to the key it came from.
+  const left = Math.min(88, Math.max(12, at * 100))
+  return (
+    <div
+      style={{ left: `${left}%` }}
+      className="absolute bottom-full z-30 mb-1.5 w-56 -translate-x-1/2 rounded-panel bg-raised p-2 shadow-overlay"
+    >
+      <div className="flex items-center justify-between pb-1">
+        <span className="text-[10.5px] text-text-secondary">This segment</span>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close the segment shape"
+          className="rounded-sm px-1 text-[12px] leading-none text-text-muted hover:bg-elevated hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+        >
+          ×
+        </button>
+      </div>
+      <EasingEditor easing={easing ?? LINEAR} onChange={onChange} />
+      <button
+        type="button"
+        onClick={() => onChange(undefined)}
+        disabled={!easing}
+        className="mt-1.5 w-full rounded-sm py-1 text-[10.5px] text-text-muted hover:bg-elevated hover:text-text-primary disabled:opacity-40 disabled:hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+      >
+        Straight line
+      </button>
+    </div>
+  )
+}
+
+const LINEAR: Easing = { x1: 0, y1: 0, x2: 1, y2: 1 }
 
 function round(v: number): string {
   return String(Number(v.toFixed(2)))
