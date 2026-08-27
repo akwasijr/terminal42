@@ -651,7 +651,7 @@ export function DesignWizard({ onCancel, onComplete, initialIdea, target = 'html
 
   return (
     <div
-      className="fixed inset-0 z-[200] grid place-items-center bg-black/60 p-6"
+      className="t42-scrim fixed inset-0 z-[200] grid place-items-center bg-black/60 p-6"
       onMouseDown={(e) => { if (e.target === e.currentTarget && !creating) onCancel() }}
       role="presentation"
     >
@@ -3020,7 +3020,7 @@ function PromptPreviewModal({ brief, onClose }: { brief: NonNullable<ReturnType<
   }
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-6"
+      className="t42-scrim fixed inset-0 z-50 grid place-items-center bg-black/60 p-6"
       onClick={onClose}
     >
       <div

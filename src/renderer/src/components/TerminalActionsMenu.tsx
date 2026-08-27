@@ -40,7 +40,7 @@ export function TerminalActionsMenu({ sessionId }: { sessionId: string | null })
         <Dropdown.Content
           align="end"
           sideOffset={6}
-          className="z-50 min-w-[240px] rounded-md bg-surface p-1 text-[12px] text-text-primary shadow-sm focus:outline-none"
+          className="t42-menu z-50 min-w-[240px] rounded-md bg-surface p-1 text-[12px] text-text-primary shadow-sm focus:outline-none"
         >
           <Item
             icon={<IconCopy />}

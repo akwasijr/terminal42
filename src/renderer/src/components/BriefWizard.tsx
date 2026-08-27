@@ -282,7 +282,7 @@ export function BriefWizard({ folderPath, projectId, initial, onCancel, onComple
 
   return (
     <div
-      className="fixed inset-0 z-[200] grid place-items-center bg-black/60 p-6"
+      className="t42-scrim fixed inset-0 z-[200] grid place-items-center bg-black/60 p-6"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel() }}
       role="presentation"
     >

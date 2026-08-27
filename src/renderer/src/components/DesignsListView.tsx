@@ -326,7 +326,7 @@ export function DesignsListView({
                 <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="-mr-0.5 ml-0.5 opacity-80"><path d="M4 6l4 4 4-4" /></svg>
               </button>
               {newMenuOpen && (
-                <div className="absolute right-0 top-full z-30 mt-1.5 w-60 overflow-hidden rounded-lg bg-raised py-1 shadow-overlay">
+                <div className="t42-menu absolute right-0 top-full z-30 mt-1.5 w-60 overflow-hidden rounded-lg bg-raised py-1 shadow-overlay">
                   {scope === 'form' ? (
                     <button type="button" onClick={() => { setNewMenuOpen(false); void createFreeform() }} className="flex w-full items-center px-3 py-2 text-left text-[12.5px] font-medium text-text-primary hover:bg-elevated">Blank form</button>
                   ) : (
@@ -557,7 +557,7 @@ function FolderAssign({ id, current, folders, onAssign }: { id: string; current:
         <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4"><rect x="2" y="3.5" width="12" height="9.5" rx="1.2" /><path d="M2 6h12" /></svg>
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-30 mt-1 w-44 overflow-hidden rounded-lg bg-raised py-1 shadow-overlay">
+        <div className="t42-menu absolute right-0 top-full z-30 mt-1 w-44 overflow-hidden rounded-lg bg-raised py-1 shadow-overlay">
           <div className="px-3 py-1 text-[11px] font-medium text-text-muted">Move to folder</div>
           <button type="button" onClick={(e) => { e.stopPropagation(); onAssign(id, null); setOpen(false) }} className={['flex w-full items-center px-3 py-1.5 text-left text-[12px] hover:bg-elevated', !current ? 'text-text-primary' : 'text-text-secondary'].join(' ')}>No folder</button>
           {folders.map((f) => (
@@ -750,7 +750,7 @@ function ConfirmDelete({ design, onCancel, onConfirm }: {
   onConfirm: () => void
 }): JSX.Element {
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 px-4">
+    <div className="t42-scrim fixed inset-0 z-50 grid place-items-center bg-black/50 px-4">
       <div className="w-full max-w-md rounded-xl bg-raised p-5 shadow-overlay">
         <h3 className="text-[15px] font-medium text-text-primary">Delete this design?</h3>
         <p className="mt-1.5 text-[13px] text-text-muted">

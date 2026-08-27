@@ -48,7 +48,7 @@ export function MotionTemplates({
     // left nothing to say the app was still behind it, so picking a template
     // felt like leaving Motion rather than reaching into a drawer.
     <div
-      className="fixed inset-0 z-40 grid place-items-center bg-black/40 p-6 backdrop-blur-sm"
+      className="t42-scrim fixed inset-0 z-40 grid place-items-center bg-black/40 p-6 backdrop-blur-sm"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <div

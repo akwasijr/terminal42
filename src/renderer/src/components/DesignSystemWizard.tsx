@@ -366,7 +366,7 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
   const needsScreenshotDecision = (a.shots?.length ?? 0) > 0 && !visionApplied && !analysisSkipped
 
   return (
-    <div className="fixed inset-0 z-[200] grid place-items-center bg-black/60 p-6" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onCancel() }} role="presentation">
+    <div className="t42-scrim fixed inset-0 z-[200] grid place-items-center bg-black/60 p-6" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onCancel() }} role="presentation">
       <div className="relative flex h-[82vh] max-h-[760px] w-[820px] max-w-full flex-col overflow-hidden rounded-xl bg-bg shadow-2xl">
         <header className="flex items-center gap-5 bg-surface/40 px-6 py-4">
           <h2 className="text-[18px] font-semibold text-text-primary">{TITLES[page]}</h2>

@@ -90,7 +90,7 @@ export function StarterPackModal({
   ).length
 
   return (
-    <div className="fixed inset-0 z-[100] grid place-items-center bg-black/50 p-6" onClick={onClose} role="presentation">
+    <div className="t42-scrim fixed inset-0 z-[100] grid place-items-center bg-black/50 p-6" onClick={onClose} role="presentation">
       <div
         className="flex h-[82vh] w-[1000px] max-w-full flex-col overflow-hidden rounded-lg bg-bg shadow-xl"
         onClick={(e) => e.stopPropagation()}

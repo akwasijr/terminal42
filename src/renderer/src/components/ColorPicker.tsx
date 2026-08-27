@@ -169,7 +169,7 @@ export function ColorPicker({ req }: { req: PickerRequest }): JSX.Element {
               <svg width="14" height="14" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M3 5h10M3 8h10M3 11h10" /></svg>
             </button>
             {menuOpen && (
-              <div className="absolute right-0 top-7 z-10 w-48 rounded-lg bg-raised p-1 shadow-overlay">
+              <div className="t42-menu absolute right-0 top-7 z-10 w-48 rounded-lg bg-raised p-1 shadow-overlay">
                 <div className="px-2 py-1 text-[11px] text-text-muted">When changing hue…</div>
                 {HUE_MODES.map((m) => (
                   <button key={m.id} type="button" onClick={() => { setHueMode(m.id); setMenuOpen(false) }} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[12px] text-text-primary hover:bg-bg/60">

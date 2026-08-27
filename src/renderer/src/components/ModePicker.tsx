@@ -55,7 +55,7 @@ export function ModePicker({
           side="top"
           sideOffset={8}
           collisionPadding={12}
-          className="z-50 min-w-[160px] rounded-lg bg-raised p-1 text-[12px] text-text-primary shadow-overlay"
+          className="t42-menu z-50 min-w-[160px] rounded-lg bg-raised p-1 text-[12px] text-text-primary shadow-overlay"
         >
           {MODES.map((m) => {
             const active = m.id === value

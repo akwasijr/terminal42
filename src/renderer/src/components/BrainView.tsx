@@ -548,7 +548,7 @@ function BrainOnboarding({
   const prev = (): void => setStep((s) => Math.max(0, s - 1))
 
   return (
-    <div className="fixed inset-0 z-40 grid place-items-center bg-bg/80 px-4 backdrop-blur-sm">
+    <div className="t42-scrim fixed inset-0 z-40 grid place-items-center bg-bg/80 px-4 backdrop-blur-sm">
       <div className="flex w-full max-w-[640px] flex-col overflow-hidden rounded-xl bg-raised shadow-overlay">
         <header className="flex items-center justify-between px-5 py-3">
           <div className="flex items-center gap-3">

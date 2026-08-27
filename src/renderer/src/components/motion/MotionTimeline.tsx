@@ -419,7 +419,7 @@ function SegmentShape({
     <div
       data-segment-shape
       style={{ left: `${left}%` }}
-      className="absolute bottom-full z-30 mb-1.5 w-56 -translate-x-1/2 rounded-panel bg-raised p-2 shadow-overlay"
+      className="t42-menu t42-menu-up absolute bottom-full z-30 mb-1.5 w-56 -translate-x-1/2 rounded-panel bg-raised p-2 shadow-overlay"
     >
       <div className="flex items-center justify-between pb-1">
         <span className="text-[10.5px] text-text-secondary">This segment</span>

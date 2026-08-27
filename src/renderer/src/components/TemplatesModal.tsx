@@ -37,7 +37,7 @@ export function TemplatesModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-6"
+      className="t42-scrim fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-6"
       onClick={onClose}
     >
       <div

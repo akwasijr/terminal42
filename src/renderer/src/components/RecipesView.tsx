@@ -196,7 +196,7 @@ function ScheduleDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[60] grid place-items-center bg-black/40"
+      className="t42-scrim fixed inset-0 z-[60] grid place-items-center bg-black/40"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
       onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}
     >

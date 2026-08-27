@@ -3180,7 +3180,7 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
       {shapeMenuOpen && (
         <>
           <div className="fixed inset-0 z-40" onPointerDown={() => setShapeMenuOpen(false)} role="presentation" />
-          <div className="absolute left-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-2xl bg-raised py-2 shadow-overlay">
+          <div className="t42-menu absolute left-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-2xl bg-raised py-2 shadow-overlay">
             {shapeTools.map((id) => (
               <button key={id} type="button" onClick={() => { setTool(id); setShapeMenuOpen(false) }} className="flex w-full items-center gap-3 px-4 py-2 text-left text-[13px] text-white/90 hover:bg-white/10">
                 <span className="grid w-4 place-items-center">{tool === id ? '✓' : ''}</span>
@@ -3958,7 +3958,7 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
         return (
           <>
             <div className="fixed inset-0 z-[60]" onPointerDown={() => setLayerMenu(null)} onContextMenu={(e) => { e.preventDefault(); setLayerMenu(null) }} />
-            <div className="fixed z-[61] w-44 rounded-md bg-raised py-1 shadow-overlay" style={{ left: layerMenu.x, top: layerMenu.y }}>
+            <div className="t42-menu fixed z-[61] w-44 rounded-md bg-raised py-1 shadow-overlay" style={{ left: layerMenu.x, top: layerMenu.y }}>
               <Item onClick={() => startRename(lo)}>Rename</Item>
               <Item onClick={() => duplicateId(lo.id)} shortcut="⌘D">Duplicate</Item>
               <Item onClick={() => copyId(lo.id)} shortcut="⌘C">Copy</Item>

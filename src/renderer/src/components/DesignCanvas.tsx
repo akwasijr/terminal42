@@ -1463,7 +1463,7 @@ function ExportMenu({ designId, disabled }: { designId: string; disabled: boolea
         {formats.length > 1 && <span className="text-[9px] opacity-70">▾</span>}
       </button>
       {open && formats.length > 0 && (
-        <div className="absolute right-0 top-full z-30 mt-1 min-w-[180px] overflow-hidden rounded-md bg-raised shadow-overlay">
+        <div className="t42-menu absolute right-0 top-full z-30 mt-1 min-w-[180px] overflow-hidden rounded-md bg-raised shadow-overlay">
           {formats.map((f) => (
             <button
               key={f}
@@ -1716,7 +1716,7 @@ function FigmaSendDialog({ designTitle: _designTitle, onCancel, onSend }: {
 
   return (
     <div
-      className="fixed inset-0 z-[150] grid place-items-center bg-black/50 p-6"
+      className="t42-scrim fixed inset-0 z-[150] grid place-items-center bg-black/50 p-6"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel() }}
     >
       <div className="w-[440px] max-w-full overflow-hidden rounded-xl bg-raised shadow-overlay">
@@ -2523,7 +2523,7 @@ function VersionPicker({ versions, activeId, onPick, open, setOpen }: {
         <span className="text-[8px] opacity-70">▾</span>
       </button>
       {open && (
-        <div className="absolute left-0 top-full z-30 mt-1 max-h-[260px] min-w-[140px] overflow-y-auto rounded-md bg-raised py-1 shadow-overlay">
+        <div className="t42-menu absolute left-0 top-full z-30 mt-1 max-h-[260px] min-w-[140px] overflow-y-auto rounded-md bg-raised py-1 shadow-overlay">
           {[...versions].reverse().map((v) => (
             <button
               key={v.id}

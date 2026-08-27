@@ -501,7 +501,7 @@ export function DesignSystemView({ openSystemId, onConsumeOpen }: { openSystemId
             {menuOpen && (
               <>
                 <div className="fixed inset-0 z-20" onClick={() => setMenuOpen(false)} role="presentation" />
-                <div className="absolute right-0 top-full z-30 mt-1.5 w-44 overflow-hidden rounded-lg bg-raised py-1 shadow-overlay">
+                <div className="t42-menu absolute right-0 top-full z-30 mt-1.5 w-44 overflow-hidden rounded-lg bg-raised py-1 shadow-overlay">
                   <button type="button" onClick={() => { setMenuOpen(false); setWizard({ initial: answersFromSystem(s) }) }} className="flex w-full px-3 py-2 text-left text-[12.5px] text-text-primary hover:bg-elevated">Duplicate &amp; tweak</button>
                   <button type="button" onClick={() => { setMenuOpen(false); setConfirmDel(true) }} className="flex w-full px-3 py-2 text-left text-[12.5px] text-error hover:bg-error/10">Delete</button>
                 </div>
@@ -546,7 +546,7 @@ export function DesignSystemView({ openSystemId, onConsumeOpen }: { openSystemId
 
       {wizardEl}
       {confirmDel && (
-        <div className="fixed inset-0 z-[200] grid place-items-center bg-black/60 p-6" onMouseDown={(e) => { if (e.target === e.currentTarget) setConfirmDel(false) }} role="presentation">
+        <div className="t42-scrim fixed inset-0 z-[200] grid place-items-center bg-black/60 p-6" onMouseDown={(e) => { if (e.target === e.currentTarget) setConfirmDel(false) }} role="presentation">
           <div className="w-[380px] max-w-full rounded-xl bg-bg p-5 shadow-2xl">
             <h3 className="text-[15px] font-semibold text-text-primary">Delete this design system?</h3>
             <p className="mt-1.5 text-[12.5px] leading-relaxed text-text-muted">“{s.name}” and its documentation will be removed. This cannot be undone.</p>

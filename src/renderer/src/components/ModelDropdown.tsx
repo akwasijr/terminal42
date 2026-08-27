@@ -154,7 +154,7 @@ export function ModelDropdown({
         <Dropdown.Content
           align="end"
           sideOffset={6}
-          className="z-50 min-w-[220px] rounded-lg bg-raised p-1 text-[12px] text-text-primary shadow-overlay"
+          className="t42-menu z-50 min-w-[220px] rounded-lg bg-raised p-1 text-[12px] text-text-primary shadow-overlay"
         >
           {groups.map((g) => (
             <div key={g}>

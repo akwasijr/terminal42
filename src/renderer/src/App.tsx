@@ -1192,7 +1192,7 @@ function Main({
       ) : null}
 
       {/* Overlay panes: render on top of the (hidden) terminal so it stays mounted. */}
-      {overlay && <div className="relative z-10 flex flex-1 overflow-hidden bg-bg"><Suspense fallback={<ViewLoading />}>{overlay}</Suspense></div>}
+      {overlay && <div key={active} className="t42-enter relative z-10 flex flex-1 overflow-hidden bg-bg"><Suspense fallback={<ViewLoading />}>{overlay}</Suspense></div>}
       {!overlay && !activeProject && !showTerminal && <EmptyHome onAddProject={onAddProject} onOpenFolder={onOpenFolder} />}
     </div>
   )

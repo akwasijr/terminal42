@@ -174,7 +174,7 @@ function PreviewModal({
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-bg/80 p-6 backdrop-blur-sm" onClick={onClose}>
+    <div className="t42-scrim fixed inset-0 z-40 flex items-center justify-center bg-bg/80 p-6 backdrop-blur-sm" onClick={onClose}>
       <div
         className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-raised shadow-overlay"
         onClick={(e) => e.stopPropagation()}

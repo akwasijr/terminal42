@@ -526,3 +526,36 @@ html[data-translucent="true"] nav.t42-sidebar {
   background-size: 16px 16px;
   background-position: 0 0, 0 8px, 8px -8px, -8px 0;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Arrivals
+
+   Three ways for something to appear, and no more, because a app where
+   every surface has its own idea of how to open reads as several apps.
+
+   All three are opacity and transform only, all are under 200ms, and all
+   move a very short distance. The point is not to be seen; it is to say
+   where the thing came from, so a menu reads as having come out of the
+   button that opened it rather than having always been there and merely
+   been invisible.
+
+   The global prefers-reduced-motion rule above already reduces every one of
+   these to nothing, so none of them needs to opt out again.
+   ───────────────────────────────────────────────────────────────────── */
+@keyframes t42-arrive { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes t42-unfold { from { opacity: 0; transform: translateY(-4px) scale(0.97); } to { opacity: 1; transform: none; } }
+@keyframes t42-lift   { from { opacity: 0; transform: translateY(8px) scale(0.985); } to { opacity: 1; transform: none; } }
+@keyframes t42-veil   { from { opacity: 0; } to { opacity: 1; } }
+
+/* A page or a tab: it was already the subject, so it barely moves. */
+.t42-enter { animation: t42-arrive 180ms cubic-bezier(.22, 1, .36, 1) both; }
+
+/* A menu: grows from the edge it is anchored to, which is nearly always the
+   top, so the origin is set here rather than in twenty class strings. */
+.t42-menu { animation: t42-unfold 130ms cubic-bezier(.22, 1, .36, 1) both; transform-origin: top center; }
+.t42-menu-up { transform-origin: bottom center; }
+
+/* A dialog and the scrim behind it. The scrim is slower so the panel does
+   not appear to arrive before the room has darkened. */
+.t42-scrim { animation: t42-veil 180ms ease-out both; }
+.t42-modal, .t42-scrim > * { animation: t42-lift 200ms cubic-bezier(.22, 1, .36, 1) both; }

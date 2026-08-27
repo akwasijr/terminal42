@@ -249,7 +249,7 @@ export function CanvasAssistant({ getContext, onCreate, onAnimate, onEdit, onDel
       )}
 
       {debugOpen && (
-        <div className="fixed inset-0 z-[300] grid place-items-center bg-black/55 p-6" onMouseDown={(e) => { if (e.target === e.currentTarget) setDebugOpen(false) }} role="presentation">
+        <div className="t42-scrim fixed inset-0 z-[300] grid place-items-center bg-black/55 p-6" onMouseDown={(e) => { if (e.target === e.currentTarget) setDebugOpen(false) }} role="presentation">
           <div className="flex h-[82vh] w-[940px] max-w-full flex-col overflow-hidden rounded-xl bg-bg shadow-2xl">
             <div className="flex items-center justify-between px-4 py-3">
               <div className="text-[13px] font-semibold text-text-primary">Generation inspector</div>
@@ -298,7 +298,7 @@ export function CanvasAssistant({ getContext, onCreate, onAnimate, onEdit, onDel
         </div>
       )}
       {brainOpen && (
-        <div className="fixed inset-0 z-[300] grid place-items-center bg-black/55 p-6" onMouseDown={(e) => { if (e.target === e.currentTarget) setBrainOpen(false) }} role="presentation">
+        <div className="t42-scrim fixed inset-0 z-[300] grid place-items-center bg-black/55 p-6" onMouseDown={(e) => { if (e.target === e.currentTarget) setBrainOpen(false) }} role="presentation">
           <div className="flex h-[78vh] w-[860px] max-w-full flex-col overflow-hidden rounded-xl bg-bg shadow-2xl">
             <header className="flex items-center justify-between px-5 py-3">
               <div className="flex items-center gap-2 text-[14px] font-semibold text-text-primary">
@@ -397,7 +397,7 @@ export function CanvasAssistant({ getContext, onCreate, onAnimate, onEdit, onDel
                         <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6l4 4 4-4" /></svg>
                       </button>
                       {skillMenuOpen && (
-                        <div className="absolute right-0 top-full z-10 mt-1.5 w-44 overflow-hidden rounded-lg bg-raised py-1 shadow-overlay">
+                        <div className="t42-menu absolute right-0 top-full z-10 mt-1.5 w-44 overflow-hidden rounded-lg bg-raised py-1 shadow-overlay">
                           <button type="button" onClick={() => { setSkillMenuOpen(false); const next = addBrainSkill(brain, 'New skill', ''); setBrain(next); setExpandedSkill(next.skills[0]?.id ?? null) }} className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[12.5px] text-text-primary hover:bg-elevated">
                             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M8 3v10M3 8h10" /></svg>
                             Create new
@@ -516,7 +516,7 @@ export function CanvasAssistant({ getContext, onCreate, onAnimate, onEdit, onDel
             <div ref={modelRef} className="relative">
               <button type="button" onClick={() => setModelOpen((o) => !o)} className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-[12px] font-medium text-text-muted hover:bg-elevated hover:text-text-primary">{(MODELS.find((m) => m.id === modelId)?.label ?? 'Model').replace(/^Claude\s+/, '')} <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6l4 4 4-4" /></svg></button>
               {modelOpen && (
-                <div className="absolute bottom-full left-0 z-40 mb-1.5 max-h-72 w-52 overflow-y-auto rounded-lg bg-raised py-1 shadow-overlay">
+                <div className="t42-menu t42-menu-up absolute bottom-full left-0 z-40 mb-1.5 max-h-72 w-52 overflow-y-auto rounded-lg bg-raised py-1 shadow-overlay">
                   {MODELS.map((m) => (
                     <button key={m.id} type="button" onClick={() => { setModelId(m.id); setModelOpen(false) }} className={['flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-elevated', m.id === modelId ? 'text-text-primary' : 'text-text-secondary'].join(' ')}>
                       <span className="w-3 shrink-0">{m.id === modelId ? '\u2713' : ''}</span>{m.label}
@@ -535,7 +535,7 @@ export function CanvasAssistant({ getContext, onCreate, onAnimate, onEdit, onDel
                   <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><circle cx="3" cy="8" r="1.3" /><circle cx="8" cy="8" r="1.3" /><circle cx="13" cy="8" r="1.3" /></svg>
                 </button>
                 {composerMenu && (
-                  <div className="absolute bottom-full right-0 z-40 mb-1.5 w-48 overflow-hidden rounded-xl bg-raised py-1 shadow-overlay">
+                  <div className="t42-menu t42-menu-up absolute bottom-full right-0 z-40 mb-1.5 w-48 overflow-hidden rounded-xl bg-raised py-1 shadow-overlay">
                     <button type="button" onClick={() => { setComposerMenu(false); fileRef.current?.click() }} className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[12.5px] text-text-primary hover:bg-elevated">
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5l-8.5 8.5a5 5 0 0 1-7-7l8.5-8.5a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3l8-8" /></svg>
                       Attach image

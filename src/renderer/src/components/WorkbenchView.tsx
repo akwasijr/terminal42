@@ -347,7 +347,7 @@ function NewMenu({ onPick }: { onPick: (k: 'skill' | 'recipe') => void }) {
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-md bg-raised py-1 shadow-overlay">
+          <div className="t42-menu absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-md bg-raised py-1 shadow-overlay">
             <button
               type="button"
               onClick={() => { onPick('skill'); setOpen(false) }}
@@ -495,7 +495,7 @@ function StarterPreview({
   const reset = () => setBody(starter.body)
   return (
     <div
-      className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-6"
+      className="t42-scrim fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-6"
       onClick={onClose}
     >
       <div
@@ -861,7 +861,7 @@ function ScheduleDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[60] grid place-items-center bg-black/40"
+      className="t42-scrim fixed inset-0 z-[60] grid place-items-center bg-black/40"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <div className="w-[440px] rounded-lg bg-bg p-5 shadow-xl">
