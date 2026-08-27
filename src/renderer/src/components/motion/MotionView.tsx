@@ -5,12 +5,13 @@
 // The thumbnail is a real frame captured while the piece was last open, so
 // the list never has to spin up the GPU to draw itself.
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { MotionDoc } from '../../../../shared/motion/types'
 import { emptyDoc, hydrateDoc } from '../../../../shared/motion/defaults'
 import { MOTION_COMPONENTS } from '../../../../shared/motion/registry'
 import { MotionStudio } from './MotionStudio'
 import { MotionTemplates } from './MotionTemplates'
+import { MotionSetup, type MotionSetupChoice } from './MotionSetup'
 import { buildTemplateDoc } from '../../lib/motion/templateDoc'
 import type { MotionTemplate } from '../../../../shared/motion/templates'
 import { IconPlus, IconTrash } from '../icons'
@@ -22,9 +23,8 @@ export function MotionView(): React.JSX.Element {
   const [rows, setRows] = useState<Row[]>([])
   const [open, setOpen] = useState<{ id: string; title: string; doc: MotionDoc } | null>(null)
   const [loading, setLoading] = useState(true)
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [setupOpen, setSetupOpen] = useState(false)
   const [templatesOpen, setTemplatesOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement | null>(null)
 
   const refresh = useCallback(async (): Promise<void> => {
     const list = await window.terminal42.motion.list()
@@ -34,18 +34,16 @@ export function MotionView(): React.JSX.Element {
 
   useEffect(() => { void refresh() }, [refresh])
 
-  useEffect(() => {
-    if (!menuOpen) return
-    const onDown = (e: MouseEvent): void => {
-      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false)
+  const create = async (choice: MotionSetupChoice): Promise<void> => {
+    setSetupOpen(false)
+    const blank = emptyDoc(choice.componentId)
+    // The frame is settled before the piece exists, so the first thing you see
+    // is already the shape and the colour you asked for.
+    const doc: MotionDoc = {
+      ...blank,
+      frame: { ...blank.frame, aspect: choice.aspect, background: choice.background }
     }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
-  }, [menuOpen])
-
-  const create = async (componentId: MotionDoc['componentId']): Promise<void> => {
-    const doc = emptyDoc(componentId)
-    const label = MOTION_COMPONENTS.find((c) => c.id === componentId)?.label ?? 'Motion'
+    const label = MOTION_COMPONENTS.find((c) => c.id === choice.componentId)?.label ?? 'Motion'
     const row = await window.terminal42.motion.create(label, doc)
     await refresh()
     setOpen({ id: row.id, title: row.title, doc })
@@ -99,31 +97,14 @@ export function MotionView(): React.JSX.Element {
           >
             Templates
           </button>
-          <div ref={menuRef} className="relative">
-            <button
-              type="button"
-              onClick={() => setMenuOpen((o) => !o)}
-              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md bg-action px-3 py-1.5 text-[13px] font-medium text-action-text transition-opacity hover:opacity-90"
-            >
-              <IconPlus size={13} />
-              <span>New motion</span>
-              <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="-mr-0.5 ml-0.5 opacity-80"><path d="M4 6l4 4 4-4" /></svg>
-            </button>
-            {menuOpen && (
-              <div className="absolute right-0 top-full z-30 mt-1.5 w-52 overflow-hidden rounded-lg bg-raised py-1 shadow-overlay">
-                {MOTION_COMPONENTS.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => { setMenuOpen(false); void create(c.id) }}
-                    className="flex w-full items-center px-3 py-2 text-left text-[12.5px] font-medium text-text-primary hover:bg-elevated"
-                  >
-                    {c.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={() => setSetupOpen(true)}
+            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md bg-action px-3 py-1.5 text-[13px] font-medium text-action-text transition-opacity hover:opacity-90"
+          >
+            <IconPlus size={13} />
+            <span>New motion</span>
+          </button>
           </div>
         </header>
 
@@ -172,6 +153,9 @@ export function MotionView(): React.JSX.Element {
           </div>
         )}
       </div>
+      {setupOpen && (
+        <MotionSetup onCancel={() => setSetupOpen(false)} onCreate={(c) => void create(c)} />
+      )}
       {templatesOpen && (
         <MotionTemplates onPick={(t) => void createFromTemplate(t)} onClose={() => setTemplatesOpen(false)} />
       )}

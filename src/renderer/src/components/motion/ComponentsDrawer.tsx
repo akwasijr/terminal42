@@ -23,7 +23,7 @@ export type SavedLayout = {
 }
 
 export function ComponentsDrawer({
-  doc, onPickComponent, onPickPreset, layouts, onApplyLayout, onDeleteLayout, width
+  doc, onPickComponent, onPickPreset, layouts, onApplyLayout, onDeleteLayout, onSaveLayout, width
 }: {
   doc: MotionDoc
   width: number
@@ -32,6 +32,7 @@ export function ComponentsDrawer({
   layouts: SavedLayout[]
   onApplyLayout: (l: SavedLayout) => void
   onDeleteLayout: (id: string) => void
+  onSaveLayout: () => void
 }): React.JSX.Element {
   const [tab, setTab] = useState<'components' | 'layouts'>('components')
   // Which component's presets are open. Null is the list of components.
@@ -129,9 +130,17 @@ export function ComponentsDrawer({
         )
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+          <button
+            type="button"
+            onClick={onSaveLayout}
+            className="mb-2 flex w-full items-center gap-1.5 rounded-sm px-2 py-1.5 text-left text-[11.5px] text-text-secondary hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+          >
+            <span className="text-[13px] leading-none">+</span>
+            Keep this look
+          </button>
           {layouts.length === 0 ? (
             <p className="px-2 py-6 text-center text-[11.5px] text-text-muted">
-              No saved layouts yet.
+              Keep a look here and any piece can wear it.
             </p>
           ) : (
             <ul className="flex flex-col gap-1">

@@ -319,11 +319,12 @@ export function MotionStudio({
         layouts={layouts}
         onApplyLayout={applyLayout}
         onDeleteLayout={(lid) => void deleteLayout(lid)}
+        onSaveLayout={beginSaveLayout}
       />
       <ResizeHandle label="Resize the components panel" width={leftWidth} onWidth={setLeftWidth} side="left" min={180} max={420} />
 
       <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-panel bg-surface">
-        <header className="flex h-9 shrink-0 items-center gap-2 px-2">
+        <header className="flex h-11 shrink-0 items-center gap-1.5 px-2">
           <button
             type="button"
             onClick={onClose}
@@ -336,21 +337,9 @@ export function MotionStudio({
             value={title}
             onChange={(e) => onRename(e.target.value)}
             aria-label="Piece name"
-            className="min-w-0 flex-1 rounded-sm bg-transparent px-1 py-0.5 text-[12.5px] text-text-primary hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            className="w-40 min-w-0 shrink rounded-sm bg-transparent px-1 py-0.5 text-[12.5px] text-text-primary hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           />
-          <span className="font-mono text-[10.5px] text-text-muted">{count} cards</span>
-          {handEdits > 0 ? (
-            <button
-              type="button"
-              onClick={() => { setSelected(null); patch({ overrides: {} }) }}
-              className="rounded-sm px-2 py-1 text-[11px] text-text-muted hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-            >
-              Reset {handEdits} hand {handEdits === 1 ? 'edit' : 'edits'}
-            </button>
-          ) : null}
-        </header>
-
-        <div className="relative min-h-0 flex-1">
+          <span className="mx-1 h-4 w-px shrink-0 bg-border" />
           <FrameToolbar
             doc={doc}
             onChange={patch}
@@ -373,6 +362,19 @@ export function MotionStudio({
             onResetView={resetView}
             viewChanged={viewChanged}
           />
+          <span className="ml-auto font-mono text-[10.5px] text-text-muted">{count} cards</span>
+          {handEdits > 0 ? (
+            <button
+              type="button"
+              onClick={() => { setSelected(null); patch({ overrides: {} }) }}
+              className="rounded-sm px-2 py-1 text-[11px] text-text-muted hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            >
+              Reset {handEdits} hand {handEdits === 1 ? 'edit' : 'edits'}
+            </button>
+          ) : null}
+        </header>
+
+        <div className="relative min-h-0 flex-1">
           <MotionStage
             doc={doc}
             images={images}
@@ -392,8 +394,8 @@ export function MotionStudio({
           />
         </div>
 
-        <div className="flex shrink-0 justify-center pt-1.5">
-          {naming ? (
+        {naming ? (
+          <div className="flex shrink-0 justify-center pt-1.5">
             <form
               className="flex items-center gap-1"
               onSubmit={(e) => { e.preventDefault(); void saveLayout(layoutName) }}
@@ -420,16 +422,8 @@ export function MotionStudio({
                 Cancel
               </button>
             </form>
-          ) : (
-            <button
-              type="button"
-              onClick={beginSaveLayout}
-              className="rounded-sm px-2.5 py-1 text-[11px] text-text-muted hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-            >
-              Save this layout
-            </button>
-          )}
-        </div>
+          </div>
+        ) : null}
 
         <MotionTimeline
           doc={doc}

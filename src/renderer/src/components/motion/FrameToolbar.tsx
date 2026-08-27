@@ -1,10 +1,11 @@
-// The toolbar that floats over the frame.
+// The frame's own tools, in the piece's top bar.
 //
 // Everything here is about the *frame* rather than the motion: how big it is,
 // what colour sits behind it, whether the grid shows, and how you are allowed
 // to drag. These used to live in the side panels, which was wrong — you judge
-// a background by looking at it, and looking at it means the control belongs
-// where your eye already is.
+// a background by looking at it. They then floated over the frame, which was
+// also wrong, because they covered the thing you were judging. Form keeps its
+// tools in the top bar and so, now, does this.
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useColorPicker } from './pickerContext'
@@ -79,105 +80,105 @@ export function FrameToolbar({
   // stacked on top of each other. Single selection cannot express that state.
   const [openPop, setOpenPop] = useState<string | null>(null)
 
+  // The tools sit in the piece's top bar, in the same place Form keeps its
+  // own, rather than floating over the frame where they covered the work.
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center p-2">
-      <div className="pointer-events-auto flex items-center gap-0.5 rounded-panel bg-surface/90 px-1 py-1 shadow-sm backdrop-blur">
-        <ToolButton
-          label={replayLooping ? 'Stop replaying the entrance' : 'Replay the entrance animation'}
-          onClick={onReplay}
-          active={replayLooping}
-        >
-          <PlayGlyph />
-        </ToolButton>
-        <ToolButton
-          label={playing ? 'Pause the animation' : 'Run the animation'}
-          onClick={onTogglePlaying}
-          active={playing}
-        >
-          <LoopGlyph />
-        </ToolButton>
+    <div className="flex min-w-0 items-center gap-0.5">
+      <ToolButton
+        label={replayLooping ? 'Stop replaying the entrance' : 'Replay the entrance animation'}
+        onClick={onReplay}
+        active={replayLooping}
+      >
+        <PlayGlyph />
+      </ToolButton>
+      <ToolButton
+        label={playing ? 'Pause the animation' : 'Run the animation'}
+        onClick={onTogglePlaying}
+        active={playing}
+      >
+        <LoopGlyph />
+      </ToolButton>
 
-        <Divider />
+      <Divider />
 
-        <Popover label="Frame size" open={openPop === 'frame'} onOpen={(o) => setOpenPop(o ? 'frame' : null)} trigger={<span className="font-mono text-[10.5px]">{frame.aspect}</span>}>
-          <PopTitle>Frame size</PopTitle>
+      <Popover label="Frame size" open={openPop === 'frame'} onOpen={(o) => setOpenPop(o ? 'frame' : null)} trigger={<span className="font-mono text-[10.5px]">{frame.aspect}</span>}>
+        <PopTitle>Frame size</PopTitle>
+        <div className="flex flex-wrap gap-1">
+          {ASPECTS.map((a) => (
+            <Chip key={a.id} active={frame.aspect === a.id} onClick={() => setFrame({ aspect: a.id })}>
+              {a.label}
+            </Chip>
+          ))}
+        </div>
+        <PopTitle>Corners</PopTitle>
+        <Stepper value={frame.corners} min={0} max={48} step={2} suffix="px" onChange={(v) => setFrame({ corners: v })} />
+        <PopTitle>Gap</PopTitle>
+        <Stepper value={frame.gap} min={0} max={60} step={2} suffix="%" onChange={(v) => setFrame({ gap: v })} />
+      </Popover>
+
+      <ToolButton
+        label={fit === 'contain' ? 'Fill the whole panel' : 'Fit the frame in view'}
+        onClick={() => onFit(fit === 'contain' ? 'edge' : 'contain')}
+        active={fit === 'edge'}
+      >
+        {fit === 'contain' ? <ExpandGlyph /> : <ContractGlyph />}
+      </ToolButton>
+
+      <Divider />
+
+      <BackgroundSwatches value={frame.background} onChange={(background) => setFrame({ background })} />
+
+      <Divider />
+
+      <ToolButton
+        label={frame.gridVisible ? 'Hide the grid' : 'Show the grid'}
+        onClick={() => setFrame({ gridVisible: !frame.gridVisible })}
+        active={frame.gridVisible}
+      >
+        <GridGlyph />
+      </ToolButton>
+      {frame.gridVisible ? (
+        <Popover label="Grid size" open={openPop === 'grid'} onOpen={(o) => setOpenPop(o ? 'grid' : null)} trigger={<span className="font-mono text-[10.5px]">{frame.gridColumns}×{frame.gridRows}</span>}>
+          <PopTitle>Grid size</PopTitle>
           <div className="flex flex-wrap gap-1">
-            {ASPECTS.map((a) => (
-              <Chip key={a.id} active={frame.aspect === a.id} onClick={() => setFrame({ aspect: a.id })}>
-                {a.label}
+            {GRID_PRESETS.map((g) => (
+              <Chip
+                key={`${g.columns}x${g.rows}`}
+                active={frame.gridColumns === g.columns && frame.gridRows === g.rows}
+                onClick={() => setFrame({ gridColumns: g.columns, gridRows: g.rows })}
+              >
+                {g.columns}×{g.rows}
               </Chip>
             ))}
           </div>
-          <PopTitle>Corners</PopTitle>
-          <Stepper value={frame.corners} min={0} max={48} step={2} suffix="px" onChange={(v) => setFrame({ corners: v })} />
-          <PopTitle>Gap</PopTitle>
-          <Stepper value={frame.gap} min={0} max={60} step={2} suffix="%" onChange={(v) => setFrame({ gap: v })} />
+          <LabelledStepper label="Columns" value={frame.gridColumns} min={1} max={48} step={1} onChange={(v) => setFrame({ gridColumns: v })} />
+          <LabelledStepper label="Rows" value={frame.gridRows} min={1} max={48} step={1} onChange={(v) => setFrame({ gridRows: v })} />
+          <PopTitle>Line colour</PopTitle>
+          <HexField value={frame.gridColour} onChange={(v) => setFrame({ gridColour: v })} />
+          <label className="mt-1 flex items-center gap-2 text-[11px] text-text-secondary">
+            <input
+              type="checkbox"
+              checked={frame.gridInExport}
+              onChange={(e) => setFrame({ gridInExport: e.target.checked })}
+              className="accent-accent"
+            />
+            Keep the grid in exports
+          </label>
         </Popover>
+      ) : null}
 
-        <ToolButton
-          label={fit === 'contain' ? 'Fill the whole panel' : 'Fit the frame in view'}
-          onClick={() => onFit(fit === 'contain' ? 'edge' : 'contain')}
-          active={fit === 'edge'}
-        >
-          {fit === 'contain' ? <ExpandGlyph /> : <ContractGlyph />}
+      <Divider />
+
+      <ToolButton
+        label={poseMode ? 'Stop posing. Drag turns the piece.' : 'Pose: drag to tilt, Shift to scale, Cmd to move'}
+        onClick={() => onPoseMode(!poseMode)}
+        active={poseMode}
+      >
+        <GlobeGlyph />
         </ToolButton>
-
-        <Divider />
-
-        <BackgroundSwatches value={frame.background} onChange={(background) => setFrame({ background })} />
-
-        <Divider />
-
-        <ToolButton
-          label={frame.gridVisible ? 'Hide the grid' : 'Show the grid'}
-          onClick={() => setFrame({ gridVisible: !frame.gridVisible })}
-          active={frame.gridVisible}
-        >
-          <GridGlyph />
-        </ToolButton>
-        {frame.gridVisible ? (
-          <Popover label="Grid size" open={openPop === 'grid'} onOpen={(o) => setOpenPop(o ? 'grid' : null)} trigger={<span className="font-mono text-[10.5px]">{frame.gridColumns}×{frame.gridRows}</span>}>
-            <PopTitle>Grid size</PopTitle>
-            <div className="flex flex-wrap gap-1">
-              {GRID_PRESETS.map((g) => (
-                <Chip
-                  key={`${g.columns}x${g.rows}`}
-                  active={frame.gridColumns === g.columns && frame.gridRows === g.rows}
-                  onClick={() => setFrame({ gridColumns: g.columns, gridRows: g.rows })}
-                >
-                  {g.columns}×{g.rows}
-                </Chip>
-              ))}
-            </div>
-            <LabelledStepper label="Columns" value={frame.gridColumns} min={1} max={48} step={1} onChange={(v) => setFrame({ gridColumns: v })} />
-            <LabelledStepper label="Rows" value={frame.gridRows} min={1} max={48} step={1} onChange={(v) => setFrame({ gridRows: v })} />
-            <PopTitle>Line colour</PopTitle>
-            <HexField value={frame.gridColour} onChange={(v) => setFrame({ gridColour: v })} />
-            <label className="mt-1 flex items-center gap-2 text-[11px] text-text-secondary">
-              <input
-                type="checkbox"
-                checked={frame.gridInExport}
-                onChange={(e) => setFrame({ gridInExport: e.target.checked })}
-                className="accent-accent"
-              />
-              Keep the grid in exports
-            </label>
-          </Popover>
-        ) : null}
-
-        <Divider />
-
-        <ToolButton
-          label={poseMode ? 'Stop posing. Drag turns the piece.' : 'Pose: drag to tilt, Shift to scale, Cmd to move'}
-          onClick={() => onPoseMode(!poseMode)}
-          active={poseMode}
-        >
-          <GlobeGlyph />
-        </ToolButton>
-        <ToolButton label="Put the view back" onClick={onResetView} disabled={!viewChanged}>
-          <ResetGlyph />
-        </ToolButton>
-      </div>
+      <ToolButton label="Put the view back" onClick={onResetView} disabled={!viewChanged}>
+        <ResetGlyph />
+      </ToolButton>
     </div>
   )
 }
