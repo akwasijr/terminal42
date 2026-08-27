@@ -1058,6 +1058,2251 @@ Motion tokens: not stated.
 
 ---
 
+## 12. Form
+
+> Sources: https://carbondesignsystem.com/components/form/usage/ | https://carbondesignsystem.com/components/form/style/
+
+**What it is** — A group of related input controls that allows users to provide data or configure options. The form component is a purposely simple structural container; product teams are responsible for composing the specific inputs within it. Use the form pattern guidance for detailed layout decisions.
+
+**Variants**
+
+Two input styles define the visual character of the whole form:
+
+| Style | Label position | Input heights available | Spacing between components | Gutter mode |
+|---|---|---|---|---|
+| **Default** | Outside / above field | sm 32 px / md 40 px / lg 48 px | 32 px / 2 rem (`margin-bottom`) | Wide gutter; inputs flush to grid columns |
+| **Fluid** | Inside field, stacked inline | 64 px only | 0 px (1 px gutter between inputs) | Condensed gutter; inputs may hang into gutter |
+
+Multi-column forms: default = 32 px between columns (wide gutter); fluid = 1 px (condensed gutter). Narrow gutter (16 px) is typically not used in forms.
+
+With AI label: form container gets a linear-gradient border, box-shadow, and inner-shadow; AI label size = large. All individual input component tokens remain unchanged.
+
+**Sizes**
+
+No named size variants for the form container itself. Sizes are determined by the chosen input style above.
+
+**States**
+
+Form fields can be in:
+
+| State | Description |
+|---|---|
+| **Enabled** | Default; live but not focused |
+| **Active** | User actively typing |
+| **Focus** | Tabbed to / clicked into field |
+| **Error** | Required field empty; invalid; system error; user must fix before submitting |
+| **Warning** | Exception condition; user may continue |
+| **Disabled** | Not interactive; not focusable; no contrast requirement |
+| **Skeleton** | Initial page load |
+| Read-only | Listed as "coming soon" at time of documentation fetch |
+
+**Tokens consumed**
+
+Colour: not stated on form style tab (inherits from contained components).
+
+Typography:
+
+| Element | Font-size (px / rem) | Font-weight | Type token |
+|---|---|---|---|
+| Heading | 28 / 1.75 | Regular 400 | not stated |
+| Label | 12 / 0.75 | Regular 400 | not stated |
+| Field text | 14 / 0.875 | Regular 400 | not stated |
+| Helper text | 12 / 0.75 | Regular 400 | not stated |
+| Error message | 12 / 0.75 | Regular 400 | not stated |
+
+Labels: sentence case; no colons.
+
+Spacing (default style):
+
+| Element | Property | px / rem | Spacing token |
+|---|---|---|---|
+| Form items | margin-bottom | 32 / 2 | not stated |
+| Title area | margin-bottom | 40 / 2.5 | not stated |
+| Gutter between columns | — | 32 / 2 | not stated |
+| Buttons | margin-top | 48 / 3 | not stated |
+
+Spacing (fluid style):
+
+| Element | Property | px / rem | Spacing token |
+|---|---|---|---|
+| Form items | margin-bottom | 0 px | — |
+| Title area | margin-bottom | 40 / 2.5 | not stated |
+| Gutter between columns | — | 1 px | — |
+| Buttons | margin-top | 48 / 3 | not stated |
+
+Motion tokens: not stated.
+
+**Anatomy**
+
+1. **Header (optional)** — title (28 / 1.75 rem, Regular 400) + optional description providing context or instructions
+2. **Form body** — area where users provide information via input fields, checkboxes, and other components
+3. **Footer** — Submit and Cancel action buttons; buttons have `margin-top` of 48 / 3 rem from the last form item
+
+---
+
+## 13. Inline Loading
+
+> Sources: https://carbondesignsystem.com/components/inline-loading/usage/ | https://carbondesignsystem.com/components/inline-loading/style/
+
+**What it is** — A compact spinner providing visual feedback that data is being processed for a short-duration operation (create, update, delete). Appears in the same position as the content or control it relates to. Do not use for full page loads — use **Skeleton states** instead. Do not trigger on more than one item or action at a time, unless on initial page load or refresh.
+
+**Variants**
+
+No separate visual variants. One presentation with four sequential states.
+
+**Sizes**
+
+| Element | Property | px / rem |
+|---|---|---|
+| Spinner | width, height | 16 / 1 |
+| Checkmark | width, height | 16 / 1 |
+
+No named size variants. The spinner is always 16 × 16 px.
+
+**States**
+
+| State | Description |
+|---|---|
+| **Inactive** | No data being loaded; no visual indicator shown |
+| **Active** | Loading in progress; animated spinner |
+| **Finished** | Success; checkmark icon; persists 1.5 seconds then fires optional `onSuccess()` callback; if no callback, state persists indefinitely |
+| **Error** | Failed; inline loading becomes inactive; inline notification or form error handling should appear alongside |
+| Focus / Hover | Not applicable to the loading indicator itself |
+| Skeleton | Not stated |
+
+Any interactive elements associated with the triggering action must be **disabled** while in the active state.
+
+**Tokens consumed**
+
+Colour:
+
+| Class / Element | Property | Token role |
+|---|---|---|
+| `.cds--loading__background` | stroke | contextual `*` |
+| Spinner stroke | stroke | not stated |
+| Text | color | not stated |
+| Checkmark icon | svg | not stated |
+| Error icon | svg | not stated |
+
+`*` Denotes a contextual token.
+
+Typography:
+
+| Element | Font-size (px / rem) | Font-weight | Type token |
+|---|---|---|---|
+| Text (label) | 14 / 0.75 | Regular 400 | not stated |
+
+Label text: sentence case. Label is optional but encouraged.
+
+Motion tokens: not stated. Finished state auto-transitions after 1.5 seconds.
+
+**Anatomy**
+
+1. **Loading status indicator** — animated spinner (active) → checkmark icon (finished) → error icon (error); 16 × 16 px
+2. **Label (optional)** — describes current state; updates with state transitions (e.g. "Saving…" → "Saved"); if no visible label, an accessible label must still be in code
+
+---
+
+## 14. Link
+
+> Sources: https://carbondesignsystem.com/components/link/usage/ | https://carbondesignsystem.com/components/link/style/
+
+**What it is** — A navigational text element for taking users to another page, resource, section, or triggering email/phone links. Do not use for actions that change data, manipulate display state, or trigger functions — use **Button** instead. Do not use images as links — use **Tile** instead.
+
+**Variants**
+
+| Variant | Usage |
+|---|---|
+| **Standalone** | Used alone or directly following content; no underline in default/enabled state; underline appears on hover, focus, and active; can be paired with an icon |
+| **Inline** | Used within a sentence or paragraph; always styled with an underline; must NOT be paired with an icon |
+
+**Sizes**
+
+| Size | Height (px / rem) | Font-size (px / rem) | Font-weight | Icon size |
+|---|---|---|---|---|
+| Small | 16 / 1 | 12 / 0.75 | Regular 400 | 16 × 16 px |
+| Medium | 18 / 1.125 | 14 / 0.875 | Regular 400 | 16 × 16 px |
+| Large | 22 / 1.375 | 16 / 1 | Regular 400 | 20 × 20 px |
+
+Inline link sizes must match the type size of surrounding text. Standalone link sizes match the default body copy size of the page. Width is determined by the length of the link text.
+
+Grouped link spacing (recommended, not built into component):
+
+| Element | Property | px / rem | Spacing token |
+|---|---|---|---|
+| Link text | padding-right | 16 / 1 | not stated |
+| Link text | padding-bottom (horizontal group) | 4 / 0.25 | not stated |
+| Link text | padding-bottom (vertical group) | 8 / 0.5 | not stated |
+
+**States**
+
+| State | Description |
+|---|---|
+| **Enabled (unvisited)** | Default; not yet clicked |
+| **Hover** | Colour change; underline applied |
+| **Focus** | 2 px focus ring; colour may change |
+| **Active** | Currently being clicked |
+| **Visited** | Previously clicked; distinct `$link-visited` colour token |
+| **Disabled** | Cannot interact; temporarily inactive or unavailable |
+| Skeleton | Not stated |
+| Error | Not applicable |
+
+**Tokens consumed**
+
+Colour:
+
+| Element | State | Property | Token role |
+|---|---|---|---|
+| Link text | enabled | text-color | not stated |
+| Icon | enabled | svg | not stated |
+| Link text | hover | text-color | not stated |
+| Icon | hover | svg | not stated |
+| Link text | focus | text-color | not stated |
+| Border | focus | border | not stated |
+| Link text | active | text-color | not stated |
+| Border | active | border | not stated |
+| Link text | visited | text-color | not stated |
+| Icon | visited | svg | not stated |
+| Link text | disabled | text-color | not stated |
+| Icon | disabled | svg | not stated |
+
+*(Token names not printed in rendered style-tab tables.)*
+
+Typography: see Sizes table above.
+
+Motion tokens: not stated.
+
+**Anatomy**
+
+1. **Link text** — communicates what is linked to; meaningful and unique; avoid generic text like "read more" or "click here"
+2. **Icon (optional, standalone only)** — same colour as link text; "launch" for external links; "arrow right" for internal; click target includes icon area
+
+---
+
+## 15. List
+
+> Sources: https://carbondesignsystem.com/components/list/usage/ | https://carbondesignsystem.com/components/list/style/
+
+**What it is** — Vertical groupings of related content where items begin with a marker (dash/bullet for unordered; number for ordered). Use for simple, related sets of items to provide structure and clarity. Do not use for complex data requiring sorting, filtering, or selection (use **Data table**); do not use when a hierarchy with tables or dividers is needed (use **Structured list** or **Contained list**).
+
+**Variants**
+
+| Variant | Marker (level 1) | Marker (level 2) | Purpose |
+|---|---|---|---|
+| **Unordered list** | En dash (–) | Square (▪) | Items of equal importance without a specific order |
+| **Ordered list** | Number | Letter | Clear sequence or hierarchy; instructions; ranked content |
+
+Type sizes:
+
+| Size | Font-size (px / rem) | Type token |
+|---|---|---|
+| **Productive** | 14 / 0.875 | not stated |
+| **Expressive** | 16 / 1 | not stated |
+
+Both levels (level 1 and level 2) use Regular 400 weight.
+
+**Sizes**
+
+No explicit px / rem height values stated per list item — height is content-driven.
+
+For ordered lists with two-digit (10+) items: numbers are left-aligned by default; an option to right-align is available.
+
+**States**
+
+Read-only display component. No interactive states.
+
+| State | Description |
+|---|---|
+| **Enabled** | Only state |
+| Hover / Focus / Disabled / Error / Skeleton | Not applicable |
+
+**Tokens consumed**
+
+Colour:
+
+| Element | Property | Token role |
+|---|---|---|
+| Item | text-color | not stated |
+
+Typography:
+
+| Element | Font-size (px / rem) | Font-weight | Type token |
+|---|---|---|---|
+| Item (productive) | 14 / 0.875 | Regular 400 | not stated |
+| Item: nested (productive) | 14 / 0.875 | Regular 400 | not stated |
+| Item (expressive) | 16 / 1 | Regular 400 | not stated |
+| Item: nested (expressive) | 16 / 1 | Regular 400 | not stated |
+
+All text: sentence case.
+
+Spacing:
+
+| Element | Property | px / rem | Spacing token |
+|---|---|---|---|
+| Item: level 1 | margin-bottom | 0 | — |
+| Item: level 2 | margin-bottom | 0 | — |
+| Item: level 2 | padding-left | 16 / 1 | not stated |
+
+Motion tokens: not stated.
+
+**Anatomy**
+
+1. **Marker (level 1)** — en dash (unordered) or number (ordered); top-aligned with first line of content
+2. **Marker (level 2)** — square (unordered) or letter (ordered); indented 16 px
+3. **List item (level 1)** — main content; wraps to multiple lines rather than truncating; top-aligned with marker
+4. **List item (level 2)** — nested child content; indented 16 px; same wrapping behaviour
+
+---
+
+## 16. Loading
+
+> Source: https://carbondesignsystem.com/components/loading/usage/
+
+**What it is** — A circular animated spinner indicating a process is underway. Use when the expected wait time exceeds **three seconds**, or when the entire page or a key section is processing after a user submits or saves data. Do not use for progressively displaying content — use **Skeleton states** instead. Do not use if user interaction is required to proceed. Do not use multiple loading indicators simultaneously.
+
+**Variants**
+
+No separate visual variants. Two sizes serve different contexts.
+
+**Sizes**
+
+| Size | Use case | Overlay |
+|---|---|---|
+| **Large** (default) | Full-screen takeover (centred in viewport); section-level loading in modals or tiles (centred in component) | Semi-transparent overlay applied; blocks all interaction |
+| **Small** | Inline within or adjacent to a triggering element (e.g. inside a button); no overlay used | No overlay; associated interactive elements must be disabled |
+
+Specific px / rem dimensions for the spinner itself: not stated on usage page.
+
+**States**
+
+| State | Description |
+|---|---|
+| **Inactive** | Not loading; no visual indicator |
+| **Active** | Loading in progress; animated spinner |
+| Finished | Not a state of this component — use **Inline loading** for finished/error feedback |
+| Error | Not a state of this component — use **Inline loading** for finished/error feedback |
+| Skeleton | Not stated |
+
+**Tokens consumed**
+
+Not stated on usage page. Style tab not fetched separately; from cross-component knowledge: spinner uses interactive (blue) colour; overlay uses `$overlay` token.
+
+Motion tokens: not stated.
+
+**Anatomy**
+
+1. **Loading indicator** — circular animated spinner; primary visual cue
+2. **Overlay (large size only)** — semi-transparent layer over page or component; blocks all user interaction during loading
+3. **Label (optional)** — brief status message below the large indicator (e.g. "Loading data…"); not included in component by default; can be customised
+
+---
+
+## 17. Menu
+
+> Sources: https://carbondesignsystem.com/components/menu/usage/ | https://carbondesignsystem.com/components/menu/style/
+
+**What it is** — A list of interactive options that appears when users interact with a trigger (menu button, combo button, overflow menu, or right-click). Use to hide less frequently used or advanced options. Use **Dropdown** instead for form submission with a static list of options or for filtering. Use **Popover** instead when many or complex inputs are used collectively.
+
+**Variants**
+
+| Variant | Description |
+|---|---|
+| **Context menu** | Triggered by right-click; contextual to the element or area clicked |
+| **Default action items** | Standard clickable list items |
+| **Single-select items** | Checkmark indicator; one selection at a time |
+| **Multi-select items** | Checkmark indicator; multiple selections |
+| **Danger items** | Red danger-hover styling for destructive actions; separated from main actions by a divider |
+| **Submenu** | Nested level; caret icon on right; avoid multiple levels of nesting |
+
+Keep to a maximum of **12 items** in context and overflow menus; **under 5** in menu button menus.
+
+**Sizes**
+
+| Size | Height (px / rem) |
+|---|---|
+| Extra small | 24 / 1.5 |
+| Small | 32 / 2 |
+| Medium | 40 / 2.5 |
+| Large | 48 / 3 |
+
+Extra small cannot be used with menu button triggers (Carbon buttons don't support extra small).
+
+Width: fixed minimum **160 px / 10 rem**; fixed maximum **288 px / 18 rem**. Menu must not be narrower than its trigger button.
+
+**States**
+
+| State | Description |
+|---|---|
+| **Enabled** | Default; live but not interacted with |
+| **Hover** | Mouse over item; background-color change |
+| **Focus** | Tab navigation |
+| **Focus and hover** | Item is both focused and hovered simultaneously |
+| **Danger hover** | Destructive item hover; distinct background + text colour |
+| **Danger hover and focus** | Destructive item focused via keyboard |
+| **Disabled** | Action temporarily unavailable; hide entirely if action can never be performed by this user |
+| Skeleton | Not stated |
+| Error | Not stated |
+
+**Tokens consumed**
+
+Colour:
+
+| Element | State | Property | Token role |
+|---|---|---|---|
+| Menu option | enabled | background-color | layer (contextual `*`) |
+| Menu option | enabled | text-color | not stated |
+| Menu option | enabled | border-top | border-subtle (contextual `*`) |
+| Caret icon | enabled | svg | not stated |
+| Shortcut icon | enabled | svg | not stated |
+| Container | — | box-shadow | `0 2px 6px 0 rgba(0,0,0,.2)` |
+| Menu option | hover | background-color | layer (contextual `*`) |
+| Menu option | hover | text-color | not stated |
+| Icon | hover | svg | not stated |
+| Menu option | focus | background-color | layer (contextual `*`) |
+| Menu option | focus | border | not stated |
+| Menu option | focus + hover | background-color | layer (contextual `*`) |
+| Menu option | danger hover | background-color | not stated |
+| Menu option | danger hover | text-color | not stated |
+| Menu option | danger hover + focus | border | not stated |
+| Menu option | disabled | background-color | layer (contextual `*`) |
+| Menu option | disabled | text-color | not stated |
+
+`*` Denotes a contextual token.
+
+Typography:
+
+| Element | Font-size (px / rem) | Font-weight | Type token |
+|---|---|---|---|
+| Menu option text | 14 / 0.875 | Regular 400 | not stated |
+
+Text: sentence case.
+
+Spacing:
+
+| Element | Property | px / rem | Spacing token |
+|---|---|---|---|
+| Icon | icon size | 16 / 1 | — |
+| Option (default) | padding-right, padding-left | 16 / 1 | not stated |
+| Option (selectable, unselected) | padding-right, padding-left | 16 / 1, 40 / 2.5 | not stated |
+| Option (selectable, selected) | padding-right, padding-left | 16 / 1 | not stated |
+| Option next to divider | margin-top or margin-bottom | 4 / 0.25 | not stated |
+| Option (first and last) | margin-top or margin-bottom | 4 / 0.25 | not stated |
+| Divider | margin-top | 1 px | — |
+
+Motion tokens: not stated.
+
+**Anatomy**
+
+1. **Trigger** — menu button, combo button, overflow menu icon, or right-click area
+2. **Action item** — clickable option; may include submenu indicator (caret) or right-aligned keyboard shortcut
+3. **Divider** — 1 px horizontal rule separating groups or isolating destructive actions
+4. **Submenu indicator** — caret icon (right side) indicating a nested level
+5. **Keyboard shortcut** — optional text right-aligned per item
+6. **Menu container** — floating open-state layer; min-width 160 px; max-width 288 px; box-shadow `0 2px 6px 0 rgba(0,0,0,.2)`
+7. **Selected item** — checkmark indicator for single/multi-select items
+8. **Submenu** — nested menu level expanding from a parent item
+
+---
+
+## 18. Modal
+
+> Sources: https://carbondesignsystem.com/components/modal/usage/ | https://carbondesignsystem.com/components/modal/style/
+
+**What it is** — A dialog displayed above all page content that focuses the user's attention on a single task. Focus is trapped inside while open. Use to request information preventing the system from continuing, to notify of urgent information, or to confirm a user decision. Do not use for tasks a user performs repeatedly — implement on the main page instead. Do not use when content requires excessive scrolling — use a full page instead.
+
+**Variants**
+
+| Variant | Purpose |
+|---|---|
+| **Passive** | Presents information the user needs to be aware of; no actions for the user to take |
+| **Transactional** | Requires an action to complete and close; Cancel + primary action buttons |
+| **Danger** | A transactional modal for destructive or irreversible actions; primary button is a danger button |
+| **Acknowledgment** | System requires acknowledgement of information; single button (commonly "OK") |
+| **Progress** | Multi-step linear flow; Cancel + Previous + Next / completion buttons |
+
+A feature flag improves accessibility (changes functionality, not visual appearance); teams are encouraged to use the feature-flag modal going forward.
+
+**Sizes**
+
+Percentage widths at each breakpoint:
+
+Extra small (xs):
+
+| Breakpoint | Width | Column span | Margin-right |
+|---|---|---|---|
+| 1584 px | 24% | 4 of 16 | 16 px / 1 rem |
+| 1312 px | 24% | 4 of 16 | 16 px / 1 rem |
+| 1056 px | 32% | 5 of 16 | 16 px / 1 rem |
+| 672 px | 48% | 4 of 8 | 16 px / 1 rem |
+| 320 px | 100% | 4 of 4 | 16 px / 1 rem |
+
+Small (sm):
+
+| Breakpoint | Width | Column span | Margin-right |
+|---|---|---|---|
+| 1584 px | 36% | 6 of 16 | 20% |
+| 1312 px | 36% | 6 of 16 | 20% |
+| 1056 px | 42% | 7 of 16 | 16 px / 1 rem |
+| 672 px | 60% | 5 of 8 | 16 px / 1 rem |
+| 320 px | 100% | 4 of 4 | 16 px / 1 rem |
+
+Medium (md):
+
+| Breakpoint | Width | Column span | Margin-right |
+|---|---|---|---|
+| 1584 px | 48% | 8 of 16 | 20% |
+| 1312 px | 48% | 8 of 16 | 20% |
+| 1056 px | 60% | 10 of 16 | 20% |
+| 672 px | 84% | 7 of 8 | 20% |
+| 320 px | 100% | 4 of 4 | 16 px / 1 rem |
+
+Large (lg):
+
+| Breakpoint | Width | Column span | Margin-right |
+|---|---|---|---|
+| 1584 px | 72% | 12 of 16 | 20% |
+| 1312 px | 72% | 12 of 16 | 20% |
+| 1056 px | 84% | 14 of 16 | 20% |
+| 672 px | 96% | 8 of 8 | 20% |
+| 320 px | 100% | 4 of 4 | 16 px / 1 rem |
+
+Max-heights:
+
+| Modal size | Max-height |
+|---|---|
+| Extra small (xs) | 48% |
+| Small (sm) | 72% |
+| Medium (md) | 84% |
+| Large (lg) | 96% |
+
+On mobile at the 320 px breakpoint, max-height does not apply. Body copy + titles follow the margin-right rule; form inputs and other components expand to full modal width. Modals ≥ 36% width use 20% margin-right; modals < 36% use 16 px / 1 rem fixed margin-right.
+
+Button layouts in footer:
+
+| Number of buttons | Width each | Positioning |
+|---|---|---|
+| 1 | 50% | Flush right |
+| 2 | 50% each | Full bleed |
+| 3 | 25% each | Flush right |
+| 3 | 25% each | 1 flush left, 2 flush right |
+
+**States**
+
+| State | Description |
+|---|---|
+| **Open** | Modal visible; focus trapped inside; overlay blocking page |
+| **Closed** | Default; not displayed |
+| **Loading** | Large spinner + overlay inside modal body; primary button disabled; use after data submission |
+| **Error** | Inline error state inside form fields; modal stays open; inline notification may also appear |
+| Skeleton | Not stated |
+
+Focus management: on open, focus set to first interactive element; Tab/Shift-Tab cycle within modal only; on close, focus returns to the opening trigger.
+
+**Tokens consumed**
+
+Colour:
+
+| Element | Property | Token role |
+|---|---|---|
+| Container | background-color | layer (contextual `*`) |
+| Container | border | border (contextual `*`) |
+| Header label | text-color | not stated |
+| Header / Content | text-color | not stated |
+| Close icon | fill | not stated |
+| Close icon — hover | background-color | layer (contextual `*`) |
+| Page overlay | color | not stated |
+
+`*` Denotes a contextual token.
+
+Typography:
+
+| Element | Font-size (px / rem) | Font-weight | Type token |
+|---|---|---|---|
+| Label (optional) | 12 / 0.75 | Regular 400 | not stated |
+| Heading | 20 / 1.25 | Regular 400 | not stated |
+| Content | 14 / 0.875 | Regular 400 | not stated |
+
+Labels and headings: sentence case.
+
+Spacing:
+
+| Element | Property | px / rem |
+|---|---|---|
+| Container | border | 1 px |
+| Close button | height × width | 48 × 48 px |
+| Close icon | height × width | 16 × 16 px |
+| Header label | margin-bottom | 4 / 0.25 |
+| Header | padding-top, padding-left | 16 / 1 |
+| Header | margin-bottom | 16 / 1 |
+| Content | padding-left | 16 / 1 |
+| Content | padding-right | 20% |
+| Content | margin-bottom | 48 / 3 |
+| Footer (fluid button group) | border | 1 px |
+
+Motion tokens: not stated.
+
+**Anatomy**
+
+1. **Header** — modal title (required); optional label above title; close × icon top-right
+2. **Body** — content area; text + components; 20% right margin for body copy; full width for inputs/components
+3. **Footer** — primary + secondary (+ tertiary) action buttons; fluid full-bleed
+4. **× icon** — always present; closes without submitting; always top-right corner
+5. **Overlay** — semi-transparent background; blocks page interaction while modal is open
+
+---
+
+## 19. Notification
+
+> Sources: https://carbondesignsystem.com/components/notification/usage/ | https://carbondesignsystem.com/components/notification/style/
+
+**What it is** — Messages that communicate information to users about system status, action results, errors, or warnings. Use to inform users of updates or changes to system status and to provide immediate feedback. Use **sparingly** — notifications are disruptive.
+
+**Variants**
+
+| Variant | Purpose |
+|---|---|
+| **Inline** | Appears in task flows near related items; usually at the top of the primary content area; optional close button |
+| **Toast** | Non-modal; fixed width 288 px / 18 rem; slides in at top of screen; disappears after a few seconds; always closeable |
+| **Actionable (inline style)** | Inline notification with an interactive ghost button action |
+| **Actionable (toast style)** | Toast with a tertiary button; does NOT auto-timeout |
+| **Callout** | Loads with page content; non-dismissible; no success or error status; for pre-task guidance |
+
+Statuses:
+
+| Status | Color | Available variants |
+|---|---|---|
+| **Informational** | Blue | Inline, Toast, Actionable, Callout |
+| **Success** | Green | Inline, Toast, Actionable |
+| **Warning** | Yellow | Inline, Toast, Actionable, Callout |
+| **Error** | Red | Inline, Toast, Actionable |
+
+Callout does not support Success or Error statuses.
+
+A feature flag has been added to the actionable notification variant (changes functionality, not visual appearance); teams are encouraged to use it going forward.
+
+**Sizes**
+
+Toast notification:
+
+| Element | Property | px / rem |
+|---|---|---|
+| Notification | width | 288 / 18 |
+| Notification | border-left | 3 px |
+| Notification | padding-right | 16 / 1 |
+| Title | margin-top | 16 / 1 |
+| Subtitle | margin-bottom | 24 / 1.5 |
+| Details | padding-right | 16 / 1 |
+| Caption | margin-bottom | 16 / 1 |
+| Close button | height, width | 48 / 3 |
+| Close icon | margin-top, margin-right | 16 / 1 |
+
+Inline notification:
+
+| Element | Property | px / rem |
+|---|---|---|
+| Inline notification | min-height | 48 / 3 |
+| Inline notification | border-left | 3 px |
+| Details | margin-left, margin-right | 16 / 1 |
+| Text-wrapper | padding-top, padding-bottom | 12 / 0.75 |
+| Icon | margin-right | 16 / 1 |
+| Close button | height, width | 48 / 3 |
+| Close icon | icon size | 16 × 16 px |
+
+Inline notification width: varies — fills container / content area.
+
+Callout:
+
+| Element | Property | px / rem |
+|---|---|---|
+| Callout | min-height | 48 / 3 |
+| Callout | border-left | 3 px |
+| Details | margin-left, margin-right | 16 / 1 |
+| Text-wrapper | padding-top, padding-bottom | 12 / 0.75 |
+| Icon | margin-right | 16 / 1 |
+
+Callout width: varies — fills container.
+
+**States**
+
+| State | Description |
+|---|---|
+| **Visible** | Notification displayed |
+| **Dismissed** | User clicked close button; notification removed |
+| **Auto-timeout** | Toast only; removed after a few seconds if coded to do so |
+| Hover / Focus | On close button and action button |
+| Skeleton | Not stated |
+
+**Tokens consumed**
+
+Colour (low contrast — token names explicitly stated):
+
+| Status | Element | Token |
+|---|---|---|
+| Error | background-color | `$notification-error-background-color` |
+| Success | background-color | `$notification-success-background-color` |
+| Warning | background-color | `$notification-warning-background-color` |
+| Information | background-color | `$notification-info-background-color` |
+| All (low contrast) | border-left | not stated |
+| All (low contrast) | svg (icon) | not stated |
+| Title | text-color | not stated |
+| Subtitle | text-color | not stated |
+| Close button | fill | not stated |
+
+Colour (high contrast):
+
+| Element | Property | Token role |
+|---|---|---|
+| Background | background-color | not stated (background-inverse) |
+| Title | text-color | not stated (text-inverse) |
+| Subtitle | text-color | not stated (text-inverse) |
+| Error border-left / icon | — | not stated (support-error-inverse) |
+| Success border-left / icon | — | not stated (support-success-inverse) |
+| Warning border-left / icon | — | not stated (support-warning-inverse) |
+| Info border-left / icon | — | not stated (support-info-inverse) |
+
+Typography:
+
+| Element | Font-size (px / rem) | Font-weight | Type token |
+|---|---|---|---|
+| Title | 14 / 0.875 | SemiBold 600 | not stated |
+| Subtitle / Body | 14 / 0.875 | Regular 400 | not stated |
+
+Text: sentence case; title has no trailing period; body ≤ 2 sentences.
+
+Motion tokens: not stated.
+
+**Anatomy**
+
+1. **Icon** — status icon (info, success, warning, error); leftmost element
+2. **Title** — brief; no trailing period; describes what happened or what stopped
+3. **Body content** — 1–2 short sentences; troubleshooting steps or next steps; does not repeat title
+4. **Close button** — × icon; optional on inline; always on toast; not included on callout
+5. **Action button (actionable only)** — ghost (inline style) or tertiary (toast style); 1–2 word label
+6. **Link (callout or actionable)** — redirects user to next steps; descriptive text; not required to be at end of sentence
+
+---
+
+## 20. Number Input
+
+> Sources: https://carbondesignsystem.com/components/number-input/usage/ | https://carbondesignsystem.com/components/number-input/style/
+
+**What it is** — A numeric text field paired with increment (+) and decrement (−) controls. Use when the user needs to input a numeric value or adjust small values requiring only a few clicks. Do not use for large value changes (use **Slider** instead); do not use for continuous variables such as prices, distances, or human heights within a wide range (use **Text input** instead).
+
+**Variants**
+
+| Variant | Label position | Use case |
+|---|---|---|
+| **Default** | Outside / above field | Productive forms |
+| **Fluid** | Inside field, stacked inline | Expressive moments; contained spaces; toolbars |
+| **With AI label** | Default or fluid | AI-generated values; embeds explainability label |
+
+**Sizes**
+
+Default:
+
+| Size | Height (px / rem) |
+|---|---|
+| Small (sm) | 32 / 2 |
+| Medium (md) | 40 / 2.5 — default |
+| Large (lg) | 48 / 3 |
+
+Fluid: single height of **64 px** (grows when warning/error message is added below; padding-top/bottom = 13 / 0.8125 rem).
+
+Default field height shown in structure table: 40 / 2.5 rem. Focus and error borders: 2 px.
+
+**States**
+
+| State | Description |
+|---|---|
+| **Enabled** | Default; contains a default value (always set a default — commonly 1, sometimes 0) |
+| **Hover** | Cursor over controls; controls background-color change |
+| **Focus** | Tabbed to or clicked into field or controls |
+| **Error (invalid)** | Required field empty; value out of range; system error; 2 px error border |
+| **Warning** | Exception condition |
+| **Disabled** | Not interactive; not focusable; no contrast requirement; border-bottom transparent (default) or contextual (fluid) |
+| **Read-only** | Focusable; passes contrast; cannot modify; background transparent (default) or contextual (fluid) |
+| **Skeleton** | Initial page load |
+
+**Tokens consumed**
+
+Colour:
+
+| Element | State | Property | Token role |
+|---|---|---|---|
+| Label | — | text-color | not stated |
+| Number | — | text-color | not stated |
+| Field | — | background-color | layer (contextual `*`) |
+| Field | — | border-bottom | border (contextual `*`) |
+| Controls | — | svg color | not stated |
+| Controls | hover | background-color | layer (contextual `*`) |
+| Field | focus | border | not stated |
+| Controls | focus | border | not stated |
+| Field | error | border | not stated |
+| Error icon | error | svg | not stated |
+| Error message | error | text-color | not stated |
+| Warning icon | warning | svg | not stated |
+| Warning message | warning | text-color | not stated |
+| Label | disabled | text-color | not stated |
+| Field | disabled | background-color | layer (contextual `*`) |
+| Field (default) | disabled | border-bottom | transparent |
+| Field (fluid) | disabled | border-bottom | contextual `*` |
+| Number | disabled | text-color | not stated |
+| Controls | disabled | svg | not stated |
+
+`*` Denotes a contextual token.
+
+Typography:
+
+| Element | Font-size (px / rem) | Font-weight | Type token |
+|---|---|---|---|
+| Label | 12 / 0.75 | Regular 400 | not stated |
+| Field input | 14 / 0.875 | Regular 400 | not stated |
+| Helper text | 12 / 0.75 | Regular 400 | not stated |
+| Error message | 12 / 0.75 | Regular 400 | not stated |
+| Warning message | 12 / 0.75 | Regular 400 | not stated |
+
+Labels: sentence case.
+
+Spacing (default):
+
+| Element | Property | px / rem |
+|---|---|---|
+| Label | margin-bottom | 8 / 0.5 |
+| Field | height | 40 / 2.5 |
+| Field | border-bottom | 1 px |
+| Number | padding-left | 16 / 1 |
+| Controls | padding-left, padding-right | 16 / 1 |
+
+Spacing (fluid):
+
+| Element | Property | px / rem |
+|---|---|---|
+| Label | padding-bottom | 4 / 0.25 |
+| Field | height | 64 / 4 |
+| Field | padding-left, padding-right | 16 / 1 |
+| Field | padding-top, padding-bottom | 13 / 0.8125 |
+| Field | border-bottom | 1 px |
+| Add or subtract icon | height, width | 16 / 1 |
+| Focus border | border | 2 px |
+| Error border | border | 2 px |
+
+Motion tokens: not stated.
+
+**Anatomy**
+
+1. **Label** — required; sentence case; ≤ 3 words; never hidden
+2. **Numeric value** — changes via typing or +/− controls; always set a default value
+3. **Helper text (optional)** — shows min/max constraints; replaced by error/warning message
+4. **Field** — container for data entry
+5. **Subtract icon (−)** — left control; decrements value
+6. **Add icon (+)** — right control; increments value
+7. **Status icon** — error or warning indicator (right side of field); 16 × 16 px (add/subtract icons)
+8. **Error or Warning text** — replaces helper text
+
+---
+
+## 21. Overflow Menu
+
+> Sources: https://carbondesignsystem.com/components/overflow-menu/usage/ | https://carbondesignsystem.com/components/overflow-menu/style/
+
+**What it is** — A compact icon button trigger (vertical ellipsis ⋮) that opens a contextual menu when space is constrained. A specialised trigger pattern for the **Menu** component, commonly used on data table rows and cards. Text within an overflow menu should be direct so users can quickly decide on an action.
+
+**Variants**
+
+No separate visual variants. The tab tip (visual connection between trigger and menu) appears on the **left or right** of the trigger depending on available screen space.
+
+**Sizes**
+
+Menu options and icon button share the same size pairings:
+
+| Element | Size | Height (px / rem) |
+|---|---|---|
+| Menu options | Small (sm) | 32 / 2 |
+| Menu options | Medium (md) | 40 / 2.5 |
+| Menu options | Large (lg) | 48 / 3 |
+| Icon button | Small (sm) | 32 / 2 |
+| Icon button | Medium (md) | 40 / 2.5 |
+| Icon button | Large (lg) | 48 / 3 |
+
+Menu option spacing: padding-right, padding-left = 16 / 1 rem. Divider: border-top = 1 px. Icon size: 16 × 16 px.
+
+**States**
+
+| State | Description |
+|---|---|
+| **Enabled** | ⋮ icon visible |
+| **Hover** | Icon button background-color change |
+| **Focus** | 2 px focus ring on trigger icon button |
+| **Open** | Menu displayed |
+| **Menu item — hover** | Menu option background-color change |
+| **Menu item — focus** | Menu option focus border |
+| **Menu item — danger hover** | Destructive option background and text colour change |
+| **Menu item — disabled** | Muted text; not interactive |
+| Skeleton | Not stated |
+| Error | Not stated |
+
+Actions that could cause significant data changes (delete, remove) are separated from primary actions by a divider and placed below them.
+
+**Tokens consumed**
+
+Colour:
+
+| Element | State | Property | Token role |
+|---|---|---|---|
+| Overflow menu icon | enabled | fill | not stated |
+| Menu option | enabled | background-color | layer (contextual `*`) |
+| Menu option | enabled | text-color | not stated |
+| Danger option | enabled | background-color | layer (contextual `*`) |
+| Container | — | box-shadow | `0 2px 6px 0 rgba(0,0,0,0.3)` |
+| Icon button | focus | border | not stated |
+| Menu option | focus | border | not stated |
+| Icon button | hover | background-color | not stated |
+| Menu option | hover | background-color | layer (contextual `*`) |
+| Menu option | hover | text-color | not stated |
+| Danger option | hover | background-color | not stated |
+| Menu option | disabled | text-color | not stated |
+
+`*` Denotes a contextual token.
+
+Typography:
+
+| Element | Font-size (px / rem) | Font-weight | Type token |
+|---|---|---|---|
+| Menu option text | 14 / 0.875 | Regular 400 | not stated |
+
+Text: sentence case.
+
+Motion tokens: not stated.
+
+**Anatomy**
+
+1. **Overflow trigger** — ⋮ icon button; the activating control; 16 × 16 px icon
+2. **Menu container** — floating open-state layer; tab tip on left or right
+3. **Menu option** — clickable action items; sentence case; direct language
+4. **Divider** — 1 px border-top; separates groups; isolates destructive actions
+
+---
+
+## 22. Pagination
+
+> Sources: https://carbondesignsystem.com/components/pagination/usage/ | https://carbondesignsystem.com/components/pagination/style/
+
+**What it is** — Divides large sets of content or data into separate pages with controls to navigate between them. Use when it would take considerable time to load all data at once, or when there is too much data to display in one view. Do not use for linear journeys such as form progressions — use **Progress bar** or **Button** navigation instead. Do not use superfluously.
+
+**Variants**
+
+| Variant | Purpose |
+|---|---|
+| **Pagination** | Bar attached to the bottom of a data table; contains items-per-page select and page navigation |
+| **Pagination nav** | Standalone; used on full pages or page sections; numbered page buttons with overflow ellipsis |
+
+**Sizes**
+
+Three sizes available for both variants: large, medium, and small. Specific px / rem heights: not stated on usage or style pages.
+
+Size pairing guidance with data table rows:
+- Extra large data table rows → use large pagination
+- Extra small data table rows → use small pagination
+- (No extra small or extra large sizes exist for pagination)
+
+Pagination variant structure:
+
+| Element | Property | px / rem |
+|---|---|---|
+| Container | border | 1 px |
+| Container | padding-left, padding-right | 16 / 1 |
+| Select — items per page | padding-left | 8 / 0.5 |
+| Select — items per page | padding-right | 16 / 1 |
+| Select — number of pages | padding-left | 16 / 1 |
+| Select — number of pages | padding-right | 8 / 0.5 |
+| Chevron icon | svg | 16 × 16 px |
+| Caret icon | svg | 16 × 16 px |
+
+Pagination nav structure:
+
+| Element | Property | px / rem |
+|---|---|---|
+| Border: selected page | border | 4 px |
+| Caret icon | svg | 16 × 16 px |
+
+**States**
+
+Inherits states from nested **Select** and **Ghost icon button** components:
+
+| State | Description |
+|---|---|
+| **Enabled** | Default; all controls interactive |
+| **Hover** | Select / button hover background |
+| **Focus** | 2 px focus ring on select or button |
+| **Selected (pagination nav)** | Current page button has 4 px border |
+| **Disabled (prev/next)** | Previous disabled on first page; Next disabled on last page |
+| **Overflow (pagination nav)** | Ellipsis button appears for many pages; never at beginning or end of series |
+| **Responsive (small breakpoint)** | Pagination variant: select components removed; item count and prev/next remain |
+| Skeleton | Not stated |
+| Error | Not stated |
+
+**Tokens consumed**
+
+Colour (pagination variant):
+
+| Element | State | Property | Token role |
+|---|---|---|---|
+| Container | — | background-color | layer (contextual `*`) |
+| Border | — | border-top | border (contextual `*`) |
+| Text: items per page | — | text-color | not stated |
+| Text: number of items | — | text-color | not stated |
+| Text: page range | — | text-color | not stated |
+| Icon | — | fill | not stated |
+| Background | hover | background-color | layer (contextual `*`) |
+| Border | focus | border | not stated |
+| Text | disabled | text-color | not stated |
+| Icon | disabled | fill | not stated |
+| Background | disabled | background-color | layer (contextual `*`) |
+
+Colour (pagination nav):
+
+| Element | State | Property | Token role |
+|---|---|---|---|
+| Container | — | background-color | transparent |
+| Text | — | text-color | not stated |
+| Icon | — | fill | not stated |
+| Page: selected | — | border | not stated |
+| Background | hover | background-color | layer (contextual `*`) |
+| Border | focus | border | not stated |
+| Border | selected | border | not stated |
+| Text | disabled | text-color | not stated |
+| Background | disabled | background-color | transparent |
+
+`*` Denotes a contextual token. Nested select and ghost icon button components use their own respective style tokens.
+
+Typography:
+
+| Element | Font-size (px / rem) | Font-weight | Type token |
+|---|---|---|---|
+| Pagination text | 14 / 0.875 | Regular 400 | not stated |
+| Pagination nav: unselected | 14 / 0.875 | Regular 400 | not stated |
+| Pagination nav: selected | 14 / 0.875 | SemiBold 600 | not stated |
+
+Motion tokens: not stated.
+
+**Anatomy**
+
+Pagination variant:
+1. **Items per page** — select component showing current items-per-page count
+2. **Range of items** — text showing e.g. "1–10 of 200 items"
+3. **Current page** — select component showing current page / total pages
+4. **Previous / Next buttons** — ghost chevron icon buttons
+5. **Container** — full-width horizontal bar; width determined by data table width
+
+Pagination nav variant:
+1. **Unselected page button** — ghost button with page number
+2. **Selected page button** — current page; 4 px border indicator; SemiBold label
+3. **Overflow ellipsis button** — reveals hidden page numbers; never at beginning or end of series
+4. **Previous / Next caret buttons** — ghost icon buttons
+5. **Container** — width determined by number of pages; can be right- or left-aligned
+
+---
+
+## 23. Popover
+
+> Sources: https://carbondesignsystem.com/components/popover/usage/ | https://carbondesignsystem.com/components/popover/style/
+
+**What it is** — A layer that appears above all other content on the page. Used as the base layer for tooltips, overflow menus, dropdown menus, toggletips, and disclosures. Only one popover can appear at a time. Use when placing interactive elements (links, buttons, rich media) inside a disclosure, or to display additional details for specific elements. If the popover would exceed four columns in width, use a **Modal** instead. Do not nest popovers within other popovers.
+
+**Variants**
+
+| Variant | Purpose |
+|---|---|
+| **No tip** | Used when the trigger button has a visually defined down state; popover flush to the trigger side |
+| **Caret tip** | Shows the relationship between popover and trigger; used for icon buttons or triggers without a visible down state |
+| **Tab tip** | Connected to a toolbar or header area; edges flush with the layer edge; 0 px space between trigger and container |
+
+Popover directions: auto by default; can be set to open from **top**, **bottom**, **left**, or **right**. Caret-tip containers can additionally be aligned to **start**, **center**, or **end**.
+
+**Sizes**
+
+| Element | Property | px / rem |
+|---|---|---|
+| Container | max-width | 352 / 22 |
+| Container | padding | 16 / 1 |
+| Caret tip | height, width | 8 / 0.5 |
+| Caret tip | margin-top | 4 / 0.25 |
+| Trigger to container distance (no-tip, caret-tip) | gap | 4 px |
+| Trigger to container distance (tab-tip) | gap | 0 px |
+
+Width and height are content-driven up to max-width of 352 px. Recommended maximum width: 4 grid columns.
+
+**States**
+
+| State | Description |
+|---|---|
+| **Open** | Triggered by click, hover, or focus on trigger button |
+| **Closed** | Default; not visible |
+| Disabled | Not stated |
+| Error | Not stated |
+| Skeleton | Not stated |
+
+**Tokens consumed**
+
+Colour:
+
+| Element | Property | Token role |
+|---|---|---|
+| Container | background-color | layer (contextual `*`) |
+| Container (inverse style) | background-color | not stated (background-inverse) |
+| Caret tip | color | inherits container background |
+
+`*` Denotes a contextual token. Container box-shadow: not stated on style tab (see Menu for `0 2px 6px 0 rgba(0,0,0,.2)` reference). Trigger button tokens: not stated (inherits from whichever button type is used as trigger).
+
+Typography: not stated — content-driven; inherits tokens from elements placed inside the container.
+
+Motion tokens: not stated.
+
+**Anatomy**
+
+1. **UI trigger button** — interactive element that opens the popover; default is an icon button; any interactive element can serve as trigger
+2. **Tip** — caret or tab; visually connects container to trigger; shows relationship; caret = 8 × 8 px
+3. **Content area** — text, interactive elements; scrolls vertically if needed (header and footer stay fixed)
+4. **Container** — the popover bounding box; max-width 352 px; padding 16 px
+
+---
+
+## 24. Progress Bar
+
+> Sources: https://carbondesignsystem.com/components/progress-bar/usage/ | https://carbondesignsystem.com/components/progress-bar/style/
+
+**What it is** — A visual track indicator showing the duration and progression of a system operation (downloading, uploading, processing). Use for long or unknown-duration operations that can be described with quantitative information. Do not use when expanded content is still loading (use **Skeleton states**); do not use when user actions are required to progress (use **Progress indicator**); do not use when the process takes less than 5 seconds (use **Loading**).
+
+**Variants**
+
+| Variant | Purpose |
+|---|---|
+| **Determinate** | Clear progress data available; bar fills left-to-right from 0–100%; never decreases |
+| **Indeterminate** | Unknown progress; bar animates left-to-right continuously; may transition to determinate when data becomes available |
+
+**Sizes**
+
+| Size | Height (px / rem) | Use case |
+|---|---|---|
+| Big | 8 / 0.5 | Large amounts of space on a page |
+| Small | 4 / 0.25 | Restricted space; inside cards, data tables, side panels |
+
+Width: minimum **48 px**; recommended maximum **6 columns**. Width must not fill the entire window.
+
+Text alignment options: **default** (full page, cards, dialogs), **inline** (data tables), **indent** (side panels, dashboard cards).
+
+Spacing:
+
+| Element | Property | px / rem | Spacing token |
+|---|---|---|---|
+| Label (top-aligned) | padding-bottom | 8 / 0.5 | not stated |
+| Helper text | padding-top | 8 / 0.5 | not stated |
+| Label (left-aligned) | padding-right | 16 / 1 | not stated |
+
+**States**
+
+| State | Description |
+|---|---|
+| **Active** | Animated bar; process in progress |
+| **Success** | Full-width bar; checkmark icon; process completed |
+| **Error** | Full-width bar; error icon; process failed |
+| Inactive | Before process starts; not displayed |
+| Skeleton | Not stated |
+
+**Tokens consumed**
+
+Colour:
+
+| Element | Property | Token role |
+|---|---|---|
+| Label | text-color | not stated |
+| Helper text | text-color | not stated |
+| Helper text — error | text-color | not stated |
+| Track | background | not stated |
+| Bar — active | background | not stated |
+| Bar — success | background | not stated |
+| Icon — success | fill | not stated |
+| Bar — error | background | not stated |
+| Icon — error | fill | not stated |
+
+*(Token names not printed in rendered style-tab tables.)*
+
+Typography:
+
+| Element | Font-size (px / rem) | Font-weight | Type token |
+|---|---|---|---|
+| Label | 14 / 0.875 | Regular 400 | not stated |
+| Helper text | 12 / 0.75 | Regular 400 | not stated |
+
+Motion tokens: not stated.
+
+**Anatomy**
+
+1. **Label** — describes the process; short; does not change during loading; no update needed on completion (icon + colour convey result)
+2. **Helper text (optional; required for error)** — percentage/fraction/numeric for determinate; not applicable for indeterminate; error description for error state
+3. **Track** — static background line; full-width reference
+4. **Bar indicator** — fills track left-to-right (determinate); oscillates left-to-right (indeterminate)
+5. **Status icon** — checkmark (success) or error icon; right-aligned at track end; 16 × 16 px
+
+---
+
+## 25. Progress Indicator
+
+> Sources: https://carbondesignsystem.com/components/progress-indicator/usage/ | https://carbondesignsystem.com/components/progress-indicator/style/
+
+**What it is** — Guides users through a linear, multi-step task by showing completed, current, and future steps. Use when the user is working through a linear process of three or more steps, on long forms (checkout, onboarding, visa applications), or when input validation is needed before advancing. Do not use for fewer than three steps, when the process may be completed in any order, or when the number of steps may change based on conditional logic.
+
+**Variants**
+
+| Variant | Description |
+|---|---|
+| **Horizontal** | Steps arranged left-to-right |
+| **Vertical** | Steps arranged top-to-bottom; preferred for easier reading |
+| **Non-interactive** | Visual progress display only; user cannot click steps |
+| **Interactive** | User can click steps to navigate; current step remains highlighted |
+
+**Sizes**
+
+| Element | Property | px / rem |
+|---|---|---|
+| Step | min-width | 128 / 8 |
+| Icon | height, width | 16 / 1 |
+| Icon | margin-top, margin-right | 16 / 1 |
+| Label | margin-top | 16 / 1 |
+
+Labels: 1–2 words; limit of 16 characters total per label; sentence case. No named height-size variants for the step items themselves — not stated.
+
+**States**
+
+| State | Description |
+|---|---|
+| **Completed** | Outlined circle + checkmark; blue active step line |
+| **Current** | Half-filled circle; blue active step line |
+| **Not started** | Outlined circle (no fill); grey inactive step line |
+| **Error** | Error icon; invalid or incomplete step |
+| **Disabled** | All interactive functions removed; not focusable; no contrast requirement |
+| **Hover** | Cursor over step (interactive variant only) |
+| **Focus** | Tab navigation (interactive variant only) |
+| Skeleton | Not stated |
+
+**Tokens consumed**
+
+Colour:
+
+| Element | Property | Token role |
+|---|---|---|
+| Complete icon | fill | not stated |
+| Current icon | fill | not stated |
+| Not started icon | fill | not stated |
+| Active step line | background-color | not stated |
+| Inactive step line | background-color | border (contextual `*`) |
+| Label | text-color | not stated |
+| Helper text | text-color | not stated |
+| Step — focus | border | not stated |
+| Label — hover | text-color | not stated |
+| Icon — error | fill | not stated |
+| Icon — disabled | fill | not stated |
+
+`*` Denotes a contextual token.
+
+Typography:
+
+| Element | Font-size (px / rem) | Font-weight | Type token |
+|---|---|---|---|
+| Label | 14 / 0.875 | Regular 400 | not stated |
+| Helper text | 12 / 0.75 | Regular 400 | not stated |
+
+Labels: sentence case; 1–2 words; ≤ 16 characters.
+
+Motion tokens: not stated.
+
+**Anatomy**
+
+1. **Status indicator** — 16 × 16 px circle icon; communicates step state (completed / current / not-started / error / disabled)
+2. **Active step line** — connector between completed/current steps
+3. **Label** — describes the step task; 1–2 words; {verb} + {noun} formula preferred (e.g. "Configure IdP")
+4. **Inactive step line** — connector for not-started / error / disabled steps
+5. **Helper text** — shows "Optional" or error state description; long text wraps (preferred over truncation)
+
+---
+
+## 26. Radio Button
+
+> Sources: https://carbondesignsystem.com/components/radio-button/usage/ | https://carbondesignsystem.com/components/radio-button/style/
+
+**What it is** — An input control for mutually exclusive choices; only one option can be selected from a group at any time. Use in forms, settings, and data tables for single-selection from a group. Use **Checkbox** instead when multiple items can be selected. Use **Selectable tile** instead when options require pricing, links, or rich content to make a choice.
+
+**Variants**
+
+| Variant | Description |
+|---|---|
+| **Default** | Standard radio button group; vertical or horizontal layout |
+| **With AI label** | AI explainability label on group label or individual labels; AI label size: mini |
+
+No option is preselected by default. If user needs to deselect, provide an "other" or "none" option.
+
+**Sizes**
+
+| Element | Property | px / rem |
+|---|---|---|
+| Radio button icon | height, width | 20 / 1.25 |
+| Radio button icon | margin-right | 8 / 0.5 |
+| Dot | height, width | 8 / 0.5 |
+| Group label | margin-bottom | 8 / 0.5 |
+| Horizontal group item | margin-left | 8 / 0.5 |
+| Vertical group item | margin-bottom | 8 / 0.5 |
+
+Radio button input: fixed **20 × 20 px** circle. No named height-size variants. Form spacing: minimum **32 px** below or before the next component.
+
+**States**
+
+| State | Description |
+|---|---|
+| **Unselected** | Default; empty circle; no preselection |
+| **Selected** | Filled dot inside circle; only one at a time |
+| **Focus** | 2 px focus ring on radio input |
+| **Hover** | Pointer cursor on input and label |
+| **Disabled** | Not interactive; not focusable; no contrast requirement |
+| **Read-only** | Focusable; passes contrast; cannot modify |
+| **Error** | Error styling on group; error message below group |
+| **Warning** | Warning styling on group; warning message below group |
+| Skeleton | Not stated |
+
+Group-level states: read-only, disabled, error, warning + optional helper text.
+
+**Tokens consumed**
+
+Colour:
+
+| Element | State | Property | Token role |
+|---|---|---|---|
+| Group label | — | text-color | not stated |
+| Radio button label | — | text-color | not stated |
+| Radio button — unselected | — | border | not stated |
+| Radio button — unselected | — | background | transparent |
+| Radio button — selected | — | border | not stated |
+| Radio button — selected | — | dot | not stated |
+| Helper text | — | text-color | not stated |
+| Radio button | focus | border | not stated |
+| Label | disabled | text-color | not stated |
+| Radio button | disabled | border | not stated |
+| Radio button | disabled | inner fill | not stated |
+| Label | read-only | text-color | not stated |
+| Radio button | read-only | border | not stated |
+| Radio button | read-only | inner fill | not stated |
+| Label | error | text-color | not stated |
+| Radio button | error | border | not stated |
+| Error message | error | text-color | not stated |
+| Error icon | error | svg | not stated |
+| Warning message | warning | text-color | not stated |
+| Warning icon | warning | svg | not stated |
+
+*(Token names not printed in rendered style-tab tables.)*
+
+Typography:
+
+| Element | Font-size (px / rem) | Font-weight | Type token |
+|---|---|---|---|
+| Group label | 12 / 0.75 | Regular 400 | not stated |
+| Radio button label | 14 / 0.875 | Regular 400 | not stated |
+| Helper text | 12 / 0.75 | Regular 400 | not stated |
+| Error message | 12 / 0.75 | Regular 400 | not stated |
+| Warning message | 12 / 0.75 | Regular 400 | not stated |
+
+Labels: sentence case; ≤ 3 words.
+
+Motion tokens: not stated.
+
+**Anatomy**
+
+1. **Group label (optional)** — describes the group or provides selection instructions; sentence case
+2. **Radio button input** — 20 × 20 px clickable circle; indicates unselected / selected state; dot = 8 × 8 px
+3. **Radio button label** — right of input (left for RTL); ≤ 3 words; wraps below input if long (top-aligned)
+
+---
+
+## 27. Search
+
+> Sources: https://carbondesignsystem.com/components/search/usage/ | https://carbondesignsystem.com/components/search/style/
+
+**What it is** — Lets users explore content using keywords. Use to help users find data efficiently within a complex or large data set, at a global, page, or component level. Do not use when there is a small or limited amount of data, or when the information is simple and can be found easily within one view.
+
+**Variants**
+
+| Style | Appearance | Use case |
+|---|---|---|
+| **Default** | No visible label; search icon left; close × right when user starts typing | Global or page-level search; needs white space around it |
+| **Fluid** | Label inside field, stacked inline | Expressive moments; fluid forms; contained spaces |
+
+**Sizes**
+
+Default:
+
+| Size | Height (px / rem) |
+|---|---|
+| Small (sm) | 32 / 2 |
+| Medium (md) | 40 / 2.5 — default |
+| Large (lg) | 48 / 3 |
+
+Fluid: single height of **64 px**.
+
+Spacing (default):
+
+| Element | Property | px / rem | Spacing token |
+|---|---|---|---|
+| Search icon / Close icon | height, width | 16 / 1 | — |
+| Small field | padding-left, padding-right | 32 / 2 | not stated |
+| Medium field | padding-left, padding-right | 40 / 2.5 | not stated |
+| Large field | padding-left, padding-right | 48 / 3 | not stated |
+
+Spacing (fluid):
+
+| Element | Property | px / rem | Spacing token |
+|---|---|---|---|
+| Label | margin-bottom | 4 / 0.25 | not stated |
+| Field | padding-left | 16 / 1 | not stated |
+| Field | padding-right | 80 / 5 | not stated |
+| Field | border | 1 px | — |
+| Field | margin-top, margin-bottom | 13 / 0.8125 | — |
+| Close icon | padding-right, padding-left | 12 / 0.75 | not stated |
+| Search icon | padding-right, padding-left | 12 / 0.75 | not stated |
+
+**States**
+
+| State | Description |
+|---|---|
+| **Enabled** | Default; placeholder text visible |
+| **Focus** | User clicked or tabbed into field |
+| **Filled** | User has typed text; close (×) icon appears |
+| **Disabled** | Cannot interact |
+| Hover | Not stated as a separate named state |
+| Error | Not stated |
+| Skeleton | Not stated |
+
+**Tokens consumed**
+
+Colour:
+
+| Element | State | Property | Token role |
+|---|---|---|---|
+| Field | enabled | background-color | layer (contextual `*`) |
+| Field | enabled | border-bottom | border (contextual `*`) |
+| Label text (fluid) | enabled | text-color | not stated |
+| Placeholder text | enabled | text-color | not stated |
+| Search icon | enabled | fill | not stated |
+| Field | focus | border | not stated |
+| Field text | filled | text-color | not stated |
+| Close icon | filled | fill | not stated |
+| Field text | disabled | text-color | not stated |
+| Label text (fluid) | disabled | text-color | not stated |
+| Search icon | disabled | fill | not stated |
+| Field (fluid) | disabled | border-bottom | border (contextual `*`) |
+
+`*` Denotes a contextual token.
+
+Typography:
+
+| Element | Font-size (px / rem) | Font-weight | Type token |
+|---|---|---|---|
+| Field text | 14 / 0.875 | Regular 400 | not stated |
+| Label text (fluid) | 12 / 0.75 | Regular 400 | not stated |
+
+Text: sentence case.
+
+Motion tokens: not stated.
+
+**Anatomy**
+
+1. **Field** — text input container; default style has no label
+2. **Search icon (🔍)** — magnifying glass; left side; 16 × 16 px; always visible; universal indicator of search
+3. **Field text** — user's search query
+4. **Close icon (×)** — 16 × 16 px; appears after user starts typing; clears field on click; Tab/Enter/Space via keyboard
+
+---
+
+## 28. Select
+
+> Sources: https://carbondesignsystem.com/components/select/usage/ | https://carbondesignsystem.com/components/select/style/
+
+**What it is** — The native HTML `<select>` element for choosing one option from a list within a form. Its appearance is controlled by the browser. Use inside a form where users select from a list and submit data, or when the experience is mostly form-based. Use **Radio button** group instead when there are fewer than three options. Use **Dropdown** instead when the component needs to be styled, when taking an action (filtering, sorting), or when multi-selection is needed.
+
+**Variants**
+
+| Variant | Purpose |
+|---|---|
+| **Default** | Standard bordered field; used in forms with other components |
+| **Inline select** | Borderless; transparent background; reduced visual weight; used when multiple selects appear together in a form |
+| **With AI label** | AI explainability label embedded; can toggle between AI and non-AI variant |
+
+Input styles:
+
+| Style | Label position | Use case |
+|---|---|---|
+| **Default** | Outside / above field | Productive forms |
+| **Fluid** | Inside field, stacked inline | Expressive moments; fluid forms |
+
+**Sizes**
+
+Default:
+
+| Size | Height (px / rem) |
+|---|---|
+| Small (sm) | 32 / 2 |
+| Medium (md) | 40 / 2.5 — default |
+| Large (lg) | 48 / 3 |
+
+Fluid:
+
+| Size | Height (px / rem) |
+|---|---|
+| Default | 64 / 4 |
+
+Inline select: same heights as default. Width: no minimum or maximum; customisable to context.
+
+Spacing (default):
+
+| Element | Property | px / rem |
+|---|---|---|
+| Label | margin-bottom | 8 / 0.5 |
+| Input text | padding-left | 16 / 1 |
+| Helper text | margin-top | 4 / 0.25 |
+| Field | padding-left | 16 / 1 |
+| Field | padding-right | 48 / 3 |
+| Field | border-bottom | 1 px |
+| Chevron icon | padding-left, padding-right | 16 / 1 |
+| State icon | padding-left, padding-right | 16 / 1 |
+
+Spacing (inline select):
+
+| Element | Property | px / rem |
+|---|---|---|
+| Input text | padding-left | 16 / 1 |
+| Input text | padding-right | 8 / 0.5 |
+| Chevron icon | padding-right | 16 / 1 |
+| Chevron icon | padding-left | 8 / 0.5 |
+
+Spacing (fluid):
+
+| Element | Property | px / rem |
+|---|---|---|
+| Label | margin-bottom | 4 / 0.25 |
+| Field | padding-left | 16 / 1 |
+| Field | padding-right | 48 / 3 |
+| Field | border-bottom | 1 px |
+
+**States**
+
+| State | Description |
+|---|---|
+| **Enabled** | Default; shows default option or placeholder |
+| **Hover** | Cursor over field; background-color change |
+| **Focus** | Tabbed to or clicked |
+| **Error (invalid)** | Required field with no selection; system error; 2 px error border |
+| **Warning** | Exception condition |
+| **Disabled** | Not interactive; not focusable; border-bottom transparent (default) or contextual (fluid) |
+| **Read-only** | Focusable; passes contrast; cannot modify; background transparent (default) or contextual (fluid) |
+| **Skeleton** | Initial page load |
+
+**Tokens consumed**
+
+Colour:
+
+| Element | State | Property | Token role |
+|---|---|---|---|
+| Field | enabled | background | layer (contextual `*`) |
+| Field | enabled | border-bottom | border (contextual `*`) |
+| Inline select | enabled | background | transparent |
+| Label | — | text-color | not stated |
+| Field text | — | text-color | not stated |
+| Helper text | — | text-color | not stated |
+| Icon (chevron) | — | fill | not stated |
+| Field | hover | background-color | layer (contextual `*`) |
+| Field | focus | border | not stated |
+| Field | error | border | not stated |
+| Error message | error | text-color | not stated |
+| Error icon | error | fill | not stated |
+| Warning message | warning | text-color | not stated |
+| Warning icon | warning | fill | not stated |
+| Field | disabled | background-color | layer (contextual `*`) |
+| Field (default) | disabled | border-bottom | transparent |
+| Field (fluid) | disabled | border-bottom | contextual `*` |
+| Field (default) | read-only | background | transparent |
+| Field (fluid) | read-only | background | layer (contextual `*`) |
+| Field | read-only | border-bottom | contextual `*` |
+
+`*` Denotes a contextual token.
+
+Typography:
+
+| Element | Font-size (px / rem) | Font-weight | Type token |
+|---|---|---|---|
+| Label | 12 / 0.75 | Regular 400 | not stated |
+| Field text | 14 / 0.875 | Regular 400 | not stated |
+| Helper text | 12 / 0.75 | Regular 400 | not stated |
+| Warning message | 12 / 0.75 | Regular 400 | not stated |
+| Error message | 12 / 0.75 | Regular 400 | not stated |
+
+Text: sentence case; ≤ 3 words.
+
+Motion tokens: not stated.
+
+**Anatomy**
+
+1. **Label** — required; 1–3 words; not helper text
+2. **Default option** — empty, prefilled first item, or common/frequent item
+3. **Helper text (optional)** — assistive; replaced by error/warning text
+4. **Field** — the visible container; persists open and closed
+5. **Option** — individual choice in the list
+6. **List** — all options when open (browser-rendered)
+7. **Status icon** — error or warning indicator inside field
+8. **Error or Warning text** — replaces helper text
+
+---
+
+## 29. Slider
+
+> Sources: https://carbondesignsystem.com/components/slider/usage/ | https://carbondesignsystem.com/components/slider/style/
+
+**What it is** — A visual control for selecting a single value or range by moving a handle along a horizontal track. Use when selecting a single value or range of number values, when needing to expose a variety of options, or when showing the relative position within a range is useful. Do not use for extremely large ranges (e.g. 1–1000), ranges that are too small (e.g. 1–3), or complex non-numeric values.
+
+**Variants**
+
+| Variant | Purpose |
+|---|---|
+| **Default slider** | Single value; label + one number input showing current value |
+| **Range slider** | Two handles for min/max; label + two number inputs |
+
+**Sizes**
+
+| Element | Property | px / rem |
+|---|---|---|
+| Handle (default) | height, width | 14 / 0.875 |
+| Handle active (default) | height, width | 20 / 1.25 |
+| Handle (range slider) | height, width | 16 / 1 |
+| Handle active (range slider) | height, width | 16 / 1 |
+| Track | height | 4 / 0.25 |
+| Track (default) | margin-left, margin-right | 8 / 0.5 |
+| Track (range slider) | margin-left, margin-right | 16 / 1 |
+| Label | margin-bottom | 8 / 0.5 |
+| Range label | margin-right | 16 / 1 |
+| Error message | margin-top | 16 / 1 |
+| Error icon | padding-right, padding-left | 16 / 1 |
+| Tooltip | padding-bottom (default) | 4 / 0.25 |
+| Tooltip | padding-bottom (range) | 0 |
+
+Recommended width limits (not built into component):
+
+| Element | Property | px / rem |
+|---|---|---|
+| Slider | min-width | 200 / 12.5 |
+| Slider | max-width | 640 / 40 |
+
+**States**
+
+| State | Description |
+|---|---|
+| **Enabled** | Default; live but not interacted with |
+| **Hover** | Cursor over field or handles; tooltip shown if no number input |
+| **Focus** | Tabbed to or clicked; tooltip shown if no number input |
+| **Active** | Pressing down on handles; tooltip shown if no number input |
+| **Error** | Required field empty; value out of range; non-numeric entry; system error |
+| **Warning** | Exception condition |
+| **Disabled** | Not interactive; not focusable; no contrast requirement |
+| **Read-only** | Focusable; passes contrast; cannot modify |
+| **Skeleton** | Initial page load |
+
+Keyboard step behaviour: Arrow keys change by 1 step increment; not stated whether Shift+Arrow is documented for slider specifically.
+
+**Tokens consumed**
+
+Colour:
+
+| Element | State | Property | Token role |
+|---|---|---|---|
+| Handle | enabled | fill | not stated |
+| Track | enabled | background-color | border (contextual `*`) |
+| Track — filled | enabled | background-color | not stated |
+| Label | enabled | text-color | not stated |
+| Range label | enabled | text-color | not stated |
+| Handle | focus | border | not stated |
+| Track | focus | background-color | not stated |
+| Handle | active | fill | not stated |
+| Track | active | background-color | not stated |
+| Number input | error | border | not stated |
+| Error icon | error | svg | not stated |
+| Error message | error | text-color | not stated |
+| Warning icon | warning | svg | not stated |
+| Warning message | warning | text-color | not stated |
+| Label | disabled | text-color | not stated |
+| Handle | disabled | fill | not stated |
+| Track | disabled | background-color | not stated |
+| Track | read-only | background-color | layer (contextual `*`) |
+| Track — filled | read-only | background-color | not stated |
+
+`*` Denotes a contextual token. Number input inherits all number input tokens.
+
+Typography:
+
+| Element | Font-size (px / rem) | Font-weight | Type token |
+|---|---|---|---|
+| Label | 12 / 0.75 | Regular 400 | not stated |
+| Range label | 14 / 0.875 | Regular 400 | not stated |
+
+Labels: sentence case; ≤ 3 words.
+
+Motion tokens: not stated.
+
+**Anatomy**
+
+Default slider:
+1. **Label** — value type description; above slider; sentence case
+2. **Min value** — minimum boundary label
+3. **Max value** — maximum boundary label
+4. **Number input** — shows and allows entry of exact current value
+5. **Handle** — 14 × 14 px draggable indicator (20 × 20 px when active)
+6. **Track** — 4 px high full-range reference line
+
+Range slider (adds):
+7. **Min value number input** — left text field
+8. **Max value number input** — right text field
+9. **Handles (×2)** — min and max position indicators; 16 × 16 px (same size active)
+
+---
+
+## 30. Structured List
+
+> Sources: https://carbondesignsystem.com/components/structured-list/usage/ | https://carbondesignsystem.com/components/structured-list/style/
+
+**What it is** — Groups similar or related content (terms + definitions, feature comparison, pricing plans) in a simple multi-column display. Supports read-only or selectable rows. Do not use for complex content needing nesting or many rows (use **Data table**); do not use in small or confined spaces (use **Contained list**).
+
+**Variants**
+
+| Variant | Description |
+|---|---|
+| **Default** | Read-only; browse and view information; rows not interactive |
+| **Selectable** | One row selectable at a time; feature flag changes icons from checkmarks (right) to radio button icons (left) |
+
+Alignment styles:
+
+| Style | Description |
+|---|---|
+| **Hang** | Text hangs into gutter; default; available for both variants |
+| **Flush** | Text flush to container edges; NOT available for selectable variant |
+
+Optional background colour modifier: applies a background layer to rows; only available in hang alignment.
+
+A feature flag has been added to the selectable variant (changes visual appearance, not functionality); teams are encouraged to use it going forward.
+
+**Sizes**
+
+| Element | Size | Height (px / rem) |
+|---|---|---|
+| Row | Default | 60 / 3.75 |
+| Row | Condensed | 36 / 2.25 |
+
+Min container width: **500 px / 31.25 rem**.
+
+Spacing (hang alignment):
+
+| Element | Property | px / rem | Spacing token |
+|---|---|---|---|
+| Header text | padding-top | 16 / 1 | not stated |
+| Header text | padding-bottom | 8 / 0.5 | not stated |
+| Header text | padding-right | 16 / 1 | not stated |
+| Header text | padding-left | 16 / 1 | not stated |
+| Row text | padding-top | 16 / 1 | not stated |
+| Row text | padding-bottom | 24 / 1.5 | not stated |
+| Row text | padding-right | 16 / 1 | not stated |
+| Row text | padding-left | 16 / 1 | not stated |
+
+Flush alignment: padding-left = 0 px for header and row text; all other values identical.
+
+**States**
+
+Default:
+
+| State | Description |
+|---|---|
+| **Enabled** | Only state; read-only |
+| **Skeleton** | Initial page load |
+
+Selectable:
+
+| State | Description |
+|---|---|
+| **Enabled (unselected)** | Default |
+| **Hover** | Row background-color change |
+| **Hover (selected)** | Selected row with cursor hover |
+| **Focus** | 2 px border outline on row |
+| **Focus (selected)** | Selected row with focus |
+| **Selected** | Active row; one at a time |
+| **Disabled** | Not interactive; muted text and icon |
+| **Disabled (selected)** | Disabled row previously selected |
+| **Skeleton** | Initial page load |
+| Error | Not stated |
+
+**Tokens consumed**
+
+Colour (default):
+
+| Element | Property | Token role |
+|---|---|---|
+| Header | background | transparent |
+| Header text | text-color | not stated |
+| Row | background | transparent |
+| Row text | text-color | not stated |
+| Divider | border-bottom | border-subtle (contextual `*`) |
+
+Colour (selectable, additional):
+
+| State | Element | Property | Token role |
+|---|---|---|---|
+| Enabled | Icon | svg | not stated |
+| Enabled (selected) | Row | background | layer-selected (contextual `*`) |
+| Hover | Row | background | layer-hover (contextual `*`) |
+| Hover (selected) | Row | background | layer-selected-hover (contextual `*`) |
+| Focus | Row | border | not stated |
+| Disabled | Row text | text-color | not stated |
+| Disabled | Icon | svg | not stated |
+
+Colour (with background colour modifier):
+
+| Element | Property | Token role |
+|---|---|---|
+| Header | background | layer (contextual `*`) |
+| Row | background | layer (contextual `*`) |
+
+`*` Denotes a contextual token.
+
+Typography:
+
+| Element | Font-size (px / rem) | Font-weight | Type token |
+|---|---|---|---|
+| Header text | 14 / 0.875 | SemiBold 600 | not stated |
+| Row text | 14 / 0.875 | Regular 400 | not stated |
+
+All text: sentence case; left-aligned.
+
+Motion tokens: not stated.
+
+**Anatomy**
+
+Default:
+1. **Column header** — title text per column; sentence case; 1–2 words
+2. **Data row** — row cells with content; optional background colour (hang alignment only)
+
+Selectable (feature flag):
+1. **Column header** — title per column
+2. **Data row** — cells + optional background
+3. **Icon** — radio button icon left-positioned (feature flag) or checkmark right-positioned (default)
+
+---
+
+## 31. Tabs
+
+> Sources: https://carbondesignsystem.com/components/tabs/usage/ | https://carbondesignsystem.com/components/tabs/style/
+
+**What it is** — Organises related content into navigable groups within the same context; users switch between views without leaving the page. Use **Content switcher** instead when toggling between different formats of the same content. Use **Progress indicator** instead when the user needs to work through a step-by-step linear process. Do not use tabs if the user needs to compare information across groups.
+
+**Variants**
+
+| Variant | Description |
+|---|---|
+| **Line tabs** | Standalone; highly flexible; used within components or large page layouts; transparent background; no tab panel container |
+| **Contained tabs** | Emphasized; for defined content areas; always attached to a tab panel; supports secondary labels |
+| **Vertical tabs** | Left/vertical orientation; for browsing information; NOT for primary product navigation |
+| **Dismissible (line or contained)** | Tabs with × close icon per tab; user can remove tabs |
+| **Icon-only (line or contained)** | Icon labels only; no text |
+
+Width alignment: **auto-width** (default for all; each tab matches label length + consistent padding) or **grid-aware** (contained tabs only; equal-width tabs spanning a set of columns).
+
+**Sizes**
+
+Line tab:
+
+| Element | Property | px / rem |
+|---|---|---|
+| Tab | height | 40 / 2.5 |
+| Tab | border-bottom | 2 px |
+| Tab | width | auto-width |
+| Tab | margin-left | 1 px |
+| Label | padding-left, padding-right | 16 / 1 |
+| Label | padding-top, padding-bottom | 8 / 0.5 |
+| Icon | padding-right | 16 / 1 |
+| Icon | padding-left | 8 / 0.5 |
+| Icon | svg | 16 × 16 px |
+| Scrollable icon | svg | 16 × 16 px |
+
+Line tab — icon-only:
+
+| Size | Element | Height × Width | Icon |
+|---|---|---|---|
+| Medium | Tab | 40 / 2.5 × 40 / 2.5 | 16 × 16 px |
+| Large | Tab | 48 / 3 × 48 / 3 | 20 × 20 px |
+
+Contained tab:
+
+| Element | Property | px / rem |
+|---|---|---|
+| Tab | height | 40 / 2.5 |
+| Tab | border-top | 2 px |
+| Tab | border-right | 1 px |
+| Tab | width | auto-width or grid |
+| Label | padding-left, padding-right | 16 / 1 |
+| Scrollable button | border-right, border-left | 1 px |
+| Icon | svg | 16 × 16 px |
+
+Contained tab — icon-only:
+
+| Size | Element | Height × Width | Icon |
+|---|---|---|---|
+| Large | Tab | 48 / 3 × 48 / 3 | 20 × 20 px |
+
+**States**
+
+| State | Description |
+|---|---|
+| **Selected** | Active tab; always one selected; SemiBold label; 2 px indicator (border-bottom line / border-top contained) |
+| **Unselected** | Inactive tab; Regular label |
+| **Hover** | Background / border change |
+| **Focus** | 2 px focus border outline on tab |
+| **Disabled** | Not interactive; muted background; muted text |
+| **Scrollable** | Left/right scroll buttons appear when tabs overflow available width |
+| Skeleton | Not stated |
+| Error | Not stated |
+
+**Tokens consumed**
+
+Colour (line tabs):
+
+| Type | Element | State | Property | Token role |
+|---|---|---|---|---|
+| Unselected | Tab | — | background-color | transparent |
+| Unselected | Tab | — | border-bottom | border-subtle (contextual `*`) |
+| Unselected | Label | — | text-color | not stated |
+| Selected | Label | — | text-color | not stated |
+| Selected | Tab | — | border-bottom | not stated (interactive colour) |
+| — | Tab | hover | border-bottom | not stated |
+| — | Tab | focus | border | not stated |
+| — | Label | disabled | text-color | not stated |
+| — | Tab | disabled | background-color | transparent |
+| — | Tab | disabled | border-bottom | not stated |
+
+Colour (contained tabs):
+
+| Type | Element | State | Property | Token role |
+|---|---|---|---|---|
+| Unselected | Tab | — | background-color | layer (contextual `*`) |
+| Unselected | Tab | — | border-right | border (contextual `*`) |
+| Selected | Tab | — | background-color | layer (contextual `*`) |
+| Selected | Tab | — | border-top | not stated (interactive colour) |
+| — | Tab | hover | background-color | layer (contextual `*`) |
+| — | Tab | focus | border | not stated |
+| — | Tab | disabled | background-color | not stated |
+
+Colour (vertical tabs):
+
+| Type | Element | State | Property | Token role |
+|---|---|---|---|---|
+| Unselected | Tab | — | background-color | layer (contextual `*`) |
+| Unselected | Tab | — | border-bottom/right/left | border (contextual `*`) |
+| Selected | Tab | — | background-color | layer (contextual `*`) |
+| Selected | Tab | — | border-bottom | layer (contextual `*`) |
+| — | Tab panel | — | background-color | layer (contextual `*`) |
+| — | Extended background | — | background-color | layer (contextual `*`) |
+
+`*` Denotes a contextual token.
+
+Typography:
+
+| Element | Font-size (px / rem) | Font-weight | Type token |
+|---|---|---|---|
+| Label: unselected | 14 / 0.875 | Regular 400 | not stated |
+| Label: selected | 14 / 0.875 | SemiBold 600 | not stated |
+| Secondary label (contained) | 12 / 0.75 | Regular 400 | not stated |
+
+Labels: sentence case; ≤ 3 words; nouns or noun phrases.
+
+Motion tokens: not stated.
+
+**Anatomy**
+
+1. **Label (A)** — tab text; 1–2 words; sentence case
+2. **Secondary label (B, contained only)** — optional additional context; 12 / 0.75 rem
+3. **Indicator (C)** — 2 px border-bottom (line) or border-top (contained); shows selection
+4. **Scroll button (D)** — appears when tab group overflows; left/right chevrons; 16 × 16 px icon
+5. **Icon (E, optional)** — decorative or replaces label in icon-only tabs; 16 × 16 px (md) or 20 × 20 px (lg contained icon-only)
+6. **Tab panel (F)** — content area below / beside the tablist
+7. **Tablist extended background (G, vertical)** — background area behind the vertical tab list
+
+---
+
+## 32. Tag
+
+> Sources: https://carbondesignsystem.com/components/tag/usage/ | https://carbondesignsystem.com/components/tag/style/
+
+**What it is** — Compact labels for categorizing, labeling, filtering, or selecting options using descriptive keywords. Four variants serve different levels of interactivity. Do not use tags as links that direct to a different page. Avoid using tags with multiple functions.
+
+**Variants**
+
+| Variant | Purpose | Interactivity |
+|---|---|---|
+| **Read-only** | Categorization and labeling only | None |
+| **Dismissible** | Can be dismissed/closed/removed | Close × icon; click to dismiss |
+| **Selectable** | Can be selected or deselected | Entire tag is click target; selected/unselected state |
+| **Operational** | Discloses additional or overflow tags in a popover, modal, or breadcrumb view | Entire tag is click target; opens disclosure |
+
+Colour palette: Read-only, dismissible, and operational use **component tokens** from the IBM Design Language colour palette. Light themes: step 70 text/icons, step 40 borders, step 20 backgrounds. Dark themes: step 20 text/icons, step 50 borders, step 70 backgrounds. High contrast and outline styles use core tokens. **Selectable tags use only core tokens** (no component colour tokens).
+
+**Sizes**
+
+| Size | Height (px / rem) | Border-radius | Padding-left/right |
+|---|---|---|---|
+| Small (sm) | 18 / 1.125 | 16 px | 8 / 0.5 |
+| Medium (md) | 24 / 1.5 | 16 px | 8 / 0.5 |
+| Large (lg) | 32 / 2 | 16 px | 12 / 0.75 |
+
+Icon size (all sizes): 16 px.
+
+Tag group spacing: 8 px between tags on all sides.
+
+Decorative icon padding (large): padding-left = 8 / 0.5; padding-right = 4 / 0.25.
+Dismissible icon padding (large): padding-left = 12 / 0.75; padding-right = 8 / 0.5.
+Dismissible icon padding (medium): padding-left = 8 / 0.5; padding-right = 4 / 0.25.
+Dismissible icon padding (small): padding-left = 8 / 0.5; padding-right = 1 / 0.0625.
+
+AI label (with AI label variant): inline size = small; padding-right = 4 px / 0.25 rem.
+
+**States**
+
+| Variant | States |
+|---|---|
+| **Read-only** | Enabled, disabled, skeleton |
+| **Dismissible** | Enabled, hover, focus, on-click, disabled, skeleton |
+| **Selectable** | Enabled, hover, focus, selected, disabled, skeleton |
+| **Operational** | Enabled, hover, focus, on-click, disabled, skeleton |
+
+Read-only tags have no interactive states (no hover, focus, or click).
+
+**Tokens consumed**
+
+Colour (read-only, dismissible, operational):
+
+| Element | Token type | Light theme step | Dark theme step |
+|---|---|---|---|
+| Text + Icon | Component token | step 70 | step 20 |
+| Background | Component token | step 20 | step 70 |
+| Border (operational, outline, high-contrast) | Component token or core | step 40 (light) / step 50 (dark) | — |
+| Hover background | Component token | hover step | hover step |
+| Focus border | Core token | `$focus` | `$focus` |
+| Disabled background | Core token (contextual `*`) | — | — |
+| Disabled text | Core token | text-disabled | text-disabled |
+
+Colour (selectable — core tokens only):
+
+| Element | State | Property | Token role |
+|---|---|---|---|
+| Background | enabled | background-color | layer (contextual `*`) |
+| Border | enabled | border | not stated |
+| Background | hover | background-color | layer (contextual `*`) |
+| Border | focus | border | not stated |
+| Text | selected | text-color | not stated |
+| Background | selected | background-color | not stated |
+| Text | disabled | text-color | text-disabled |
+| Border | disabled | border | not stated |
+| Background | disabled | background-color | layer (contextual `*`) |
+
+`*` Denotes a contextual token.
+
+Typography:
+
+| Element | Font-size (px / rem) | Font-weight | Type token |
+|---|---|---|---|
+| Title | 12 / 0.75 | Regular 400 | not stated |
+
+Title: concise; ≤ 20 characters ideally; truncates with ellipsis + tooltip if too long; no wrapping.
+
+Motion tokens: not stated.
+
+**Anatomy**
+
+1. **Decorative icon (optional)** — left of title; same colour as text; not recommended for small size
+2. **Title** — concise; ≤ 20 characters; truncates with ellipsis + tooltip; no wrapping
+3. **Container** — compact; 16 px border-radius all sizes
+
+*(Dismissible adds:)*
+4. **Close icon (×)** — right side; 16 px; distinct clickable area from title
+
+*(Selectable and Operational add:)*
+5. **Border** — visible in enabled state to indicate interactivity; not present on read-only
+
+---
+
+## 33. Text Input
+
+> Sources: https://carbondesignsystem.com/components/text-input/usage/ | https://carbondesignsystem.com/components/text-input/style/
+
+**What it is** — Enables users to enter free-form text data; single-line (text input) or multi-line (text area). Use when a user needs to input unique or memorable information that cannot be predicted with preset options. Do not use if the user can only enter from a predefined list — use **Dropdown**, **Select**, or **Radio button** group instead.
+
+**Variants**
+
+| Variant | Description |
+|---|---|
+| **Text input — Default** | Single line; label outside/above |
+| **Text input — Fluid** | Single line; label inside field |
+| **Password input — Default** | Single line with visibility toggle icon |
+| **Password input — Fluid** | Fluid style with visibility toggle |
+| **Text area — Default** | Multi-line; label outside/above; resize handle; supports character/word counter |
+| **Text area — Fluid** | Multi-line; label inside field |
+
+**Sizes**
+
+Default text input / password input:
+
+| Size | Height (px / rem) |
+|---|---|
+| Small (sm) | 32 / 2 |
+| Medium (md) | 40 / 2.5 — default |
+| Large (lg) | 48 / 3 |
+
+Fluid text input / password input: single height of **64 px** (grows when warning/error message is added below; padding-top/bottom = 13 / 0.8125 rem).
+
+Text area (default style):
+
+| Element | Property | px / rem |
+|---|---|---|
+| Field | height | varies (content-driven) |
+| Field | padding-left, padding-right | 16 / 1 |
+| Field | padding-top, padding-bottom | 11 / 0.6875 |
+| Field | border-bottom | 1 px |
+
+Text area (fluid style): same padding values; height varies.
+
+**States**
+
+| State | Description |
+|---|---|
+| **Enabled** | Default; may contain placeholder text or user content |
+| **Active** | User actively typing |
+| **Focus** | Tabbed to or clicked into field; 2 px border |
+| **Error (invalid)** | Invalid input; required field empty; system error; 2 px red border + error icon + error message |
+| **Warning** | Exception condition; warning icon + warning message |
+| **Disabled** | Not interactive; not focusable; border-bottom transparent (default) or contextual (fluid) |
+| **Read-only** | Focusable; passes contrast; background transparent (default) or contextual (fluid) |
+| **Skeleton** | Initial page load |
+| **Hover (password)** | View icon changes colour on hover |
+
+**Tokens consumed**
+
+Colour (text input / text area):
+
+| Element | State | Property | Token role |
+|---|---|---|---|
+| Label | — | text-color | not stated |
+| Field text | — | text-color | not stated |
+| Placeholder text | — | text-color | not stated |
+| Helper text | — | text-color | not stated |
+| Field | enabled | background-color | layer (contextual `*`) |
+| Field | enabled | border-bottom | border (contextual `*`) |
+| Field | focus | border | not stated (2 px) |
+| Field | error | border | not stated (2 px) |
+| Error message | error | text-color | not stated |
+| Error icon | error | svg | not stated |
+| Warning message | warning | text-color | not stated |
+| Warning icon | warning | svg | not stated |
+| Field | disabled | background | layer (contextual `*`) |
+| Field (default) | disabled | border-bottom | transparent |
+| Field (fluid) | disabled | border-bottom | contextual `*` |
+| Field text | disabled | text-color | not stated |
+| Field (default) | read-only | background | transparent |
+| Field (fluid) | read-only | background | layer (contextual `*`) |
+| Field | read-only | border-bottom | contextual `*` |
+
+Password input (additional):
+
+| Element | State | Property | Token role |
+|---|---|---|---|
+| View icon | enabled | svg | not stated |
+| View icon | hover | svg | not stated |
+| View icon | disabled | svg | not stated |
+| View icon | read-only | svg | not stated |
+
+`*` Denotes a contextual token.
+
+Typography:
+
+| Element | Font-size (px / rem) | Font-weight | Type token |
+|---|---|---|---|
+| Label | 12 / 0.75 | Regular 400 | not stated |
+| Field text | 14 / 0.875 | Regular 400 | not stated |
+| Helper text | 12 / 0.75 | Regular 400 | not stated |
+| Invalid and warning message | 12 / 0.75 | Regular 400 | not stated |
+
+Labels: sentence case; ≤ 3 words; no colons.
+
+Spacing (default text input):
+
+| Element | Property | px / rem |
+|---|---|---|
+| Label | margin-bottom | 8 / 0.5 |
+| Helper text | margin-top | 4 / 0.25 |
+| Field text | padding-left, padding-right | 16 / 1 |
+| Field | border-bottom | 1 px |
+| Focus | border | 2 px |
+| Invalid | border | 2 px |
+
+Spacing (fluid text input):
+
+| Element | Property | px / rem |
+|---|---|---|
+| Label | padding-bottom | 4 / 0.25 |
+| Field | height | 64 / 4 |
+| Field | padding-left, padding-right | 16 / 1 |
+| Field | padding-top, padding-bottom | 13 / 0.8125 |
+| Field | border-bottom | 1 px |
+| Focus | border | 2 px |
+| Invalid | border | 2 px |
+
+Spacing (default password input, additions):
+
+| Element | Property | px / rem |
+|---|---|---|
+| View icon | padding-left, padding-right | 16 / 1 |
+| State icon | padding-left | 16 / 1 |
+| State icon | padding-right | 8 / 0.5 |
+
+Spacing (fluid password input, additions):
+
+| Element | Property | px / rem |
+|---|---|---|
+| View icon | padding-left, padding-right | 16 / 1 |
+| State icon | padding-left, padding-right | 16 / 1 |
+
+Spacing (default text area, additions):
+
+| Element | Property | px / rem |
+|---|---|---|
+| Field | padding-top, padding-bottom | 11 / 0.6875 |
+
+Motion tokens: not stated.
+
+**Anatomy**
+
+Text input:
+1. **Label** — required (unless approved accessibility exemption); sentence case; ≤ 3 words; no colon
+2. **Value** — user-entered content; scrolls horizontally if overflows single-line field
+3. **Field** — container; must meet 3:1 non-text contrast
+4. **Helper text (optional)** — below field; replaced by error/warning message when triggered
+
+Text area (adds):
+5. **Resize handle** — bottom-right corner; adjusts height only; vertical scroll appears if content exceeds resized area
+6. **Counter (optional)** — character or word count; below field right-aligned; updates as user types
+
+Password input (adds):
+7. **View icon button** — eye icon; right side of field; toggles password visibility
+
+---
+
 ## 34. Tile
 
 **Sources:** https://carbondesignsystem.com/components/tile/usage/

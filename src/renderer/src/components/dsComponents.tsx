@@ -219,8 +219,23 @@ function IAccordion({ s, items }: { s: DesignSystem; items: { q: string; a: stri
   )
 }
 
-function ITooltip({ s }: { s: DesignSystem }): JSX.Element {
-  const [show, setShow] = useState(false)
+/** The floating list of actions shared by the menu-opening buttons. */
+function IMenuList({ s, items, danger = false }: { s: DesignSystem; items: string[]; danger?: boolean }): JSX.Element {
+  const [hover, setHover] = useState(-1)
+  return (
+    <div role="menu" style={{ position: 'absolute', top: '100%', left: 0, zIndex: 1, marginTop: 6, minWidth: 172, background: s.colors.surface, border: dsBorder(s), borderRadius: s.radii.md, boxShadow: SHADOW_CSS[s.shadow === 'off' ? 'subtle' : s.shadow], overflow: 'hidden', padding: '4px 0' }}>
+      {items.map((t, i) => {
+        const last = danger && i === items.length - 1
+        return (
+          <button key={t} type="button" role="menuitem" onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(-1)}
+            style={{ width: '100%', textAlign: 'left', padding: '7px 12px', fontSize: s.type.sm, fontFamily: stack(s.font.family), color: last ? s.colors.error : s.colors.text, background: hover === i ? `${s.colors.text}0f` : 'transparent', border: 'none', cursor: 'pointer', transition: transition(s) }}>{t}</button>
+        )
+      })}
+    </div>
+  )
+}
+
+function ITooltip({ s }: { s: DesignSystem }): JSX.Element {  const [show, setShow] = useState(false)
   return (
     <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 8, fontFamily: stack(s.font.family) }}>
       <span role="tooltip" style={{ height: 26, fontSize: s.type.xs, color: onSolid(s.colors.text), background: show ? s.colors.text : 'transparent', padding: show ? '5px 9px' : 0, borderRadius: s.radii.sm, transition: transition(s) }}>{show ? 'Copy link' : ''}</span>
@@ -754,5 +769,270 @@ export const DS_COMPONENTS: DSComponent[] = [
       <div style={{ background: s.colors.primary, borderTopLeftRadius: s.radii.md, borderTopRightRadius: s.radii.md, padding: '18px 16px 6px', color: onSolid(s.colors.primary), fontSize: s.type.sm }}>Section content</div>
       <svg width="320" height="20" viewBox="0 0 320 20" preserveAspectRatio="none" style={{ display: 'block' }}><path d="M0 0 Q 20 20 40 0 T 80 0 T 120 0 T 160 0 T 200 0 T 240 0 T 280 0 T 320 0 V0 H0 Z" fill={s.colors.primary} /></svg>
     </div>
-  ) }
+  ) },
+
+  // Actions, continued ----------------------------------------------------------
+  { name: 'MenuButton', category: 'Actions', desc: 'One button whose whole face opens a menu of related actions.', render: (s) => {
+    const Demo = (): JSX.Element => {
+      const [open, setOpen] = useState(false)
+      return (
+        <div style={{ fontFamily: stack(s.font.family), position: 'relative' }}>
+          <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)} style={{ ...fillBtn(s, s.colors.primary), transition: transition(s) }}>
+            Actions<DsIcon name="chevronDown" style={s.iconStyle ?? 'outlined'} size={14} />
+          </button>
+          {open && <IMenuList s={s} items={['Duplicate', 'Move to…', 'Archive']} />}
+        </div>
+      )
+    }
+    return <Demo />
+  } },
+  { name: 'ComboButton', category: 'Actions', desc: 'A primary action with a second, smaller trigger for its alternatives.', render: (s) => {
+    const Demo = (): JSX.Element => {
+      const [open, setOpen] = useState(false)
+      const r = s.radii.md
+      const base = fillBtn(s, s.colors.primary)
+      return (
+        <div style={{ fontFamily: stack(s.font.family), position: 'relative' }}>
+          <div style={{ display: 'inline-flex' }}>
+            <button type="button" style={{ ...base, borderTopRightRadius: 0, borderBottomRightRadius: 0, borderRadius: `${r}px 0 0 ${r}px`, transition: transition(s) }}>Publish</button>
+            <span style={{ width: 1, background: `${onSolid(s.colors.primary)}33` }} />
+            <button type="button" aria-label="More publish options" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}
+              style={{ ...base, padding: `${dims(s).padY}px ${Math.round(dims(s).padX * 0.6)}px`, borderRadius: `0 ${r}px ${r}px 0`, transition: transition(s) }}>
+              <DsIcon name="chevronDown" style={s.iconStyle ?? 'outlined'} size={14} />
+            </button>
+          </div>
+          {open && <IMenuList s={s} items={['Publish and notify', 'Schedule…', 'Save as draft']} />}
+        </div>
+      )
+    }
+    return <Demo />
+  } },
+  { name: 'OverflowMenu', category: 'Actions', desc: 'An icon-only trigger that holds the actions a row has no room for.', render: (s) => {
+    const Demo = (): JSX.Element => {
+      const [open, setOpen] = useState(false)
+      const [hover, setHover] = useState(false)
+      return (
+        <div style={{ fontFamily: stack(s.font.family), position: 'relative' }}>
+          <button type="button" aria-label="More actions" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}
+            onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+            style={{ width: 32, height: 32, display: 'grid', placeItems: 'center', borderRadius: s.radii.sm, border: 'none', cursor: 'pointer', color: s.colors.text, background: open || hover ? `${s.colors.text}0f` : 'transparent', transition: transition(s) }}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="3" r="1.5" /><circle cx="8" cy="8" r="1.5" /><circle cx="8" cy="13" r="1.5" /></svg>
+          </button>
+          {open && <IMenuList s={s} items={['Rename', 'Duplicate', 'Delete']} danger />}
+        </div>
+      )
+    }
+    return <Demo />
+  } },
+
+  // Forms, continued ------------------------------------------------------------
+  { name: 'TreeView', category: 'Navigation', desc: 'A nested list whose branches expand to show what is inside them.', render: (s) => {
+    const Demo = (): JSX.Element => {
+      const [open, setOpen] = useState<Record<string, boolean>>({ Design: true })
+      const [sel, setSel] = useState('Tokens')
+      const tree: { label: string; children?: string[] }[] = [
+        { label: 'Design', children: ['Tokens', 'Components', 'Patterns'] },
+        { label: 'Engineering', children: ['Packages', 'Releases'] },
+        { label: 'Guidelines' }
+      ]
+      const row = (label: string, depth: number, node: boolean, expanded?: boolean, onClick?: () => void): JSX.Element => {
+        const active = sel === label
+        return (
+          <button key={label} type="button" onClick={onClick} aria-expanded={node ? expanded : undefined} aria-current={active ? 'true' : undefined}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', textAlign: 'left', padding: `6px 10px 6px ${10 + depth * 16}px`, border: 'none', cursor: 'pointer', fontSize: s.type.sm, fontFamily: stack(s.font.family), color: active ? s.colors.text : s.colors.textMuted, fontWeight: active ? s.weights.medium : s.weights.regular, background: active ? `${s.colors.primary}1a` : 'transparent', borderLeft: `2px solid ${active ? s.colors.primary : 'transparent'}`, transition: transition(s) }}>
+            <span style={{ width: 12, display: 'grid', placeItems: 'center', opacity: node ? 1 : 0 }}>
+              <span style={{ display: 'grid', transform: expanded ? 'rotate(90deg)' : 'none', transition: transition(s) }}><DsIcon name="chevronRight" style={s.iconStyle ?? 'outlined'} size={12} /></span>
+            </span>
+            {label}
+          </button>
+        )
+      }
+      return (
+        <div role="tree" style={{ width: 232, background: s.colors.surface, border: dsBorder(s), borderRadius: s.radii.md, padding: '6px 0', overflow: 'hidden' }}>
+          {tree.map((n) => (
+            <div key={n.label} role="treeitem" aria-expanded={n.children ? !!open[n.label] : undefined}>
+              {row(n.label, 0, !!n.children, !!open[n.label], () => { if (n.children) setOpen((o) => ({ ...o, [n.label]: !o[n.label] })); else setSel(n.label) })}
+              {n.children && open[n.label] && n.children.map((c) => row(c, 1, false, undefined, () => setSel(c)))}
+            </div>
+          ))}
+        </div>
+      )
+    }
+    return <Demo />
+  } },
+  { name: 'RightPanel', category: 'Navigation', desc: 'A panel that slides in from the edge to hold details without leaving the page.', render: (s) => {
+    const Demo = (): JSX.Element => {
+      const [open, setOpen] = useState(true)
+      return (
+        <div style={{ width: 340, height: 208, position: 'relative', overflow: 'hidden', border: dsBorder(s), borderRadius: s.radii.md, background: s.colors.bg, fontFamily: stack(s.font.family) }}>
+          <div style={{ padding: 14 }}>
+            <div style={{ color: s.colors.text, fontSize: s.type.sm, fontWeight: s.weights.medium }}>Page content</div>
+            <div style={{ marginTop: 10 }}><IButton s={s} color={s.colors.primary} size="sm" onClick={() => setOpen((o) => !o)}>{open ? 'Close panel' : 'Open panel'}</IButton></div>
+          </div>
+          <aside aria-hidden={!open} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: 188, background: s.colors.surface, borderLeft: dsBorder(s), boxShadow: SHADOW_CSS[s.shadow === 'off' ? 'subtle' : s.shadow], transform: open ? 'translateX(0)' : 'translateX(100%)', transition: `transform ${s.motion.normal || 200}ms ${s.motion.easing}`, padding: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ color: s.colors.text, fontSize: s.type.sm, fontWeight: s.weights.semibold, fontFamily: stack(s.font.heading) }}>Details</span>
+              <button type="button" aria-label="Close panel" onClick={() => setOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: s.colors.textMuted, display: 'grid' }}><DsIcon name="close" style={s.iconStyle ?? 'outlined'} size={14} /></button>
+            </div>
+            {['Owner', 'Updated', 'Status'].map((k, i) => (
+              <div key={k} style={{ marginTop: 12 }}>
+                <div style={{ color: s.colors.textMuted, fontSize: s.type.xs }}>{k}</div>
+                <div style={{ color: s.colors.text, fontSize: s.type.sm, marginTop: 2 }}>{['Design team', 'Today', 'In review'][i]}</div>
+              </div>
+            ))}
+          </aside>
+        </div>
+      )
+    }
+    return <Demo />
+  } },
+
+  // Containers, continued -------------------------------------------------------
+  { name: 'Popover', category: 'Containers', desc: 'A small floating surface that holds content next to whatever opened it.', render: (s) => {
+    const Demo = (): JSX.Element => {
+      const [open, setOpen] = useState(true)
+      return (
+        <div style={{ position: 'relative', fontFamily: stack(s.font.family), paddingBottom: open ? 96 : 0 }}>
+          <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} style={btn(s, 'transparent', s.colors.text, s.colors.border)}>Filters</button>
+          {open && (
+            <div role="dialog" aria-label="Filters" style={{ position: 'absolute', top: '100%', left: 0, marginTop: 8, width: 216, background: s.colors.surface, border: dsBorder(s), borderRadius: s.radii.md, boxShadow: SHADOW_CSS[s.shadow === 'off' ? 'subtle' : s.shadow], padding: 12 }}>
+              <span style={{ position: 'absolute', top: -5, left: 18, width: 8, height: 8, background: s.colors.surface, borderLeft: dsBorder(s), borderTop: dsBorder(s), transform: 'rotate(45deg)' }} />
+              <div style={{ color: s.colors.text, fontSize: s.type.sm, fontWeight: s.weights.medium, marginBottom: 8 }}>Show</div>
+              <div style={{ display: 'grid', gap: 7 }}>
+                <ICheck s={s} label="Published" defaultOn />
+                <ICheck s={s} label="Drafts" />
+                <ICheck s={s} label="Archived" />
+              </div>
+            </div>
+          )}
+        </div>
+      )
+    }
+    return <Demo />
+  } },
+  { name: 'AspectRatio', category: 'Containers', desc: 'Holds a fixed shape for media so nothing shifts while it loads.', render: (s) => {
+    const Demo = (): JSX.Element => {
+      const ratios: [string, number][] = [['16:9', 16 / 9], ['4:3', 4 / 3], ['1:1', 1]]
+      const [pick, setPick] = useState(0)
+      const [label, r] = ratios[pick]
+      return (
+        <div style={{ width: 260, fontFamily: stack(s.font.family) }}>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+            {ratios.map(([l], i) => (
+              <button key={l} type="button" onClick={() => setPick(i)} style={{ padding: '4px 10px', fontSize: s.type.xs, borderRadius: s.radii.sm, cursor: 'pointer', border: dsBorder(s), background: i === pick ? `${s.colors.primary}1a` : 'transparent', color: i === pick ? s.colors.text : s.colors.textMuted, transition: transition(s) }}>{l}</button>
+            ))}
+          </div>
+          <div style={{ width: '100%', aspectRatio: String(r), background: `${s.colors.primary}1f`, border: dsBorder(s), borderRadius: s.radii.md, display: 'grid', placeItems: 'center', color: s.colors.textMuted, fontSize: s.type.sm, transition: transition(s) }}>{label}</div>
+        </div>
+      )
+    }
+    return <Demo />
+  } },
+
+  // Notifications, continued ----------------------------------------------------
+  { name: 'Toggletip', category: 'Notifications', desc: 'Like a tooltip, but it stays open so the content inside can be used.', render: (s) => {
+    const Demo = (): JSX.Element => {
+      const [open, setOpen] = useState(true)
+      return (
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: stack(s.font.family), position: 'relative', paddingBottom: open ? 78 : 0 }}>
+          <span style={{ color: s.colors.text, fontSize: s.type.sm }}>Monthly spend</span>
+          <button type="button" aria-label="About monthly spend" aria-expanded={open} onClick={() => setOpen((o) => !o)}
+            style={{ width: 18, height: 18, borderRadius: s.radii.pill, border: dsBorder(s), background: 'transparent', color: s.colors.textMuted, cursor: 'pointer', fontSize: 11, display: 'grid', placeItems: 'center', padding: 0, transition: transition(s) }}>i</button>
+          {open && (
+            <div role="dialog" style={{ position: 'absolute', top: 26, left: 0, width: 212, background: s.colors.surface, border: dsBorder(s), borderRadius: s.radii.md, boxShadow: SHADOW_CSS[s.shadow === 'off' ? 'subtle' : s.shadow], padding: 10 }}>
+              <div style={{ color: s.colors.text, fontSize: s.type.xs, lineHeight: 1.5 }}>Spend is totalled on the first of each month and excludes tax.</div>
+              <button type="button" style={{ marginTop: 8, background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: s.colors.primary, fontSize: s.type.xs, fontWeight: s.weights.medium, fontFamily: stack(s.font.family) }}>Read the billing guide</button>
+            </div>
+          )}
+        </div>
+      )
+    }
+    return <Demo />
+  } },
+  { name: 'InlineLoading', category: 'Notifications', desc: 'Reports the progress of one action in the place the action was taken.', render: (s) => {
+    const Demo = (): JSX.Element => {
+      const [state, setState] = useState<'idle' | 'active' | 'done' | 'error'>('active')
+      const tone = state === 'error' ? s.colors.error : state === 'done' ? s.colors.success : s.colors.primary
+      const text = { idle: 'Not started', active: 'Saving…', done: 'Saved', error: 'Could not save' }[state]
+      return (
+        <div style={{ fontFamily: stack(s.font.family), display: 'grid', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 20 }}>
+            {state === 'active' && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ animation: 'spin 1s linear infinite' }}><circle cx="12" cy="12" r="9" stroke={s.colors.border} strokeWidth="3" /><path d="M21 12a9 9 0 0 0-9-9" stroke={tone} strokeWidth="3" strokeLinecap="round" /></svg>}
+            {state === 'done' && <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke={tone} strokeWidth="2" strokeLinecap="round"><circle cx="8" cy="8" r="6.6" /><path d="M5 8.4l2.2 2.2L11.2 6" /></svg>}
+            {state === 'error' && <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke={tone} strokeWidth="2" strokeLinecap="round"><circle cx="8" cy="8" r="6.6" /><path d="M8 4.8v4M8 11.1v.1" /></svg>}
+            {state === 'idle' && <span style={{ width: 16 }} />}
+            <span style={{ color: state === 'idle' ? s.colors.textMuted : s.colors.text, fontSize: s.type.sm }}>{text}</span>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {(['idle', 'active', 'done', 'error'] as const).map((k) => (
+              <button key={k} type="button" onClick={() => setState(k)} style={{ padding: '3px 9px', fontSize: s.type.xs, borderRadius: s.radii.sm, cursor: 'pointer', border: dsBorder(s), background: state === k ? `${s.colors.primary}1a` : 'transparent', color: state === k ? s.colors.text : s.colors.textMuted, transition: transition(s) }}>{k}</button>
+            ))}
+          </div>
+        </div>
+      )
+    }
+    return <Demo />
+  } },
+  { name: 'AILabel', category: 'Notifications', desc: 'Marks content a model produced, and explains itself when opened.', render: (s) => {
+    const Demo = (): JSX.Element => {
+      const [open, setOpen] = useState(false)
+      return (
+        <div style={{ fontFamily: stack(s.font.family), position: 'relative', paddingBottom: open ? 92 : 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ color: s.colors.text, fontSize: s.type.sm }}>Suggested summary</span>
+            <button type="button" aria-label="Explain this AI result" aria-expanded={open} onClick={() => setOpen((o) => !o)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: s.radii.pill, cursor: 'pointer', border: `1px solid ${s.colors.primary}66`, background: `${s.colors.primary}14`, color: legible(s.colors.primary, s.colors.bg), fontSize: s.type.xs, fontWeight: s.weights.medium, fontFamily: stack(s.font.family), transition: transition(s) }}>
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l1.6 4.4L14 7l-4.4 1.6L8 13l-1.6-4.4L2 7l4.4-1.6z" /></svg>AI
+            </button>
+          </div>
+          {open && (
+            <div role="dialog" style={{ position: 'absolute', top: 28, left: 0, width: 244, background: s.colors.surface, border: dsBorder(s), borderRadius: s.radii.md, boxShadow: SHADOW_CSS[s.shadow === 'off' ? 'subtle' : s.shadow], padding: 12 }}>
+              <div style={{ color: s.colors.text, fontSize: s.type.sm, fontWeight: s.weights.medium }}>How this was made</div>
+              <div style={{ color: s.colors.textMuted, fontSize: s.type.xs, marginTop: 5, lineHeight: 1.5 }}>Written from the last 30 days of activity in this project. Check it before you send it on.</div>
+            </div>
+          )}
+        </div>
+      )
+    }
+    return <Demo />
+  } },
+
+  // Data, continued -------------------------------------------------------------
+  { name: 'ContainedList', category: 'Data', desc: 'A named list held inside its own surface, for a set that belongs together.', render: (s) => (
+    <div style={{ width: 264, background: s.colors.surface, border: dsBorder(s), borderRadius: s.radii.md, overflow: 'hidden', fontFamily: stack(s.font.family) }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px', borderBottom: dsDivider(s), background: `${s.colors.text}08` }}>
+        <span style={{ color: s.colors.text, fontSize: s.type.sm, fontWeight: s.weights.semibold, fontFamily: stack(s.font.heading) }}>Members</span>
+        <span style={{ color: s.colors.textMuted, fontSize: s.type.xs }}>3</span>
+      </div>
+      {['Ada Lovelace', 'Grace Hopper', 'Alan Turing'].map((n, i) => (
+        <div key={n} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px', borderTop: i ? dsDivider(s) : 'none' }}>
+          <span style={{ color: s.colors.text, fontSize: s.type.sm }}>{n}</span>
+          <span style={{ color: s.colors.textMuted, fontSize: s.type.xs }}>{['Owner', 'Editor', 'Viewer'][i]}</span>
+        </div>
+      ))}
+    </div>
+  ) },
+  { name: 'StructuredList', category: 'Data', desc: 'Rows of related values, one of which can be chosen.', render: (s) => {
+    const Demo = (): JSX.Element => {
+      const rows = [['Starter', '5 seats', 'Free'], ['Team', '25 seats', '£40/mo'], ['Business', 'Unlimited', '£120/mo']]
+      const [sel, setSel] = useState(1)
+      return (
+        <div role="radiogroup" style={{ width: 320, border: dsBorder(s), borderRadius: s.radii.md, overflow: 'hidden', fontFamily: stack(s.font.family) }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto 24px', gap: 10, padding: '8px 12px', borderBottom: dsDivider(s), color: s.colors.textMuted, fontSize: s.type.xs, fontWeight: s.weights.medium }}>
+            <span>Plan</span><span>Seats</span><span>Price</span><span />
+          </div>
+          {rows.map((r, i) => (
+            <button key={r[0]} type="button" role="radio" aria-checked={sel === i} onClick={() => setSel(i)}
+              style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto 24px', gap: 10, alignItems: 'center', width: '100%', textAlign: 'left', padding: '10px 12px', borderTop: i ? dsDivider(s) : 'none', borderLeft: 'none', borderRight: 'none', borderBottom: 'none', cursor: 'pointer', background: sel === i ? `${s.colors.primary}12` : 'transparent', color: s.colors.text, fontSize: s.type.sm, fontFamily: stack(s.font.family), transition: transition(s) }}>
+              <span style={{ fontWeight: sel === i ? s.weights.medium : s.weights.regular }}>{r[0]}</span>
+              <span style={{ color: s.colors.textMuted }}>{r[1]}</span>
+              <span>{r[2]}</span>
+              <span style={{ display: 'grid', placeItems: 'center', color: s.colors.primary }}>{sel === i && <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M3 8.5l3.2 3.2L13 5" /></svg>}</span>
+            </button>
+          ))}
+        </div>
+      )
+    }
+    return <Demo />
+  } }
 ]
