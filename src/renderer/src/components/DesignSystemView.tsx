@@ -4,6 +4,7 @@ import { FONT_OPTIONS } from '../lib/brief'
 import { DesignSystemWizard } from './DesignSystemWizard'
 import { DS_CATEGORIES, DS_COMPONENTS } from './dsComponents'
 import { DsIcon, ICON_SAMPLE, iconSnippet } from './dsIcons'
+import { studioFromDesignSystem } from '../lib/tokens/fromDesignSystem'
 
 function fontStack(name: string): string {
   return FONT_OPTIONS.find((f) => f.id === name)?.stack ?? `'${name}', system-ui, sans-serif`
@@ -85,6 +86,8 @@ export function DesignSystemView({ openSystemId, onConsumeOpen }: { openSystemId
   const [wizard, setWizard] = useState<{ initial?: SystemAnswers } | null>(null)
   const [nav, setNav] = useState<string>('overview')
   const [menuOpen, setMenuOpen] = useState(false)
+  const [makingTokens, setMakingTokens] = useState(false)
+  const [tokensNote, setTokensNote] = useState<string | null>(null)
   const [confirmDel, setConfirmDel] = useState(false)
   const [foundOpen, setFoundOpen] = useState(true)
   const [compOpen, setCompOpen] = useState(true)
@@ -174,6 +177,28 @@ export function DesignSystemView({ openSystemId, onConsumeOpen }: { openSystemId
 
   // ── Documentation dashboard ───────────────────────────────────────────────────
   const s = system
+
+  /**
+   * Turn this system into a token library.
+   *
+   * A new library rather than an update to an existing one, because the two
+   * drift apart the moment either is edited and silently overwriting a
+   * library someone has been binding forms to would be the worse surprise.
+   */
+  async function makeTokens(): Promise<void> {
+    setMakingTokens(true)
+    setTokensNote(null)
+    try {
+      const studio = studioFromDesignSystem(s)
+      const row = await window.terminal42.tokens.create(s.name, studio)
+      await window.terminal42.tokens.save(row.id, { ...studio, id: row.id })
+      setTokensNote(`\u201c${s.name}\u201d is now a token library. Find it under Design \u203a Tokens.`)
+    } catch {
+      setTokensNote('That library could not be made. Try again.')
+    } finally {
+      setMakingTokens(false)
+    }
+  }
   const colorRows: { key: keyof DesignSystem['colors']; label: string }[] = [
     { key: 'primary', label: 'Primary' }, { key: 'secondary', label: 'Secondary' }, { key: 'tertiary', label: 'Tertiary' },
     { key: 'bg', label: 'Background' }, { key: 'surface', label: 'Surface' }, { key: 'border', label: 'Border' },
@@ -503,12 +528,23 @@ export function DesignSystemView({ openSystemId, onConsumeOpen }: { openSystemId
                 <div className="fixed inset-0 z-20" onClick={() => setMenuOpen(false)} role="presentation" />
                 <div className="t42-menu absolute right-0 top-full z-30 mt-1.5 w-44 overflow-hidden rounded-lg bg-raised py-1 shadow-overlay">
                   <button type="button" onClick={() => { setMenuOpen(false); setWizard({ initial: answersFromSystem(s) }) }} className="flex w-full px-3 py-2 text-left text-[12.5px] text-text-primary hover:bg-elevated">Duplicate &amp; tweak</button>
+                  <button
+                    type="button"
+                    disabled={makingTokens}
+                    onClick={() => { setMenuOpen(false); void makeTokens() }}
+                    className="flex w-full px-3 py-2 text-left text-[12.5px] text-text-primary hover:bg-elevated disabled:opacity-50"
+                  >
+                    {makingTokens ? 'Making a library…' : 'Make a token library'}
+                  </button>
                   <button type="button" onClick={() => { setMenuOpen(false); setConfirmDel(true) }} className="flex w-full px-3 py-2 text-left text-[12.5px] text-error hover:bg-error/10">Delete</button>
                 </div>
               </>
             )}
           </div>
         </div>
+        {tokensNote ? (
+          <p className="mt-2 text-[12px] text-text-secondary">{tokensNote}</p>
+        ) : null}
       </div>
 
       <div ref={bodyRef} className="flex min-h-0 gap-6 overflow-hidden" style={{ height: bodyH || undefined }}>
