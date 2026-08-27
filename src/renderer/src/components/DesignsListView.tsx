@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatAge } from '../lib/formatAge'
 import type { Design, DesignBrief, DesignGroup, TemplateInfo } from '../../../preload/index'
 import { DesignWizard } from './DesignWizard'
+import { TokensView } from './tokens/TokensView'
 import { TemplatesGallery } from './TemplatesGallery'
 import { DesignSystemView } from './DesignSystemView'
 import { DesignSystemWizard } from './DesignSystemWizard'
@@ -15,7 +16,7 @@ const GROUP_LABEL: Record<DesignGroup, string> = {
 }
 // Display order for the chip row. Keeps the most common kinds on the left.
 const GROUP_ORDER: DesignGroup[] = ['web', 'app', 'presentation', 'content', 'print', 'data', 'social', 'figma', 'other']
-type TypeFilter = 'all' | 'form' | DesignGroup | 'system' | 'templates'
+type TypeFilter = 'all' | 'form' | DesignGroup | 'system' | 'templates' | 'tokens'
 
 /**
  * Which family of files this list is showing. Forms (the freeform canvas) and
@@ -265,12 +266,12 @@ export function DesignsListView({
   }, [scoped])
 
   const allLabel = scope === 'form' ? 'All forms' : 'All designs'
-  const heading = typeFilter === 'system' ? 'Design systems' : typeFilter === 'templates' ? 'Templates' : folderFilter !== 'all' ? folderFilter : allLabel
+  const heading = typeFilter === 'system' ? 'Design systems' : typeFilter === 'tokens' ? 'Tokens' : typeFilter === 'templates' ? 'Templates' : folderFilter !== 'all' ? folderFilter : allLabel
 
   // Apply type + folder + search, then bucket by recency.
   const buckets = useMemo(() => {
     const q = search.trim().toLowerCase()
-    const isGroup = typeFilter !== 'all' && typeFilter !== 'form' && typeFilter !== 'system' && typeFilter !== 'templates'
+    const isGroup = typeFilter !== 'all' && typeFilter !== 'form' && typeFilter !== 'system' && typeFilter !== 'templates' && typeFilter !== 'tokens'
     const visible = scoped.filter((d) => {
       if (isGroup && (d.brief?.group ?? 'other') !== typeFilter) return false
       if (folderFilter !== 'all' && designFolders[d.id] !== folderFilter) return false
@@ -361,6 +362,7 @@ export function DesignsListView({
               <>
                 <span className="mx-1.5" />
                 <ViewPill active={typeFilter === 'system'} onClick={() => setTypeFilter('system')}>Design systems</ViewPill>
+                <ViewPill active={typeFilter === 'tokens'} onClick={() => setTypeFilter('tokens')}>Tokens</ViewPill>
                 <ViewPill active={typeFilter === 'templates'} onClick={() => setTypeFilter('templates')}>Templates</ViewPill>
               </>
             )}
@@ -425,7 +427,7 @@ export function DesignsListView({
               </div>
           </div>
         </div>
-        {typeFilter !== 'system' && typeFilter !== 'templates' && (folders.length > 0 || newFolderOpen) && (
+        {typeFilter !== 'system' && typeFilter !== 'templates' && typeFilter !== 'tokens' && (folders.length > 0 || newFolderOpen) && (
           <div className="-mt-1 mb-3 flex flex-wrap items-center gap-1.5">
             <span className="mr-1 text-[11px] font-medium text-text-muted">Folders</span>
             <FolderChip active={folderFilter === 'all'} onClick={() => setFolderFilter('all')} label="All" />
@@ -445,6 +447,8 @@ export function DesignsListView({
         <div className="pb-10">
         {typeFilter === 'system' ? (
           <DesignSystemView openSystemId={pendingDsId} onConsumeOpen={() => setPendingDsId(null)} />
+        ) : typeFilter === 'tokens' ? (
+          <TokensView />
         ) : typeFilter === 'templates' ? (
           <TemplatesGallery onUse={createFromTemplate} />
         ) : designs.length === 0 ? (

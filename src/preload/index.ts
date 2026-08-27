@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { SessionInsights } from '../shared/sessionInsights'
 import type { MotionRecord, MotionLayoutRecord, MotionBentoRecord, BrandSetRecord } from '../main/motion'
+import type { TokenStudioRecord } from '../main/tokens'
 
 export type { SessionInsights }
 
@@ -758,6 +759,22 @@ const api = {
       >,
     exportFile: (fileName: string, base64: string) =>
       ipcRenderer.invoke('motion:exportFile', { fileName, base64 }) as Promise<{ ok: boolean; path?: string }>
+  },
+
+  tokens: {
+    list: () => ipcRenderer.invoke('tokens:list') as Promise<TokenStudioRecord[]>,
+    get: (id: string) => ipcRenderer.invoke('tokens:get', id) as Promise<TokenStudioRecord | null>,
+    create: (name: string, studio: unknown) =>
+      ipcRenderer.invoke('tokens:create', { name, studio }) as Promise<TokenStudioRecord>,
+    save: (id: string, studio: unknown) =>
+      ipcRenderer.invoke('tokens:save', { id, studio }) as Promise<boolean>,
+    rename: (id: string, name: string) =>
+      ipcRenderer.invoke('tokens:rename', { id, name }) as Promise<boolean>,
+    delete: (id: string) => ipcRenderer.invoke('tokens:delete', id) as Promise<boolean>,
+    export: (studio: unknown, themeId: string | null, dir?: string | null) =>
+      ipcRenderer.invoke('tokens:export', { studio, themeId, dir }) as Promise<
+        { ok: true; paths: string[] } | { ok: false; error?: string }
+      >
   },
 
   designs: {

@@ -185,6 +185,20 @@ function migrate(d: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_motion_brand_sets ON motion_brand_sets(kind, created_at);
 
+    -- Token studios. One row is a whole studio: its sets, its themes and all
+    -- its tokens, as a single JSON blob, for the same reason a Motion document
+    -- is. A studio is read and written whole, and its shape gains a field
+    -- whenever a token type is added, which would otherwise be a migration per
+    -- kind of value.
+    CREATE TABLE IF NOT EXISTS token_studios (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      studio TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_token_studios_recent ON token_studios(updated_at DESC);
+
     CREATE TABLE IF NOT EXISTS designs (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,

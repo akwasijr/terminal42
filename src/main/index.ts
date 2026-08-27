@@ -11,6 +11,7 @@ import { useBrowserShim } from './browserShim'
 import { registerCanvasAssistIpc } from './canvasAssist'
 import { registerDesignIpc, stopAllDesignWatchers, killAllDesignRuns } from './design'
 import { registerMotionIpc } from './motion'
+import { registerTokensIpc } from './tokens'
 import { registerPreviewIpc, killAllPreviews, runningPreviewCount, runningPreviewList, stopPreview } from './preview'
 import { registerSkillsIpc } from './skills'
 import { registerRecipesIpc } from './recipes'
@@ -352,6 +353,7 @@ app.whenReady().then(() => {
   registerCanvasAssistIpc(() => mainWindow)
   registerDesignIpc(() => mainWindow)
   registerMotionIpc(() => mainWindow)
+  registerTokensIpc(() => mainWindow)
   registerPreviewIpc(() => mainWindow)
   registerSkillsIpc(() => mainWindow)
   registerRecipesIpc(() => mainWindow)
