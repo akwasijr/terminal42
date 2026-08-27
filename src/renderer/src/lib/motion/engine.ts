@@ -23,6 +23,7 @@ import type * as THREE from 'three'
 import type { CardPlacement, MotionDoc } from '../../../../shared/motion/types'
 import { TAU, wrap01 } from '../../../../shared/motion/math'
 import { imageAssignment, resolvedPose, waveAt } from '../../../../shared/motion/frame'
+import { CAMERA } from '../../../../shared/motion/visibility'
 import { applyBendShader, cardAspect, drawCardFace } from './cardTexture'
 
 type CardHandle = {
@@ -71,8 +72,8 @@ export class MotionEngine {
     })
     this.renderer.setClearColor(0x000000, 0)
     this.scene = new three.Scene()
-    this.camera = new three.PerspectiveCamera(38, 16 / 9, 0.1, 200)
-    this.camera.position.set(0, 0, 12)
+    this.camera = new three.PerspectiveCamera(CAMERA.fov, 16 / 9, CAMERA.near, CAMERA.far)
+    this.camera.position.set(0, 0, CAMERA.z)
     this.root = new three.Group()
     this.poseGroup = new three.Group()
     this.driftGroup = new three.Group()
