@@ -13,7 +13,7 @@
 // It is set apart by a step in tone with a gutter around it, not by a rule —
 // nothing in this app is divided by a line.
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { LogoLayer, MotionDoc, TextLayer } from '../../../../shared/motion/types'
 import { FRAME_RATES } from '../../../../shared/motion/types'
 import { componentFor } from '../../../../shared/motion/registry'
@@ -307,6 +307,23 @@ function TrackRow({
 
   const shapingKey = (track?.keys ?? []).find((k) => k.id === shaping) ?? null
 
+  // The panel is over the work, so anywhere else is a way out of it.
+  useEffect(() => {
+    if (!shaping) return
+    const onDown = (e: MouseEvent): void => {
+      // A key of this lane is left alone so that pressing the open one can
+      // close it, rather than closing and reopening in the same gesture.
+      if (!(e.target as HTMLElement).closest('[data-segment-shape],[data-lane-key]')) setShaping(null)
+    }
+    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') setShaping(null) }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [shaping])
+
   return (
     <div className="flex items-center gap-2">
       <button
@@ -339,6 +356,7 @@ function TrackRow({
           <button
             key={k.id}
             type="button"
+            data-lane-key
             aria-label={`${label} key at ${Math.round(k.t * 100)} percent`}
             onPointerDown={(e) => down(e, k.id)}
             onPointerMove={move}
@@ -398,6 +416,7 @@ function SegmentShape({
   const left = Math.min(88, Math.max(12, at * 100))
   return (
     <div
+      data-segment-shape
       style={{ left: `${left}%` }}
       className="absolute bottom-full z-30 mb-1.5 w-56 -translate-x-1/2 rounded-panel bg-raised p-2 shadow-overlay"
     >
