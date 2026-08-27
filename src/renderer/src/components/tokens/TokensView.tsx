@@ -995,7 +995,7 @@ function FamilyRow({
               : shortValue(r.ok ? r.value : hit.token.value)
             if (wide) {
               return (
-                <li key={path} className="w-full">
+                <li key={path} className="w-full max-w-[560px]">
                   <button
                     type="button"
                     data-token-swatch=""
@@ -1248,6 +1248,9 @@ function NameField({
   )
 }
 
+/** A shape dimension that is a line's thickness rather than a corner's size. */
+const STROKE_STEM = /(^|\.)(stroke|border)(\.|$)/i
+
 /** Tokens Studio writes `original`; CSS has no such word for "leave it". */
 function cssTextCase(v: string): 'none' | 'uppercase' | 'lowercase' | 'capitalize' {
   const k = v.toLowerCase()
@@ -1283,12 +1286,27 @@ function TokenMark({ token, value }: { token: Token; value: TokenValue | null })
       // says nothing. Drawn as the corner it is, you can see the difference
       // between 8 and 12 without reading either number.
       if (sectionOf(token) === 'shape') {
-        const r = Math.min(24, Math.abs(num(value)))
+        // A border width is not a corner either. Drawn as a rounded square it
+        // looked exactly like a radius token, which is how `stroke.hairline`
+        // came to be indistinguishable from `corner.pill`.
+        if (STROKE_STEM.test(token.path)) {
+          const w = Math.max(1, Math.min(10, Math.abs(num(value))))
+          return (
+            <span className="grid h-12 place-items-center rounded-md bg-sunken">
+              <span style={{ height: w }} className="block w-9 rounded-[1px] bg-text-primary/80" />
+            </span>
+          )
+        }
+        // Shown as the corner of something larger, running off the tile,
+        // which is what a radius actually is. A whole rounded rectangle
+        // turns into a circle as the number grows, so every large radius
+        // ends up looking the same as every other.
+        const r = Math.min(28, Math.abs(num(value)))
         return (
-          <span className="grid h-12 place-items-center rounded-md bg-sunken">
+          <span className="relative block h-12 overflow-hidden rounded-md bg-sunken">
             <span
-              style={{ borderRadius: r }}
-              className="block h-8 w-8 bg-accent/25 ring-1 ring-inset ring-accent"
+              style={{ borderTopLeftRadius: r }}
+              className="absolute bottom-[-20%] left-[22%] right-[-20%] top-[22%] bg-text-primary/15"
             />
           </span>
         )
@@ -1297,7 +1315,7 @@ function TokenMark({ token, value }: { token: Token; value: TokenValue | null })
         <span className="flex h-12 items-center rounded-md bg-sunken px-1.5">
           <span
             style={{ width: Math.max(2, Math.min(72, Math.abs(num(value)))) }}
-            className="block h-1.5 rounded-full bg-accent"
+            className="block h-1.5 rounded-full bg-text-primary/70"
           />
         </span>
       )
@@ -1374,7 +1392,7 @@ function TokenMark({ token, value }: { token: Token; value: TokenValue | null })
       return (
         <span className="grid h-12 place-items-center rounded-md bg-sunken">
           <svg width="60" height="40" viewBox="0 0 60 40" fill="none" aria-hidden="true">
-            <path d={path} stroke="currentColor" strokeWidth="1.5" className="text-accent" />
+            <path d={path} stroke="currentColor" strokeWidth="1.5" className="text-text-secondary" />
           </svg>
         </span>
       )
@@ -1391,8 +1409,8 @@ function TokenMark({ token, value }: { token: Token; value: TokenValue | null })
       const s = (typeof value === 'object' ? value : {}) as Record<string, string | number>
       const shadow = `${num(s.x)}px ${num(s.y)}px ${num(s.blur)}px ${num(s.spread)}px ${s.color ?? 'transparent'}`
       return (
-        <span className="grid h-12 place-items-center rounded-md bg-sunken">
-          <span style={{ boxShadow: shadow }} className="block h-6 w-6 rounded-[4px] bg-surface" />
+        <span className="grid h-12 place-items-center rounded-md bg-bg">
+          <span style={{ boxShadow: shadow }} className="block h-7 w-14 rounded-[5px] bg-surface" />
         </span>
       )
     }
@@ -1401,7 +1419,7 @@ function TokenMark({ token, value }: { token: Token; value: TokenValue | null })
         <span className="grid h-12 place-items-center rounded-md bg-sunken">
           <span
             style={{ opacity: parseFloat(String(value)) || 0 }}
-            className="block h-6 w-6 rounded-full bg-accent"
+            className="block h-6 w-6 rounded-full bg-text-primary"
           />
         </span>
       )
@@ -1412,7 +1430,7 @@ function TokenMark({ token, value }: { token: Token; value: TokenValue | null })
       return (
         <span className="grid h-12 place-items-center rounded-md bg-sunken">
           <span
-            className={`block h-2.5 w-2.5 rounded-full ${on ? 'bg-accent' : 'bg-text-muted/40'}`}
+            className={`block h-2.5 w-2.5 rounded-full ${on ? 'bg-text-primary' : 'bg-text-muted/40'}`}
             aria-hidden="true"
           />
         </span>
@@ -1543,7 +1561,7 @@ function TimeRail({ ms, easing }: { ms: number; easing?: string }): React.JSX.El
     <span className="relative block h-1.5 w-full rounded-full bg-sunken">
       <span
         ref={dot}
-        className="absolute top-1/2 block h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent"
+        className="absolute top-1/2 block h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-text-primary"
         style={{ left: 0 }}
       />
     </span>
@@ -1583,7 +1601,7 @@ function Specimen({ token, value }: { token: Token; value: TokenValue | null }):
               d={`M 0 40 C ${c.x1 * 60} ${40 - c.y1 * 40} ${c.x2 * 60} ${40 - c.y2 * 40} 60 0`}
               stroke="currentColor"
               strokeWidth="1.5"
-              className="text-accent"
+              className="text-text-secondary"
             />
           </svg>
           <span className="min-w-0 max-w-[280px] flex-1">
