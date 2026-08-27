@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { tokensPrefix } from '../../src/renderer/src/components/tokens/TokensChip'
+import { tokensPrefix } from '../../src/renderer/src/lib/tokens/chatTokens'
 import type { TokenLibrary } from '../../src/renderer/src/lib/tokens/useTokenLibraries'
 import { studioFromFeel, type Feel } from '../../src/shared/tokens/scaffold'
 import { brandItems } from '../../src/shared/tokens/bridges'

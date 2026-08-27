@@ -8,7 +8,8 @@ import { useVoiceInput, formatVoiceTime, isVoiceInputSupported } from '../lib/vo
 import { analyzeGoalQuality, shouldShowGoalQualityHint } from '../../../shared/goalQuality'
 import { GoalHint } from './GoalHint'
 import { COMPOSER_FILL_EVENT } from './composerFill'
-import { TokensChip, useChatTokens } from './tokens/TokensChip'
+import { TokensChip } from './tokens/TokensChip'
+import { useChatTokens } from '../lib/tokens/chatTokens'
 
 // Legacy local 2-mode type kept as a no-op so old localStorage entries don't crash.
 type Mode = AgentMode
