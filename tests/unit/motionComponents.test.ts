@@ -51,13 +51,20 @@ const NUMERIC_FIELDS: Array<keyof CardPlacement> = ['x', 'y', 'z', 'rotX', 'rotY
  * Each set walks every slider across its range and rotates through every
  * segmented option and both toggle states, so the 24 samples between them
  * exercise the extremes the loop-closure guarantee has to hold at.
+ *
+ * Values are snapped to the slider's declared step. A component is entitled to
+ * assume it will never be handed 24.6 cards, because the control that sets the
+ * count counts in whole cards; testing it against a value it cannot receive
+ * reports a fault that does not exist.
  */
 function sampleParams(schema: ParamSpec[], k: number): Record<string, ParamValue> {
   const params: Record<string, ParamValue> = {}
   schema.forEach((spec, s) => {
     if (spec.kind === 'slider') {
       const frac = ((k + 1 + s * 3.1) % 25) / 25
-      params[spec.key] = spec.min + frac * (spec.max - spec.min)
+      const raw = spec.min + frac * (spec.max - spec.min)
+      const snapped = spec.step > 0 ? spec.min + Math.round((raw - spec.min) / spec.step) * spec.step : raw
+      params[spec.key] = Math.min(spec.max, Math.max(spec.min, snapped))
     } else if (spec.kind === 'segmented') {
       params[spec.key] = spec.options[(k + s) % spec.options.length].value
     } else {
@@ -71,6 +78,66 @@ function sampleParams(schema: ParamSpec[], k: number): Record<string, ParamValue
 // sampled, they just do not each blow the test out to hundreds of thousands of
 // placements.
 const MAX_CARDS = 240
+
+// Nearest-neighbour matching is quadratic, so the seam check runs on a smaller
+// arrangement than the sweeps. A fractional advance shows up in a dozen cards
+// just as plainly as in two hundred.
+const SEAM_CARDS = 48
+
+// The loop is walked in STEPS places, each sampled DELTA apart, to learn how
+// far this arrangement moves in one frame of its own accord.
+const STEPS = 48
+const DELTA = 1 / 480
+
+// Which entries of a placement vector are angles in radians.
+const ANGULAR = NUMERIC_FIELDS.map((f) => f === 'rotX' || f === 'rotY' || f === 'rotZ')
+const OPACITY = NUMERIC_FIELDS.indexOf('opacity')
+
+// Far enough off the seam that the drift is bigger than floating-point noise,
+// close enough that a component's easing is effectively linear across it.
+const EPS = 1e-4
+
+/** Every card's placement at one instant, as plain numeric vectors. */
+function frame(
+  component: MotionComponent,
+  phase: number,
+  n: number,
+  params: Record<string, ParamValue>
+): number[][] {
+  return Array.from({ length: n }, (_, i) => {
+    const p = component.layout(phase, i, n, params)
+    return NUMERIC_FIELDS.map((f) => p[f] as number)
+  })
+}
+
+/**
+ * How far the furthest card visibly moved between two frames.
+ *
+ * Movement counts for as much as the card doing it can be seen. A conveyor
+ * recycles its cards under a fade so that the jump cannot be watched, and a
+ * card at two per cent opacity crossing the whole frame is not something that
+ * happens on screen. Weighting by visibility rather than filtering on it keeps
+ * the measure continuous, so a card halfway through its fade is worth half.
+ *
+ * Angles are compared the short way round, because components report rotation
+ * cumulatively and a card that has turned a full circle is where it started.
+ */
+function step(a: number[][], b: number[][]): number {
+  let worst = 0
+  for (let i = 0; i < a.length; i++) {
+    const seen = Math.max(a[i][OPACITY], b[i][OPACITY])
+    let sum = 0
+    for (let k = 0; k < a[i].length; k++) {
+      let d = a[i][k] - b[i][k]
+      if (ANGULAR[k]) d = ((d % TAU) + TAU + Math.PI) % TAU - Math.PI
+      if (k !== OPACITY) d *= seen
+      sum += d * d
+    }
+    const dist = Math.sqrt(sum)
+    if (dist > worst) worst = dist
+  }
+  return worst
+}
 
 describe.each(components.map((c) => [c.label, c] as const))('%s component', (_label, component) => {
   const combos = Array.from({ length: 24 }, (_, k) => sampleParams(component.schema, k))
@@ -110,12 +177,41 @@ describe.each(components.map((c) => [c.label, c] as const))('%s component', (_la
 
   // Comparing phase 0 with phase 1 cannot see a broken seam: every component
   // wraps its phase, so phase 1 *is* phase 0 and the check passes by
-  // construction. The seam only shows up on approach — at phase 0.999999 a
-  // conveyor that advances a fractional number of cards per loop has carried
-  // the whole arrangement part of a step away from where it started, and jumps
-  // back on the next frame. Cards are compared as a set because a conveyor is
-  // allowed to recycle a card from one end to the other; what must not change
-  // is the shape they make.
+  // construction. The seam only shows up on approach. A conveyor that advances
+  // a fractional number of cards per loop has, by phase 0.9999, carried the
+  // whole arrangement part of a step past where it started, and snaps back on
+  // the next frame.
+  //
+  // Comparing the two arrangements directly does not work, and several
+  // attempts to make it work were abandoned. A conveyor is entitled to recycle
+  // a card from the end of its path to the beginning, so cards cannot be
+  // matched by index; matched as a set, the card sitting exactly on the wrap
+  // boundary defeats every threshold, because on a looping path the two ends
+  // are the same place and only the component knows where they are.
+  //
+  // So this asks a question that needs no such knowledge: is the seam special?
+  // Recycling produces a jump, but it produces one wherever it happens, all the
+  // way round the loop. A residue at the seam produces a jump that happens
+  // *only* there, and moves every card at once. Measuring the largest single
+  // frame-to-frame movement inside the loop gives the animation's own scale for
+  // what a jump is, and the seam is held to it.
+  it('does not jump at the seam more than it does anywhere else', () => {
+    for (const params of combos) {
+      const n = Math.min(SEAM_CARDS, component.cardCount(params))
+      const at = (ph: number): number[][] => frame(component, ph, n, params)
+
+      let inside = 0
+      for (let j = 1; j < STEPS; j++) {
+        const s = step(at(j / STEPS), at(j / STEPS - DELTA))
+        if (s > inside) inside = s
+      }
+
+      const seam = step(at(0), at(1 - DELTA))
+      // A still arrangement never jumps anywhere, so it may not jump here.
+      expect(seam).toBeLessThanOrEqual(inside * 1.5 + 1e-6)
+    }
+  })
+
   it('produces only finite numbers across the loop', () => {
     for (const params of combos) {
       const n = Math.min(MAX_CARDS, component.cardCount(params))
