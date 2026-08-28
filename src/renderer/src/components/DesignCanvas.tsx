@@ -125,6 +125,21 @@ const PROFILES: Record<string, CanvasProfile> = {
   }
 }
 
+/**
+ * A viewport label narrow enough for a pill.
+ *
+ * The old rule took the first two words, which turned "1280 × 720" into
+ * "1280 ×" — a label that names nothing and ends mid-symbol. A size is either
+ * described by a name ("A3 Portrait", "Tri-fold") or by its numbers, so keep
+ * whichever of the two the label leads with and drop the rest.
+ */
+function shortViewport(label: string): string {
+  const m = label.match(/^(.*?)\s*(\d+)\s*×\s*(\d+)$/)
+  if (!m) return label
+  const name = m[1].trim()
+  return name ? name.replace(/\s*×\s*/g, '×') : `${m[2]}×${m[3]}`
+}
+
 function artboard(id: string, board: Viewport): CanvasProfile {
   return {
     id,
@@ -919,7 +934,7 @@ export function DesignCanvas({
                   active ? 'bg-surface text-text-primary' : 'text-text-secondary hover:text-text-primary'
                 ].join(' ')}
               >
-                {Icon ? <Icon size={14} /> : v.label.split(' ').slice(0, 2).join(' ')}
+                {Icon ? <Icon size={14} /> : shortViewport(v.label)}
               </button>
             )
           })}
@@ -981,101 +996,55 @@ export function DesignCanvas({
         </>}
 
         <div className="ml-auto flex items-center gap-1">
-          {design?.brief?.figmaUrl && (
-            <a
-              href={design.brief.figmaUrl}
-              target="_blank"
-              rel="noreferrer"
-              title="Open the Figma reference this design was built from"
-              onClick={(e) => { e.preventDefault(); if (design?.brief?.figmaUrl) void window.terminal42.designs.openExternal(design.brief.figmaUrl) }}
-              className="flex h-7 items-center gap-1 rounded-md px-2 text-[11.5px] text-text-secondary hover:bg-elevated hover:text-text-primary"
-            >
-              <FigmaPill /> <span>Reference</span>
-            </a>
-          )}
-          <button
-            type="button"
-            onClick={enterAnnotate}
-            disabled={empty}
-            title={annotate ? 'Exit annotate mode' : 'Click an element to leave a comment for the AI'}
-            className={[
-              'flex h-7 items-center gap-1.5 rounded-md px-2 text-[11.5px] transition-colors disabled:opacity-40',
-              annotate
-                ? 'bg-action text-action-text'
-                : 'text-text-secondary hover:bg-elevated hover:text-text-primary'
-            ].join(' ')}
-          >
-            <IconChat size={12} />
-            <span>{annotate ? 'Annotating' : 'Annotate'}</span>
-          </button>
-          <button
-            type="button"
-            onClick={enterEdit}
-            disabled={empty}
-            title={editMode ? 'Exit edit mode' : 'Edit elements (granular) or project tokens (global)'}
-            className={[
-              'flex h-7 items-center gap-1.5 rounded-md px-2 text-[11.5px] transition-colors disabled:opacity-40',
-              editMode
-                ? 'bg-action text-action-text'
-                : 'text-text-secondary hover:bg-elevated hover:text-text-primary'
-            ].join(' ')}
-          >
-            <IconEdit size={12} />
-            <span>{editMode ? 'Editing' : 'Edit'}</span>
-          </button>
-          <button
-            type="button"
-            onClick={enterCompare}
-            disabled={empty || versions.length < 2 || active?.kind === 'pptx'}
-            title={compareMode ? 'Exit compare' : 'Compare two versions side by side'}
-            className={[
-              'flex h-7 items-center gap-1.5 rounded-md px-2 text-[11.5px] transition-colors disabled:opacity-40',
-              compareMode
-                ? 'bg-action text-action-text'
-                : 'text-text-secondary hover:bg-elevated hover:text-text-primary'
-            ].join(' ')}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="3" y="4" width="7" height="16" rx="1" />
-              <rect x="14" y="4" width="7" height="16" rx="1" />
-            </svg>
-            <span>{compareMode ? 'Comparing' : 'Compare'}</span>
-          </button>
-          <button
-            type="button"
-            onClick={enterMotion}
-            disabled={empty || active?.kind === 'pptx'}
-            title={motionMode ? 'Exit motion mode' : 'Click an element to add an animation'}
-            className={[
-              'flex h-7 items-center gap-1.5 rounded-md px-2 text-[11.5px] transition-colors disabled:opacity-40',
-              motionMode
-                ? 'bg-action text-action-text'
-                : 'text-text-secondary hover:bg-elevated hover:text-text-primary'
-            ].join(' ')}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M5 12h4l2-6 3 14 2-8h3" />
-            </svg>
-            <span>{motionMode ? 'Motion on' : 'Motion'}</span>
-          </button>
-          <button
-            type="button"
-            onClick={enterShader}
-            disabled={empty || active?.kind === 'pptx'}
-            title={shaderMode ? 'Exit shader mode' : 'Click an element to add a shader background'}
-            className={[
-              'flex h-7 items-center gap-1.5 rounded-md px-2 text-[11.5px] transition-colors disabled:opacity-40',
-              shaderMode
-                ? 'bg-action text-action-text'
-                : 'text-text-secondary hover:bg-elevated hover:text-text-primary'
-            ].join(' ')}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="9" /><path d="M12 3a9 9 0 0 0 0 18M5 9h14M5 15h14" />
-            </svg>
-            <span>{shaderMode ? 'Shader on' : 'Shader'}</span>
-          </button>
-          {brainCheckRunning ? (
+          {/* One picker, because these five are one choice: each enter* turns
+              the others off. Five labelled buttons said so nowhere and pushed
+              the rest of the bar off the end of the row. Only the chosen one
+              carries its name; the others are their icon, as the viewport
+              pills already are. */}
+          <ModePicker
+            modes={[
+              { id: 'annotate', label: 'Annotate', on: 'Annotating',
+                hint: 'Click an element to leave a comment for the AI',
+                active: annotate, disabled: empty, onPick: enterAnnotate,
+                icon: <IconChat size={12} /> },
+              { id: 'edit', label: 'Edit', on: 'Editing',
+                hint: 'Edit elements (granular) or project tokens (global)',
+                active: editMode, disabled: empty, onPick: enterEdit,
+                icon: <IconEdit size={12} /> },
+              { id: 'compare', label: 'Compare', on: 'Comparing',
+                hint: versions.length < 2
+                  ? 'Compare needs a second version to put beside this one'
+                  : 'Put two versions side by side',
+                active: compareMode,
+                disabled: empty || versions.length < 2 || active?.kind === 'pptx',
+                onPick: enterCompare,
+                icon: (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <rect x="3" y="4" width="7" height="16" rx="1" />
+                    <rect x="14" y="4" width="7" height="16" rx="1" />
+                  </svg>
+                ) },
+              { id: 'motion', label: 'Motion', on: 'Motion on',
+                hint: 'Click an element to add an animation',
+                active: motionMode, disabled: empty || active?.kind === 'pptx',
+                onPick: enterMotion,
+                icon: (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M5 12h4l2-6 3 14 2-8h3" />
+                  </svg>
+                ) },
+              { id: 'shader', label: 'Shader', on: 'Shader on',
+                hint: 'Click an element to add a shader background',
+                active: shaderMode, disabled: empty || active?.kind === 'pptx',
+                onPick: enterShader,
+                icon: (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" /><path d="M12 3a9 9 0 0 0 0 18M5 9h14M5 15h14" />
+                  </svg>
+                ) }
+            ]}
+          />
+          {brainCheckRunning && (
             <button
               type="button"
               onClick={cancelBrainCheck}
@@ -1088,39 +1057,33 @@ export function DesignCanvas({
               </span>
               <span>{brainCheckProgress}</span>
             </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => void runBrainCheck()}
-              disabled={empty || busy}
-              title="Apply your brain notes to this design"
-              className="flex h-7 items-center gap-1.5 rounded-md px-2 text-[11.5px] text-text-secondary transition-colors hover:bg-elevated hover:text-text-primary disabled:opacity-40"
-            >
-              <IconBrain size={12} />
-              <span>Brain check</span>
-            </button>
           )}
           <ExportMenu designId={designId} disabled={empty} />
-          {canFigma && (
-            <button
-              type="button"
-              onClick={openFigmaDialog}
-              disabled={!active}
-              title="Send this design to Figma: create a new file or push into an existing one"
-              className="flex h-7 items-center gap-1.5 rounded-md px-2 text-[11.5px] text-text-secondary transition-colors hover:bg-elevated hover:text-text-primary disabled:opacity-40"
-            >
-              <FigmaPill /> <span>Figma</span>
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={openExternal}
-            disabled={!active}
-            title="Open in default browser"
-            className="grid h-7 w-7 place-items-center rounded-md text-text-secondary hover:bg-elevated hover:text-text-primary disabled:opacity-40"
-          >
-            <IconExternal size={12} />
-          </button>
+          {/* Everything that leaves the app or runs over the whole design.
+              None of it is reached often enough to earn a permanent slot,
+              and together they were what pushed the bar past its width. */}
+          <MoreMenu
+            items={[
+              ...(design?.brief?.figmaUrl
+                ? [{ id: 'ref', label: 'Open the Figma reference',
+                     note: 'The file this design was built from',
+                     icon: <FigmaPill />,
+                     onPick: () => { const u = design?.brief?.figmaUrl; if (u) void window.terminal42.designs.openExternal(u) } }]
+                : []),
+              ...(canFigma
+                ? [{ id: 'figma', label: 'Send to Figma',
+                     note: 'Create a new file, or push into an existing one',
+                     icon: <FigmaPill />, disabled: !active, onPick: openFigmaDialog }]
+                : []),
+              { id: 'brain', label: 'Brain check',
+                note: 'Apply your brain notes to this design',
+                icon: <IconBrain size={12} />, disabled: empty || busy || brainCheckRunning,
+                onPick: () => void runBrainCheck() },
+              { id: 'external', label: 'Open in your browser',
+                note: 'The live page, outside Terminal 42',
+                icon: <IconExternal size={12} />, disabled: !active, onPick: openExternal }
+            ]}
+          />
           {onClose && (
             <button
               type="button"
@@ -1381,6 +1344,119 @@ function CanvasGenerating({ phase, variant }: { phase: string; variant?: 'signat
 }
 
 // ─── Export menu ───────────────────────────────────────────────────────────
+
+type Mode = {
+  id: string
+  /** What the mode is called when it is off. */
+  label: string
+  /** What it is called when it is on, so the bar reads as a state. */
+  on: string
+  hint: string
+  icon: JSX.Element
+  active: boolean
+  disabled?: boolean
+  onPick: () => void
+}
+
+/**
+ * The five things you can be doing to a design, as one control.
+ *
+ * They were five buttons, which read as five independent switches when in
+ * fact turning one on turns the rest off. Only the active mode carries its
+ * name: naming all five is what made the row too wide to fit, and an icon
+ * with a tooltip is how the viewport pills next door already work.
+ */
+function ModePicker({ modes }: { modes: Mode[] }): JSX.Element {
+  return (
+    <div role="group" aria-label="Mode" className="flex items-center gap-0.5 rounded-md bg-elevated p-0.5">
+      {modes.map((m) => (
+        <button
+          key={m.id}
+          type="button"
+          onClick={m.onPick}
+          disabled={m.disabled}
+          aria-pressed={m.active}
+          aria-label={m.label}
+          title={m.active ? `Leave ${m.label.toLowerCase()}` : `${m.label} — ${m.hint}`}
+          className={[
+            'flex h-6 items-center gap-1.5 rounded text-[11.5px] transition-colors disabled:opacity-30',
+            m.active ? 'bg-action px-2 text-action-text' : 'w-7 justify-center text-text-secondary hover:text-text-primary'
+          ].join(' ')}
+        >
+          {m.icon}
+          {m.active && <span>{m.on}</span>}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+type MoreItem = {
+  id: string
+  label: string
+  note: string
+  icon: JSX.Element
+  disabled?: boolean
+  onPick: () => void
+}
+
+/** The rest of the bar: things worth having, not worth a permanent slot. */
+function MoreMenu({ items }: { items: MoreItem[] }): JSX.Element {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e: MouseEvent): void => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', onDoc)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDoc)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="More"
+        title="Figma, brain check, open in your browser"
+        className="grid h-7 w-7 place-items-center rounded-md text-text-secondary hover:bg-elevated hover:text-text-primary"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" />
+        </svg>
+      </button>
+      {open && (
+        <div role="menu" className="t42-menu absolute right-0 top-full z-30 mt-1 min-w-[240px] overflow-hidden rounded-md bg-raised py-1 shadow-overlay">
+          {items.map((it) => (
+            <button
+              key={it.id}
+              type="button"
+              role="menuitem"
+              disabled={it.disabled}
+              onClick={() => { setOpen(false); it.onPick() }}
+              className="flex w-full items-start gap-2.5 px-3 py-1.5 text-left hover:bg-elevated disabled:opacity-40 disabled:hover:bg-transparent"
+            >
+              <span className="mt-[3px] shrink-0 text-text-secondary">{it.icon}</span>
+              <span className="min-w-0">
+                <span className="block text-[12.5px] text-text-primary">{it.label}</span>
+                <span className="block text-[11px] text-text-muted">{it.note}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 const FORMAT_LABEL: Record<string, string> = {
   pdf:  'Export as PDF',
