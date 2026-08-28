@@ -570,7 +570,7 @@ export function DesignSystemView({ openSystemId, onConsumeOpen }: { openSystemId
                 if (!items.length) return null
                 return (
                   <div key={cat} className="mb-1.5">
-                    <div className="px-2 pb-0.5 pt-1 text-[10.5px] text-text-muted/70">{cat}</div>
+                    <div className="px-2 pb-0.5 pt-1 text-[10.5px] text-text-muted">{cat}</div>
                     {items.map((c) => <button key={c.name} type="button" onClick={() => { setNav('component:' + c.name); setCompVariant(0); setCompBase(s.base ?? 'light') }} className={navCls('component:' + c.name)}>{c.name}</button>)}
                   </div>
                 )

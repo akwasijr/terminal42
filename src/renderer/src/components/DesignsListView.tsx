@@ -439,7 +439,7 @@ export function DesignsListView({
                   placeholder={'Search'}
                   tabIndex={searchOpen ? 0 : -1}
                   className={[
-                    'min-w-0 flex-1 bg-transparent py-1.5 pr-1 text-[12.5px] text-text-primary caret-text-primary placeholder:text-text-muted/70 outline-none transition-opacity duration-200 focus:outline-none focus-visible:outline-none',
+                    'min-w-0 flex-1 bg-transparent py-1.5 pr-1 text-[12.5px] text-text-primary caret-text-primary placeholder:text-text-muted outline-none transition-opacity duration-200 focus:outline-none focus-visible:outline-none',
                     searchOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
                   ].join(' ')}
                 />

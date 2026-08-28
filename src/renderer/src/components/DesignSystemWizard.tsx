@@ -444,7 +444,7 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
                             <div className="flex gap-1">{[a.primary, a.secondary, a.tertiary].map((c, i) => <span key={i} className="t42-swatch h-4 w-4 rounded" style={{ background: c }} title={c} />)}</div>
                           </div>
                           {analysisNote && <p className="text-[11.5px] leading-relaxed text-text-muted">{analysisNote}</p>}
-                          <p className="text-[11px] leading-relaxed text-text-muted/80">These become your starting tokens. You can change any of them in the next steps.</p>
+                          <p className="text-[11px] leading-relaxed text-text-muted">These become your starting tokens. You can change any of them in the next steps.</p>
                         </>
                       )}
                       {!analyzing && analysisSkipped && <p className="text-[11.5px] leading-relaxed text-text-muted">Analysis skipped. Generate is allowed, but the result may not match the screenshots as closely.</p>}

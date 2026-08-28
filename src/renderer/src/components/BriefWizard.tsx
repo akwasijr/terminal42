@@ -1392,7 +1392,7 @@ function GuidedField({
   return (
     <div className="rounded-lg bg-surface/30 p-3">
       <label className="block text-xs font-medium text-text-secondary">{label}</label>
-      <div className="mb-2 text-xs text-text-secondary/80">{hint}</div>
+      <div className="mb-2 text-xs text-text-secondary">{hint}</div>
       <textarea
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value)}

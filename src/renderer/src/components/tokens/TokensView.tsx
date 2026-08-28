@@ -959,7 +959,17 @@ function FamilyRow({
   // library look switched off; dimming only inside a family that is partly
   // involved says the useful half of the same thing.
   const involved = related !== null && family.paths.some((p) => related.has(p))
+  // What the selection is not about is set back rather than faded out.
+  //
+  // Fading the whole tile was the obvious thing and it made the labels
+  // unreadable: text at 40% opacity lands near 1.7:1 against the panel, where
+  // 4.5:1 is the floor, and no opacity high enough to be legible is low
+  // enough to read as dimmed. So the specimen — a shape, which no contrast
+  // rule governs — carries the dimming, and the words stay at full strength
+  // in a colour chosen to clear AA on every surface.
   const dimmed = (p: string): boolean => involved && !related.has(p)
+  const dimMark = (p: string): string => (dimmed(p) ? 'opacity-40' : 'opacity-100')
+  const dimText = (p: string): string => (dimmed(p) ? 'text-text-muted' : 'text-text-secondary')
   const on = (p: string): boolean => marked.has(p)
   // A gathered token is ringed the same way a selected one is, since it is
   // the same statement — "this one" — made about several at once.
@@ -987,9 +997,9 @@ function FamilyRow({
                 aria-label={`${path}, ${hex}`}
                 aria-pressed={selected === path || on(path)}
                 style={{ background: hex }}
-                className={`group/step relative min-w-0 flex-1 transition-opacity focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/60 ${
-                  dimmed(path) ? 'opacity-40' : 'opacity-100'
-                } ${ring(path)}`}
+                className={`group/step relative min-w-0 flex-1 transition-opacity focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/60 ${dimMark(
+                  path
+                )} ${ring(path)}`}
               >
                 <span className="pointer-events-none absolute inset-x-0 bottom-1 text-center text-[8.5px] font-medium text-text-primary opacity-0 mix-blend-difference transition-opacity group-hover/step:opacity-100">
                   {leafOf(path)}
@@ -1017,17 +1027,17 @@ function FamilyRow({
                     data-token-path={path}
                     onClick={(e) => press(e, path)}
                     aria-pressed={selected === path || on(path)}
-                    className={`flex w-full items-baseline gap-3 rounded-md px-2 py-1.5 text-left transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
-                      dimmed(path) ? 'opacity-40' : 'opacity-100'
-                    } ${selected === path || on(path) ? 'bg-raised' : 'hover:bg-raised'} ${on(path) ? 'ring-2 ring-inset ring-accent' : ''}`}
+                    className={`flex w-full items-baseline gap-3 rounded-md px-2 py-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                      selected === path || on(path) ? 'bg-raised' : 'hover:bg-raised'
+                    } ${on(path) ? 'ring-2 ring-inset ring-accent' : ''}`}
                   >
-                    <span className="min-w-0 flex-1 overflow-hidden">
+                    <span className={`min-w-0 flex-1 overflow-hidden transition-opacity ${dimMark(path)}`}>
                       <Specimen token={hit.token} value={r.ok ? r.value : null} />
                     </span>
                     <span className="shrink-0 text-right">
                       <span
                         className={`block text-[10.5px] ${
-                          hit.token.deprecated ? 'text-text-muted line-through' : 'text-text-secondary'
+                          hit.token.deprecated ? 'text-text-muted line-through' : dimText(path)
                         }`}
                         title={hit.token.deprecated?.message ?? undefined}
                       >
@@ -1047,14 +1057,16 @@ function FamilyRow({
                   data-token-path={path}
                   onClick={(e) => press(e, path)}
                   aria-pressed={selected === path || on(path)}
-                  className={`w-[104px] rounded-md p-1.5 text-left transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
-                    dimmed(path) ? 'opacity-40' : 'opacity-100'
-                  } ${selected === path || on(path) ? 'bg-raised' : 'hover:bg-raised'} ${on(path) ? 'ring-2 ring-inset ring-accent' : ''}`}
+                  className={`w-[104px] rounded-md p-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                    selected === path || on(path) ? 'bg-raised' : 'hover:bg-raised'
+                  } ${on(path) ? 'ring-2 ring-inset ring-accent' : ''}`}
                 >
-                  <TokenMark token={hit.token} value={r.ok ? r.value : null} />
+                  <span className={`block transition-opacity ${dimMark(path)}`}>
+                    <TokenMark token={hit.token} value={r.ok ? r.value : null} />
+                  </span>
                   <span
                     className={`mt-1.5 block truncate text-[10.5px] ${
-                      hit.token.deprecated ? 'text-text-muted line-through' : 'text-text-secondary'
+                      hit.token.deprecated ? 'text-text-muted line-through' : dimText(path)
                     }`}
                     title={hit.token.deprecated?.message ?? undefined}
                   >
@@ -1266,6 +1278,22 @@ function NameField({
 /** A shape dimension that is a line's thickness rather than a corner's size. */
 const STROKE_STEM = /(^|\.)(stroke|border)(\.|$)/i
 
+/** A spacing token that sits inside something rather than between two things. */
+const PAD_STEM = /(^|\.)(pad|padding|inset|padx|pady)(\.|$)/i
+
+/**
+ * A spacing value in the pixels the specimen should draw.
+ *
+ * True to size where the tile has room, so 4 and 8 are honestly half and
+ * whole. Past that it compresses instead of clamping — a clamp made every
+ * large step draw identically, which is the one thing a specimen must not do.
+ */
+function spaceScale(v: number): number {
+  const a = Math.abs(v)
+  if (a <= 24) return Math.max(2, a)
+  return Math.min(56, 24 + (a - 24) * 0.45)
+}
+
 /** Tokens Studio writes `original`; CSS has no such word for "leave it". */
 function cssTextCase(v: string): 'none' | 'uppercase' | 'lowercase' | 'capitalize' {
   const k = v.toLowerCase()
@@ -1326,12 +1354,29 @@ function TokenMark({ token, value }: { token: Token; value: TokenValue | null })
           </span>
         )
       }
+      // Spacing is not a length, it is a distance between two things, and a
+      // lone bar in a box says neither. Worse, the bar was clamped, so every
+      // value past the cap drew the same width: a 64 and a 96 were the same
+      // picture. Drawn as the thing it does — the space between two blocks,
+      // or the inset around one — the number is legible without reading it.
+      const px = spaceScale(num(value))
+      if (PAD_STEM.test(token.path)) {
+        return (
+          <span className="grid h-12 place-items-center rounded-md bg-sunken">
+            <span
+              style={{ padding: Math.max(1, Math.round(px / 2)) }}
+              className="rounded-[3px] bg-accent/30"
+            >
+              <span className="block h-4 w-7 rounded-[2px] bg-text-primary/35" />
+            </span>
+          </span>
+        )
+      }
       return (
-        <span className="flex h-12 items-center rounded-md bg-sunken px-1.5">
-          <span
-            style={{ width: Math.max(2, Math.min(72, Math.abs(num(value)))) }}
-            className="block h-1.5 rounded-full bg-text-primary/70"
-          />
+        <span className="flex h-12 items-center justify-center rounded-md bg-sunken px-2">
+          <span className="h-7 w-2.5 shrink-0 rounded-l-[2px] bg-text-primary/35" />
+          <span style={{ width: px }} className="h-7 shrink-0 bg-accent/30" />
+          <span className="h-7 w-2.5 shrink-0 rounded-r-[2px] bg-text-primary/35" />
         </span>
       )
     }

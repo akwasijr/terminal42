@@ -172,7 +172,7 @@ export function EasingCurveEditor({ value, onChange, size = 150 }: {
                 })}
               </div>
             ) : (
-              !naming && <span className="text-[10px] text-text-muted/70">Save a curve to reuse it across the project.</span>
+              !naming && <span className="text-[10px] text-text-muted">Save a curve to reuse it across the project.</span>
             )}
           </div>
         </>

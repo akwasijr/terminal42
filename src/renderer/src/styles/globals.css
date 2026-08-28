@@ -13,29 +13,54 @@
    text-field underlines in dense data views).
    ───────────────────────────────────────────────────────────────────────── */
 :root {
-  /* Light tokens */
-  --bg: 240 240 241;        /* deepest: page background behind the panels */
-  --surface: 250 250 250;   /* panels, rails, inspector */
-  --elevated: 237 237 238;  /* rows, chips, hover states inside a panel */
+  /* Light tokens.
+     The steps are deliberately wider than they look like they need to be.
+     Separation here comes from tone alone, and light greys a few points
+     apart are indistinguishable on a bright screen: at 240 against 250 a
+     panel and the page behind it read as one flat sheet, which is what made
+     cards disappear. Each layer is now about a 1.08 contrast step from its
+     neighbour and the page sits a clear 1.16 below a panel. The order is
+     also strictly monotonic, which it was not: elevated used to be darker
+     than the page it was supposed to be lifted off.
+
+     Note that `raised` has two jobs — a menu floating over the page, and the
+     hover or selected tone of a row sitting on a panel. Only the first was
+     ever checked, so with surface at 252 a selected row against white came
+     out at 1.02 and you could not tell which row you had picked. Surface is
+     held down at 247 to leave that last step somewhere to go. */
+  --bg: 230 230 234;        /* deepest: page background behind the panels */
+  --surface: 247 247 249;   /* panels, rails, inspector */
+  --elevated: 238 238 242;  /* rows, chips, hover states inside a panel */
   --raised: 255 255 255;    /* floating toolbars, canvas sheet, menus */
-  --sunken: 232 232 234;    /* slider tracks, wells, inset fields */
-  --border: 249 249 249;    /* ~invisible: matches surface by design */
-  --border-strong: 224 224 226;
+  --sunken: 220 220 224;    /* slider tracks, wells, inset fields */
+  --border: 246 246 248;    /* ~invisible: matches surface by design */
+  --border-strong: 210 210 216;
   --hairline: 0 0 0 / 0.07; /* opt-in only, via var(--hairline-color) */
   --hairline-color: rgba(0, 0, 0, 0.07);
-  --text-primary: 23 23 23;
-  --text-secondary: 92 92 96;
-  --text-muted: 112 112 118;
-  --accent: 14 165 233;
+  --text-primary: 23 23 25;
+  /* Both of these are set so they clear 4.5:1 against every surface above,
+     including the darkest. Muted was previously below AA on the page, on a
+     row and in a well — three of the five places it actually appears. */
+  --text-secondary: 80 80 87;
+  --text-muted: 88 88 96;
+  /* Deep enough that white can be read on it. The old sky blue took white
+     to 2.77:1, so every filled accent button and badge failed before the
+     user had chosen anything at all. */
+  --accent: 11 125 177;
   --accent-text: 255 255 255;
   /* Primary actions. Neutral by design: a button is important because of
      where it sits and what it says, not because it is painted the brand
      colour. Accent is kept for focus, selection dots and status. */
   --action: 23 23 23;
   --action-text: 250 250 250;
-  --success: 22 163 74;
-  --warning: 217 119 6;
-  --error: 220 38 38;
+  /* Set dark enough to be read as text, which is what they mostly are: 71
+     uses colour a word or a glyph, 44 fill a shape. At their old values a
+     green tick came out at 2.4:1 and an amber label at 2.3:1 against the
+     lighter panels. Deepened they still read plainly as green, amber and
+     red when used as a fill. */
+  --success: 15 112 51;
+  --warning: 145 80 4;
+  --error: 189 33 33;
 
   /* Shape */
   --radius-control: 8px;
@@ -59,24 +84,32 @@
 }
 
 .dark {
+  /* Same treatment as the light ramp, and it needed it more than it looked:
+     near black, equal steps in RGB give much smaller contrast steps, so a
+     well at 12 against a canvas at 5 came out at 1.04 and a panel sat only
+     1.08 off the page. Every neighbour is now at least a 1.065 step. */
   --bg: 5 5 6;              /* deepest: canvas / page background */
-  --surface: 17 17 19;      /* panels, rails, inspector */
-  --elevated: 30 30 33;     /* rows, chips, hover states inside a panel */
-  --raised: 38 38 42;       /* floating toolbars, menus */
-  --sunken: 12 12 14;       /* slider tracks, wells, inset fields */
-  --border: 18 18 20;       /* ~invisible: matches surface by design */
+  --surface: 24 24 26;      /* panels, rails, inspector */
+  --elevated: 30 30 32;     /* rows, chips, hover states inside a panel */
+  --raised: 36 36 38;       /* floating toolbars, menus */
+  --sunken: 16 16 18;       /* slider tracks, wells, inset fields */
+  --border: 24 24 26;       /* ~invisible: matches surface by design */
   --border-strong: 52 52 58;
   --hairline-color: rgba(255, 255, 255, 0.06);
   --text-primary: 240 240 242;
   --text-secondary: 154 154 160;
-  --text-muted: 128 128 136;
+  /* Lifted for the same reason as its light counterpart: on a raised
+     surface, a menu or a floating toolbar, the old value read at 3.85:1. */
+  --text-muted: 142 142 150;
   --accent: 56 189 248;
   --accent-text: 10 10 10;
   --action: 240 240 242;
   --action-text: 10 10 10;
   --success: 34 197 94;
   --warning: 245 158 11;
-  --error: 239 68 68;
+  /* Lifted: the old red sat at 4.01:1 on a raised surface, so an error on a
+     menu or floating toolbar was the one message you could not read. */
+  --error: 241 89 89;
 
   --shadow-row: 0 1px 2px rgba(0, 0, 0, 0.30);
   --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.40);

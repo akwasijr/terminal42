@@ -289,15 +289,34 @@ export function App() {
       const n = parseInt(m[1], 16)
       return `${(n >> 16) & 255} ${(n >> 8) & 255} ${n & 255}`
     }
+    // Which of black or white can actually be read on top of the accent.
+    //
+    // The accent is whatever colour the user picked, but the text on it was
+    // fixed at white, so a bright pick — the green in the default palette,
+    // or any yellow or cyan — put white on a pale field at under 2:1. The
+    // pairing has to be decided from the colour, not assumed.
+    const readableOn = (rgb: string): string => {
+      const c = rgb.split(/\s+/).map(Number)
+      if (c.length !== 3 || c.some((n) => !Number.isFinite(n))) return '255 255 255'
+      const lin = c.map((v) => {
+        const s = v / 255
+        return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4)
+      })
+      const lum = 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+      const onWhite = 1.05 / (lum + 0.05)
+      const onBlack = (lum + 0.05) / 0.05
+      return onBlack >= onWhite ? '16 16 18' : '255 255 255'
+    }
     const apply = (s: { accentColor?: string; translucentSidebar?: boolean } | null): void => {
       if (!s) return
       const root = document.documentElement
-      if (s.accentColor) {
-        const rgb = hexToTriplet(s.accentColor)
-        if (rgb) root.style.setProperty('--accent', rgb)
-        else root.style.removeProperty('--accent')
+      const rgb = s.accentColor ? hexToTriplet(s.accentColor) : null
+      if (rgb) {
+        root.style.setProperty('--accent', rgb)
+        root.style.setProperty('--accent-text', readableOn(rgb))
       } else {
         root.style.removeProperty('--accent')
+        root.style.removeProperty('--accent-text')
       }
       root.dataset.translucent = s.translucentSidebar ? 'true' : 'false'
     }

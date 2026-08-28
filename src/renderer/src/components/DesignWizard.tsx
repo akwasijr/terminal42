@@ -2091,7 +2091,7 @@ function PageMotion({ state, set }: PageProps): JSX.Element {
             onChange={(e) => set('customMotion', e.target.value)}
             placeholder="e.g. Cards lift 4px on hover with a 200ms ease-out. Hero headline fades up on load. Buttons get a subtle scale (0.98) on press."
             rows={3}
-            className="w-full rounded-md bg-elevated/80 px-2.5 py-2 text-[12.5px] text-text-primary placeholder:text-text-muted/60 outline-none focus:ring-1 focus:ring-accent"
+            className="w-full rounded-md bg-elevated/80 px-2.5 py-2 text-[12.5px] text-text-primary placeholder:text-text-muted outline-none focus:ring-1 focus:ring-accent"
           />
         </div>
       )}
@@ -2205,7 +2205,7 @@ function PageStack({ state, set }: PageProps): JSX.Element {
             onChange={(e) => set('customStack', e.target.value)}
             placeholder="Anything to steer the choice. e.g. 'must run on edge', 'team knows React'."
             rows={2}
-            className="w-full rounded-md bg-elevated/80 px-2.5 py-2 text-[12.5px] text-text-primary placeholder:text-text-muted/60 outline-none focus:ring-1 focus:ring-accent"
+            className="w-full rounded-md bg-elevated/80 px-2.5 py-2 text-[12.5px] text-text-primary placeholder:text-text-muted outline-none focus:ring-1 focus:ring-accent"
           />
         </div>
       )}
@@ -2807,7 +2807,7 @@ function PageDefaults({ state, set }: PageProps): JSX.Element {
           onChange={(e) => set('customAvoid', e.target.value)}
           rows={4}
           placeholder={'e.g. brand purple\nillustrated mascots\ntestimonial sliders\n"Get started" CTAs'}
-          className="w-full resize-y rounded-md bg-elevated/40 px-3 py-2 text-[12.5px] text-text-primary placeholder:text-text-muted/60 outline-none focus:ring-1 focus:ring-accent/40"
+          className="w-full resize-y rounded-md bg-elevated/40 px-3 py-2 text-[12.5px] text-text-primary placeholder:text-text-muted outline-none focus:ring-1 focus:ring-accent/40"
         />
       </div>
     </div>
@@ -2971,7 +2971,7 @@ function PageSummary({ state, set }: { state: DesignWizardState; set: <K extends
           onChange={(e) => set('planNotes', e.target.value)}
           rows={3}
           placeholder={'e.g. Drop the chart, lead with the team section, smaller cards\u2026'}
-          className="w-full resize-y rounded-md bg-elevated/40 px-3 py-2 text-[12.5px] text-text-primary placeholder:text-text-muted/60 outline-none focus:ring-1 focus:ring-accent/40"
+          className="w-full resize-y rounded-md bg-elevated/40 px-3 py-2 text-[12.5px] text-text-primary placeholder:text-text-muted outline-none focus:ring-1 focus:ring-accent/40"
         />
       </div>
 
