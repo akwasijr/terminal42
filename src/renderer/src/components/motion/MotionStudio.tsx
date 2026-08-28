@@ -15,6 +15,7 @@ import { liveLayerIds, pruneLayerTracks } from '../../../../shared/motion/keyfra
 import { cardCountFor, emptyOverride, overrideIsEmpty } from '../../../../shared/motion/frame'
 import { exportStill, exportVideo, type ExportProgress } from '../../lib/motion/exporter'
 import { ensureTextFonts } from '../../lib/motion/fonts'
+import { useTokenSwatches } from '../../lib/tokens/useTokenSwatches'
 import { ComponentsDrawer, type SavedLayout } from './ComponentsDrawer'
 import { MotionStage, type StageHandle } from './MotionStage'
 import { ExportPanel } from './ExportPanel'
@@ -69,6 +70,10 @@ export function MotionStudio({
   const [playing, setPlaying] = useState(false)
   const [phase, setPhase] = useState(0)
   const [pickerReq, setPickerReq] = useState<PickerRequest | null>(null)
+  // The library's colours, offered by every colour control in Motion. Injected
+  // at the one place the picker is rendered rather than at each control, so a
+  // new control cannot forget them.
+  const tokenSwatches = useTokenSwatches()
   const [exporting, setExporting] = useState(false)
   const [progress, setProgress] = useState<ExportProgress | null>(null)
   const [note, setNote] = useState<string | null>(null)
@@ -639,7 +644,7 @@ export function MotionStudio({
           </PanelIconButton>
         </aside>
       )}
-      {pickerReq ? <ColorPicker req={pickerReq} /> : null}
+      {pickerReq ? <ColorPicker req={{ ...pickerReq, tokenSwatches }} /> : null}
     </div>
     </MotionPickerProvider>
   )

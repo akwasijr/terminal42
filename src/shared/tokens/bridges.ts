@@ -53,6 +53,40 @@ export function brandItems(
   return { colours, fonts }
 }
 
+/** A library colour, still carrying the name it is known by. */
+export type ColourSwatch = {
+  /** The dot path, which is the token's name. */
+  path: string
+  hex: string
+}
+
+/**
+ * The library's colours, with their names kept.
+ *
+ * `brandItems` throws the paths away because a row of swatches is chosen from
+ * by eye. This is for the other case: picking a colour *because* it is
+ * `colour.text.muted`, where the name is the reason and a bare hex would mean
+ * choosing the right grey out of six identical ones.
+ *
+ * Semantic only, for the same reason `brandItems` is: the primitive ramp is a
+ * paint shop, and a design that names `colour.blue.500` has hard-coded a blue
+ * with extra steps.
+ *
+ * Deprecated tokens are left out. A deprecation says "stop reaching for this",
+ * and a list whose entire purpose is reaching for one should not offer it.
+ */
+export function colourSwatches(studio: TokenStudio, themeId: string | null): ColourSwatch[] {
+  const out: ColourSwatch[] = []
+  for (const [path, hit] of sorted(studio, themeId)) {
+    if (hit.token.tier === 'primitive') continue
+    if (hit.token.deprecated) continue
+    if (hit.token.type !== 'color') continue
+    if (typeof hit.value !== 'string') continue
+    out.push({ path, hex: hit.value })
+  }
+  return out
+}
+
 /**
  * Whether a token can become a Form variable at all.
  *

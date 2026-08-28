@@ -1,5 +1,6 @@
 import { createContext, Fragment, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { ColorPicker, type PickerRequest } from './ColorPicker'
+import { useTokenSwatches } from '../lib/tokens/useTokenSwatches'
 import { lerpHex } from '../lib/color'
 import { TimelinePanel } from './TimelinePanel'
 import { Tooltip } from './Tooltip'
@@ -1739,6 +1740,10 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
   // Floating colour picker + gradient options windows (rendered over the canvas,
   // outside the clipped inspector). Opening the picker stamps one undo entry.
   const [pickerReq, setPickerReq] = useState<PickerRequest | null>(null)
+  // The library's colours, offered by every colour control in Form. Injected
+  // at the one place the picker is rendered rather than at each control, so a
+  // new control cannot forget them.
+  const tokenSwatches = useTokenSwatches()
   const [gradOpts, setGradOpts] = useState<{ anchor: DOMRect; cfg: PaintCfg } | null>(null)
   const [effectPopover, setEffectPopover] = useState<{ id: string; anchor: DOMRect } | null>(null)
   const [shaderGallery, setShaderGallery] = useState<{ effectId: string; anchor: DOMRect } | null>(null)
@@ -4027,7 +4032,7 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
         )
       })()}
 
-      {pickerReq && <ColorPicker req={pickerReq} />}
+      {pickerReq && <ColorPicker req={{ ...pickerReq, tokenSwatches }} />}
       {gradOpts && sel && (sel[gradOpts.cfg.mode] === 'gradient') && (
         <GradientOptions sel={sel} cfg={gradOpts.cfg} patch={patch} patchObj={patchObj} pushHistory={pushHistory} anchor={gradOpts.anchor} onClose={() => setGradOpts(null)} />
       )}

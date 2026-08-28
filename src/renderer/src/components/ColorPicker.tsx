@@ -17,6 +17,11 @@ export interface PickerRequest {
   onBindVar?: (id: string) => void
   /** Optional: create a new color variable from the current color and bind it. */
   onCreateVar?: (hex: string) => void
+  /**
+   * Optional: the token library's named colours, offered wherever a colour is
+   * chosen. Applied as a value, not bound — see `useTokenSwatches`.
+   */
+  tokenSwatches?: { id: string; name: string; hex: string }[]
 }
 
 type HueMode = 'closest' | 'chroma' | 'lightness'
@@ -251,6 +256,26 @@ export function ColorPicker({ req }: { req: PickerRequest }): JSX.Element {
             </>
           )}
         </div>
+
+        {req.tokenSwatches && req.tokenSwatches.length > 0 && (
+          <div className="pt-2">
+            <div className="mb-1.5 text-[11px] text-text-muted">Library</div>
+            <div className="flex max-h-40 flex-col gap-0.5 overflow-y-auto">
+              {req.tokenSwatches.map((sw) => (
+                <button
+                  key={sw.id}
+                  type="button"
+                  title={`${sw.name} · ${sw.hex.toUpperCase()}`}
+                  onClick={() => setFromRgb(parseHex(sw.hex) ?? { r: 0, g: 0, b: 0 })}
+                  className="flex items-center gap-2 rounded-md px-1.5 py-1 text-left hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                >
+                  <span className="h-4 w-4 shrink-0 rounded-[4px]" style={{ background: sw.hex }} />
+                  <span className="min-w-0 flex-1 truncate text-[12px] text-text-primary">{sw.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {req.onCreateVar && (
           <div className="pt-2">
