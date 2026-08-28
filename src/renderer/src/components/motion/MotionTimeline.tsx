@@ -13,7 +13,7 @@
 // It is set apart by a step in tone with a gutter around it, not by a rule —
 // nothing in this app is divided by a line.
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import type { LogoLayer, MotionDoc, TextLayer } from '../../../../shared/motion/types'
 import { FRAME_RATES } from '../../../../shared/motion/types'
 import { componentFor } from '../../../../shared/motion/registry'
@@ -28,7 +28,7 @@ import { Hint } from '../Hint'
 import { samePick, type Pick } from '../../lib/motion/overlayPick'
 
 /** The three columns every row shares. Changing one here moves all of them. */
-const LABEL_W = 'w-[104px]'
+const LABEL_W = 'w-[132px]'
 const TAIL_W = 'w-[68px]'
 
 export function MotionTimeline({
@@ -59,6 +59,17 @@ export function MotionTimeline({
   const logos = doc.visual.logos
   const layerCount = text.length + logos.length + targets.length + 1
 
+  // A track belongs to the layer it drives. Any left over drives a layer that
+  // has since been deleted — it still applies, so it still has to be listed.
+  const orphans = targets.filter((t) => {
+    const [kind, rest] = splitOnce(t)
+    if (kind !== 'text' && kind !== 'logo') return kind !== 'param' && kind !== 'pose' && kind !== 'fx'
+    const [id] = splitOnce(rest)
+    return kind === 'text'
+      ? !text.some((l) => l.id === id)
+      : !logos.some((l) => l.id === id)
+  })
+
   const setText = (id: string, patch: Partial<TextLayer>): void =>
     onChange({ visual: { ...doc.visual, text: text.map((t) => (t.id === id ? { ...t, ...patch } : t)) } })
   const setLogo = (id: string, patch: Partial<LogoLayer>): void =>
@@ -84,7 +95,7 @@ export function MotionTimeline({
             tracks the same span the lanes use. */}
         <span
           aria-hidden="true"
-          style={{ left: `calc(112px + (100% - 188px) * ${phase})` }}
+          style={{ left: `calc(140px + (100% - 216px) * ${phase})` }}
           className="pointer-events-none absolute bottom-0 top-0 z-10 w-px bg-accent/40"
         />
         <Ruler doc={doc} phase={phase} onPhase={onPhase} />
@@ -93,65 +104,127 @@ export function MotionTimeline({
         <>
           <GroupLabel>Scene</GroupLabel>
           <ComponentRow doc={doc} phase={phase} />
-          {text.map((t) => (
-            <LayerRow
-              key={t.id}
-              label={t.text.trim().split('\n')[0] || 'Text'}
-              kind="Text"
-              span={t}
-              phase={phase}
-              onSpan={(patch) => setText(t.id, patch)}
-              selected={samePick(selected, { kind: 'text', id: t.id })}
-              onSelect={onSelect ? () => onSelect({ kind: 'text', id: t.id }) : undefined}
-              onRemove={onRemove ? () => onRemove({ kind: 'text', id: t.id }) : undefined}
-            />
-          ))}
-          {logos.map((l, i) => (
-            <LayerRow
-              key={l.id}
-              label={`Logo ${i + 1}`}
-              kind="Logo"
-              span={l}
-              phase={phase}
-              onSpan={(patch) => setLogo(l.id, patch)}
-              selected={samePick(selected, { kind: 'logo', id: l.id })}
-              onSelect={onSelect ? () => onSelect({ kind: 'logo', id: l.id }) : undefined}
-              onRemove={onRemove ? () => onRemove({ kind: 'logo', id: l.id }) : undefined}
-            />
-          ))}
-        </>
-      ) : null}
-
-      {targets.length > 0 ? (
-        <>
-          {open ? <GroupLabel>Animated values</GroupLabel> : null}
-          {targets.map((target) => (
+          {tracksOf(targets, 'scene').map((target) => (
             <TrackRow
               key={target}
-              label={trackLabel(doc, target)}
+              label={fieldLabel(doc, target)}
               target={target}
               keys={keys}
               phase={phase}
               onPhase={onPhase}
               onKeys={(next) => onChange({ keys: next })}
+              nested
             />
           ))}
-          <div className="flex items-center gap-2">
-            <span className={`${LABEL_W} shrink-0 px-1 text-[10px] text-text-muted`}>
-              {targets.length === 1 ? '1 animated value' : `${targets.length} animated values`}
-            </span>
-            <span className="flex flex-1 items-center">
-              <Hint label="Click a key to shape the segment after it, drag to move, right-click to remove, double-click a lane to add one." />
-            </span>
-            <button
-              type="button"
-              onClick={() => onChange({ keys: {} })}
-              className={`${TAIL_W} shrink-0 rounded-sm py-0.5 text-[10px] text-text-muted hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60`}
-            >
-              Clear
-            </button>
-          </div>
+
+          {text.length > 0 ? <GroupLabel>Type</GroupLabel> : null}
+          {text.map((t) => (
+            <Fragment key={t.id}>
+              <LayerRow
+                label={t.text.trim().split('\n')[0] || 'Text'}
+                kind="Text"
+                span={t}
+                phase={phase}
+                onSpan={(patch) => setText(t.id, patch)}
+                selected={samePick(selected, { kind: 'text', id: t.id })}
+                onSelect={onSelect ? () => onSelect({ kind: 'text', id: t.id }) : undefined}
+                onRemove={onRemove ? () => onRemove({ kind: 'text', id: t.id }) : undefined}
+              />
+              {tracksOf(targets, `text:${t.id}`).map((target) => (
+                <TrackRow
+                  key={target}
+                  label={fieldLabel(doc, target)}
+                  target={target}
+                  keys={keys}
+                  phase={phase}
+                  onPhase={onPhase}
+                  onKeys={(next) => onChange({ keys: next })}
+                  nested
+                />
+              ))}
+            </Fragment>
+          ))}
+
+          {logos.length > 0 ? <GroupLabel>Marks</GroupLabel> : null}
+          {logos.map((l, i) => (
+            <Fragment key={l.id}>
+              <LayerRow
+                label={`Logo ${i + 1}`}
+                kind="Logo"
+                span={l}
+                phase={phase}
+                onSpan={(patch) => setLogo(l.id, patch)}
+                selected={samePick(selected, { kind: 'logo', id: l.id })}
+                onSelect={onSelect ? () => onSelect({ kind: 'logo', id: l.id }) : undefined}
+                onRemove={onRemove ? () => onRemove({ kind: 'logo', id: l.id }) : undefined}
+              />
+              {tracksOf(targets, `logo:${l.id}`).map((target) => (
+                <TrackRow
+                  key={target}
+                  label={fieldLabel(doc, target)}
+                  target={target}
+                  keys={keys}
+                  phase={phase}
+                  onPhase={onPhase}
+                  onKeys={(next) => onChange({ keys: next })}
+                  nested
+                />
+              ))}
+            </Fragment>
+          ))}
+
+          {/* Tracks whose layer is gone. They keep applying, so they have to
+              stay reachable — but they belong under nothing, and saying so is
+              better than filing them beside tracks that do have a layer. */}
+          {orphans.length > 0 ? (
+            <>
+              <GroupLabel>No longer attached to a layer</GroupLabel>
+              {orphans.map((target) => (
+                <TrackRow
+                  key={target}
+                  label={trackLabel(doc, target)}
+                  target={target}
+                  keys={keys}
+                  phase={phase}
+                  onPhase={onPhase}
+                  onKeys={(next) => onChange({ keys: next })}
+                />
+              ))}
+            </>
+          ) : null}
         </>
+      ) : (
+        // Closed, the layers are put away but the animation is not: the keys
+        // are the part you come back to adjust, so they stay on show.
+        targets.map((target) => (
+          <TrackRow
+            key={target}
+            label={trackLabel(doc, target)}
+            target={target}
+            keys={keys}
+            phase={phase}
+            onPhase={onPhase}
+            onKeys={(next) => onChange({ keys: next })}
+          />
+        ))
+      )}
+
+      {targets.length > 0 ? (
+        <div className="flex items-center gap-2">
+          <span className={`${LABEL_W} shrink-0 px-1 text-[10px] text-text-muted`}>
+            {targets.length === 1 ? '1 animated value' : `${targets.length} animated values`}
+          </span>
+          <span className="flex flex-1 items-center">
+            <Hint label="Click a key to shape the segment after it, drag to move, right-click to remove, double-click a lane to add one." />
+          </span>
+          <button
+            type="button"
+            onClick={() => onChange({ keys: {} })}
+            className={`${TAIL_W} shrink-0 rounded-sm py-0.5 text-[10px] text-text-muted hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60`}
+          >
+            Clear
+          </button>
+        </div>
       ) : null}
       </div>
     </div>
@@ -412,7 +485,7 @@ function ComponentRow({ doc, phase }: { doc: MotionDoc; phase: number }): React.
       <div className="relative h-5 flex-1 overflow-hidden rounded-sm bg-sunken">
         <span
           aria-hidden
-          className={`absolute inset-y-[3px] left-0 right-0 rounded-[3px] ${enabled ? 'bg-raised' : 'bg-raised/40'}`}
+          className={`absolute inset-y-[3px] left-0 right-0 rounded-[3px] ${enabled ? 'bg-text-muted/35' : 'bg-text-muted/15'}`}
         />
         <span
           aria-hidden
@@ -426,7 +499,7 @@ function ComponentRow({ doc, phase }: { doc: MotionDoc; phase: number }): React.
 }
 
 function TrackRow({
-  label, target, keys, phase, onPhase, onKeys
+  label, target, keys, phase, onPhase, onKeys, nested = false
 }: {
   label: string
   target: TrackTarget
@@ -434,6 +507,8 @@ function TrackRow({
   phase: number
   onPhase: (p: number) => void
   onKeys: (k: Keyframes) => void
+  /** Whether it hangs under a layer row, which is where the indent comes from. */
+  nested?: boolean
 }): React.JSX.Element {
   const track = keys[target]
   const lane = useRef<HTMLDivElement>(null)
@@ -502,15 +577,15 @@ function TrackRow({
         type="button"
         onClick={() => onKeys(setMuted(keys, target, !track?.muted))}
         title={track?.muted ? `Let ${label} animate again` : `Stop ${label} animating, keeping its keys`}
-        className={`${LABEL_W} shrink-0 truncate rounded-sm px-1 py-0.5 text-left text-[10.5px] hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
-          track?.muted ? 'text-text-muted line-through' : 'text-text-secondary'
-        }`}
+        className={`${LABEL_W} shrink-0 truncate rounded-sm py-0.5 text-left text-[10px] hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+          nested ? 'pl-4 pr-1' : 'px-1'
+        } ${track?.muted ? 'text-text-muted line-through' : 'text-text-muted'}`}
       >
         {label}
       </button>
       <div
         ref={lane}
-        className="relative h-5 flex-1 rounded-sm bg-sunken"
+        className="relative h-4 flex-1 rounded-sm bg-sunken"
         onDoubleClick={(e) => {
           // Adds a control point without changing the shape: the new key takes
           // the value the track already has there, so the animation is
@@ -623,6 +698,41 @@ function round(v: number): string {
 }
 
 /**
+ * The tracks belonging to one owner.
+ *
+ * A property track used to be filed in a flat list under "Animated values",
+ * so a track reading "a film in six tracki…" sat three rows away from the
+ * layer it drives with nothing to say they were related. Nesting each track
+ * under its layer is how the Form timeline has always done it, and it is the
+ * only arrangement in which the label can be short enough to read.
+ */
+function tracksOf(targets: readonly TrackTarget[], owner: string): TrackTarget[] {
+  if (owner === 'scene') {
+    return targets.filter((t) => {
+      const [kind] = splitOnce(t)
+      return kind === 'param' || kind === 'pose' || kind === 'fx'
+    })
+  }
+  return targets.filter((t) => t.startsWith(`${owner}:`))
+}
+
+/**
+ * What a track drives, without repeating the layer it hangs under.
+ *
+ * The layer's name is already on the row above, so saying it again costs the
+ * width that made these labels truncate in the first place.
+ */
+function fieldLabel(doc: MotionDoc, target: TrackTarget): string {
+  const [kind, rest] = splitOnce(target)
+  if (kind === 'text' || kind === 'logo') {
+    const [, field] = splitOnce(rest)
+    const name = FIELD_LABELS[field] ?? field
+    return name.charAt(0).toUpperCase() + name.slice(1)
+  }
+  return trackLabel(doc, target)
+}
+
+/**
  * A track's name in the words the panel uses for it.
  *
  * Falls back to the raw target so a document keyed against a parameter this
@@ -681,6 +791,13 @@ type LayerSpan = { from?: number; to?: number; fade?: number }
  * separate step for turning timing on. A layer whose window wraps through the
  * seam draws as two pieces of one bar rather than as two bars, because it is
  * one span and reading it as two would suggest it could be moved apart.
+ *
+ * Every bar is the same colour. It used to be white when the layer ran the
+ * whole loop and green when it had a window, which put two unrelated meanings
+ * into a colour with nothing to read them by — and green is also selection,
+ * the playhead and every key, so it was saying four things at once. Now the
+ * length of the bar carries the window, tone carries whether the layer is on
+ * screen at the playhead, and accent is kept for the one thing in hand.
  */
 function LayerRow({
   label, kind, span, phase, onSpan, selected = false, onSelect, onRemove
@@ -770,7 +887,7 @@ function LayerRow({
             onPointerUp={up}
             onPointerCancel={up}
             className={`absolute inset-y-[3px] rounded-[3px] ${dragging ? 'cursor-grabbing' : 'cursor-grab'} ${
-              bounded ? 'bg-accent/25' : 'bg-raised'
+              selected ? 'bg-accent/45' : on ? 'bg-text-muted/35' : 'bg-text-muted/15'
             }`}
             style={{ left: `${p.left * 100}%`, width: `${Math.max(0, p.width) * 100}%` }}
           />
@@ -784,37 +901,34 @@ function LayerRow({
         />
       </div>
       <div className={`${TAIL_W} flex shrink-0 items-center justify-end gap-0.5`}>
-        <button
-          type="button"
-          onClick={() => onSpan({ fade: span.fade ? undefined : 0.15 })}
-          aria-pressed={Boolean(span.fade)}
-          // Softening the ends of a window that has no ends would do nothing
-          // at all, so it is shut off rather than left to be pressed in vain.
-          disabled={!bounded}
-          aria-label={`Soften the ends of ${label}`}
-          title={
-            !bounded
-              ? 'Give it a window first, then its ends can be softened'
-              : span.fade
-                ? 'Cut the ends sharp again'
-                : 'Soften the ends, so it comes and goes'
-          }
-          className={`rounded-sm px-0.5 py-0.5 leading-none disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
-            span.fade ? 'text-accent' : 'text-text-muted enabled:hover:bg-raised enabled:hover:text-text-primary'
-          }`}
-        >
-          <FadeGlyph />
-        </button>
-        <button
-          type="button"
-          onClick={() => onSpan({ from: undefined, to: undefined, fade: undefined })}
-          disabled={!bounded && !span.fade}
-          aria-label={`Show ${label} for the whole loop`}
-          title={bounded ? `Show ${label} for the whole loop` : `${label} already runs the whole loop`}
-          className="rounded-sm px-1 text-[12px] leading-none text-text-muted enabled:hover:bg-raised enabled:hover:text-text-primary disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-        >
-          ×
-        </button>
+        {/* A window's controls appear only once it has a window. Three greyed
+            glyphs on every row taught nothing except that most of the tail is
+            unavailable, and left the one live glyph looking like an error. */}
+        {bounded ? (
+          <>
+            <button
+              type="button"
+              onClick={() => onSpan({ fade: span.fade ? undefined : 0.15 })}
+              aria-pressed={Boolean(span.fade)}
+              aria-label={`Soften the ends of ${label}`}
+              title={span.fade ? 'Cut the ends sharp again' : 'Soften the ends, so it comes and goes'}
+              className={`rounded-sm px-0.5 py-0.5 leading-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                span.fade ? 'text-accent' : 'text-text-muted hover:bg-raised hover:text-text-primary'
+              }`}
+            >
+              <FadeGlyph />
+            </button>
+            <button
+              type="button"
+              onClick={() => onSpan({ from: undefined, to: undefined, fade: undefined })}
+              aria-label={`Show ${label} for the whole loop`}
+              title={`Show ${label} for the whole loop`}
+              className="rounded-sm px-1 text-[12px] leading-none text-text-muted hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            >
+              ×
+            </button>
+          </>
+        ) : null}
         {onRemove ? (
           <button
             type="button"
