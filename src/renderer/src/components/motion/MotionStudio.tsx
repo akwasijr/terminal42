@@ -11,6 +11,7 @@ import { SHAPE_LABELS } from '../../../../shared/motion/types'
 import { componentFor } from '../../../../shared/motion/registry'
 import { presetParams } from '../../../../shared/motion/presets'
 import { emptyDoc, hydrateDoc } from '../../../../shared/motion/defaults'
+import { liveLayerIds, pruneLayerTracks } from '../../../../shared/motion/keyframes'
 import { cardCountFor, emptyOverride, overrideIsEmpty } from '../../../../shared/motion/frame'
 import { exportStill, exportVideo, type ExportProgress } from '../../lib/motion/exporter'
 import { ensureTextFonts } from '../../lib/motion/fonts'
@@ -129,7 +130,17 @@ export function MotionStudio({
   }, [])
 
   const patch = useCallback((p: Partial<MotionDoc>) => {
-    setHist((h) => record(h, { ...h.present, ...p }, Date.now()))
+    setHist((h) => {
+      const next = { ...h.present, ...p }
+      // A layer's tracks go when the layer does, wherever it was deleted
+      // from -- the timeline's bin or any of the four panels' ×. Doing it
+      // here rather than in each of those is what stops one of them being
+      // forgotten and leaving a row in the timeline for something that is
+      // not in the piece. Undo is unaffected: it restores a whole document,
+      // keys and all, from before the delete.
+      const keys = pruneLayerTracks(next.keys, liveLayerIds(next.visual))
+      return record(h, keys === next.keys ? next : { ...next, keys }, Date.now())
+    })
   }, [])
 
   const stepBack = useCallback(() => setHist(undoHistory), [])

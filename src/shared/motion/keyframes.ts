@@ -300,3 +300,57 @@ export function nudgeKeyTime(t: number, frames: number, steps: number): number {
   const onGrid = frames > 0 ? Math.round(t * frames) / frames : t
   return Math.min(1, Math.max(0, onGrid + step * steps))
 }
+
+/** The kinds of track that belong to a layer, and so die with it. */
+const LAYER_KINDS = ['text', 'logo', 'shape', 'picture']
+
+/**
+ * Drop the tracks of layers that are no longer in the piece.
+ *
+ * Deleting a layer used to leave its keyframes behind, and a track with no
+ * layer still draws a row: the timeline showed something called "Layer down"
+ * that was nowhere in the scene and could not be selected, because the name
+ * comes from a layer that had gone. It applied to nothing and could not be
+ * got rid of except by finding the × on a row you had no reason to trust.
+ *
+ * Only layer tracks are pruned. A `param:` target naming a parameter this
+ * component does not have is deliberately kept -- that is how switching
+ * component and switching back keeps the motion you built -- and the same
+ * goes for `pose:` and `fx:`, which belong to the piece rather than to any
+ * layer.
+ *
+ * Returns the original map when there is nothing to drop, so this can sit on
+ * a hot path without making a new object on every edit.
+ */
+export function pruneLayerTracks(
+  keys: Keyframes | undefined,
+  alive: ReadonlySet<string>
+): Keyframes | undefined {
+  if (!keys) return keys
+  let dropped = false
+  const out: Keyframes = {}
+  for (const [target, track] of Object.entries(keys)) {
+    const parts = target.split(':')
+    if (parts.length >= 3 && LAYER_KINDS.includes(parts[0]) && !alive.has(`${parts[0]}:${parts[1]}`)) {
+      dropped = true
+      continue
+    }
+    out[target] = track
+  }
+  return dropped ? out : keys
+}
+
+/** Every layer in a piece, as the `kind:id` keys a track target begins with. */
+export function liveLayerIds(visual: {
+  text?: Array<{ id: string }>
+  logos?: Array<{ id: string }>
+  shapes?: Array<{ id: string }>
+  pictures?: Array<{ id: string }>
+}): Set<string> {
+  const out = new Set<string>()
+  for (const l of visual.text ?? []) out.add(`text:${l.id}`)
+  for (const l of visual.logos ?? []) out.add(`logo:${l.id}`)
+  for (const l of visual.shapes ?? []) out.add(`shape:${l.id}`)
+  for (const l of visual.pictures ?? []) out.add(`picture:${l.id}`)
+  return out
+}

@@ -66,7 +66,10 @@ export function MotionTimeline({
   const logos = doc.visual.logos
   const shapes = doc.visual.shapes ?? []
   const pictures = doc.visual.pictures ?? []
-  const layerCount = text.length + logos.length + shapes.length + pictures.length + targets.length + 1
+  // Layers, and only layers. It used to count the tracks and the scene row
+  // too, so a piece with four captions said "Layers 7" and the timeline was
+  // claiming things the scene did not have.
+  const layerCount = text.length + logos.length + shapes.length + pictures.length
 
   // A track belongs to the layer it drives. Any left over drives a layer that
   // has since been deleted — it still applies, so it still has to be listed.
