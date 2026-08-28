@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import type { Design, DesignVersion } from '../../../preload/index'
-import { IconBrain, IconChat, IconChevronRight, IconClose, IconDesktop, IconDownload, IconEdit, IconExternal, IconFluid, IconMobile, IconRefresh, IconSparkle, IconTablet } from './icons'
+import { IconBrain, IconChat, IconCheck, IconChevronRight, IconClose, IconDesktop, IconDownload, IconEdit, IconExternal, IconFluid, IconFolder, IconMobile, IconRefresh, IconSparkle, IconTablet } from './icons'
 import { PencilThinking, pickAnimationForKind } from './PencilThinking'
 import { MotionTimeline } from './MotionTimeline'
 import { MOTION_PRESETS, presetSpec, generateMotionCss, type MotionSpec } from '../lib/motionCss'
@@ -1479,6 +1479,10 @@ function ExportMenu({ designId, disabled }: { designId: string; disabled: boolea
   // populates the real list. Avoids briefly showing HTML when the kind
   // actually supports more (or fewer) formats.
   const [formats, setFormats] = useState<Array<'html' | 'pdf' | 'png' | 'pptx'>>([])
+  // A finished export used to be a line of chat text and nothing else, so the
+  // file it wrote was only findable by reading a path and going looking for it.
+  // This holds the last success long enough to offer a way straight to it.
+  const [done, setDone] = useState<{ path: string; label: string } | null>(null)
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -1497,13 +1501,25 @@ function ExportMenu({ designId, disabled }: { designId: string; disabled: boolea
     return () => document.removeEventListener('mousedown', onDoc)
   }, [open])
 
+  // The confirmation is a claim about a file on disk, so it stops being true
+  // as soon as the design changes underneath it.
+  useEffect(() => { setDone(null) }, [designId])
+
+  useEffect(() => {
+    if (!done) return
+    const t = setTimeout(() => setDone(null), 12000)
+    return () => clearTimeout(t)
+  }, [done])
+
   const doExport = async (fmt: 'html' | 'pdf' | 'png' | 'pptx'): Promise<void> => {
     setOpen(false)
+    setDone(null)
     setBusy(true)
     const fmtLabel = FORMAT_LABEL[fmt] ?? fmt.toUpperCase()
     try {
       const res = await window.terminal42.designs.export(designId, fmt)
       if (res.ok) {
+        setDone({ path: res.path, label: fmtLabel.replace(/^Export as /, '') })
         // Show the saved path so the user knows where to find the file
         // (and that the export actually succeeded). Truncate the home
         // directory prefix for readability.
@@ -1558,6 +1574,30 @@ function ExportMenu({ designId, disabled }: { designId: string; disabled: boolea
               <span className="text-text-secondary">{FORMAT_LABEL[f] ?? f.toUpperCase()}</span>
             </button>
           ))}
+        </div>
+      )}
+      {done && !open && (
+        <div className="absolute right-0 top-full z-30 mt-1 flex min-w-[220px] max-w-[320px] items-center gap-2 rounded-md bg-raised p-2 shadow-overlay">
+          <IconCheck size={12} className="shrink-0 text-accent" />
+          <span className="min-w-0 flex-1 truncate text-[11.5px] text-text-secondary" title={done.path}>
+            {done.label} · {done.path.split('/').pop()}
+          </span>
+          <button
+            type="button"
+            onClick={() => { void window.terminal42.system.revealFolder(done.path); setDone(null) }}
+            className="flex h-6 shrink-0 items-center gap-1 rounded px-1.5 text-[11px] text-text-secondary hover:bg-elevated hover:text-text-primary"
+          >
+            <IconFolder size={11} />
+            <span>Show</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setDone(null)}
+            aria-label="Dismiss export confirmation"
+            className="grid h-6 w-6 shrink-0 place-items-center rounded text-text-muted hover:bg-elevated hover:text-text-primary"
+          >
+            <IconClose size={9} />
+          </button>
         </div>
       )}
     </div>

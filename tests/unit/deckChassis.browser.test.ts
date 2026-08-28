@@ -16,6 +16,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import type { Browser, Page } from 'playwright'
 import { buildDeckBaseBlock } from '../../src/main/deckChassis'
+import { EXPORT_PREP_JS, SLIDE_COUNT_JS, showSlideJs, IS_CHASSIS_JS } from '../../src/main/deckCapture'
 
 let browser: Browser | null = null
 let page: Page | null = null
@@ -313,6 +314,108 @@ describe.runIf(process.env.SKIP_BROWSER_TESTS !== '1')('the deck chassis in a br
     await p.click('.detail-close')
     await p.waitForTimeout(400)
     expect(await p.$eval('.deck-num', (e) => e.textContent)).toBe(atTile)
+  })
+
+  // Everything below is the export path. It runs in Electron rather than
+  // Playwright in production, but it is page script either way, and the
+  // failure it exists to prevent — a PowerPoint of blank slides — is only
+  // visible once a real engine has laid the deck out.
+  it_('recognises a chassis deck', async (p) => {
+    await load(p)
+    expect(await p.evaluate(IS_CHASSIS_JS)).toBe(true)
+    await p.setContent('<body><section>Not a deck</section></body>')
+    expect(await p.evaluate(IS_CHASSIS_JS)).toBe(false)
+  })
+
+  it_('counts the slides an export has to produce', async (p) => {
+    await load(p)
+    expect(await p.evaluate(SLIDE_COUNT_JS)).toBe(10)
+  })
+
+  it_('leaves every slide fully painted once prepared for export', async (p) => {
+    // This is the bug in full: without the prep, only the slide that happens
+    // to be in view has any opacity, so the deck exports as one picture and
+    // nine blanks.
+    await load(p)
+    const bare = await p.$$eval('.slide > .inner', (els) =>
+      els.filter((e) => Number(getComputedStyle(e).opacity) > 0.9).length)
+    expect(bare).toBe(1)
+
+    expect(await p.evaluate(EXPORT_PREP_JS)).toBe(true)
+    await p.waitForTimeout(120)
+    const prepped = await p.$$eval('.slide > .inner', (els) =>
+      els.map((e) => ({ o: getComputedStyle(e).opacity, t: getComputedStyle(e).transform })))
+    for (const [i, r] of prepped.entries()) {
+      expect(Number(r.o), `slide ${i} opacity`).toBeGreaterThan(0.99)
+      expect(r.t, `slide ${i} transform`).toBe('none')
+    }
+    // The words of a headline are held below their masks until they arrive.
+    const words = await p.$$eval('.display .w', (els) =>
+      els.every((e) => getComputedStyle(e).transform === 'none' && Number(getComputedStyle(e).opacity) > 0.99))
+    expect(words).toBe(true)
+  })
+
+  it_('keeps a bar chart standing up in an export', async (p) => {
+    // The generic "no transforms" rule would flatten a bar to nothing,
+    // because a bar is drawn by scaling it up.
+    await load(p)
+    await p.evaluate(EXPORT_PREP_JS)
+    await p.evaluate(showSlideJs(2))
+    await p.waitForTimeout(150)
+    const hs = await p.$$eval('.slide[data-ground="invert"] .bar > .col',
+      (c) => c.map((x) => x.getBoundingClientRect().height))
+    expect(Math.min(...hs)).toBeGreaterThan(20)
+    expect(hs[2]).toBeGreaterThan(hs[0])
+  })
+
+  it_('hides the things that only mean something to a mouse', async (p) => {
+    await load(p)
+    await p.evaluate(EXPORT_PREP_JS)
+    await p.waitForTimeout(100)
+    for (const sel of ['.nav-cluster', '.tile-detail', '.carousel-bar']) {
+      expect(await p.$eval(sel, (e) => getComputedStyle(e).display), sel).toBe('none')
+    }
+    // The frame stays: brand, slide number and footnote belong on the slide.
+    expect(await p.$eval('.frame', (e) => getComputedStyle(e).display)).not.toBe('none')
+  })
+
+  it_('walks the deck one distinct slide at a time', async (p) => {
+    // The old exporter called window.scrollTo, which does nothing to a scroll
+    // container, so every capture was the same frame.
+    await load(p)
+    await p.evaluate(EXPORT_PREP_JS)
+    const seen: string[] = []
+    for (let i = 0; i < 10; i++) {
+      expect(await p.evaluate(showSlideJs(i)), `step ${i}`).toBe(true)
+      await p.waitForTimeout(120)
+      seen.push(await p.evaluate(() => {
+        const d = document.querySelector('.deck') as HTMLElement
+        const s = document.querySelector('.slide.in-view') as HTMLElement
+        return `${Math.round(d.scrollLeft)}:${s.dataset.title}:${document.querySelector('.deck-num')?.textContent}`
+      }))
+    }
+    expect(new Set(seen).size).toBe(10)
+    expect(seen[0]).toBe('0:Cover:[01]')
+    expect(seen[9]).toBe('11520:Recap:[10]')
+  })
+
+  it_('asks for a slide that is not there without throwing', async (p) => {
+    await load(p)
+    await p.evaluate(EXPORT_PREP_JS)
+    expect(await p.evaluate(showSlideJs(99))).toBe(false)
+  })
+
+  it_('prepares a plain stack of sections too', async (p) => {
+    // Not every deck in the library was generated against the chassis.
+    await p.setContent(`<body style="margin:0">
+      <section class="slide" style="height:720px">One</section>
+      <section class="slide" style="height:720px">Two</section>
+      <section class="slide" style="height:720px">Three</section></body>`)
+    expect(await p.evaluate(SLIDE_COUNT_JS)).toBe(3)
+    expect(await p.evaluate(EXPORT_PREP_JS)).toBe(true)
+    await p.evaluate(showSlideJs(2))
+    await p.waitForTimeout(120)
+    expect(await p.evaluate(() => Math.round(window.scrollY))).toBe(1440)
   })
 
   it_('reads on a light house as well as a dark one', async (p) => {

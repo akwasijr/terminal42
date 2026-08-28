@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow, shell, dialog } from 'electron'
+import { ipcMain, BrowserWindow, shell, dialog, app } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { promises as fs, watch as fsWatch, type FSWatcher, existsSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -20,6 +20,13 @@ import { buildEngineBaseBlock, ENGINE_USAGE, ENGINE_BASE_ID, ENGINE_MOTION_ID } 
 import { pickVariety } from './designVariety'
 import { pickDeckStyle } from './deckStyles'
 import { buildDeckBaseBlock, DECK_USAGE, DECK_BASE_ID, DECK_RUNTIME_ID } from './deckChassis'
+import {
+  EXPORT_PREP_JS,
+  SLIDE_COUNT_JS,
+  showSlideJs,
+  buildSlidePdfHtml,
+  DECK_CAPTURE_SIZE
+} from './deckCapture'
 import {
   type ExportFormat,
   extFor,
@@ -1441,6 +1448,40 @@ async function renderHtmlOffscreen<T>(
 }
 
 
+/** The kinds that are decks, whatever the brief's group says. */
+const DECK_KINDS = new Set(['pitch-deck', 'sales-deck', 'talk-slides', 'workshop-deck'])
+
+/**
+ * One PNG per slide, at the deck's native size.
+ *
+ * The old path scrolled the *window* and waited 80ms. A chassis deck scrolls
+ * a container, and its slides are transparent until they arrive, so that
+ * produced the same blank frame once per slide. Here the page is put into an
+ * export mode first — transitions frozen, reveals forced, chrome hidden —
+ * and then walked one slide at a time.
+ */
+async function captureDeckSlides(htmlPath: string): Promise<Buffer[]> {
+  return renderHtmlOffscreen(htmlPath, DECK_CAPTURE_SIZE, async (wc) => {
+    await wc.executeJavaScript(EXPORT_PREP_JS)
+    const count = Number(await wc.executeJavaScript(SLIDE_COUNT_JS)) || 0
+    if (!count) {
+      const img = await wc.capturePage()
+      return [img.toPNG()]
+    }
+    const out: Buffer[] = []
+    for (let i = 0; i < count; i++) {
+      const ok = await wc.executeJavaScript(showSlideJs(i))
+      if (!ok) continue
+      // Nothing is animating any more, so this is a paint, not a settle.
+      await new Promise((r) => setTimeout(r, 120))
+      const img = await wc.capturePage()
+      out.push(img.toPNG())
+    }
+    return out
+  })
+}
+
+
 async function exportLatest(
   designId: string,
   format: ExportFormat
@@ -1470,6 +1511,65 @@ async function exportLatest(
     // formats we already constrain the artboard inside the HTML, so a
     // generous canvas is fine.
     const viewport = viewportForKind(d.brief?.kind)
+    const isDeck = d.brief?.group === 'presentation' || DECK_KINDS.has(d.brief?.kind ?? '')
+
+    // Decks are photographed slide by slide, whatever the format asks for.
+    // Everything downstream — PowerPoint, a paginated PDF, a cover image —
+    // is the same set of pictures arranged differently.
+    if (isDeck) {
+      const shots = await captureDeckSlides(latest.filePath)
+      if (!shots.length) return { ok: false, error: 'That deck has no slides to export.' }
+
+      if (format === 'png') {
+        // One picture of a deck can only be its cover.
+        await fs.writeFile(out, shots[0])
+        return { ok: true, path: out }
+      }
+
+      if (format === 'pptx') {
+        const pptxgen = (await import('pptxgenjs')).default
+        const pres = new pptxgen()
+        pres.layout = 'LAYOUT_WIDE' // 13.3 × 7.5 in (16:9)
+        for (const buf of shots) {
+          const s = pres.addSlide()
+          s.addImage({
+            data: `data:image/png;base64,${buf.toString('base64')}`,
+            x: 0, y: 0, w: '100%', h: '100%'
+          })
+        }
+        await pres.writeFile({ fileName: out })
+        return { ok: true, path: out }
+      }
+
+      if (format === 'pdf') {
+        // Chromium will not paginate the deck itself: it is one viewport
+        // tall with overflow hidden, so it prints as a single page of
+        // whichever slide was showing. A plain document of one image per
+        // page is the only way the page count matches the deck.
+        const doc = buildSlidePdfHtml(
+          shots.map((b) => `data:image/png;base64,${b.toString('base64')}`),
+          DECK_CAPTURE_SIZE
+        )
+        const tmp = join(app.getPath('temp'), `deck-print-${Date.now()}.html`)
+        await fs.writeFile(tmp, doc, 'utf8')
+        try {
+          const pdf = await renderHtmlOffscreen(tmp, DECK_CAPTURE_SIZE, (wc) =>
+            wc.printToPDF({
+              printBackground: true,
+              pageSize: {
+                width: DECK_CAPTURE_SIZE.width / 96,
+                height: DECK_CAPTURE_SIZE.height / 96
+              },
+              margins: { top: 0, bottom: 0, left: 0, right: 0 }
+            })
+          )
+          await fs.writeFile(out, pdf)
+        } finally {
+          try { await fs.unlink(tmp) } catch {}
+        }
+        return { ok: true, path: out }
+      }
+    }
 
     if (format === 'pdf') {
       const pdf = await renderHtmlOffscreen(latest.filePath, viewport, (wc) =>
@@ -1490,55 +1590,6 @@ async function exportLatest(
         return img.toPNG()
       })
       await fs.writeFile(out, png)
-      return { ok: true, path: out }
-    }
-
-    if (format === 'pptx') {
-      // Take one PNG per <section class="slide"> and stitch into a deck.
-      // We resize the BrowserWindow to each slide's bounding box.
-      const pptxgen = (await import('pptxgenjs')).default
-      const pres = new pptxgen()
-      pres.layout = 'LAYOUT_WIDE' // 13.3 × 7.5 in (16:9)
-
-      const slides = await renderHtmlOffscreen(latest.filePath, { width: 1280, height: 720 }, async (wc) => {
-        // Pull bounding rects for every .slide section
-        const rects = (await wc.executeJavaScript(`
-          (() => {
-            const out = [];
-            document.querySelectorAll('section.slide, .slide, [data-slide]').forEach((el) => {
-              const r = el.getBoundingClientRect();
-              out.push({ x: r.x, y: r.y, w: r.width, h: r.height });
-            });
-            return out;
-          })()
-        `)) as Array<{ x: number; y: number; w: number; h: number }>
-        if (!rects.length) {
-          // Fallback: capture whole page as one slide.
-          const img = await wc.capturePage()
-          return [{ buf: img.toPNG(), w: img.getSize().width, h: img.getSize().height }]
-        }
-        const out: Array<{ buf: Buffer; w: number; h: number }> = []
-        for (const r of rects) {
-          // Scroll the slide to the top of the viewport so capturePage gets it
-          await wc.executeJavaScript(`window.scrollTo(${r.x}, ${r.y})`)
-          await new Promise((res) => setTimeout(res, 80))
-          const img = await wc.capturePage({
-            x: 0, y: 0,
-            width: Math.round(r.w),
-            height: Math.round(r.h)
-          })
-          out.push({ buf: img.toPNG(), w: img.getSize().width, h: img.getSize().height })
-        }
-        return out
-      })
-
-      for (const slide of slides) {
-        const s = pres.addSlide()
-        const dataUrl = `data:image/png;base64,${slide.buf.toString('base64')}`
-        s.addImage({ data: dataUrl, x: 0, y: 0, w: '100%', h: '100%' })
-      }
-      // pptxgen writeFile returns the actual saved name.
-      await pres.writeFile({ fileName: out })
       return { ok: true, path: out }
     }
 
