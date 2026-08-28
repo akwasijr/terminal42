@@ -445,6 +445,89 @@ export type CardOverride = {
   imageId?: string
 }
 
+/**
+ * The outlines a shape or a picture mask can take.
+ *
+ * A fixed set rather than an arbitrary path. Every reference these templates
+ * are built from uses one of these six, and a general path editor would be a
+ * much larger thing to build, learn and animate for no gain here. If a
+ * seventh is ever genuinely needed it is one entry and one case.
+ */
+export const SHAPE_KINDS = ['rect', 'ellipse', 'pill', 'half', 'arch', 'triangle'] as const
+export type ShapeKind = (typeof SHAPE_KINDS)[number]
+
+/**
+ * A flat block of colour over the frame.
+ *
+ * The motion engine arranges cards in space; it had no way to put a plain
+ * panel behind or beside them. Every 2D composition — a colour field with
+ * type on it, a band across the foot of the frame — needed one, so it was
+ * being faked with cards that had no picture, which then obeyed the
+ * component's arrangement instead of staying where they were put.
+ *
+ * Placed and sized as a percentage of the frame, like text and logos, so it
+ * lands in the same spot at every export size.
+ */
+export type ShapeLayer = {
+  id: string
+  kind: ShapeKind
+  /** Width as a percentage of the frame's width. */
+  width: number
+  /** Height as a percentage of the frame's height. */
+  height: number
+  x: number
+  y: number
+  /** Degrees clockwise, about the shape's own centre. */
+  rotation: number
+  colour: string
+  opacity: number
+  /** Corner radius as a percentage of the shorter side. Rectangles only. */
+  corner?: number
+  /** When in the loop this layer is on screen. See TextLayer.from. */
+  from?: number
+  to?: number
+  fade?: number
+}
+
+/** Whether a picture fills its mask or fits inside it. */
+export type PictureFit = 'cover' | 'contain'
+
+/**
+ * A photograph placed flat on the frame, cut to a shape.
+ *
+ * Distinct from a logo, which is a mark drawn at its own aspect ratio and
+ * never cropped. A picture has a frame of its own that it is cut to fit, and
+ * that cut is most of what makes these compositions look composed.
+ *
+ * The image is optional. A template has to be able to say "a portrait goes
+ * here" before anyone has chosen one, and drawing a labelled placeholder is
+ * more use than drawing nothing at all — nothing at all is indistinguishable
+ * from a layer that is broken.
+ */
+export type PictureLayer = {
+  id: string
+  imageId?: string
+  /** What the picture is cut to. */
+  mask: ShapeKind
+  /** Width as a percentage of the frame's width. */
+  width: number
+  /** Height as a percentage of the frame's height. */
+  height: number
+  x: number
+  y: number
+  rotation: number
+  opacity: number
+  fit: PictureFit
+  /** Corner radius as a percentage of the shorter side. Rectangles only. */
+  corner?: number
+  /** Words drawn in the placeholder, so an empty slot says what belongs in it. */
+  placeholder?: string
+  /** When in the loop this layer is on screen. See TextLayer.from. */
+  from?: number
+  to?: number
+  fade?: number
+}
+
 export type VisualState = {
   card: CardStyle
   images: ImageRef[]
@@ -452,6 +535,16 @@ export type VisualState = {
   imageOrder: 'in-order' | 'scatter'
   text: TextLayer[]
   logos: LogoLayer[]
+  /**
+   * Blocks of colour, drawn under the cards.
+   *
+   * Optional because documents are stored as written and there is no
+   * migration step: a piece made before these existed simply has none, which
+   * is the truth about it rather than a gap to be filled in.
+   */
+  shapes?: ShapeLayer[]
+  /** Photographs cut to a shape, drawn under the cards. See shapes. */
+  pictures?: PictureLayer[]
   effects: EffectsState
 }
 
@@ -591,4 +684,19 @@ export type MotionComponent = {
   cardCount: (params: Record<string, ParamValue>) => number
   schema: ParamSpec[]
   layout: (phase: number, index: number, count: number, params: Record<string, ParamValue>) => CardPlacement
+}
+
+/**
+ * What each outline is called, in the words the panel uses.
+ *
+ * Kept beside the kinds so a new outline cannot be added without being given
+ * a name — an unnamed entry in a picker is a bug that ships quietly.
+ */
+export const SHAPE_LABELS: Record<ShapeKind, string> = {
+  rect: 'Rectangle',
+  ellipse: 'Ellipse',
+  pill: 'Pill',
+  half: 'Half circle',
+  arch: 'Arch',
+  triangle: 'Triangle'
 }

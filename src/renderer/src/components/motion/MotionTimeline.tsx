@@ -14,8 +14,10 @@
 // nothing in this app is divided by a line.
 
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
-import type { LogoLayer, MotionDoc, TextLayer } from '../../../../shared/motion/types'
-import { FRAME_RATES } from '../../../../shared/motion/types'
+import type {
+  LogoLayer, MotionDoc, PictureLayer, ShapeLayer, TextLayer
+} from '../../../../shared/motion/types'
+import { FRAME_RATES, SHAPE_LABELS } from '../../../../shared/motion/types'
 import { componentFor } from '../../../../shared/motion/registry'
 import { layerVisibility } from '../../../../shared/motion/frame'
 import {
@@ -57,23 +59,31 @@ export function MotionTimeline({
 
   const text = doc.visual.text
   const logos = doc.visual.logos
-  const layerCount = text.length + logos.length + targets.length + 1
+  const shapes = doc.visual.shapes ?? []
+  const pictures = doc.visual.pictures ?? []
+  const layerCount = text.length + logos.length + shapes.length + pictures.length + targets.length + 1
 
   // A track belongs to the layer it drives. Any left over drives a layer that
   // has since been deleted — it still applies, so it still has to be listed.
+  const owners: Record<string, ReadonlyArray<{ id: string }>> = {
+    text, logo: logos, shape: shapes, picture: pictures
+  }
   const orphans = targets.filter((t) => {
     const [kind, rest] = splitOnce(t)
-    if (kind !== 'text' && kind !== 'logo') return kind !== 'param' && kind !== 'pose' && kind !== 'fx'
+    const list = owners[kind]
+    if (!list) return kind !== 'param' && kind !== 'pose' && kind !== 'fx'
     const [id] = splitOnce(rest)
-    return kind === 'text'
-      ? !text.some((l) => l.id === id)
-      : !logos.some((l) => l.id === id)
+    return !list.some((l) => l.id === id)
   })
 
   const setText = (id: string, patch: Partial<TextLayer>): void =>
     onChange({ visual: { ...doc.visual, text: text.map((t) => (t.id === id ? { ...t, ...patch } : t)) } })
   const setLogo = (id: string, patch: Partial<LogoLayer>): void =>
     onChange({ visual: { ...doc.visual, logos: logos.map((l) => (l.id === id ? { ...l, ...patch } : l)) } })
+  const setShape = (id: string, patch: Partial<ShapeLayer>): void =>
+    onChange({ visual: { ...doc.visual, shapes: shapes.map((l) => (l.id === id ? { ...l, ...patch } : l)) } })
+  const setPicture = (id: string, patch: Partial<PictureLayer>): void =>
+    onChange({ visual: { ...doc.visual, pictures: pictures.map((l) => (l.id === id ? { ...l, ...patch } : l)) } })
 
   return (
     <div className="mx-3 mb-2 flex shrink-0 flex-col gap-1 rounded-panel bg-elevated p-2">
@@ -115,6 +125,60 @@ export function MotionTimeline({
               onKeys={(next) => onChange({ keys: next })}
               nested
             />
+          ))}
+
+          {shapes.length + pictures.length > 0 ? <GroupLabel>Scenery</GroupLabel> : null}
+          {shapes.map((sh) => (
+            <Fragment key={sh.id}>
+              <LayerRow
+                label={SHAPE_LABELS[sh.kind]}
+                kind="Shape"
+                span={sh}
+                phase={phase}
+                onSpan={(patch) => setShape(sh.id, patch)}
+                selected={samePick(selected, { kind: 'shape', id: sh.id })}
+                onSelect={onSelect ? () => onSelect({ kind: 'shape', id: sh.id }) : undefined}
+                onRemove={onRemove ? () => onRemove({ kind: 'shape', id: sh.id }) : undefined}
+              />
+              {tracksOf(targets, `shape:${sh.id}`).map((target) => (
+                <TrackRow
+                  key={target}
+                  label={fieldLabel(doc, target)}
+                  target={target}
+                  keys={keys}
+                  phase={phase}
+                  onPhase={onPhase}
+                  onKeys={(next) => onChange({ keys: next })}
+                  nested
+                />
+              ))}
+            </Fragment>
+          ))}
+          {pictures.map((pic) => (
+            <Fragment key={pic.id}>
+              <LayerRow
+                label={pic.imageId ? 'Picture' : `${pic.placeholder ?? 'Picture'} (empty)`}
+                kind="Picture"
+                span={pic}
+                phase={phase}
+                onSpan={(patch) => setPicture(pic.id, patch)}
+                selected={samePick(selected, { kind: 'picture', id: pic.id })}
+                onSelect={onSelect ? () => onSelect({ kind: 'picture', id: pic.id }) : undefined}
+                onRemove={onRemove ? () => onRemove({ kind: 'picture', id: pic.id }) : undefined}
+              />
+              {tracksOf(targets, `picture:${pic.id}`).map((target) => (
+                <TrackRow
+                  key={target}
+                  label={fieldLabel(doc, target)}
+                  target={target}
+                  keys={keys}
+                  phase={phase}
+                  onPhase={onPhase}
+                  onKeys={(next) => onChange({ keys: next })}
+                  nested
+                />
+              ))}
+            </Fragment>
           ))}
 
           {text.length > 0 ? <GroupLabel>Type</GroupLabel> : null}
@@ -724,7 +788,7 @@ function tracksOf(targets: readonly TrackTarget[], owner: string): TrackTarget[]
  */
 function fieldLabel(doc: MotionDoc, target: TrackTarget): string {
   const [kind, rest] = splitOnce(target)
-  if (kind === 'text' || kind === 'logo') {
+  if (kind === 'text' || kind === 'logo' || kind === 'shape' || kind === 'picture') {
     const [, field] = splitOnce(rest)
     const name = FIELD_LABELS[field] ?? field
     return name.charAt(0).toUpperCase() + name.slice(1)
@@ -747,11 +811,18 @@ export function trackLabel(doc: MotionDoc, target: TrackTarget): string {
   }
   if (kind === 'pose') return POSE_LABELS[rest] ?? `Pose ${rest}`
   if (kind === 'fx') return FX_LABELS[rest] ?? rest
-  if (kind === 'text' || kind === 'logo') {
+  if (kind === 'text' || kind === 'logo' || kind === 'shape' || kind === 'picture') {
     const [id, field] = splitOnce(rest)
     const name = kind === 'text'
       ? doc.visual.text.find((t) => t.id === id)?.text.trim().split('\n')[0]
-      : `Logo ${doc.visual.logos.findIndex((l) => l.id === id) + 1}`
+      : kind === 'shape'
+        ? (() => {
+            const sh = (doc.visual.shapes ?? []).find((l) => l.id === id)
+            return sh ? SHAPE_LABELS[sh.kind] : undefined
+          })()
+        : kind === 'picture'
+          ? 'Picture'
+          : `Logo ${doc.visual.logos.findIndex((l) => l.id === id) + 1}`
     // The layer's own words are the best name it has; the field is what
     // tells two tracks on the same layer apart.
     return `${(name || 'Layer').slice(0, 14)} ${FIELD_LABELS[field] ?? field}`
@@ -766,7 +837,8 @@ const FX_LABELS: Record<string, string> = {
 }
 
 const FIELD_LABELS: Record<string, string> = {
-  size: 'size', x: 'across', y: 'down', opacity: 'opacity', tracking: 'tracking'
+  size: 'size', x: 'across', y: 'down', opacity: 'opacity', tracking: 'tracking',
+  width: 'width', height: 'height', rotation: 'turn'
 }
 
 const POSE_LABELS: Record<string, string> = {

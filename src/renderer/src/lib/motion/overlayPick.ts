@@ -25,6 +25,8 @@ export type Pick =
   | { kind: 'card'; index: number }
   | { kind: 'text'; id: string }
   | { kind: 'logo'; id: string }
+  | { kind: 'shape'; id: string }
+  | { kind: 'picture'; id: string }
 
 export type Box = { x: number; y: number; w: number; h: number }
 
@@ -98,6 +100,23 @@ export function logoBox(
   return { x: (layer.x / 100) * width - w / 2, y: (layer.y / 100) * height - h / 2, w, h }
 }
 
+/**
+ * The box a shape or picture occupies.
+ *
+ * Rotation is left out on purpose: the marquee marks where the layer is so it
+ * can be grabbed, and an upright box round a tilted panel is easier to hit
+ * than a tilted one, at the cost of a little slack at the corners.
+ */
+function flatBox(
+  layer: { width: number; height: number; x: number; y: number },
+  width: number,
+  height: number
+): Box {
+  const w = (layer.width / 100) * width
+  const h = (layer.height / 100) * height
+  return { x: (layer.x / 100) * width - w / 2, y: (layer.y / 100) * height - h / 2, w, h }
+}
+
 /** Every flat layer's box, in the order they are painted: first is furthest back. */
 export function overlayBoxes(
   ctx: CanvasRenderingContext2D,
@@ -108,6 +127,16 @@ export function overlayBoxes(
   phase: number
 ): Array<{ pick: Pick; box: Box }> {
   const out: Array<{ pick: Pick; box: Box }> = []
+  // Scenery first, because it is painted first: the list is back to front, so
+  // a click that lands on a caption over a colour panel picks the caption.
+  for (const sh of doc.visual.shapes ?? []) {
+    if (layerVisibility(sh, phase) <= 0) continue
+    out.push({ pick: { kind: 'shape', id: sh.id }, box: flatBox(sh, width, height) })
+  }
+  for (const pic of doc.visual.pictures ?? []) {
+    if (layerVisibility(pic, phase) <= 0) continue
+    out.push({ pick: { kind: 'picture', id: pic.id }, box: flatBox(pic, width, height) })
+  }
   for (const t of doc.visual.text) {
     const box = textBox(ctx, t, width, height, phase)
     if (box) out.push({ pick: { kind: 'text', id: t.id }, box })

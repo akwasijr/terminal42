@@ -7,7 +7,9 @@
 // looking at. A grid drawn as scene geometry would have needed its own
 // perspective handling and would not have matched.
 
-import type { FrameStyle, LogoLayer, MotionDoc, TextLayer } from '../../../../shared/motion/types'
+import type {
+  FrameStyle, LogoLayer, MotionDoc, PictureLayer, ShapeKind, ShapeLayer, TextLayer
+} from '../../../../shared/motion/types'
 import { resolvedText } from '../../../../shared/motion/types'
 import { clipTimeline } from '../../../../shared/motion/entrance'
 import { layerVisibility } from '../../../../shared/motion/frame'
@@ -198,4 +200,203 @@ export function describeOutput(
     `${seconds.toFixed(1)}s`,
     doc.frame.aspect
   ].join(' · ')
+}
+
+/**
+ * A shape's outline, in the box it occupies, ready to fill or clip with.
+ *
+ * One function so a block of colour and the cut on a picture cannot drift
+ * apart: a half-circle panel and a half-circle photo beside it have to be the
+ * same half-circle or the composition falls over.
+ *
+ * The box is given as a centre and a size because that is how every layer in
+ * this app is placed — from the middle out, as a fraction of the frame — and
+ * converting to corners at each call site is where sign errors live.
+ */
+export function shapePath(
+  ctx: CanvasRenderingContext2D,
+  kind: ShapeKind,
+  cx: number,
+  cy: number,
+  w: number,
+  h: number,
+  cornerPct = 0
+): void {
+  const x = cx - w / 2
+  const y = cy - h / 2
+  ctx.beginPath()
+  switch (kind) {
+    case 'ellipse':
+      ctx.ellipse(cx, cy, w / 2, h / 2, 0, 0, Math.PI * 2)
+      break
+    case 'pill': {
+      // A pill's ends are always semicircles, so its radius is half the
+      // shorter side and no setting can make it anything else.
+      const r = Math.min(w, h) / 2
+      ctx.roundRect(x, y, w, h, r)
+      break
+    }
+    case 'half':
+      // A half-circle sitting on its flat edge: the arc across the top, then
+      // straight along the bottom. Drawn to fill the box rather than as a
+      // true half of a circle, so it can be stretched like everything else.
+      ctx.moveTo(x, y + h)
+      ctx.lineTo(x, y + h)
+      ctx.ellipse(cx, y + h, w / 2, h, Math.PI, 0, Math.PI * 2, false)
+      ctx.closePath()
+      break
+    case 'arch': {
+      // Straight sides up to a semicircular head — a doorway. The head takes
+      // half the width, so a tall arch has long sides and a square one is
+      // nearly a half-circle, which is how arches actually behave.
+      const r = Math.min(w / 2, h)
+      ctx.moveTo(x, y + h)
+      ctx.lineTo(x, y + r)
+      ctx.arc(cx, y + r, r, Math.PI, 0)
+      ctx.lineTo(x + w, y + h)
+      ctx.closePath()
+      break
+    }
+    case 'triangle':
+      ctx.moveTo(cx, y)
+      ctx.lineTo(x + w, y + h)
+      ctx.lineTo(x, y + h)
+      ctx.closePath()
+      break
+    case 'rect':
+    default: {
+      const r = Math.max(0, Math.min(50, cornerPct)) / 100 * Math.min(w, h)
+      if (r > 0) ctx.roundRect(x, y, w, h, r)
+      else ctx.rect(x, y, w, h)
+      break
+    }
+  }
+}
+
+/**
+ * Blocks of colour, under everything else on the flat layer.
+ *
+ * Under, because a shape is scenery: it is the thing type sits on and the
+ * thing a picture is placed against. A shape drawn over the type it was meant
+ * to back would hide it, and there is no arrangement of the panel in which
+ * that is what was wanted.
+ */
+export function drawShapes(
+  ctx: CanvasRenderingContext2D,
+  layers: ShapeLayer[],
+  width: number,
+  height: number,
+  phase = 0
+): void {
+  for (const layer of layers) {
+    const visible = layerVisibility(layer, phase)
+    if (visible <= 0 || layer.opacity <= 0) continue
+    const w = (layer.width / 100) * width
+    const h = (layer.height / 100) * height
+    if (w <= 0 || h <= 0) continue
+    ctx.save()
+    ctx.globalAlpha = Math.min(1, Math.max(0, layer.opacity / 100)) * visible
+    ctx.translate((layer.x / 100) * width, (layer.y / 100) * height)
+    if (layer.rotation) ctx.rotate((layer.rotation * Math.PI) / 180)
+    ctx.fillStyle = layer.colour
+    shapePath(ctx, layer.kind, 0, 0, w, h, layer.corner ?? 0)
+    ctx.fill()
+    ctx.restore()
+  }
+}
+
+/**
+ * Photographs cut to a shape.
+ *
+ * A slot with no picture in it draws as a marked placeholder rather than as
+ * nothing. Nothing is indistinguishable from a layer that has broken, and a
+ * template has to be able to say "a portrait goes here" before anyone has
+ * chosen one.
+ */
+export function drawPictures(
+  ctx: CanvasRenderingContext2D,
+  layers: PictureLayer[],
+  images: Map<string, HTMLImageElement>,
+  width: number,
+  height: number,
+  phase = 0
+): void {
+  for (const layer of layers) {
+    const visible = layerVisibility(layer, phase)
+    if (visible <= 0 || layer.opacity <= 0) continue
+    const w = (layer.width / 100) * width
+    const h = (layer.height / 100) * height
+    if (w <= 0 || h <= 0) continue
+    const img = layer.imageId ? images.get(layer.imageId) : undefined
+    const ready = img && img.complete && img.naturalWidth > 0
+
+    ctx.save()
+    ctx.globalAlpha = Math.min(1, Math.max(0, layer.opacity / 100)) * visible
+    ctx.translate((layer.x / 100) * width, (layer.y / 100) * height)
+    if (layer.rotation) ctx.rotate((layer.rotation * Math.PI) / 180)
+    shapePath(ctx, layer.mask, 0, 0, w, h, layer.corner ?? 0)
+
+    if (ready) {
+      ctx.clip()
+      // Cover fills the mask and loses the overflow; contain shows the whole
+      // picture and leaves the rest of the mask empty. Scaled from the centre
+      // either way, so changing the fit does not also move the subject.
+      const scale = layer.fit === 'contain'
+        ? Math.min(w / img.naturalWidth, h / img.naturalHeight)
+        : Math.max(w / img.naturalWidth, h / img.naturalHeight)
+      const dw = img.naturalWidth * scale
+      const dh = img.naturalHeight * scale
+      ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh)
+    } else {
+      drawPlaceholder(ctx, w, h, layer.placeholder ?? 'Picture')
+    }
+    ctx.restore()
+  }
+}
+
+/**
+ * What an empty picture slot looks like.
+ *
+ * Deliberately plain and obviously unfinished — a flat tint, a light rule
+ * corner to corner and the words for what belongs there. It has to read as a
+ * slot at a glance so that nobody exports one by accident, which a
+ * convincing grey rectangle would let them do.
+ *
+ * Assumes the path for the mask is already on the context, so the placeholder
+ * takes the shape of the slot rather than always being a rectangle.
+ */
+function drawPlaceholder(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  label: string
+): void {
+  ctx.save()
+  ctx.fillStyle = 'rgba(128,128,132,0.28)'
+  ctx.fill()
+  ctx.clip()
+  ctx.strokeStyle = 'rgba(128,128,132,0.5)'
+  ctx.lineWidth = Math.max(1, Math.min(w, h) * 0.005)
+  ctx.beginPath()
+  ctx.moveTo(-w / 2, -h / 2)
+  ctx.lineTo(w / 2, h / 2)
+  ctx.moveTo(w / 2, -h / 2)
+  ctx.lineTo(-w / 2, h / 2)
+  ctx.stroke()
+
+  const size = Math.max(9, Math.min(w, h) * 0.09)
+  ctx.font = `500 ${size}px "DM Sans", system-ui, sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  // A dark plate behind the words, because the slot sits on whatever the
+  // composition happens to be and pale text on a pale frame says nothing.
+  const pad = size * 0.5
+  const tw = ctx.measureText(label).width
+  ctx.fillStyle = 'rgba(20,20,22,0.72)'
+  ctx.beginPath()
+  ctx.roundRect(-tw / 2 - pad, -size * 0.8, tw + pad * 2, size * 1.6, size * 0.35)
+  ctx.fill()
+  ctx.fillStyle = 'rgba(255,255,255,0.92)'
+  ctx.fillText(label, 0, 0)
+  ctx.restore()
 }

@@ -8,8 +8,9 @@
 import type {
   AnimationState, CardOverride, ComponentId, DropShadowFx, EdgeAmounts, EdgeBlurFx, EdgeFalloff,
   EdgeShadeFx, EffectScope, EffectsState, EntranceShape, EntranceSpec, GlassFx, LogoLayer,
-  MotionDoc, ParamSpec, ParamValue, Wave
+  MotionDoc, ParamSpec, ParamValue, PictureLayer, ShapeKind, ShapeLayer, Wave
 } from './types'
+import { SHAPE_KINDS } from './types'
 import { defaultEntrance, ENTRANCE_SHAPES } from './entrance'
 import { wrap01 } from './math'
 
@@ -126,6 +127,8 @@ export function hydrateDoc(raw: unknown): MotionDoc {
       images: doc.visual?.images ?? [],
       text: doc.visual?.text ?? [],
       logos: hydrateLogos(doc.visual?.logos),
+      shapes: hydrateShapes(doc.visual?.shapes),
+      pictures: hydratePictures(doc.visual?.pictures),
       effects: hydrateEffects(doc.visual?.effects)
     },
     frame: { ...base.frame, ...(doc.frame ?? {}) },
@@ -436,6 +439,82 @@ function hydrateSpan(raw: Partial<Record<'from' | 'to' | 'fade', unknown>>): {
   if (to !== undefined) span.to = to
   if (fade !== undefined) span.fade = Math.min(0.5, fade)
   return span
+}
+
+/**
+ * Blocks of colour, with anything unusable dropped.
+ *
+ * A shape whose width did not survive being written to disk would come back
+ * as NaN, and a NaN width is a path the canvas silently declines to draw --
+ * the layer is listed in the timeline but nothing appears, which is the
+ * hardest kind of fault to look at and understand. Clamped instead.
+ *
+ * Absent rather than empty when there is nothing, so a piece made before
+ * scenery existed keeps saying so instead of gaining two empty arrays.
+ */
+function hydrateShapes(raw: unknown): ShapeLayer[] | undefined {
+  if (!Array.isArray(raw)) return undefined
+  const out: ShapeLayer[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const l = item as Partial<Record<keyof ShapeLayer, unknown>>
+    if (typeof l.id !== 'string') continue
+    out.push({
+      id: l.id,
+      kind: SHAPE_KINDS.includes(l.kind as ShapeKind) ? (l.kind as ShapeKind) : 'rect',
+      ...hydrateGeometry(l),
+      colour: typeof l.colour === 'string' ? l.colour : '#d8d3c8',
+      ...(typeof l.corner === 'number' && Number.isFinite(l.corner)
+        ? { corner: Math.min(50, Math.max(0, l.corner)) }
+        : {}),
+      ...hydrateSpan(l)
+    })
+  }
+  return out.length > 0 ? out : undefined
+}
+
+/** Pictures cut to a shape, with anything unusable dropped. See hydrateShapes. */
+function hydratePictures(raw: unknown): PictureLayer[] | undefined {
+  if (!Array.isArray(raw)) return undefined
+  const out: PictureLayer[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const l = item as Partial<Record<keyof PictureLayer, unknown>>
+    if (typeof l.id !== 'string') continue
+    out.push({
+      id: l.id,
+      // An unreadable image id becomes an empty slot rather than a broken
+      // reference, so the frame says what is missing instead of going blank.
+      ...(typeof l.imageId === 'string' && l.imageId ? { imageId: l.imageId } : {}),
+      mask: SHAPE_KINDS.includes(l.mask as ShapeKind) ? (l.mask as ShapeKind) : 'rect',
+      ...hydrateGeometry(l),
+      fit: l.fit === 'contain' ? 'contain' : 'cover',
+      ...(typeof l.corner === 'number' && Number.isFinite(l.corner)
+        ? { corner: Math.min(50, Math.max(0, l.corner)) }
+        : {}),
+      ...(typeof l.placeholder === 'string' ? { placeholder: l.placeholder } : {}),
+      ...hydrateSpan(l)
+    })
+  }
+  return out.length > 0 ? out : undefined
+}
+
+/** The box the two scenery layers share, clamped to something drawable. */
+function hydrateGeometry(l: Partial<Record<string, unknown>>): {
+  width: number; height: number; x: number; y: number; rotation: number; opacity: number
+} {
+  const num = (v: unknown, fallback: number, lo: number, hi: number): number =>
+    typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : fallback
+  return {
+    width: num(l.width, 40, 0, 400),
+    height: num(l.height, 30, 0, 400),
+    // Beyond the frame is allowed, because a panel sliding in from off-screen
+    // spends most of its time out there.
+    x: num(l.x, 50, -200, 300),
+    y: num(l.y, 50, -200, 300),
+    rotation: num(l.rotation, 0, -360, 360),
+    opacity: num(l.opacity, 100, 0, 100)
+  }
 }
 
 function hydrateLogos(raw: unknown): LogoLayer[] {

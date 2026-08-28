@@ -14,8 +14,10 @@
 // the image at all: a caption is not in the photograph.
 
 import type { MotionDoc } from '../../../../shared/motion/types'
-import { resolvedEffects, resolvedLogoLayers, resolvedTextLayers } from '../../../../shared/motion/frame'
-import { drawBackdrop, drawLogos, drawOverlay } from './backdrop'
+import {
+  resolvedEffects, resolvedLogoLayers, resolvedPictureLayers, resolvedShapeLayers, resolvedTextLayers
+} from '../../../../shared/motion/frame'
+import { drawBackdrop, drawLogos, drawOverlay, drawPictures, drawShapes } from './backdrop'
 import { beforeCardsFilter, drawEffects } from './effects'
 import {
   applyEdgeBlur, applyGlass, drawDropShadow, drawEdgeShade, edgeBlurActive
@@ -76,6 +78,11 @@ export function composeFrame(
     transparent: opts.transparent,
     showGrid: opts.showGrid ?? doc.frame.gridVisible
   })
+
+  // Scenery sits between the backdrop and the cards, matching the screen,
+  // where it is painted on the canvas underneath the WebGL layer.
+  drawShapes(ctx, resolvedShapeLayers(doc, phase), width, height, phase)
+  drawPictures(ctx, resolvedPictureLayers(doc, phase), opts.images ?? new Map(), width, height, phase)
 
   drawDropShadow(ctx, cards, fx.dropShadow, width, height)
 

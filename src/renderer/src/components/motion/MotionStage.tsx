@@ -10,12 +10,14 @@ import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type
 import type { CardOverride, MotionDoc } from '../../../../shared/motion/types'
 import {
   cardCountFor, emptyOverride, hasEffectKeys, hasLayerKeys, layerVisibility,
-  resolvedEffects, resolvedLogoLayers, resolvedTextLayers
+  resolvedEffects, resolvedLogoLayers, resolvedPictureLayers, resolvedShapeLayers, resolvedTextLayers
 } from '../../../../shared/motion/frame'
 import { placementsAt, totalDuration } from '../../../../shared/motion/entrance'
 import type { FrameFit } from './FrameToolbar'
 import { MotionEngine } from '../../lib/motion/engine'
-import { drawBackdrop, drawLogos, drawOverlay, FRAME_ASPECT_RATIO } from '../../lib/motion/backdrop'
+import {
+  drawBackdrop, drawLogos, drawOverlay, drawPictures, drawShapes, FRAME_ASPECT_RATIO
+} from '../../lib/motion/backdrop'
 import { beforeCardsFilter, drawEffects } from '../../lib/motion/effects'
 import { composeFrame, releaseComposeScratch } from '../../lib/motion/compose'
 import { needsPixelPass, releaseFxScratches } from '../../lib/motion/frameFx'
@@ -210,7 +212,15 @@ export function MotionStage({
       back.width = Math.round(size.width * dpr)
       back.height = Math.round(size.height * dpr)
       const ctx = back.getContext('2d')
-      if (ctx) drawBackdrop(ctx, doc.frame, back.width, back.height)
+      if (ctx) {
+        drawBackdrop(ctx, doc.frame, back.width, back.height)
+        // Scenery goes on the backdrop, below the WebGL canvas, because a
+        // block of colour is the thing cards and type sit on. Drawn on the
+        // overlay it would cover the very things it was put there to back.
+        const bp = phaseRef.current
+        drawShapes(ctx, resolvedShapeLayers(doc, bp), back.width, back.height, bp)
+        drawPictures(ctx, resolvedPictureLayers(doc, bp), images, back.width, back.height, bp)
+      }
     }
     const fx = fxRef.current
     if (fx && size.width > 0) {
@@ -235,7 +245,8 @@ export function MotionStage({
         if (box) drawPickOutline(ctx, box, accentRef.current)
       }
     }
-  }, [size, ready, fontTick, visTick, selected, doc.frame, doc.visual.text, doc.visual.logos, doc.visual.effects, images])
+  }, [size, ready, fontTick, visTick, selected, doc.frame, doc.visual.text, doc.visual.logos,
+      doc.visual.shapes, doc.visual.pictures, doc.visual.effects, images])
 
   // A webfont arrives after the frame it was first asked for has been painted,
   // and a canvas does not re-render itself the way the DOM does. Bumping this
@@ -308,9 +319,11 @@ export function MotionStage({
       : null
     if (flat) {
       const d0 = docRef.current
-      const src = flat.kind === 'text'
-        ? d0.visual.text.find((l) => l.id === flat.id)
-        : flat.kind === 'logo' ? d0.visual.logos.find((l) => l.id === flat.id) : undefined
+      const src = flat.kind === 'text' ? d0.visual.text.find((l) => l.id === flat.id)
+        : flat.kind === 'logo' ? d0.visual.logos.find((l) => l.id === flat.id)
+        : flat.kind === 'shape' ? (d0.visual.shapes ?? []).find((l) => l.id === flat.id)
+        : flat.kind === 'picture' ? (d0.visual.pictures ?? []).find((l) => l.id === flat.id)
+        : undefined
       if (src) {
         dragRef.current = {
           mode: 'layer',
@@ -395,6 +408,10 @@ export function MotionStage({
         onPatch({ visual: { ...d.visual, text: d.visual.text.map((l) => (l.id === pick.id ? { ...l, x, y } : l)) } })
       } else if (pick.kind === 'logo') {
         onPatch({ visual: { ...d.visual, logos: d.visual.logos.map((l) => (l.id === pick.id ? { ...l, x, y } : l)) } })
+      } else if (pick.kind === 'shape') {
+        onPatch({ visual: { ...d.visual, shapes: (d.visual.shapes ?? []).map((l) => (l.id === pick.id ? { ...l, x, y } : l)) } })
+      } else if (pick.kind === 'picture') {
+        onPatch({ visual: { ...d.visual, pictures: (d.visual.pictures ?? []).map((l) => (l.id === pick.id ? { ...l, x, y } : l)) } })
       }
     } else if (drag.mode === 'scrub') {
       const width = Math.max(1, sizeRef.current.width)
@@ -667,6 +684,15 @@ function staticSignature(doc: MotionDoc, phase: number): string {
   for (const l of doc.visual.logos) {
     if (l.from === undefined && l.to === undefined) continue
     out += `l${l.id}:${layerVisibility(l, phase).toFixed(2)};`
+  }
+  // Shapes and pictures live on the backdrop, which is redrawn from this
+  // signature too. A shape whose width is keyed changes every frame, so its
+  // whole geometry goes in rather than only its visibility.
+  for (const sh of resolvedShapeLayers(doc, phase)) {
+    out += `s${sh.id}:${layerVisibility(sh, phase).toFixed(2)},${sh.width.toFixed(2)},${sh.height.toFixed(2)},${sh.x.toFixed(2)},${sh.y.toFixed(2)},${sh.opacity.toFixed(1)},${sh.rotation.toFixed(1)};`
+  }
+  for (const pic of resolvedPictureLayers(doc, phase)) {
+    out += `p${pic.id}:${layerVisibility(pic, phase).toFixed(2)},${pic.width.toFixed(2)},${pic.height.toFixed(2)},${pic.x.toFixed(2)},${pic.y.toFixed(2)},${pic.opacity.toFixed(1)},${pic.rotation.toFixed(1)};`
   }
   // Keyed type, marks and grain live on the same rarely-drawn layer, so the
   // signature has to speak for them too or a keyed heading would sit still.

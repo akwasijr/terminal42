@@ -20,6 +20,7 @@ import { TEXT_DEFAULTS, type TextAlign } from '../../../../shared/motion/types'
 import { ImagesPanel } from './MotionImages'
 import { BrandSection } from './MotionBrand'
 import { LogoSection } from './MotionLogos'
+import { PictureSection, ShapeSection } from './MotionScenery'
 import { EffectsSection } from './MotionEffects'
 import { PosePad } from './PosePad'
 import { EasingEditor } from './EasingEditor'
@@ -382,6 +383,8 @@ export function VisualPanel({
         })}
       </Section>
 
+      <ShapeSection doc={doc} onChange={onChange} keyer={keyer} selected={selected} onSelect={onSelect} />
+      <PictureSection doc={doc} onChange={onChange} keyer={keyer} selected={selected} onSelect={onSelect} />
       <LogoSection doc={doc} onChange={onChange} keyer={keyer} selected={selected} onSelect={onSelect} />
 
       <EffectsSection doc={doc} onChange={onChange} keyer={keyer} />

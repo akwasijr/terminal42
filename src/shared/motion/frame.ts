@@ -6,7 +6,8 @@
 // second code path that could drift.
 
 import type {
-  CardOverride, CardPlacement, EffectsState, LogoLayer, MotionDoc, ParamValue, Pose, TextLayer, Wave
+  CardOverride, CardPlacement, EffectsState, LogoLayer, MotionDoc, ParamValue, PictureLayer,
+  Pose, ShapeLayer, TextLayer, Wave
 } from './types'
 import { TEXT_DEFAULTS } from './types'
 import { componentFor } from './registry'
@@ -276,6 +277,15 @@ const TEXT_KEY_FIELDS = ['size', 'x', 'y', 'opacity', 'tracking'] as const
 /** The same, for a mark: where it sits, how large, how present. */
 const LOGO_KEY_FIELDS = ['size', 'x', 'y', 'opacity'] as const
 
+/**
+ * The same, for a block of colour or a picture.
+ *
+ * Width and height are separate here where a logo has one size, because a
+ * shape has no picture dictating its proportions -- it is whatever box it is
+ * given, and a band stretching across the frame changes only one of the two.
+ */
+const SHAPE_KEY_FIELDS = ['width', 'height', 'x', 'y', 'opacity', 'rotation'] as const
+
 /** The flat, numeric frame effects. The four grouped treatments are not keyed. */
 const FX_KEY_FIELDS = [
   'blur', 'grain', 'vignette', 'shadow', 'brightness', 'contrast', 'saturation', 'tintAmount'
@@ -341,6 +351,50 @@ export function resolvedLogoLayers(doc: MotionDoc, phase: number): LogoLayer[] {
 }
 
 /** Frame effects as they stand at a point in the loop. */
+/**
+ * Shape layers as they stand at a point in the loop.
+ *
+ * Width and height are keyable as well as position, because a block of colour
+ * growing across the frame is the move half these compositions are built on,
+ * and it is not something a card can be made to do.
+ */
+export function resolvedShapeLayers(doc: MotionDoc, phase: number): ShapeLayer[] {
+  const layers = doc.visual.shapes ?? []
+  const keys = doc.keys
+  if (!keys || layers.length === 0) return layers
+  return layers.map((layer) => {
+    let out: ShapeLayer | null = null
+    for (const field of SHAPE_KEY_FIELDS) {
+      const target = `shape:${layer.id}:${field}`
+      if (!keys[target]) continue
+      const next = valueAt(keys, target, phase, layer[field])
+      if (next === layer[field]) continue
+      out = out ?? { ...layer }
+      out[field] = next
+    }
+    return out ?? layer
+  })
+}
+
+/** Picture layers as they stand at a point in the loop. */
+export function resolvedPictureLayers(doc: MotionDoc, phase: number): PictureLayer[] {
+  const layers = doc.visual.pictures ?? []
+  const keys = doc.keys
+  if (!keys || layers.length === 0) return layers
+  return layers.map((layer) => {
+    let out: PictureLayer | null = null
+    for (const field of SHAPE_KEY_FIELDS) {
+      const target = `picture:${layer.id}:${field}`
+      if (!keys[target]) continue
+      const next = valueAt(keys, target, phase, layer[field])
+      if (next === layer[field]) continue
+      out = out ?? { ...layer }
+      out[field] = next
+    }
+    return out ?? layer
+  })
+}
+
 export function resolvedEffects(doc: MotionDoc, phase: number): EffectsState {
   const keys = doc.keys
   const fx = doc.visual.effects

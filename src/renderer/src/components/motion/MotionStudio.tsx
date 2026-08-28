@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ComponentId, MotionDoc } from '../../../../shared/motion/types'
+import { SHAPE_LABELS } from '../../../../shared/motion/types'
 import { componentFor } from '../../../../shared/motion/registry'
 import { presetParams } from '../../../../shared/motion/presets'
 import { emptyDoc, hydrateDoc } from '../../../../shared/motion/defaults'
@@ -188,6 +189,10 @@ export function MotionStudio({
     setSelected(null)
     if (pick.kind === 'text') {
       patch({ visual: { ...doc.visual, text: doc.visual.text.filter((l) => l.id !== pick.id) } })
+    } else if (pick.kind === 'shape') {
+      patch({ visual: { ...doc.visual, shapes: (doc.visual.shapes ?? []).filter((l) => l.id !== pick.id) } })
+    } else if (pick.kind === 'picture') {
+      patch({ visual: { ...doc.visual, pictures: (doc.visual.pictures ?? []).filter((l) => l.id !== pick.id) } })
     } else {
       patch({ visual: { ...doc.visual, logos: doc.visual.logos.filter((l) => l.id !== pick.id) } })
     }
@@ -668,6 +673,14 @@ function selectionLabel(doc: MotionDoc, pick: Pick): string {
     const layer = doc.visual.text.find((l) => l.id === pick.id)
     const first = layer?.text.trim().split('\n')[0] ?? ''
     return first ? `Text: ${first.length > 32 ? `${first.slice(0, 32)}\u2026` : first}` : 'Text selected'
+  }
+  if (pick.kind === 'shape') {
+    const sh = (doc.visual.shapes ?? []).find((l) => l.id === pick.id)
+    return sh ? `${SHAPE_LABELS[sh.kind]} selected` : 'Shape selected'
+  }
+  if (pick.kind === 'picture') {
+    const pic = (doc.visual.pictures ?? []).find((l) => l.id === pick.id)
+    return pic?.imageId ? 'Picture selected' : `Empty picture slot: ${pic?.placeholder ?? 'Picture'}`
   }
   const i = doc.visual.logos.findIndex((l) => l.id === pick.id)
   return `Logo ${i + 1} selected`
