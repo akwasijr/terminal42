@@ -8,7 +8,7 @@
 import type {
   AnimationState, CardOverride, ComponentId, DropShadowFx, EdgeAmounts, EdgeBlurFx, EdgeFalloff,
   EdgeShadeFx, EffectScope, EffectsState, EntranceShape, EntranceSpec, GlassFx, LogoLayer,
-  MotionDoc, ParamSpec, ParamValue, PictureLayer, ShapeKind, ShapeLayer, TextLayer, Wave
+  LayerTransform, MotionDoc, ParamSpec, ParamValue, PictureLayer, ShapeKind, ShapeLayer, TextLayer, Wave
 } from './types'
 import { SHAPE_KINDS } from './types'
 import { defaultEntrance, ENTRANCE_SHAPES } from './entrance'
@@ -457,8 +457,8 @@ function hydrateTextSpans(raw: unknown): TextLayer[] {
   if (!Array.isArray(raw)) return []
   return (raw as TextLayer[]).map((layer) => {
     if (!layer || typeof layer !== 'object') return layer
-    const { from: _f, to: _t, fade: _d, hidden: _h, ...rest } = layer
-    return { ...rest, ...hydrateSpan(layer) }
+    const { from: _f, to: _t, fade: _d, hidden: _h, rotation: _r, scale: _s, anchor: _a, ...rest } = layer
+    return { ...rest, ...hydrateTransform(layer), ...hydrateSpan(layer) }
   })
 }
 
@@ -504,6 +504,7 @@ function hydrateShapes(raw: unknown): ShapeLayer[] | undefined {
       id: l.id,
       kind: SHAPE_KINDS.includes(l.kind as ShapeKind) ? (l.kind as ShapeKind) : 'rect',
       ...hydrateGeometry(l),
+      ...hydrateTransform(l),
       colour: typeof l.colour === 'string' ? l.colour : '#d8d3c8',
       ...(typeof l.corner === 'number' && Number.isFinite(l.corner)
         ? { corner: Math.min(50, Math.max(0, l.corner)) }
@@ -529,6 +530,7 @@ function hydratePictures(raw: unknown): PictureLayer[] | undefined {
       ...(typeof l.imageId === 'string' && l.imageId ? { imageId: l.imageId } : {}),
       mask: SHAPE_KINDS.includes(l.mask as ShapeKind) ? (l.mask as ShapeKind) : 'rect',
       ...hydrateGeometry(l),
+      ...hydrateTransform(l),
       fit: l.fit === 'contain' ? 'contain' : 'cover',
       ...(typeof l.corner === 'number' && Number.isFinite(l.corner)
         ? { corner: Math.min(50, Math.max(0, l.corner)) }
@@ -541,6 +543,33 @@ function hydratePictures(raw: unknown): PictureLayer[] | undefined {
 }
 
 /** The box the two scenery layers share, clamped to something drawable. */
+/**
+ * Rotation, scale and the anchor, kept only when they say something.
+ *
+ * All three are absent by default and absent means untouched, so writing
+ * `rotation: 0` back onto every layer would fill saved pieces with fields
+ * that mean nothing. An anchor is only kept when both halves are numbers,
+ * because half an anchor is not a point.
+ */
+function hydrateTransform(l: Partial<Record<string, unknown>>): LayerTransform {
+  const num = (v: unknown, lo: number, hi: number): number | undefined =>
+    typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : undefined
+  const out: LayerTransform = {}
+  const rotation = num(l.rotation, -360, 360)
+  const scale = num(l.scale, 0, 1000)
+  if (rotation !== undefined && rotation !== 0) out.rotation = rotation
+  if (scale !== undefined && scale !== 100) out.scale = scale
+  const a = l.anchor as { x?: unknown; y?: unknown } | undefined
+  if (a && typeof a === 'object') {
+    const ax = num(a.x, 0, 1)
+    const ay = num(a.y, 0, 1)
+    if (ax !== undefined && ay !== undefined && !(ax === 0.5 && ay === 0.5)) {
+      out.anchor = { x: ax, y: ay }
+    }
+  }
+  return out
+}
+
 function hydrateGeometry(l: Partial<Record<string, unknown>>): {
   width: number; height: number; x: number; y: number; rotation: number; opacity: number
 } {
@@ -574,6 +603,7 @@ function hydrateLogos(raw: unknown): LogoLayer[] {
       opacity: num(l.opacity, 100, 0, 100),
       x: num(l.x, 50, 0, 100),
       y: num(l.y, 50, 0, 100),
+      ...hydrateTransform(l),
       ...hydrateSpan(l)
     })
   }

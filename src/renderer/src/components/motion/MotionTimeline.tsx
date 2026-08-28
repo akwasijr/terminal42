@@ -974,7 +974,7 @@ const FX_LABELS: Record<string, string> = {
 
 const FIELD_LABELS: Record<string, string> = {
   size: 'size', x: 'across', y: 'down', opacity: 'opacity', tracking: 'tracking',
-  width: 'width', height: 'height', rotation: 'turn'
+  width: 'width', height: 'height', rotation: 'turn', scale: 'scale'
 }
 
 const POSE_LABELS: Record<string, string> = {

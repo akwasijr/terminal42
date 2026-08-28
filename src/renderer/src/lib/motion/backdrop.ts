@@ -12,6 +12,7 @@ import type {
 } from '../../../../shared/motion/types'
 import { resolvedText } from '../../../../shared/motion/types'
 import { clipTimeline } from '../../../../shared/motion/entrance'
+import { applyLayerTransform, layerScaleVisible } from './layerTransform'
 import { layerVisibility } from '../../../../shared/motion/frame'
 
 import { textFont } from './overlayPick'
@@ -111,6 +112,7 @@ export function drawOverlay(
     if (visible <= 0) continue
     const layer = resolvedText(raw)
     if (layer.opacity <= 0) continue
+    if (!layerScaleVisible(raw)) continue
 
     const px = Math.round((layer.size / 100) * height)
     if (px <= 0) continue
@@ -127,11 +129,28 @@ export function drawOverlay(
     // assigning an unknown property would silently do nothing rather than warn.
     if ('letterSpacing' in ctx) ctx.letterSpacing = `${(layer.tracking / 100) * px}px`
 
-    const x = (layer.x / 100) * width
-    const y = (layer.y / 100) * height
+    // The block's own extent, which is what the anchor is a fraction of.
+    // Measured after the font and tracking are set, or it would be the size
+    // of some other typeface.
+    const blockW = lines.reduce((widest, line) => Math.max(widest, ctx.measureText(line).width), 0)
+    const blockH = lines.length * step
+    // Text hangs off its x according to the alignment, so the middle of what
+    // you can see is not the x you typed. The anchor has to be a fraction of
+    // the words, not of a box they happen to sit to one side of.
+    const alignShift = layer.align === 'left' ? blockW / 2 : layer.align === 'right' ? -blockW / 2 : 0
+
+    applyLayerTransform(ctx, raw, {
+      cx: (layer.x / 100) * width + alignShift,
+      cy: (layer.y / 100) * height,
+      w: blockW,
+      h: blockH
+    })
+
+    // Drawing happens about the origin now, so put the alignment back.
+    const x = -alignShift
     // Centre the block of lines on y, so the anchor is the middle of the text
     // however many lines it turns out to have.
-    const top = y - ((lines.length - 1) * step) / 2
+    const top = -((lines.length - 1) * step) / 2
 
     lines.forEach((line, i) => {
       const ly = top + i * step
@@ -169,11 +188,18 @@ export function drawLogos(
     const img = images.get(layer.imageId)
     if (!img || !img.complete || img.naturalWidth === 0) continue
     if (layer.opacity <= 0) continue
+    if (!layerScaleVisible(layer)) continue
     const w = (layer.size / 100) * width
     const h = w * (img.naturalHeight / img.naturalWidth)
     ctx.save()
     ctx.globalAlpha = Math.min(1, Math.max(0, layer.opacity / 100)) * visible
-    ctx.drawImage(img, (layer.x / 100) * width - w / 2, (layer.y / 100) * height - h / 2, w, h)
+    applyLayerTransform(ctx, layer, {
+      cx: (layer.x / 100) * width,
+      cy: (layer.y / 100) * height,
+      w,
+      h
+    })
+    ctx.drawImage(img, -w / 2, -h / 2, w, h)
     ctx.restore()
   }
 }
@@ -294,10 +320,15 @@ export function drawShapes(
     const w = (layer.width / 100) * width
     const h = (layer.height / 100) * height
     if (w <= 0 || h <= 0) continue
+    if (!layerScaleVisible(layer)) continue
     ctx.save()
     ctx.globalAlpha = Math.min(1, Math.max(0, layer.opacity / 100)) * visible
-    ctx.translate((layer.x / 100) * width, (layer.y / 100) * height)
-    if (layer.rotation) ctx.rotate((layer.rotation * Math.PI) / 180)
+    applyLayerTransform(ctx, layer, {
+      cx: (layer.x / 100) * width,
+      cy: (layer.y / 100) * height,
+      w,
+      h
+    })
     ctx.fillStyle = layer.colour
     shapePath(ctx, layer.kind, 0, 0, w, h, layer.corner ?? 0)
     ctx.fill()
@@ -330,10 +361,15 @@ export function drawPictures(
     const img = layer.imageId ? images.get(layer.imageId) : undefined
     const ready = img && img.complete && img.naturalWidth > 0
 
+    if (!layerScaleVisible(layer)) continue
     ctx.save()
     ctx.globalAlpha = Math.min(1, Math.max(0, layer.opacity / 100)) * visible
-    ctx.translate((layer.x / 100) * width, (layer.y / 100) * height)
-    if (layer.rotation) ctx.rotate((layer.rotation * Math.PI) / 180)
+    applyLayerTransform(ctx, layer, {
+      cx: (layer.x / 100) * width,
+      cy: (layer.y / 100) * height,
+      w,
+      h
+    })
     shapePath(ctx, layer.mask, 0, 0, w, h, layer.corner ?? 0)
 
     if (ready) {

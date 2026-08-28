@@ -188,6 +188,33 @@ export type FrameStyle = {
  * so every one of them resolves through `resolvedText` rather than being
  * written into old documents by a migration.
  */
+/**
+ * How a layer sits on the frame, past where it is.
+ *
+ * Shared by all four kinds so that turning a picture and turning a word mean
+ * the same thing and are drawn by the same code. Every field is optional and
+ * every default is "untouched", so a layer written before any of this existed
+ * looks exactly as it did.
+ *
+ * Deliberately flat. Motion's cards tilt in three axes because they are built
+ * in perspective; these layers are drawn onto the frame, and an X or Y tilt
+ * on a flat layer is a foreshortening the 2D canvas cannot honestly do.
+ */
+export type LayerTransform = {
+  /** Degrees clockwise, about the anchor. */
+  rotation?: number
+  /** Percentage of natural size; 100 is untouched. */
+  scale?: number
+  /**
+   * The point the layer turns and grows about, as fractions of its own box:
+   * 0,0 is its top left and 1,1 its bottom right.
+   *
+   * The middle by default, which is where every layer used to turn. Moving it
+   * is what makes a layer swing from a corner rather than spin in place.
+   */
+  anchor?: { x: number; y: number }
+}
+
 export type TextLayer = {
   id: string
   text: string
@@ -229,7 +256,7 @@ export type TextLayer = {
    * away already back on would be a surprise.
    */
   hidden?: boolean
-}
+} & LayerTransform
 
 export type TextAlign = 'left' | 'center' | 'right'
 
@@ -257,7 +284,9 @@ export const TEXT_DEFAULTS = {
  */
 export type ResolvedText =
   TextLayer &
-  Required<Omit<TextLayer, 'id' | 'text' | 'size' | 'colour' | 'x' | 'y' | 'from' | 'to' | 'fade' | 'hidden'>>
+  Required<Omit<TextLayer,
+    'id' | 'text' | 'size' | 'colour' | 'x' | 'y' | 'from' | 'to' | 'fade' | 'hidden'
+    | 'rotation' | 'scale' | 'anchor'>>
 
 export function resolvedText(layer: TextLayer): ResolvedText {
   return {
@@ -300,7 +329,7 @@ export type LogoLayer = {
    * away already back on would be a surprise.
    */
   hidden?: boolean
-}
+} & LayerTransform
 
 /**
  * The frame rates worth offering.
@@ -492,7 +521,7 @@ export type ShapeLayer = {
   height: number
   x: number
   y: number
-  /** Degrees clockwise, about the shape's own centre. */
+  /** Degrees clockwise, about the anchor. */
   rotation: number
   colour: string
   opacity: number
@@ -509,7 +538,7 @@ export type ShapeLayer = {
    * away already back on would be a surprise.
    */
   hidden?: boolean
-}
+} & LayerTransform
 
 /** Whether a picture fills its mask or fits inside it. */
 export type PictureFit = 'cover' | 'contain'
@@ -555,7 +584,7 @@ export type PictureLayer = {
    * away already back on would be a surprise.
    */
   hidden?: boolean
-}
+} & LayerTransform
 
 export type VisualState = {
   card: CardStyle

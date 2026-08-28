@@ -22,6 +22,7 @@ import { BrandSection } from './MotionBrand'
 import { LogoSection } from './MotionLogos'
 import { PictureSection, ShapeSection } from './MotionScenery'
 import { EffectsSection } from './MotionEffects'
+import { TransformRows } from './MotionTransformRows'
 import { PosePad } from './PosePad'
 import { EasingEditor } from './EasingEditor'
 
@@ -341,6 +342,9 @@ export function VisualPanel({
               <ColorRow label="Colour" value={layer.colour} onChange={(v) => setLayer({ colour: v })} />
               <SliderRow label="Across" value={layer.x} min={0} max={100} step={0.5} onChange={(v) => setLayer({ x: v })} keyframe={keyer(`text:${layer.id}:x`, layer.x)} />
               <SliderRow label="Down" value={layer.y} min={0} max={100} step={0.5} onChange={(v) => setLayer({ y: v })} keyframe={keyer(`text:${layer.id}:y`, layer.y)} />
+              {/* Placement, not typography, so it sits with Across and Down
+                  rather than behind the type disclosure. */}
+              <TransformRows layer={layer} prefix={`text:${layer.id}`} onChange={setLayer} keyer={keyer} />
               {/* The refinements fold away: most layers only ever need a size,
                   a face and a place to sit. */}
               <Disclosure label="More type">

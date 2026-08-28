@@ -7,6 +7,7 @@
 
 import type { LogoLayer, MotionDoc } from '../../../../shared/motion/types'
 import { Section, SliderRow } from './controls'
+import { TransformRows } from './MotionTransformRows'
 import type { Keyer } from '../../lib/motion/keying'
 import type { Pick } from '../../lib/motion/overlayPick'
 
@@ -86,6 +87,7 @@ export function LogoSection({
             <SliderRow label="Across" value={layer.x} min={0} max={100} step={0.5} onChange={(v) => setLayer({ x: v })} keyframe={keyer?.(`logo:${layer.id}:x`, layer.x)} />
             <SliderRow label="Down" value={layer.y} min={0} max={100} step={0.5} onChange={(v) => setLayer({ y: v })} keyframe={keyer?.(`logo:${layer.id}:y`, layer.y)} />
             <SliderRow label="Opacity" value={layer.opacity} min={0} max={100} step={1} onChange={(v) => setLayer({ opacity: v })} keyframe={keyer?.(`logo:${layer.id}:opacity`, layer.opacity)} />
+            <TransformRows layer={layer} prefix={`logo:${layer.id}`} onChange={setLayer} keyer={keyer} />
           </div>
         )
       })}

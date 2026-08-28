@@ -7,6 +7,17 @@ import { resolvedText, TEXT_DEFAULTS, type TextLayer } from '../../src/shared/mo
 // do. That is the right level for this anyway — what matters is that a font
 // property reaches the context at all, since the failure being guarded
 // against is a property that the panel offers and the drawing quietly ignores.
+function mul(m: number[], n: number[]): number[] {
+  return [
+    m[0] * n[0] + m[2] * n[1],
+    m[1] * n[0] + m[3] * n[1],
+    m[0] * n[2] + m[2] * n[3],
+    m[1] * n[2] + m[3] * n[3],
+    m[0] * n[4] + m[2] * n[5] + m[4],
+    m[1] * n[4] + m[3] * n[5] + m[5]
+  ]
+}
+
 class FakeCtx {
   calls: string[] = []
   globalAlpha = 1
@@ -16,13 +27,38 @@ class FakeCtx {
   textAlign = 'start'
   textBaseline = 'alphabetic'
 
-  save(): void { this.calls.push('save') }
-  restore(): void { this.calls.push('restore') }
+  // Text is drawn about the origin and placed by the canvas transform, so the
+  // stand-in has to keep a real matrix. Recording the raw arguments instead
+  // would make every one of these read `0,0` and stop saying anything about
+  // where the words actually land.
+  private m = [1, 0, 0, 1, 0, 0]
+  private stack: number[][] = []
+
+  save(): void { this.calls.push('save'); this.stack.push([...this.m]) }
+  restore(): void { this.calls.push('restore'); this.m = this.stack.pop() ?? [1, 0, 0, 1, 0, 0] }
+
+  translate(x: number, y: number): void {
+    this.m = mul(this.m, [1, 0, 0, 1, x, y])
+  }
+  rotate(a: number): void {
+    this.m = mul(this.m, [Math.cos(a), Math.sin(a), -Math.sin(a), Math.cos(a), 0, 0])
+  }
+  scale(x: number, y: number): void {
+    this.m = mul(this.m, [x, 0, 0, y, 0, 0])
+  }
+  /** Where a point in the current frame of reference lands on the canvas. */
+  at(x: number, y: number): { x: number; y: number } {
+    const [a, b, c, d, e, f] = this.m
+    return { x: a * x + c * y + e, y: b * x + d * y + f }
+  }
+
   fillText(text: string, x: number, y: number): void {
-    this.calls.push(`fillText ${JSON.stringify(text)} ${Math.round(x)},${Math.round(y)}`)
+    const p = this.at(x, y)
+    this.calls.push(`fillText ${JSON.stringify(text)} ${Math.round(p.x)},${Math.round(p.y)}`)
   }
   fillRect(x: number, y: number, w: number, h: number): void {
-    this.calls.push(`fillRect ${Math.round(x)},${Math.round(y)},${Math.round(w)},${Math.round(h)}`)
+    const p = this.at(x, y)
+    this.calls.push(`fillRect ${Math.round(p.x)},${Math.round(p.y)},${Math.round(w)},${Math.round(h)}`)
   }
   measureText(text: string): { width: number } {
     // Enough to make alignment arithmetic observable without a real font.

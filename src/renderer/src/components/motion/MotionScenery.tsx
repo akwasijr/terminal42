@@ -14,12 +14,13 @@
 // be kept in step by hand.
 
 import type {
-  MotionDoc, PictureFit, PictureLayer, ShapeKind, ShapeLayer
+  LayerTransform, MotionDoc, PictureFit, PictureLayer, ShapeKind, ShapeLayer
 } from '../../../../shared/motion/types'
 import { SHAPE_KINDS, SHAPE_LABELS } from '../../../../shared/motion/types'
 import { ColorRow, Section, SegmentedRow, SelectRow, SliderRow } from './controls'
 import type { Keyer } from '../../lib/motion/keying'
 import type { Pick } from '../../lib/motion/overlayPick'
+import { TransformRows } from './MotionTransformRows'
 
 const SHAPE_OPTIONS = SHAPE_KINDS.map((k) => ({ value: k, label: SHAPE_LABELS[k] }))
 
@@ -256,10 +257,12 @@ export function PictureSection({
 function Geometry({
   layer, prefix, keyer, onChange
 }: {
-  layer: { width: number; height: number; x: number; y: number; rotation: number; opacity: number }
+  layer: { width: number; height: number; x: number; y: number; opacity: number } & LayerTransform
   prefix: string
   keyer?: Keyer
-  onChange: (patch: { width?: number; height?: number; x?: number; y?: number; rotation?: number; opacity?: number }) => void
+  onChange: (
+    patch: { width?: number; height?: number; x?: number; y?: number; opacity?: number } & LayerTransform
+  ) => void
 }): React.JSX.Element {
   return (
     <>
@@ -267,8 +270,11 @@ function Geometry({
       <SliderRow label="Height" value={layer.height} min={1} max={140} step={0.5} onChange={(v) => onChange({ height: v })} keyframe={keyer?.(`${prefix}:height`, layer.height)} />
       <SliderRow label="Across" value={layer.x} min={-20} max={120} step={0.5} onChange={(v) => onChange({ x: v })} keyframe={keyer?.(`${prefix}:x`, layer.x)} />
       <SliderRow label="Down" value={layer.y} min={-20} max={120} step={0.5} onChange={(v) => onChange({ y: v })} keyframe={keyer?.(`${prefix}:y`, layer.y)} />
-      <SliderRow label="Turn" value={layer.rotation} min={-180} max={180} step={1} onChange={(v) => onChange({ rotation: v })} keyframe={keyer?.(`${prefix}:rotation`, layer.rotation)} />
       <SliderRow label="Opacity" value={layer.opacity} min={0} max={100} step={1} onChange={(v) => onChange({ opacity: v })} keyframe={keyer?.(`${prefix}:opacity`, layer.opacity)} />
+      {/* Turn lives with scale and the anchor, because the three are one
+          idea and a layer that can turn but not turn about a corner is only
+          half of it. */}
+      <TransformRows layer={layer} prefix={prefix} onChange={onChange} keyer={keyer} />
     </>
   )
 }

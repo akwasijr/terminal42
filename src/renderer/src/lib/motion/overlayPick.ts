@@ -19,6 +19,17 @@ import type { LogoLayer, MotionDoc, TextLayer } from '../../../../shared/motion/
 import { resolvedText } from '../../../../shared/motion/types'
 import { layerVisibility } from '../../../../shared/motion/frame'
 import { fontByLabel } from '../freeformTypes'
+import { scaledBox, type LayerBox } from './layerTransform'
+
+/**
+ * A layer's own box, scaled and anchored, as the rectangle a pointer is
+ * tested against. Every kind goes through here so the slack is the same
+ * everywhere and none of them can quietly forget to be scaled.
+ */
+function boxOf(layer: Parameters<typeof scaledBox>[0], own: LayerBox): Box {
+  const b = scaledBox(layer, own)
+  return { x: b.cx - b.w / 2, y: b.cy - b.h / 2, w: b.w, h: b.h }
+}
 
 /** What the user has hold of. A card lives in the scene; the rest are flat. */
 export type Pick =
@@ -80,7 +91,7 @@ export function textBox(
   const y = (layer.y / 100) * height
   const h = (lines.length - 1) * step + px
   const left = layer.align === 'left' ? x : layer.align === 'right' ? x - widest : x - widest / 2
-  return { x: left, y: y - h / 2, w: widest, h }
+  return boxOf(raw, { cx: left + widest / 2, cy: y, w: widest, h })
 }
 
 /** The rectangle a logo covers. Width is given; height follows the picture. */
@@ -97,7 +108,7 @@ export function logoBox(
   if (!img || !img.complete || img.naturalWidth === 0) return null
   const w = (layer.size / 100) * width
   const h = w * (img.naturalHeight / img.naturalWidth)
-  return { x: (layer.x / 100) * width - w / 2, y: (layer.y / 100) * height - h / 2, w, h }
+  return boxOf(layer, { cx: (layer.x / 100) * width, cy: (layer.y / 100) * height, w, h })
 }
 
 /**
@@ -108,13 +119,13 @@ export function logoBox(
  * than a tilted one, at the cost of a little slack at the corners.
  */
 function flatBox(
-  layer: { width: number; height: number; x: number; y: number },
+  layer: { width: number; height: number; x: number; y: number } & Parameters<typeof scaledBox>[0],
   width: number,
   height: number
 ): Box {
   const w = (layer.width / 100) * width
   const h = (layer.height / 100) * height
-  return { x: (layer.x / 100) * width - w / 2, y: (layer.y / 100) * height - h / 2, w, h }
+  return boxOf(layer, { cx: (layer.x / 100) * width, cy: (layer.y / 100) * height, w, h })
 }
 
 /** Every flat layer's box, in the order they are painted: first is furthest back. */

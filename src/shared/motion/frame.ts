@@ -281,6 +281,18 @@ export function layerVisibility(
 }
 
 /**
+ * What a transform field is worth on a layer that has never set it.
+ *
+ * A keyframe has to start from a number, and "unset" is not one. These are
+ * the same values applyLayerTransform falls back to, so a track added to an
+ * untouched layer starts exactly where the layer already looked.
+ */
+const TRANSFORM_BASE: Record<string, number> = { rotation: 0, scale: 100 }
+
+const baseOf = (v: number | undefined, field: string): number =>
+  v ?? TRANSFORM_BASE[field] ?? 0
+
+/**
  * The text layer fields a keyframe can drive.
  *
  * Numbers only, and only the ones worth moving. A colour or a font could be
@@ -288,10 +300,10 @@ export function layerVisibility(
  * piece that needs two typefaces needs two layers rather than one that melts
  * between them.
  */
-const TEXT_KEY_FIELDS = ['size', 'x', 'y', 'opacity', 'tracking'] as const
+const TEXT_KEY_FIELDS = ['size', 'x', 'y', 'opacity', 'tracking', 'rotation', 'scale'] as const
 
 /** The same, for a mark: where it sits, how large, how present. */
-const LOGO_KEY_FIELDS = ['size', 'x', 'y', 'opacity'] as const
+const LOGO_KEY_FIELDS = ['size', 'x', 'y', 'opacity', 'rotation', 'scale'] as const
 
 /**
  * The same, for a block of colour or a picture.
@@ -300,7 +312,7 @@ const LOGO_KEY_FIELDS = ['size', 'x', 'y', 'opacity'] as const
  * shape has no picture dictating its proportions -- it is whatever box it is
  * given, and a band stretching across the frame changes only one of the two.
  */
-const SHAPE_KEY_FIELDS = ['width', 'height', 'x', 'y', 'opacity', 'rotation'] as const
+const SHAPE_KEY_FIELDS = ['width', 'height', 'x', 'y', 'opacity', 'rotation', 'scale'] as const
 
 /** The flat, numeric frame effects. The four grouped treatments are not keyed. */
 const FX_KEY_FIELDS = [
@@ -357,8 +369,9 @@ export function resolvedLogoLayers(doc: MotionDoc, phase: number): LogoLayer[] {
     for (const field of LOGO_KEY_FIELDS) {
       const target = `logo:${layer.id}:${field}`
       if (!keys[target]) continue
-      const next = valueAt(keys, target, phase, layer[field])
-      if (next === layer[field]) continue
+      const base = baseOf(layer[field], field)
+      const next = valueAt(keys, target, phase, base)
+      if (next === base) continue
       out = out ?? { ...layer }
       out[field] = next
     }
@@ -383,8 +396,9 @@ export function resolvedShapeLayers(doc: MotionDoc, phase: number): ShapeLayer[]
     for (const field of SHAPE_KEY_FIELDS) {
       const target = `shape:${layer.id}:${field}`
       if (!keys[target]) continue
-      const next = valueAt(keys, target, phase, layer[field])
-      if (next === layer[field]) continue
+      const base = baseOf(layer[field], field)
+      const next = valueAt(keys, target, phase, base)
+      if (next === base) continue
       out = out ?? { ...layer }
       out[field] = next
     }
@@ -402,8 +416,9 @@ export function resolvedPictureLayers(doc: MotionDoc, phase: number): PictureLay
     for (const field of SHAPE_KEY_FIELDS) {
       const target = `picture:${layer.id}:${field}`
       if (!keys[target]) continue
-      const next = valueAt(keys, target, phase, layer[field])
-      if (next === layer[field]) continue
+      const base = baseOf(layer[field], field)
+      const next = valueAt(keys, target, phase, base)
+      if (next === base) continue
       out = out ?? { ...layer }
       out[field] = next
     }
