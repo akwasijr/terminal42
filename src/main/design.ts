@@ -1426,16 +1426,32 @@ export function killAllDesignRuns(): void {
 
 // Render an HTML file in an off-screen BrowserWindow at a given viewport,
 // then run a callback against its webContents to produce bytes (PDF / PNG).
+//
+// `detached` asks for a real offscreen surface rather than a hidden window.
+// A hidden window is still a window and is bound by the display it would have
+// appeared on: ask for more than the screen and the page either comes back
+// the wrong size or fails to load at all (3840x2160 reliably fails on a
+// laptop). An offscreen surface is not attached to a display and honours what
+// it is given. It is only used where the size can exceed the screen, because
+// it is the less well-trodden path.
 async function renderHtmlOffscreen<T>(
   htmlPath: string,
   viewport: { width: number; height: number },
-  produce: (wc: Electron.WebContents) => Promise<T>
+  produce: (wc: Electron.WebContents) => Promise<T>,
+  opts: { detached?: boolean } = {}
 ): Promise<T> {
   const win = new BrowserWindow({
     show: false,
+    // Otherwise the window frame eats into the page and the capture is short.
+    useContentSize: true,
     width: viewport.width,
     height: viewport.height,
-    webPreferences: { offscreen: false, sandbox: true, contextIsolation: true, nodeIntegration: false }
+    webPreferences: {
+      offscreen: opts.detached === true,
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false
+    }
   })
   try {
     await win.loadFile(htmlPath)

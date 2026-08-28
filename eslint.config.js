@@ -19,6 +19,18 @@ export default tseslint.config(
     }
   },
   {
+    // Developer scripts: Node, and CommonJS where Electron needs it.
+    files: ['scripts/**/*.{ts,js,cjs,mjs}'],
+    languageOptions: {
+      globals: { ...globals.node },
+      parserOptions: { ecmaVersion: 'latest', sourceType: 'module' }
+    },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+      'no-console': 'off'
+    }
+  },
+  {
     files: ['src/renderer/**/*.{ts,tsx}'],
     languageOptions: {
       globals: { ...globals.browser },

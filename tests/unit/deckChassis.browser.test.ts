@@ -15,103 +15,11 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import type { Browser, Page } from 'playwright'
-import { buildDeckBaseBlock } from '../../src/main/deckChassis'
+import { samplePage } from '../fixtures/deckSample'
 import { EXPORT_PREP_JS, SLIDE_COUNT_JS, showSlideJs, IS_CHASSIS_JS } from '../../src/main/deckCapture'
 
 let browser: Browser | null = null
 let page: Page | null = null
-
-/** Every layout the usage doc documents, in one page. */
-const SLIDES = `
-<section class="slide cover" data-title="Cover"><div class="inner">
-  <h1 class="display">A deck that <span class="accent">already</span> works.</h1>
-  <div class="cover-meta"><span>Terminal 42</span><span>May 2026</span></div></div></section>
-
-<section class="slide" data-title="Reasons"><div class="inner">
-  <span class="eyebrow">Section 01</span><h2 class="display">Three reasons.</h2>
-  <div class="reasonlist">
-    <div class="reason" data-reveal="1"><span class="picto"></span><p>First.</p></div>
-    <div class="reason" data-reveal="2"><span class="picto"></span><p>Second.</p></div>
-    <div class="reason" data-reveal="3"><span class="picto"></span><p>Third.</p></div>
-  </div></div></section>
-
-<section class="slide" data-ground="invert" data-title="Growth"><div class="inner">
-  <h2 class="display">Scaling <span class="accent">revenue</span> and <mark>margin</mark>.</h2>
-  <div class="bars">
-    <div class="bar" style="--v:28"><div class="col"><span class="v">31%</span></div><span class="k">Margin</span></div>
-    <div class="bar" style="--v:55"><div class="col"><span class="v">$1.2B</span></div><span class="k">Fleet</span></div>
-    <div class="bar on" style="--v:100"><div class="col"><span class="v">+218%</span></div><span class="k">Revenue</span></div>
-    <div class="bar" style="--v:42"><div class="col"><span class="v">+44%</span></div><span class="k">Subs</span></div>
-  </div></div></section>
-
-<section class="slide" data-ground="accent" data-title="Palette"><div class="inner">
-  <h2 class="display">Palette.</h2>
-  <div class="swatches">
-    <div class="swatch" data-hex="#B89457"><span class="nm">Harvest Gold</span><span class="hx">#B89457</span><span class="ro">Primary</span></div>
-    <div class="swatch" data-hex="#432818"><span class="nm">Espresso</span><span class="hx">#432818</span><span class="ro">Secondary</span></div>
-    <div class="swatch" data-hex="#FFE5A7"><span class="nm">Wheat Cream</span><span class="hx">#FFE5A7</span><span class="ro">Light</span></div>
-  </div></div></section>
-
-<section class="slide" data-title="Team"><div class="inner"><h2 class="display">Leadership.</h2>
-  <div class="figures">
-    <figure class="figure"><figcaption class="figcap"><span class="nm">Daniel Verhart</span><span class="ro">CEO</span></figcaption></figure>
-    <figure class="figure"><figcaption class="figcap"><span class="nm">Amelia Ryden</span><span class="ro">CTO</span></figcaption></figure>
-  </div></div></section>
-
-<section class="slide" data-ground="soft" data-title="Type"><div class="inner"><h2 class="display">Type.</h2>
-  <div class="specimens">
-    <div class="specimen"><span class="aa">Aa</span><div><h3>Bold</h3><p>Cut the noise.</p></div></div>
-    <div class="specimen body"><span class="aa">Aa</span><div><h3>Regular</h3><p>Body copy.</p></div></div>
-  </div></div></section>
-
-<section class="slide bleed" data-title="Precision">
-  <div class="bleed-media"></div>
-  <div class="inner"><h2 class="display">Built on precision.</h2><p class="lede">To three edges.</p></div></section>
-
-<section class="slide" data-title="Examples"><div class="inner"><h2 class="display">Examples.</h2>
-  <div class="carousel" data-carousel><div class="carousel-stage">
-    <img class="carousel-img active" alt="one" data-note="First caption">
-    <img class="carousel-img" alt="two" data-note="Second caption">
-  </div><div class="carousel-bar">
-    <button class="carousel-nav" data-car-prev aria-label="Previous">&#8592;</button>
-    <button class="carousel-nav" data-car-next aria-label="Next">&#8594;</button>
-    <div class="carousel-dots" data-car-dots></div><p class="carousel-note" data-car-note></p>
-  </div></div></div></section>
-
-<section class="slide" data-title="Tiles"><div class="inner"><h2 class="display">What you get.</h2>
-  <div class="tiles">
-    <button class="tile" data-detail="d-1">Tile one</button>
-    <button class="tile" data-detail="d-2">Tile two</button>
-  </div>
-  <div class="tile-detail"><button class="detail-close" aria-label="Close">&times;</button><div data-detail-body></div></div>
-  <template id="d-1"><h4>Tile one</h4><ul><li>Detail A</li></ul></template>
-  <template id="d-2"><h4>Tile two</h4><ul><li>Detail B</li></ul></template>
-</div></section>
-
-<section class="slide" data-title="Recap"><div class="inner"><h2 class="display">Recap.</h2>
-  <ol class="recap"><li><span class="recap-n">01</span>One</li><li><span class="recap-n">02</span>Two</li></ol>
-</div></section>`
-
-export function samplePage(tone: 'dark' | 'light'): string {
-  const house = tone === 'light'
-    ? `<style>:root{--deck-bg:#FFFFFF;--deck-panel:rgba(15,17,26,.045);--deck-panel-2:rgba(15,17,26,.085);--deck-sheen:rgba(255,255,255,.55);--deck-ink:#0A0A0A;--deck-ink-2:#5E5E5E;--deck-ink-3:#8A8A8A;--deck-accent-1:#0A0A0A;--deck-accent-2:#EFEE3C;--deck-accent-3:#0A0A0A;--deck-accent-4:#EFEE3C;--deck-radius:0px}</style>`
-    : ''
-  return `<!doctype html><html lang="en"${tone === 'light' ? ' data-deck-tone="light"' : ''}><head><meta charset="utf-8">
-${buildDeckBaseBlock()}
-${house}
-</head><body>
-<div class="frame">
-  <button type="button" class="brand"><span class="dot"></span>Terminal 42</button>
-  <div class="foot"><span class="deck-num"></span><span class="footnote">Draft</span></div>
-</div>
-<div class="nav-cluster">
-  <button type="button" class="toc-btn" aria-expanded="false" aria-label="Contents"><svg viewBox="0 0 24 24"></svg></button>
-  <div class="toc"><div class="toc-head"><span class="toc-heading">Contents</span><button class="toc-close" aria-label="Close"><svg viewBox="0 0 24 24"></svg></button></div><ul class="toc-list"></ul></div>
-  <div class="dots"></div>
-</div>
-<main class="deck">${SLIDES}</main>
-</body></html>`
-}
 
 /** Relative luminance of a computed `rgb(...)` colour. */
 function lum(css: string): number {
@@ -133,6 +41,10 @@ function contrast(a: string, b: string): number {
  * place, hash and all, and the runtime honours a hash on load — so every test
  * after the first would otherwise open wherever the previous one finished.
  */
+// Generous, because these run alongside the rest of the suite and a browser
+// that is sharing a machine with a hundred other test files is a slow one.
+const SETTLE = 20_000
+
 const ORIGIN = 'https://deck.test/'
 let loadN = 0
 
@@ -142,7 +54,20 @@ async function load(p: Page, tone: 'dark' | 'light' = 'dark', hash = ''): Promis
   const url = `${ORIGIN}${++loadN}`
   await p.route(url, (route) => route.fulfill({ contentType: 'text/html', body: samplePage(tone) }))
   await p.goto(url + hash)
-  await p.waitForTimeout(450)
+  // Wait for the runtime to have claimed a slide rather than guessing at how
+  // long that takes. Under a loaded machine it is not 450ms, and a guess that
+  // is usually right is a test that usually passes.
+  await p.waitForFunction(() => !!document.querySelector('.slide.in-view'), null, { timeout: SETTLE })
+}
+
+/** Waits until the deck has actually settled on a slide. */
+async function atSlide(p: Page, n: number): Promise<void> {
+  const label = `[${String(n).padStart(2, '0')}]`
+  await p.waitForFunction(
+    (l) => document.querySelector('.deck-num')?.textContent === l,
+    label,
+    { timeout: SETTLE }
+  )
 }
 
 async function show(p: Page, i: number): Promise<void> {
@@ -150,7 +75,18 @@ async function show(p: Page, i: number): Promise<void> {
     const d = document.querySelector('.deck') as HTMLElement
     d.scrollLeft = n * d.clientWidth
   }, i)
-  await p.waitForTimeout(1200)
+  // In view *and* finished fading in: the reveal transition is most of a
+  // second, and half a slide is not what any of these tests mean to measure.
+  await p.waitForFunction((n) => {
+    const d = document.querySelector('.deck') as HTMLElement
+    // Snap can nudge the container after the assignment; measuring mid-nudge
+    // puts every rectangle half a pixel out.
+    if (Math.abs(d.scrollLeft - n * d.clientWidth) > 0.5) return false
+    const s = document.querySelectorAll('.slide')[n] as HTMLElement | undefined
+    if (!s || !s.classList.contains('in-view')) return false
+    const inner = s.querySelector('.inner') as HTMLElement | null
+    return !inner || parseFloat(getComputedStyle(inner).opacity) > 0.99
+  }, i, { timeout: SETTLE })
 }
 
 let available = true
@@ -167,7 +103,7 @@ beforeAll(async () => {
 afterAll(async () => { await browser?.close() })
 
 describe.runIf(process.env.SKIP_BROWSER_TESTS !== '1')('the deck chassis in a browser', () => {
-  const it_ = (name: string, fn: (p: Page) => Promise<void>, timeout = 30_000): void => {
+  const it_ = (name: string, fn: (p: Page) => Promise<void>, timeout = 60_000): void => {
     it(name, async () => {
       if (!available || !page) return
       await fn(page)
@@ -258,42 +194,44 @@ describe.runIf(process.env.SKIP_BROWSER_TESTS !== '1')('the deck chassis in a br
   it_('runs a bleed image to three edges', async (p) => {
     await load(p)
     await show(p, 6)
-    const box = await p.$eval('.slide.bleed .bleed-media', (e) => {
-      const r = e.getBoundingClientRect()
-      return { x: r.x, y: r.y, w: r.width, h: r.height }
+    // Measured against its own slide, not the viewport: the scroll container
+    // can rest on a fractional offset, and half a pixel of that is not a bug
+    // in the layout being tested here.
+    const box = await p.$eval('.slide.bleed', (slide) => {
+      const m = (slide.querySelector('.bleed-media') as HTMLElement).getBoundingClientRect()
+      const s = slide.getBoundingClientRect()
+      return { left: m.left - s.left, top: m.top - s.top, bottom: s.bottom - m.bottom, w: m.width / s.width }
     })
-    expect(box.x).toBe(0)
-    expect(box.y).toBe(0)
-    expect(box.h).toBe(720)
-    expect(box.w).toBeCloseTo(640, 0)
+    // Within a pixel: the deck rests on a fractional scroll offset, so every
+    // rectangle on the slide carries a fraction of one with it.
+    expect(Math.abs(box.left)).toBeLessThan(1)
+    expect(Math.abs(box.top)).toBeLessThan(1)
+    expect(Math.abs(box.bottom)).toBeLessThan(1)
+    // Half the slide, give or take the grid gap.
+    expect(box.w).toBeCloseTo(0.5, 1)
   })
 
   it_('navigates by key, by dot and by hash, and keeps the number current', async (p) => {
     await load(p)
     await p.keyboard.press('ArrowRight')
-    await p.waitForTimeout(900)
-    expect(await p.$eval('.deck-num', (e) => e.textContent)).toBe('[02]')
+    await atSlide(p, 2)
     expect(await p.evaluate(() => location.hash)).toBe('#2')
     await p.$$eval('.dots button', (b) => (b[4] as HTMLElement).click())
-    await p.waitForTimeout(900)
-    expect(await p.$eval('.deck-num', (e) => e.textContent)).toBe('[05]')
+    await atSlide(p, 5)
     await p.keyboard.press('Home')
-    await p.waitForTimeout(900)
-    expect(await p.$eval('.deck-num', (e) => e.textContent)).toBe('[01]')
+    await atSlide(p, 1)
   })
 
   it_('opens on the slide a deep link names', async (p) => {
     await load(p, 'dark', '#6')
-    await p.waitForTimeout(700)
-    expect(await p.$eval('.deck-num', (e) => e.textContent)).toBe('[06]')
+    await atSlide(p, 6)
     expect(await p.$eval('.slide.in-view', (e) => (e as HTMLElement).dataset.title)).toBe('Type')
   })
 
   it_('follows a hash pasted into an already-open deck', async (p) => {
     await load(p)
     await p.evaluate(() => { location.hash = '#4' })
-    await p.waitForTimeout(900)
-    expect(await p.$eval('.deck-num', (e) => e.textContent)).toBe('[04]')
+    await atSlide(p, 4)
     expect(await p.$eval('.slide.in-view', (e) => (e as HTMLElement).dataset.title)).toBe('Palette')
   })
 
@@ -416,6 +354,38 @@ describe.runIf(process.env.SKIP_BROWSER_TESTS !== '1')('the deck chassis in a br
     await p.evaluate(showSlideJs(2))
     await p.waitForTimeout(120)
     expect(await p.evaluate(() => Math.round(window.scrollY))).toBe(1440)
+  })
+
+  it_('keeps a figure caption on two lines, not one run-on word', async (p) => {
+    // Two inline spans in a positioned box print as "Daniel VerhartCEO".
+    await load(p)
+    await show(p, 4)
+    const cap = await p.evaluate(() => {
+      const c = document.querySelector('.figcap') as HTMLElement
+      const nm = c.querySelector('.nm') as HTMLElement
+      const ro = c.querySelector('.ro') as HTMLElement
+      const a = nm.getBoundingClientRect()
+      const b = ro.getBoundingClientRect()
+      return { roleBelowName: b.top >= a.bottom - 1, sharesLeftEdge: Math.abs(a.left - b.left) < 2 }
+    })
+    expect(cap.roleBelowName).toBe(true)
+    expect(cap.sharesLeftEdge).toBe(true)
+  })
+
+  it_('lines figures up with the headline at a readable size', async (p) => {
+    await load(p)
+    await show(p, 4)
+    const m = await p.evaluate(() => {
+      const g = document.querySelector('.figures') as HTMLElement
+      const h = document.querySelectorAll('.slide')[4].querySelector('.display') as HTMLElement
+      const f = (g.querySelector('.figure') as HTMLElement).getBoundingClientRect()
+      return { drift: Math.abs(f.left - h.getBoundingClientRect().left), w: Math.round(f.width), ratio: f.width / f.height }
+    })
+    // Content that starts anywhere other than the headline's edge reads as a mistake.
+    expect(m.drift).toBeLessThan(2)
+    // Two figures used to come out a quarter of the width and unreadably small.
+    expect(m.w).toBeGreaterThan(280)
+    expect(m.ratio).toBeCloseTo(3 / 4, 1)
   })
 
   it_('reads on a light house as well as a dark one', async (p) => {

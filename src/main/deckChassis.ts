@@ -47,6 +47,10 @@ export const DECK_CSS = `:root{
 --deck-ink:#14161d;--deck-ink-2:#4d5364;--deck-ink-3:#7c8296}
 *,*::before,*::after{box-sizing:border-box}
 html,body{margin:0;padding:0;height:100%}
+/* figure, figcaption and blockquote carry a UA margin of 1em 40px. Left
+   unreset it pushes content off the headline's edge and shrinks it, which
+   reads as a layout bug rather than a browser default. */
+figure,figcaption,blockquote,dl,dd{margin:0}
 body{background:var(--deck-bg);color:var(--deck-ink);font-family:var(--deck-font);font-feature-settings:'tnum' 1;-webkit-font-smoothing:antialiased;overflow:hidden}
 button{font:inherit;color:inherit}
 button:focus{outline:none}
@@ -273,10 +277,16 @@ h2.display{font-size:clamp(30px,4.2vw,60px)}
 .swatch .hx,.swatch .ro{font-family:var(--deck-mono);font-size:11px;opacity:.72}
 
 /* ---- figure: an image that says who is in it ---- */
-.figures{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(10px,1.2vw,16px);margin-top:clamp(28px,3.2vw,40px)}
-.figure{position:relative;overflow:hidden;border-radius:calc(var(--deck-radius) * .7);aspect-ratio:3/4;background:var(--deck-panel-2)}
+/* Flexible rather than a fixed four-column grid: two people should sit on
+   the headline's left edge at a readable size, not be stranded at a quarter
+   width next to an invisible grid. The cap stops two figures becoming
+   billboards; the aspect ratio sets the height either way. */
+.figures{display:flex;flex-wrap:wrap;gap:clamp(10px,1.2vw,16px);margin-top:clamp(28px,3.2vw,40px)}
+.figure{position:relative;flex:1 1 0;min-width:0;max-width:340px;overflow:hidden;border-radius:calc(var(--deck-radius) * .7);aspect-ratio:3/4;background:var(--deck-panel-2)}
 .figure img{width:100%;height:100%;object-fit:cover;display:block}
-.figcap{position:absolute;left:0;right:0;bottom:0;padding:clamp(9px,1vw,13px) clamp(11px,1.2vw,15px);background:var(--deck-accent-1);color:var(--deck-bg)}
+/* A grid, not two inline spans — otherwise the name and the role print as
+   one word ("Daniel VerhartCEO"). */
+.figcap{position:absolute;left:0;right:0;bottom:0;display:grid;gap:2px;padding:clamp(9px,1vw,13px) clamp(11px,1.2vw,15px);background:var(--deck-accent-1);color:var(--deck-bg)}
 .figcap .nm{font-size:clamp(12px,1vw,15px);font-weight:700;line-height:1.2}
 .figcap .ro{font-family:var(--deck-mono);font-size:10px;opacity:.8}
 
@@ -295,7 +305,8 @@ h2.display{font-size:clamp(30px,4.2vw,60px)}
 .split,.statgrid,.exhibit,.recap,.specimens{grid-template-columns:1fr}
 .slide.bleed{grid-template-columns:1fr;grid-template-rows:1fr auto}
 .slide.bleed.right>.bleed-media{order:0}
-.figures{grid-template-columns:repeat(2,1fr)}
+.figures{grid-auto-flow:row;grid-template-columns:repeat(2,1fr)}
+.figure{max-width:none;flex-basis:calc(50% - 8px)}
 .swatches{grid-auto-flow:row;grid-auto-columns:auto}
 .tiles{grid-template-columns:repeat(2,1fr)}
 .slide.cover>.inner{max-width:100%}

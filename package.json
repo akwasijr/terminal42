@@ -25,7 +25,8 @@
     "package:win": "electron-vite build && electron-builder --config electron-builder.yml --win",
     "package:linux": "electron-vite build && electron-builder --config electron-builder.yml --linux",
     "package:dir": "electron-vite build && electron-builder --config electron-builder.yml --dir",
-    "bench": "electron scripts/bench.cjs"
+    "bench": "electron scripts/bench.cjs",
+    "smoke:deck": "vite-node scripts/deckSmokeSetup.ts && electron scripts/deckExportSmoke.cjs"
   },
   "dependencies": {
     "@electron/rebuild": "^4.0.4",
