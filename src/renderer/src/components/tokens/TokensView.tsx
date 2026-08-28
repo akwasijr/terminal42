@@ -571,17 +571,16 @@ function StudioEditor({
             setNote(msg)
             window.setTimeout(() => setNote(null), 4000)
           }} />
-          <CssOptionsMenu
-            options={cssOptionsOf(studio.css)}
+          <ExportMenu
+            studio={studio}
+            themeId={themeId}
             onChange={(css) => onChange({ ...studio, css })}
+            onWrite={() => void exportFiles()}
+            onCopied={(msg) => {
+              setNote(msg)
+              window.setTimeout(() => setNote(null), 4000)
+            }}
           />
-          <button
-            type="button"
-            onClick={() => void exportFiles()}
-            className="rounded-md bg-action px-3 py-1.5 text-[12px] font-medium text-action-text hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-          >
-            Export
-          </button>
         </div>
       </header>
 
@@ -1886,37 +1885,82 @@ function TypeMenu({
 /**
  * How hard this library leans on the designs bound to it.
  *
- * Three words rather than a switch, because the middle rung is the point: a
+ * Three rungs rather than a switch, because the middle one is the point: a
  * two-state "enforce on/off" would force a team to choose between being told
  * nothing and having a turn spent on their behalf, and most teams want to see
  * the drift first and decide.
  *
- * Worded as what happens, not as a level name, because "check" means nothing
- * on its own and the whole feature turns on knowing what it does.
+ * It reads as a named choice rather than three bare words, because "Check" on
+ * its own is not a sentence anybody can act on, and the whole feature turns on
+ * knowing what it does. The button says what the setting is about and the menu
+ * spells out, on every rung, what will actually happen.
  */
 function EnforcementPicker({ studio, onChange }: { studio: TokenStudio; onChange: (s: TokenStudio) => void }): JSX.Element {
   const current = enforcementOf(studio)
+  const [open, setOpen] = useState(false)
+  const box = useRef<HTMLDivElement | null>(null)
   const options: { id: Enforcement; label: string; hint: string }[] = [
     { id: 'advise', label: 'Advise', hint: 'Put the token names in the prompt and leave it there.' },
     { id: 'check', label: 'Check', hint: 'Also count and name anything that came out off the library.' },
     { id: 'block', label: 'Fix', hint: 'Also ask for the off-library values to be replaced.' }
   ]
+  const now = options.find((o) => o.id === current) ?? options[0]
+
+  useEffect(() => {
+    if (!open) return
+    const away = (e: MouseEvent): void => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false)
+    }
+    const esc = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', away)
+    document.addEventListener('keydown', esc)
+    return () => {
+      document.removeEventListener('mousedown', away)
+      document.removeEventListener('keydown', esc)
+    }
+  }, [open])
+
   return (
-    <div className="flex items-center gap-0.5 rounded-md bg-surface p-0.5">
-      {options.map((o) => (
-        <button
-          key={o.id}
-          type="button"
-          title={o.hint}
-          aria-pressed={o.id === current}
-          onClick={() => onChange({ ...studio, enforcement: o.id })}
-          className={`rounded-sm px-2 py-1 text-[11px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
-            o.id === current ? 'bg-raised text-text-primary' : 'text-text-muted hover:text-text-secondary'
-          }`}
+    <div ref={box} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="rounded-md bg-surface px-2.5 py-1 text-[11.5px] text-text-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+      >
+        Off-library: <span className="text-text-primary">{now.label}</span>
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="t42-menu absolute right-0 top-full z-30 mt-1 w-72 rounded-panel bg-elevated p-1 shadow-lg ring-1 ring-border"
         >
-          {o.label}
-        </button>
-      ))}
+          <p className="px-2 py-1.5 text-[10.5px] text-text-muted">
+            When a design uses something this library does not have:
+          </p>
+          {options.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              role="menuitemradio"
+              aria-checked={o.id === current}
+              onClick={() => {
+                setOpen(false)
+                onChange({ ...studio, enforcement: o.id })
+              }}
+              className={`w-full rounded-sm px-2 py-1.5 text-left hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                o.id === current ? 'bg-raised' : ''
+              }`}
+            >
+              <span className="block text-[11.5px] text-text-primary">{o.label}</span>
+              <span className="block text-[10.5px] text-text-muted">{o.hint}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -2048,15 +2092,30 @@ function GapsMenu({
   )
 }
 
-function CssOptionsMenu({
-  options,
-  onChange
+/**
+ * Export used to be two controls sitting next to each other: a "CSS" button
+ * that held the options and a dark "Export" button that wrote the files. They
+ * were one job split in half, and the options were easy to miss until after
+ * you had already written the wrong thing. One menu now: how the stylesheet is
+ * written, a live sample of a name, and then the two ways of taking it away —
+ * to disk, or to the clipboard for pasting at a coding agent.
+ */
+function ExportMenu({
+  studio,
+  themeId,
+  onChange,
+  onWrite,
+  onCopied
 }: {
-  options: CssOptions
+  studio: TokenStudio
+  themeId: string | null
   onChange: (o: CssOptions) => void
+  onWrite: () => void
+  onCopied: (message: string) => void
 }): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const box = useRef<HTMLDivElement | null>(null)
+  const options = cssOptionsOf(studio.css)
 
   useEffect(() => {
     if (!open) return
@@ -2078,6 +2137,14 @@ function CssOptionsMenu({
     'w-full rounded-md border border-border bg-bg px-2 py-1 text-[11.5px] text-text-primary placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60'
   const label = 'block text-[10.5px] text-text-muted'
 
+  const copy = async (): Promise<void> => {
+    const css = toCSS(studio, themeId)
+    await navigator.clipboard.writeText(css)
+    const names = css.split('\n').filter((l) => l.includes(': ')).length
+    setOpen(false)
+    onCopied(`${names} names copied. Paste them at a coding agent and ask it to use these.`)
+  }
+
   return (
     <div ref={box} className="relative">
       <button
@@ -2085,14 +2152,16 @@ function CssOptionsMenu({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        title="How the stylesheet is written"
-        className="rounded-md bg-surface px-2.5 py-1 text-[11.5px] text-text-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+        className="rounded-md bg-action px-3 py-1.5 text-[12px] font-medium text-action-text hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
       >
-        CSS
+        Export
       </button>
       {open && (
         <div className="t42-menu absolute right-0 top-full z-30 mt-1 w-72 rounded-panel bg-elevated p-3 shadow-lg ring-1 ring-border">
           <div className="flex flex-col gap-2.5">
+            <p className="text-[10.5px] text-text-muted">
+              Written as CSS custom properties.
+            </p>
             <div className="flex gap-2">
               <label className="min-w-0 flex-1">
                 <span className={label}>Prefix</span>
@@ -2166,6 +2235,26 @@ function CssOptionsMenu({
             <p className="rounded-md bg-surface px-2 py-1.5 font-mono text-[10.5px] text-text-secondary">
               {sampleCss(options)}
             </p>
+
+            <div className="flex gap-2 border-t border-border pt-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false)
+                  onWrite()
+                }}
+                className="flex-1 rounded-md bg-action px-3 py-1.5 text-[11.5px] font-medium text-action-text hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+              >
+                Save to a file
+              </button>
+              <button
+                type="button"
+                onClick={() => void copy()}
+                className="flex-1 rounded-md bg-surface px-3 py-1.5 text-[11.5px] text-text-primary hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+              >
+                Copy
+              </button>
+            </div>
           </div>
         </div>
       )}
