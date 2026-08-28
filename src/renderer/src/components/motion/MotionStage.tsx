@@ -82,6 +82,11 @@ export function MotionStage({
   const engineRef = useRef<MotionEngine | null>(null)
   const docRef = useRef(doc)
   const phaseRef = useRef(phase)
+  // The pixel pass redraws the backdrop inside the animation loop, and the
+  // loop's closure is set up once. Without a ref it would compose against the
+  // empty map it started with and paint every picture as a placeholder over
+  // the real one underneath.
+  const imagesRef = useRef(images)
   const playingRef = useRef(playing)
   const exportingRef = useRef(exporting)
   const [error, setError] = useState<string | null>(null)
@@ -128,6 +133,7 @@ export function MotionStage({
 
   docRef.current = doc
   playingRef.current = playing
+  imagesRef.current = images
   exportingRef.current = exporting
   if (!playing) phaseRef.current = phase
 
@@ -572,6 +578,7 @@ export function MotionStage({
               // pixel for a texture that never moves would cost more each
               // frame than everything else here together.
               skipStatic: true,
+              images: imagesRef.current,
               phase: phaseRef.current
             })
           } else if (fxLiveRef.current) {

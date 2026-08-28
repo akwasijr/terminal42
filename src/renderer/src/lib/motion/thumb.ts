@@ -8,7 +8,8 @@
 // which is the only job a thumbnail has.
 
 import type { CardPlacement, MotionDoc, Pose } from '../../../../shared/motion/types'
-import { computePlacements } from '../../../../shared/motion/frame'
+import { computePlacements, resolvedPictureLayers, resolvedShapeLayers } from '../../../../shared/motion/frame'
+import { drawPictures, drawShapes } from './backdrop'
 
 /**
  * The engine's camera, mirrored here.
@@ -39,6 +40,16 @@ export function drawPresetThumb(
   if (!ctx) return
   ctx.scale(dpr, dpr)
   ctx.clearRect(0, 0, opts.width, opts.height)
+
+  // Scenery first, because it sits under the cards in the real frame. A tile
+  // that left it out would show the Habitts card as a scatter of dots on
+  // white and tell you nothing about the template you were choosing.
+  //
+  // No pictures are passed: the gallery builds every template with none, so
+  // each picture draws as its placeholder, which is what the template really
+  // amounts to before you have chosen a photograph.
+  drawShapes(ctx, resolvedShapeLayers(doc, phase), opts.width, opts.height, phase)
+  drawPictures(ctx, resolvedPictureLayers(doc, phase), new Map(), opts.width, opts.height, phase)
 
   const placements = computePlacements(doc, phase)
   const projected = placements

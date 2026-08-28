@@ -22,7 +22,11 @@ const IMAGES: ImageRef[] = [
 
 describe('motion templates', () => {
   it('offers enough to choose between', () => {
-    expect(MOTION_TEMPLATES.length).toBeGreaterThanOrEqual(15)
+    // Six visual languages, each in the portrait and landscape shapes a piece
+    // actually ships in. Deliberately a short list: a gallery of thirty
+    // near-identical starting points is harder to choose from than a gallery
+    // of twelve that are each obviously a different thing.
+    expect(MOTION_TEMPLATES.length).toBeGreaterThanOrEqual(12)
   })
 
   it('gives every template a distinct id and name', () => {
@@ -108,6 +112,35 @@ describe('motion templates', () => {
         expect(Math.max(...sizes) / Math.min(...sizes)).toBeGreaterThan(1.2)
       })
 
+      it('keeps every block of type inside the frame', () => {
+        // A text layer is centred on its y, so a six-line headline set at
+        // y: 6 has half of itself above the top edge. Nothing catches that at
+        // runtime -- the piece just opens with its first two lines missing --
+        // and the template's own thumbnail is drawn from the same frame, so
+        // the gallery advertises the fault as if it were the design.
+        //
+        // Size is a percentage of the frame's height, which makes the block's
+        // height exactly computable: the baselines are (lines - 1) steps
+        // apart, plus one line of body.
+        const doc = t.build(IMAGES)
+        for (const raw of doc.visual.text) {
+          const layer = resolvedText(raw)
+          if (!layer.text.trim()) continue
+          const lines = layer.text.split('\n').length
+          const height = (lines - 1) * layer.size * layer.lineHeight + layer.size
+          // Every y the layer is ever set to, not only the one it starts on.
+          const ys = [layer.y]
+          for (const [target, track] of Object.entries(doc.keys ?? {})) {
+            if (target !== `text:${layer.id}:y`) continue
+            for (const key of track.keys) ys.push(key.v)
+          }
+          for (const y of ys) {
+            expect(y - height / 2, `${t.id}.${layer.id} top`).toBeGreaterThanOrEqual(-1)
+            expect(y + height / 2, `${t.id}.${layer.id} bottom`).toBeLessThanOrEqual(101)
+          }
+        }
+      })
+
       it('gives the frame some depth', () => {
         const fx = doc.visual.effects
         const treated =
@@ -149,6 +182,19 @@ describe('motion templates', () => {
             const [, layerId, field] = target.split(':')
             expect(doc.visual.text.some((l) => l.id === layerId), `${t.id} keys missing layer ${target}`).toBe(true)
             expect(['size', 'x', 'y', 'opacity', 'tracking'], `${t.id}: ${target}`).toContain(field)
+          } else if (target.startsWith('shape:') || target.startsWith('picture:')) {
+            // Scenery is keyed by layer id like type is, and carries the same
+            // risk: a track naming a panel that was renamed still loads, still
+            // shows a row in the timeline, and still does nothing at all.
+            const [, layerId, field] = target.split(':')
+            const layers = target.startsWith('shape:')
+              ? (doc.visual.shapes ?? [])
+              : (doc.visual.pictures ?? [])
+            expect(layers.some((l) => l.id === layerId), `${t.id} keys missing layer ${target}`).toBe(true)
+            expect(
+              ['width', 'height', 'x', 'y', 'opacity', 'rotation'],
+              `${t.id}: ${target}`
+            ).toContain(field)
           } else if (target.startsWith('fx:')) {
             expect(
               ['blur', 'grain', 'vignette', 'shadow', 'brightness', 'contrast', 'saturation', 'tintAmount'],

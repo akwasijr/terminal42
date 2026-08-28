@@ -108,12 +108,18 @@ export function drawBankImage(canvas: HTMLCanvasElement, id: string, size = 512)
     ctx.restore()
   }
 
-  // A band along the bottom gives every picture a consistent place for the eye
-  // to land, which is what stops a deck of twelve of these reading as noise.
-  ctx.fillStyle = ink
-  ctx.globalAlpha = 0.85
-  ctx.fillRect(0, h - h * 0.11, w, h * 0.11)
-  ctx.globalAlpha = 1
+  // A soft fall-off along the bottom gives every picture a consistent place
+  // for the eye to land. It was a solid band once, which read as a black bar
+  // across the foot of any card these were used full bleed on -- a fault
+  // rather than a photograph.
+  const foot = ctx.createLinearGradient(0, h * 0.72, 0, h)
+  foot.addColorStop(0, 'rgba(0,0,0,0)')
+  foot.addColorStop(1, ink)
+  ctx.save()
+  ctx.globalAlpha = 0.5
+  ctx.fillStyle = foot
+  ctx.fillRect(0, h * 0.72, w, h * 0.28)
+  ctx.restore()
 }
 
 /** The same picture as a PNG payload, ready to be written to disk. */

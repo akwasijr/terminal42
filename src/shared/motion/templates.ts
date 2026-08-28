@@ -34,6 +34,8 @@ import type {
   GlassFx,
   ImageRef,
   MotionDoc,
+  PictureLayer,
+  ShapeLayer,
   TextLayer,
   Wave
 } from './types'
@@ -81,6 +83,39 @@ function text(layer: Partial<TextLayer> & Pick<TextLayer, 'id' | 'text'>): TextL
     lineHeight: 1.1,
     tracking: 0,
     opacity: 100,
+    ...layer
+  }
+}
+
+/** A block of colour with the fields most shapes leave alone already settled. */
+function shape(layer: Partial<ShapeLayer> & Pick<ShapeLayer, 'id'>): ShapeLayer {
+  return {
+    kind: 'rect',
+    width: 40, height: 30, x: 50, y: 50,
+    rotation: 0, colour: '#d8d3c8', opacity: 100,
+    ...layer
+  }
+}
+
+/**
+ * A picture placed against the frame.
+ *
+ * `imageId` is looked up by position rather than passed, because the gallery
+ * builds every template with no pictures at all to draw its tiles. An absent
+ * id is a placeholder, which is the honest thing to show when the photograph
+ * has not been chosen yet.
+ */
+function picture(
+  images: ImageRef[],
+  index: number,
+  layer: Partial<PictureLayer> & Pick<PictureLayer, 'id'>
+): PictureLayer {
+  const src = images[index]
+  return {
+    mask: 'rect',
+    width: 40, height: 40, x: 50, y: 50,
+    rotation: 0, opacity: 100, fit: 'cover',
+    ...(src ? { imageId: src.id } : {}),
     ...layer
   }
 }
@@ -167,6 +202,8 @@ function base(
     effects?: Partial<MotionDoc['visual']['effects']>
     export?: Partial<MotionDoc['export']>
     text?: TextLayer[]
+    shapes?: ShapeLayer[]
+    pictures?: PictureLayer[]
     imageOrder?: MotionDoc['visual']['imageOrder']
   }
 ): MotionDoc {
@@ -181,6 +218,10 @@ function base(
       images,
       imageOrder: patch.imageOrder ?? doc.visual.imageOrder,
       text: patch.text ?? [],
+      // Left absent rather than empty when a template has no scenery, so a
+      // document says what it is instead of carrying two empty arrays.
+      ...(patch.shapes ? { shapes: patch.shapes } : {}),
+      ...(patch.pictures ? { pictures: patch.pictures } : {}),
       effects: { ...doc.visual.effects, ...patch.effects }
     },
     frame: { ...doc.frame, ...patch.frame, gridVisible: patch.frame?.gridVisible ?? false },
@@ -188,1000 +229,530 @@ function base(
   }
 }
 
+// The six visual languages, each in the two shapes a piece actually ships in.
+//
+// A template is a whole finished frame, so it is written the way a designer
+// would describe one: a ground, a photograph, a headline with a hierarchy
+// under it, and something that moves. The portrait and landscape versions of
+// a language are separate entries rather than one entry with a switch,
+// because a headline that reads well stacked in a 9:16 does not simply
+// rewrap in a 16:9 -- it wants a different size, a different corner of the
+// frame, and often a different crop of the picture. Pretending otherwise is
+// how templates end up looking like a phone screenshot stretched sideways.
+//
+// Everything a template puts on screen is a layer a person can then select,
+// move, recolour and key: type is a text layer, panels are shapes, and
+// photographs are picture layers. Nothing is baked into the background.
+
+/** Ground colours, kept together so a language can be read at a glance. */
+const INK = {
+  navy: '#0A1222',
+  navyLift: '#132038',
+  paper: '#E9EEF7',
+  bone: '#EDE9E1',
+  olive: '#4A4A38',
+  teal: '#2E6E7E',
+  yellow: '#F2F06A',
+  orange: '#F86B26',
+  white: '#FFFFFF',
+  black: '#141414',
+  sky: '#CFE6F2'
+}
+
 export const MOTION_TEMPLATES: readonly MotionTemplate[] = [
   {
-    id: 'title-carousel',
-    name: 'Title carousel',
-    note: 'A slow turn on warm paper, with the title set over it.',
-    images: ['dune', 'lantern', 'ember', 'quarry', 'orchard', 'moss'],
-    swatch: ['#e8d5b7', '#4a2f1a'],
-    build: (images) =>
-      base('carousel', images, {
-        params: {
-          cards: 12, cardScale: 1.15, rows: 1, radius: 5.2, speed: 0.22,
-          bend: 18, type: 'continuous', spinAxis: 'y'
-        },
-        doc: {
-          pose: { tiltX: 8, tiltY: 0, tiltZ: 0 },
-          keys: {
-            // The turn is even, so the piece needs its shape from somewhere
-            // else: the camera leans a degree or two either side of centre,
-            // which is enough to stop the loop reading as a machine.
-            'pose:tiltX': ride([[0, 6], [0.5, 11]]),
-            'text:t2:tracking': ride([[0, 3.4], [0.5, 5.2]])
-          }
-        },
-        card: { aspect: '4:5', corner: 14, gradientOpacity: 22 },
-        frame: { background: '#efe6d6', corners: 14 },
-        effects: {
-          vignette: 12,
-          saturation: 104,
-          grain: 8,
-          dropShadow: cast({ angle: 18, distance: 16, blur: 26, density: 30, colour: '#4a2f1a' }),
-          edgeShade: edgeShade({ mode: 'light', colour: '#efe6d6', edges: reach({ left: 22, right: 22 }), falloff: 'soft', softness: 70 })
-        },
-        text: [
-          text({ id: 't1', text: 'Late summer', size: 10.5, weight: 700, y: 22, colour: '#2a1c10', font: 'Fraunces', tracking: -2 }),
-          text({ id: 't2', text: 'a film in six frames', size: 2.4, weight: 500, y: 32, colour: '#7a6244', tracking: 4 }),
-          text({ id: 't3', text: 'Terminal 42', size: 2, weight: 500, y: 93, colour: '#a08c6d', font: 'JetBrains Mono', tracking: 6, from: 0.55, to: 0.98, fade: 0.12 })
-        ]
-      })
-  },
-  {
-    id: 'poster-ring',
-    name: 'Poster ring',
-    note: 'A ring seen edge on, behind glass, for a portrait poster.',
-    images: ['tide', 'harbour', 'slate', 'drift'],
-    swatch: ['#bfe3f2', '#0e2a3a'],
-    build: (images) =>
-      base('ring', images, {
-        params: {
-          cards: 14, rings: 2, cardScale: 0.95, radius: 3, ringGap: 1.7,
-          arc: 360, speed: 0.3, sizeFalloff: 0.35, faceCentre: true
-        },
-        doc: {
-          pose: { tiltX: 44, tiltY: 0, tiltZ: 0 },
-          transform: { positionX: 0, positionY: -0.5, scale: 1.05 },
-          keys: { 'param:radius': ride([[0, 3.2], [0.5, 3.9]]) }
-        },
-        card: { aspect: '1:1', corner: 18, gradientOpacity: 24 },
-        frame: { aspect: '4:5', background: '#07202c', corners: 16 },
-        effects: {
-          vignette: 34,
-          saturation: 116,
-          contrast: 104,
-          tint: '#0aa3c2',
-          tintAmount: 8,
-          glass: glass({ width: 16, refraction: 55, curve: 2.4 }),
-          edgeShade: edgeShade({ mode: 'dark', colour: '#02121a', edges: reach({ bottom: 46 }), falloff: 'soft', softness: 70 })
-        },
-        export: { durationSec: 6 },
-        text: [
-          text({ id: 't1', text: 'Harbour', size: 13, weight: 700, y: 20, colour: '#eaf6fb', font: 'Space Grotesk', tracking: -3 }),
-          text({ id: 't2', text: 'Nine to five,\nevery tide', size: 3.4, weight: 400, y: 79, colour: '#a6cdde', lineHeight: 1.35 }),
-          text({ id: 't3', text: 'North quay, 06:40', size: 1.9, weight: 400, y: 93, colour: '#5d8ba1', font: 'JetBrains Mono', tracking: 4 })
-        ]
-      })
-  },
-  {
-    id: 'story-feed',
-    name: 'Story feed',
-    note: 'A vertical scroll sized for a phone, captioned as it goes.',
-    images: ['bloom', 'signal', 'ember', 'orchard', 'dune'],
-    swatch: ['#f6d3e2', '#3a1024'],
-    build: (images) =>
-      base('feed', images, {
-        params: {
-          cards: 14, columns: 1, cardScale: 2.8, gap: 1.25, edgeFalloff: 0.75,
-          mode: 'continuous', direction: 'forward'
-        },
-        doc: {
-          pose: { tiltX: 0, tiltY: 0, tiltZ: 0 },
-          displacement: move({ wave: { depth: 1.1, frequency: 1.4, speed: 1, style: 'wave', direction: 'vertical' } })
-        },
-        card: { aspect: '4:5', corner: 18, gradient: false },
-        frame: { aspect: '9:16', background: '#2a0c1c', corners: 18 },
-        effects: {
-          grain: 12,
-          contrast: 104,
-          saturation: 108,
-          edgeBlur: edgeBlur({ edges: reach({ top: 26, bottom: 26 }), amount: 34, falloff: 'soft', softness: 62 }),
-          edgeShade: edgeShade({ mode: 'dark', colour: '#2a0c1c', edges: reach({ top: 30, bottom: 34 }), falloff: 'soft', softness: 65 })
-        },
-        export: { durationSec: 9, resolution: 1080 },
-        // Three captions rather than one heading: the piece is a scroll, so
-        // the words should move through it too, one at a time.
-        text: [
-          text({ id: 't1', text: 'This week', size: 4, weight: 700, y: 7, colour: '#fbe9f1', tracking: -1 }),
-          text({ id: 't2', text: 'Everything we shot on Monday', size: 3, weight: 500, y: 90, colour: '#f4c7db', from: 0.02, to: 0.32, fade: 0.06 }),
-          text({ id: 't3', text: 'Half of it in the rain', size: 3, weight: 500, y: 90, colour: '#f4c7db', from: 0.34, to: 0.64, fade: 0.06 }),
-          text({ id: 't4', text: 'None of it planned', size: 3, weight: 500, y: 90, colour: '#f4c7db', from: 0.66, to: 0.96, fade: 0.06 })
-        ]
-      })
-  },
-  {
-    id: 'contact-sheet',
-    name: 'Contact sheet',
-    note: 'A drifting grid on a light table, marked up in pencil.',
-    images: ['slate', 'quarry', 'harbour', 'drift', 'moss', 'tide'],
-    swatch: ['#d8dbe0', '#1b1f24'],
-    build: (images) =>
-      base('grid', images, {
-        params: {
-          columns: 5, rows: 4, cardScale: 0.8, gapX: 2.4, gapY: 2, 
-          driftX: 1, driftY: 0, curve: 0.1, depth: 0.5, lean: 0
-        },
-        doc: { pose: { tiltX: 4, tiltY: 0, tiltZ: 0 } },
-        card: { aspect: '4:3', corner: 4, gradient: false, backOpacity: 12 },
-        frame: { background: '#e7e5e0', corners: 10 },
-        effects: {
-          saturation: 62,
-          contrast: 108,
-          grain: 16,
-          dropShadow: cast({ angle: 0, distance: 8, blur: 14, density: 22, colour: '#1b1f24' }),
-          edgeShade: edgeShade({ mode: 'light', colour: '#e7e5e0', edges: all(18), falloff: 'soft', softness: 75 })
-        },
-        text: [
-          text({ id: 't1', text: 'Roll 04', size: 2.6, weight: 500, x: 6, y: 8, align: 'left', colour: '#2c3037', font: 'JetBrains Mono' }),
-          text({ id: 't2', text: '24 exposures on Ilford HP5', size: 2, weight: 400, x: 6, y: 93, align: 'left', colour: '#6d737c', font: 'JetBrains Mono' }),
-          text({ id: 't3', text: 'keep 9, 14, 21', size: 2, weight: 400, x: 94, y: 93, align: 'right', colour: '#a33b2a', font: 'JetBrains Mono', from: 0.4, to: 0.95, fade: 0.1 })
-        ]
-      })
-  },
-  {
-    id: 'launch-wall',
-    name: 'Launch wall',
-    note: 'A wall of cards flipping behind a headline, in ink and amber.',
-    images: ['signal', 'ember', 'lantern', 'dune'],
-    swatch: ['#ffd166', '#101f4a'],
-    build: (images) =>
-      base('flip', images, {
-        params: {
-          columns: 5, rows: 3, cardScale: 0.95, gapX: 1.4, gapY: 1.8, axis: 'y',
-          flips: 2, stagger: 0.55, hold: 0.8, transition: 0.7, depth: 0.4
-        },
-        doc: {
-          pose: { tiltX: 6, tiltY: 0, tiltZ: 0 },
-          // Lifted, so the bottom row clears the band the words sit in.
-          transform: { positionX: 0, positionY: 0.8, scale: 0.9 },
-          keys: {
-            // The wall flips in steps, so the grade pulses with it rather than
-            // sitting still while everything else moves.
-            'fx:tintAmount': ride([[0, 6], [0.5, 20]]),
-            'text:t1:size': ride([[0, 8.6], [0.5, 9.2]])
-          }
-        },
-        card: { aspect: '1:1', corner: 8, gradientOpacity: 26 },
-        frame: { background: '#101f4a', corners: 12 },
-        effects: {
-          vignette: 26,
-          contrast: 106,
-          saturation: 112,
-          tint: '#ffb020',
-          tintAmount: 10,
-          dropShadow: cast({ angle: 12, distance: 14, blur: 30, density: 40, colour: '#05091c' }),
-          edgeShade: edgeShade({ mode: 'dark', colour: '#05091c', edges: reach({ top: 18, bottom: 48 }), falloff: 'soft', softness: 62 })
-        },
-        export: { durationSec: 6 },
-        text: [
-          text({ id: 't0', text: 'Release notes', size: 2, weight: 500, y: 70, colour: '#8fa3d8', font: 'JetBrains Mono', tracking: 8 }),
-          text({ id: 't1', text: 'Now shipping', size: 8.6, weight: 700, y: 80, colour: '#ffd166', font: 'Space Grotesk', tracking: -3 }),
-          text({ id: 't2', text: 'Version two, today', size: 2.8, weight: 400, y: 88, colour: '#c8d3f0' }),
-          text({ id: 't3', text: 'terminal42.app', size: 2, weight: 500, y: 95, colour: '#7f92c8', from: 0.5, to: 0.98, fade: 0.12 })
-        ]
-      })
-  },
-  {
-    id: 'deep-field',
-    name: 'Deep field',
-    note: 'Cards flying past the camera, focus pulling as they come.',
-    images: ['drift', 'slate', 'tide', 'harbour'],
-    swatch: ['#dcd9f2', '#1f1a3d'],
-    build: (images) =>
-      base('space', images, {
-        params: { cards: 70, cardScale: 0.42, spread: 9.5, depthRange: 28, speed: 2, direction: 'forward' },
-        doc: {
-          pose: { tiltX: 0, tiltY: 0, tiltZ: 0 },
-          keys: { 'fx:blur': ride([[0, 1], [0.5, 5]], EASE.breath) }
-        },
-        card: { aspect: '4:5', corner: 12, gradientOpacity: 40 },
-        frame: { background: '#0a0722', corners: 12 },
-        effects: {
-          blur: 1,
-          vignette: 46,
-          saturation: 122,
-          tint: '#6a5cff',
-          tintAmount: 12,
-          glass: glass({ width: 10, refraction: 40, curve: 3 }),
-          dropShadow: cast({ angle: 0, distance: 0, blur: 40, density: 30, colour: '#000018' })
-        },
-        imageOrder: 'scatter',
-        export: { durationSec: 6 },
-        text: [
-          text({ id: 't1', text: 'Everything,\nall at once', size: 6.4, weight: 600, y: 78, colour: '#e4e0ff', lineHeight: 1.15 }),
-          text({ id: 't2', text: 'an archive of 4,200 frames', size: 2.2, weight: 400, y: 92, colour: '#8b83c9', tracking: 3 })
-        ]
-      })
-  },
-  {
-    id: 'quiet-slider',
-    name: 'Quiet slider',
-    note: 'One card at a time on off-white, held long enough to read.',
-    images: ['moss', 'orchard', 'quarry', 'dune'],
-    swatch: ['#d6e6c3', '#2b3524'],
+    id: 'signal-portrait',
+    name: 'Signal — portrait',
+    note: 'A dark product story: photograph full height, claim across the foot.',
+    images: ['slate', 'harbour', 'drift', 'quarry'],
+    swatch: [INK.navyLift, INK.navy],
     build: (images) =>
       base('slider', images, {
         params: {
-          cards: 6, cardScale: 4, gap: 3.4, stagger: 0.2, depth: 1.6,
-          mode: 'stepped', stepSize: 1, hold: 1.6, transition: 1.2, drift: 4
+          cards: 4, cardScale: 4, gap: 2.6, stagger: 0, depth: 0,
+          spinX: 0, spinY: 0, spinZ: 0, axis: 'x', mode: 'step',
+          stepSize: 1, direction: 'forward', hold: 2.1, transition: 0.9, drift: 4
         },
         doc: {
-          pose: { tiltX: 6, tiltY: 0, tiltZ: 0 },
-          easing: EASE.snap,
-          transform: { positionX: 0, positionY: 0, scale: 1.5 }
-        },
-        card: { aspect: '4:5', corner: 10, gradientOpacity: 14 },
-        frame: { background: '#f0eee6', corners: 12 },
-        effects: {
-          saturation: 96,
-          contrast: 102,
-          grain: 6,
-          dropShadow: cast({ angle: 8, distance: 18, blur: 34, density: 26, colour: '#2b3524' }),
-          edgeShade: edgeShade({ mode: 'light', colour: '#f0eee6', edges: reach({ left: 26, right: 26 }), falloff: 'soft', softness: 78 })
-        },
-        export: { durationSec: 8 },
-        text: [
-          text({ id: 't1', text: 'Field notes', size: 3.6, weight: 400, x: 8, y: 10, align: 'left', colour: '#2b3524', font: 'Lora' }),
-          text({ id: 't2', text: 'Kent, late April', size: 2.1, weight: 400, x: 8, y: 15, align: 'left', colour: '#7b8470', font: 'JetBrains Mono', tracking: 3 }),
-          text({ id: 't3', text: 'Four days of walking, one roll of film', size: 2.3, weight: 400, x: 8, y: 92, align: 'left', colour: '#5c6553', font: 'Lora', italic: true })
-        ]
-      })
-  },
-  {
-    id: 'editorial-column',
-    name: 'Editorial column',
-    note: 'A helix rising beside a serif title, on ivory.',
-    images: ['bloom', 'ember', 'lantern', 'signal'],
-    swatch: ['#f6f1e7', '#3f1d05'],
-    build: (images) =>
-      base('column', images, {
-        params: {
-          cards: 20, cardScale: 0.7, radius: 2.6, pitch: 0.85, twist: 2.5,
-          taper: 0.9, speed: 1, lean: 8, facing: 'camera'
-        },
-        doc: {
-          pose: { tiltX: 14, tiltY: 0, tiltZ: 0 },
-          transform: { positionX: 2.4, positionY: 0, scale: 1 },
-          keys: { 'param:lean': ride([[0, 4], [0.5, 12]]) }
-        },
-        card: { aspect: '4:5', corner: 10, gradientOpacity: 18 },
-        frame: { aspect: '4:5', background: '#f6f1e7', corners: 14 },
-        effects: {
-          saturation: 100,
-          grain: 7,
-          dropShadow: cast({ angle: 22, distance: 14, blur: 30, density: 24, colour: '#3f1d05' }),
-          edgeShade: edgeShade({ mode: 'light', colour: '#f6f1e7', edges: reach({ top: 20, bottom: 20 }), falloff: 'soft', softness: 72 })
-        },
-        text: [
-          text({ id: 't0', text: 'Issue eleven', size: 2, weight: 500, x: 8, y: 10, align: 'left', colour: '#a1794b', font: 'JetBrains Mono', tracking: 8 }),
-          text({ id: 't1', text: 'The long\nway round', size: 8, weight: 400, x: 8, y: 40, align: 'left', colour: '#2a1608', font: 'Playfair Display', lineHeight: 1.02 }),
-          text({ id: 't2', text: 'Six photographers on the roads they keep\ncoming back to.', size: 2.3, weight: 400, x: 8, y: 60, align: 'left', colour: '#6b5238', font: 'Lora', lineHeight: 1.5 }),
-          text({ id: 't3', text: 'Words by Ama Yeboah', size: 1.9, weight: 400, x: 8, y: 91, align: 'left', colour: '#9c8467', font: 'JetBrains Mono' })
-        ]
-      })
-  },
-  {
-    id: 'globe-brand',
-    name: 'Globe',
-    note: 'A sphere of cards turning under a wordmark that opens out.',
-    images: ['tide', 'harbour', 'drift', 'slate', 'moss'],
-    swatch: ['#cfe0e6', '#062028'],
-    build: (images) =>
-      base('global', images, {
-        params: {
-          cards: 40, cardScale: 0.82, radius: 4.2, band: 1, speed: 0.36,
-          swell: 0.4, scaleFalloff: 0.5, facing: 'camera'
-        },
-        doc: {
-          pose: { tiltX: 10, tiltY: 0, tiltZ: 0 },
+          transform: { ...emptyDoc('slider').transform, scale: 2.5 },
           keys: {
-            'text:t1:tracking': ride([[0, -1], [0.5, 6]], EASE.breath),
-            'text:t1:opacity': ride([[0, 100], [0.5, 82]])
+            // The photograph is still between steps, so the piece gets its
+            // pulse from the type instead: the claim settles as each new
+            // picture arrives rather than hanging there through the cut.
+            'text:head:y': ride([[0, 73.5], [0.06, 72]], EASE.settle),
+            'text:sub:opacity': ride([[0, 46], [0.1, 82]], EASE.settle)
           }
         },
-        card: { aspect: '1:1', corner: 16, gradientOpacity: 30 },
-        frame: { background: '#062028', corners: 12 },
+        card: { aspect: '9:16', corner: 0, gradient: true, gradientOpacity: 46, gradientSide: 'front' },
+        frame: { aspect: '9:16', background: INK.navy, corners: 0 },
         effects: {
-          vignette: 38,
-          saturation: 112,
-          tint: '#1fd0c0',
-          tintAmount: 9,
-          glass: glass({ width: 14, refraction: 50, curve: 2 }),
-          dropShadow: cast({ angle: 0, distance: 6, blur: 44, density: 34, colour: '#00080c' })
+          edgeShade: edgeShade({ mode: 'dark', colour: INK.navy, edges: reach({ bottom: 46, top: 22 }), falloff: 'soft', softness: 70 })
         },
-        imageOrder: 'scatter',
+        export: { durationSec: 12, fps: 30 },
         text: [
-          text({ id: 't1', text: 'Everywhere', size: 7, weight: 700, y: 49, colour: '#e6f2f6', font: 'Space Grotesk' }),
-          text({ id: 't2', text: 'thirty-one cities, one afternoon', size: 2.1, weight: 400, y: 58, colour: '#79a5b0', tracking: 4 })
+          text({ id: 'brand', text: 'Aivon', size: 2.4, colour: INK.white, x: 8, y: 5.5, align: 'left', weight: 600 }),
+          text({ id: 'url', text: 'aivon.com', size: 1.6, colour: '#8FA4C2', x: 92, y: 5.6, align: 'right', weight: 400 }),
+          text({
+            id: 'head', text: 'Fewer meetings.\nFaster answers.',
+            size: 6.4, colour: INK.white, x: 8, y: 73.5, align: 'left', weight: 700, lineHeight: 1.08
+          }),
+          text({
+            id: 'sub', text: 'Aivon surfaces the answer before\nthe meeting was booked.',
+            size: 2.3, colour: '#A8BAD4', x: 8, y: 84, align: 'left', weight: 400, lineHeight: 1.35, opacity: 82
+          }),
+          text({ id: 'foot', text: 'Aivon', size: 2.2, colour: INK.white, x: 8, y: 95, align: 'left', weight: 600 })
         ]
       })
   },
   {
-    id: 'ribbon-banner',
-    name: 'Ribbon banner',
-    note: 'A wide wave in warm light, sized for a site header.',
-    images: ['ember', 'signal', 'lantern', 'bloom'],
-    swatch: ['#ffd0a6', '#3d0f0a'],
+    id: 'signal-landscape',
+    name: 'Signal — landscape',
+    note: 'The same dark story, opened out: picture right, claim held left.',
+    images: ['harbour', 'slate', 'drift', 'quarry'],
+    swatch: [INK.navyLift, INK.navy],
     build: (images) =>
-      base('ribbon', images, {
+      base('slider', images, {
         params: {
-          cards: 22, cardScale: 0.72, length: 17, amplitude: 2.4,
-          wavelength: 2, twist: 40, depth: 2.2, speed: 1
+          cards: 4, cardScale: 4, gap: 4, stagger: 0, depth: 0,
+          spinX: 0, spinY: 0, spinZ: 0, axis: 'x', mode: 'step',
+          stepSize: 1, direction: 'forward', hold: 2.1, transition: 0.9, drift: 3
         },
         doc: {
-          pose: { tiltX: 16, tiltY: 0, tiltZ: 0 },
-          displacement: move({ wave: { depth: 1.6, frequency: 2, speed: 1, style: 'wave', direction: 'horizontal' } })
+          pose: { tiltX: 0, tiltY: 0, tiltZ: 0 },
+          transform: { ...emptyDoc('slider').transform, positionX: 3.2, scale: 3 },
+          keys: {
+            'text:head:x': ride([[0, 7.5], [0.06, 6]], EASE.settle),
+            'text:sub:opacity': ride([[0, 46], [0.1, 82]], EASE.settle)
+          }
         },
-        card: { aspect: '4:5', corner: 12, gradientOpacity: 26 },
-        frame: { background: '#2a0b08', corners: 12 },
+        card: { aspect: '4:5', corner: 0, gradient: true, gradientOpacity: 40, gradientSide: 'front' },
+        frame: { aspect: '16:9', background: INK.navy, corners: 0 },
         effects: {
-          vignette: 30,
-          saturation: 118,
-          tint: '#ff7a2f',
-          tintAmount: 14,
-          edgeBlur: edgeBlur({ edges: reach({ left: 30, right: 30 }), amount: 30, falloff: 'soft', softness: 60, over: 'component' }),
-          dropShadow: cast({ angle: 30, distance: 12, blur: 32, density: 36, colour: '#1a0402' })
+          edgeShade: edgeShade({ mode: 'dark', colour: INK.navy, edges: reach({ left: 70 }), falloff: 'soft', softness: 92 })
         },
+        export: { durationSec: 12, fps: 30 },
         text: [
-          text({ id: 't1', text: 'Warm front', size: 7.4, weight: 700, y: 12, colour: '#ffe3c8', font: 'Space Grotesk', tracking: -2 }),
-          text({ id: 't2', text: 'A season of work, opening 14 June', size: 2.3, weight: 400, y: 88, colour: '#d29b76', tracking: 3 })
+          text({ id: 'brand', text: 'Aivon', size: 3.2, colour: INK.white, x: 6, y: 9, align: 'left', weight: 600 }),
+          text({
+            id: 'head', text: 'Fewer meetings.\nFaster answers.',
+            size: 8.2, colour: INK.white, x: 6, y: 44, align: 'left', weight: 700, lineHeight: 1.06
+          }),
+          text({
+            id: 'sub', text: 'Aivon surfaces the answer before the\nmeeting was ever booked.',
+            size: 3, colour: '#A8BAD4', x: 6, y: 66, align: 'left', weight: 400, lineHeight: 1.35, opacity: 82
+          }),
+          text({ id: 'foot', text: 'aivon.com', size: 2.6, colour: '#8FA4C2', x: 6, y: 91, align: 'left', weight: 400 })
         ]
       })
   },
   {
-    id: 'drop-reveal',
-    name: 'Drop reveal',
-    note: 'Cards fall in and settle, and the title lands after them.',
-    images: ['quarry', 'dune', 'slate', 'orchard'],
-    swatch: ['#e3ded6', '#2e281f'],
-    previewPhase: 0.85,
-    build: (images) => {
-      const doc = base('card-drop', images, {
-        params: {
-          cards: 10, cardScale: 1.7, spread: 4.6, dropHeight: 9,
-          squash: 0.35, spin: 22, stagger: 0.6, drops: 1
-        },
-        doc: { pose: { tiltX: 18, tiltY: 0, tiltZ: 0 } },
-        card: { aspect: '4:5', corner: 10, gradientOpacity: 20 },
-        frame: { background: '#1c2117', corners: 12 },
-        effects: {
-          vignette: 22,
-          saturation: 104,
-          dropShadow: cast({ angle: 0, distance: 22, blur: 26, density: 52, colour: '#050703' }),
-          edgeShade: edgeShade({ mode: 'dark', colour: '#050703', edges: reach({ bottom: 40 }), falloff: 'soft', softness: 68 })
-        },
-        export: { durationSec: 6 },
-        text: [
-          text({ id: 't1', text: 'Deal me in', size: 7, weight: 700, y: 84, colour: '#eee7db', font: 'Space Grotesk', from: 0.42, to: 0.99, fade: 0.1 }),
-          text({ id: 't2', text: 'twelve cards, one hand', size: 2.2, weight: 400, y: 92, colour: '#9aa38c', tracking: 4, from: 0.52, to: 0.99, fade: 0.08 })
-        ]
-      })
-      return {
-        ...doc,
-        animation: {
-          ...doc.animation,
-          componentIn: { ...doc.animation.componentIn, enabled: true, shape: 'drop', duration: 1, stagger: 0.06 }
-        }
-      }
-    }
-  },
-  {
-    id: 'shuffle-cut',
-    name: 'Shuffle',
-    note: 'A deck cut and restacked, close in and lit from one side.',
-    images: ['ember', 'drift', 'bloom'],
-    swatch: ['#f6d3e2', '#241a33'],
+    id: 'daybreak-portrait',
+    name: 'Daybreak — portrait',
+    note: 'Pale and quiet: the claim at the top, a soft panel doing the proving.',
+    images: ['tide', 'drift'],
+    swatch: ['#F6F9FE', INK.paper],
     build: (images) =>
-      base('card-shuffle', images, {
+      base('feed', images, {
         params: {
-          images: '3', cardScale: 3.8, stagger: 0.35, depth: 1.4,
-          mode: 'stepped', stepSize: 1, hold: 0.7, transition: 0.9, drift: 14
-        },
-        doc: { pose: { tiltX: 10, tiltY: 0, tiltZ: 0 }, easing: EASE.settle },
-        card: { aspect: '4:5', corner: 14, gradientOpacity: 18 },
-        frame: { aspect: '1:1', background: '#241a33', corners: 16 },
-        effects: {
-          vignette: 30,
-          saturation: 108,
-          tint: '#b07bff',
-          tintAmount: 10,
-          dropShadow: cast({ angle: 42, distance: 20, blur: 30, density: 48, colour: '#0d0715' }),
-          glass: glass({ width: 8, refraction: 32, curve: 2.6 })
-        },
-        text: [
-          text({ id: 't1', text: 'Pick one', size: 4.4, weight: 600, y: 88, colour: '#efe7ff' }),
-          text({ id: 't2', text: 'you already know which', size: 2, weight: 400, y: 94, colour: '#9a8bc0', italic: true, from: 0.35, to: 0.95, fade: 0.1 })
-        ]
-      })
-  },
-  {
-    id: 'repeater-pattern',
-    name: 'Pattern',
-    note: 'A dense field of one picture, rippling from the middle.',
-    images: ['signal'],
-    swatch: ['#8ef0d8', '#04241f'],
-    build: (images) =>
-      base('image-repeater', images, {
-        params: {
-          columns: 11, rows: 7, gap: 1.1, cardScale: 0.5,
-          waveAmp: 0.9, waveSpeed: 2, waveAxis: 'depth'
+          cards: 4, columns: 1, cardScale: 1.9, gap: 1.5, edgeFalloff: 0.85,
+          mode: 'continuous', direction: 'up', hold: 0.8, transition: 0.5
         },
         doc: {
-          pose: { tiltX: 24, tiltY: 0, tiltZ: 0 },
-          displacement: move({ wave: { depth: 2.4, frequency: 3, speed: 1, style: 'ripple', direction: 'horizontal' } }),
-          keys: { 'fx:vignette': ride([[0, 34], [0.5, 52]]) }
+          transform: { ...emptyDoc('feed').transform, positionY: -1.9 },
+          keys: {
+            // Cards are drawn in the scene and shapes on the ground behind it,
+            // so the panel can only ever sit under the feed. It is sized to
+            // hold the column rather than compete with it.
+            'shape:panel:height': ride([[0, 47], [0.5, 48.4]], EASE.breath),
+            'text:head:y': ride([[0, 13.2], [0.1, 12]], EASE.settle)
+          }
         },
-        card: { aspect: '1:1', corner: 24, gradient: false },
-        frame: { background: '#04241f', corners: 12 },
+        card: { aspect: '4:5', corner: 10, gradient: false, gradientOpacity: 0 },
+        frame: { aspect: '9:16', background: INK.paper, corners: 18 },
         effects: {
-          vignette: 34,
-          saturation: 130,
-          contrast: 106,
-          tint: '#00e0b0',
-          tintAmount: 16,
-          edgeBlur: edgeBlur({ edges: all(28), amount: 26, falloff: 'soft', softness: 70 })
+          dropShadow: cast({ density: 16, blur: 30, distance: 10, angle: 0 }),
+          edgeBlur: edgeBlur({ amount: 16, edges: reach({ top: 18, bottom: 24 }), falloff: 'soft', softness: 62 })
         },
+        export: { durationSec: 10, fps: 30 },
+        shapes: [
+          shape({ id: 'panel', kind: 'rect', width: 82, height: 47, x: 50, y: 66, colour: '#F7FAFE', corner: 6, opacity: 100 })
+        ],
+        pictures: [
+          picture(images, 0, { id: 'thumb', mask: 'rect', width: 20, height: 11, x: 22, y: 50, corner: 10 })
+        ],
         text: [
-          text({ id: 't1', text: 'Signal', size: 7.5, weight: 700, y: 46, colour: '#eafff8', font: 'JetBrains Mono', tracking: 10 }),
-          text({ id: 't2', text: 'ninety-six of the same picture', size: 2.4, weight: 400, y: 57, colour: '#8fd8c4', font: 'JetBrains Mono', tracking: 4 })
+          text({
+            id: 'head', text: 'Leads captured.\nPipeline updated.\nAutomatically.',
+            size: 5.6, colour: '#16203A', x: 10, y: 12, align: 'left', weight: 700, lineHeight: 1.12
+          }),
+          text({
+            id: 'sub', text: 'Aivon connects your tools and moves\nopportunities forward without manual input.',
+            size: 2, colour: '#5A6A85', x: 10, y: 27, align: 'left', weight: 400, lineHeight: 1.4
+          }),
+          text({ id: 'foot', text: 'Aivon', size: 2.2, colour: '#16203A', x: 10, y: 94, align: 'left', weight: 600 })
         ]
       })
   },
   {
-    id: 'gallery-plate',
-    name: 'Gallery plate',
-    note: 'A turntable seen from above, on sand.',
-    images: ['moss', 'orchard', 'quarry', 'dune', 'harbour'],
-    swatch: ['#e9e2d2', '#3c4423'],
+    id: 'daybreak-landscape',
+    name: 'Daybreak — landscape',
+    note: 'The pale layout turned wide: claim left, the panel proving it on the right.',
+    images: ['tide', 'drift'],
+    swatch: ['#F6F9FE', INK.paper],
     build: (images) =>
-      base('plate', images, {
+      base('feed', images, {
         params: {
-          cards: 12, rings: 2, cardScale: 1.5, radius: 3.2, ringGap: 1.6,
-          speed: 0.28, tip: 62, lift: 0.4, scatter: 0.2, heading: 'radial'
+          cards: 4, columns: 1, cardScale: 1.3, gap: 1.5, edgeFalloff: 0.85,
+          mode: 'continuous', direction: 'up', hold: 0.8, transition: 0.5
         },
         doc: {
-          pose: { tiltX: 6, tiltY: 0, tiltZ: 0 },
-          keys: { 'param:lift': ride([[0, 0.2], [0.5, 0.7]]) }
+          transform: { ...emptyDoc('feed').transform, positionX: 3.6 },
+          keys: {
+            'shape:panel:width': ride([[0, 40], [0.5, 41.6]], EASE.breath),
+            'text:head:x': ride([[0, 7], [0.1, 6]], EASE.settle)
+          }
         },
-        card: { aspect: '4:5', corner: 10, gradientOpacity: 16 },
-        frame: { background: '#e9e2d2', corners: 12 },
+        card: { aspect: '4:5', corner: 10, gradient: false, gradientOpacity: 0 },
+        frame: { aspect: '16:9', background: INK.paper, corners: 14 },
         effects: {
-          saturation: 98,
-          grain: 8,
-          dropShadow: cast({ angle: 0, distance: 12, blur: 24, density: 30, colour: '#3c4423' }),
-          edgeShade: edgeShade({ mode: 'light', colour: '#e9e2d2', edges: all(16), falloff: 'soft', softness: 76 })
+          dropShadow: cast({ density: 16, blur: 30, distance: 10, angle: 0 }),
+          edgeBlur: edgeBlur({ amount: 14, edges: reach({ top: 20, bottom: 20 }), falloff: 'soft', softness: 62 })
         },
+        export: { durationSec: 10, fps: 30 },
+        shapes: [
+          shape({ id: 'panel', kind: 'rect', width: 40, height: 78, x: 76, y: 50, colour: '#F7FAFE', corner: 5, opacity: 100 })
+        ],
+        pictures: [
+          picture(images, 0, { id: 'thumb', mask: 'ellipse', width: 5, height: 9, x: 8, y: 76 })
+        ],
         text: [
-          text({ id: 't1', text: 'On show', size: 3.4, weight: 500, y: 8, colour: '#3c4423', tracking: 8 }),
-          text({ id: 't2', text: 'Room two, until Sunday', size: 2.1, weight: 400, y: 92, colour: '#7a815f', font: 'Lora', italic: true })
+          text({
+            id: 'head', text: 'Leads captured.\nPipeline updated.\nAutomatically.',
+            size: 6.8, colour: '#16203A', x: 6, y: 30, align: 'left', weight: 700, lineHeight: 1.1
+          }),
+          text({
+            id: 'sub', text: 'Aivon connects your tools and moves opportunities\nforward without manual input.',
+            size: 2.6, colour: '#5A6A85', x: 6, y: 50, align: 'left', weight: 400, lineHeight: 1.4
+          }),
+          text({ id: 'foot', text: 'Aivon', size: 2.8, colour: '#16203A', x: 6, y: 88, align: 'left', weight: 600 })
         ]
       })
   },
   {
-    id: 'parallax-scene',
-    name: 'Parallax',
-    note: 'Layers passing at different speeds through a soft edge.',
-    images: ['harbour', 'tide', 'slate', 'drift'],
-    swatch: ['#bfe3f2', '#12222e'],
+    id: 'bloom-portrait',
+    name: 'Bloom — portrait',
+    note: 'Editorial and botanical: a tall serif over bone, one ghosted letterform behind.',
+    images: ['bloom', 'orchard', 'moss'],
+    swatch: ['#B9AE9A', '#6A6552'],
+    build: (images) =>
+      base('carousel', images, {
+        params: {
+          cards: 3, cardScale: 1.9, rows: 1, radius: 1.8, speed: 0.1,
+          bend: 6, type: 'continuous', spinAxis: 'y'
+        },
+        doc: {
+          transform: { ...emptyDoc('carousel').transform, positionY: -1.1 },
+          keys: {
+            // The ghosted mark turns very slowly behind everything, which is
+            // the only movement in a frame that is otherwise a poster.
+            'shape:ghost:rotation': ride([[0, -6], [0.5, 6]], EASE.breath),
+            'text:kicker:tracking': ride([[0, 16], [0.5, 22]], EASE.breath)
+          }
+        },
+        card: { aspect: '4:5', corner: 4, gradient: false, gradientOpacity: 0 },
+        frame: { aspect: '9:16', background: INK.bone, corners: 20 },
+        effects: {
+          edgeBlur: edgeBlur({ amount: 18, edges: reach({ bottom: 12 }), falloff: 'soft', softness: 62 }),
+          edgeShade: edgeShade({ mode: 'light', colour: INK.bone, edges: reach({ top: 30 }), falloff: 'soft', softness: 70 })
+        },
+        export: { durationSec: 14, fps: 30 },
+        shapes: [
+          shape({ id: 'ghost', kind: 'ellipse', width: 54, height: 54, x: 68, y: 40, colour: '#DFD9CD', opacity: 70 })
+        ],
+        text: [
+          text({ id: 'kicker', text: 'Moontion present', size: 1.7, colour: INK.olive, x: 50, y: 8, align: 'center', weight: 500, caps: true, tracking: 16 }),
+          text({
+            id: 'head', text: 'Create\nyour beauty\nhere',
+            size: 7.4, colour: INK.olive, x: 50, y: 25, align: 'center', weight: 700, lineHeight: 1.04, caps: true, font: 'Playfair Display'
+          }),
+          text({ id: 'foot', text: 'In every season', size: 1.7, colour: INK.olive, x: 50, y: 94, align: 'center', weight: 500, caps: true, tracking: 16 })
+        ]
+      })
+  },
+  {
+    id: 'bloom-landscape',
+    name: 'Bloom — landscape',
+    note: 'The botanical setting laid on its side: serif left, the picture running off the right edge.',
+    images: ['orchard', 'bloom', 'moss'],
+    swatch: ['#B9AE9A', '#6A6552'],
+    build: (images) =>
+      base('carousel', images, {
+        params: {
+          cards: 3, cardScale: 3.4, rows: 1, radius: 1.4, speed: 0.1,
+          bend: 5, type: 'continuous', spinAxis: 'y'
+        },
+        doc: {
+          transform: { ...emptyDoc('carousel').transform, positionX: 4.8 },
+          keys: {
+            'shape:ghost:rotation': ride([[0, -5], [0.5, 5]], EASE.breath),
+            'text:kicker:tracking': ride([[0, 16], [0.5, 22]], EASE.breath)
+          }
+        },
+        card: { aspect: '4:5', corner: 4, gradient: false, gradientOpacity: 0 },
+        frame: { aspect: '16:9', background: INK.teal, corners: 14 },
+        effects: {
+          edgeShade: edgeShade({ mode: 'dark', colour: INK.teal, edges: reach({ left: 44 }), falloff: 'soft', softness: 70 })
+        },
+        export: { durationSec: 14, fps: 30 },
+        shapes: [
+          shape({ id: 'ghost', kind: 'ellipse', width: 30, height: 52, x: 26, y: 46, colour: '#3B7E8E', opacity: 70 })
+        ],
+        text: [
+          text({ id: 'kicker', text: 'Moontion present', size: 2.1, colour: '#E7EEEE', x: 6, y: 13, align: 'left', weight: 500, caps: true, tracking: 16 }),
+          text({
+            id: 'head', text: 'Beauty\nfresh\nflowers',
+            size: 10, colour: '#F4F1E8', x: 6, y: 46, align: 'left', weight: 700, lineHeight: 1.02, caps: true, font: 'Playfair Display'
+          }),
+          text({ id: 'foot', text: 'In every season', size: 2.1, colour: '#E7EEEE', x: 6, y: 89, align: 'left', weight: 500, caps: true, tracking: 16 })
+        ]
+      })
+  },
+  {
+    id: 'ribbon-portrait',
+    name: 'Ribbon — portrait',
+    note: 'A cause poster: the photograph full bleed, the line split top and bottom over it.',
+    images: ['harbour', 'lantern'],
+    swatch: ['#8A8578', '#3A3630'],
+    build: (images) =>
+      base('slider', images, {
+        params: {
+          cards: 2, cardScale: 4, gap: 2.6, stagger: 0, depth: 0,
+          spinX: 0, spinY: 0, spinZ: 0, axis: 'x', mode: 'step',
+          stepSize: 1, direction: 'forward', hold: 3.4, transition: 1.1, drift: 5
+        },
+        doc: {
+          transform: { ...emptyDoc('slider').transform, scale: 1.3 },
+          keys: {
+            // The two halves of the line arrive from the edges they sit
+            // against, so the sentence closes on the frame rather than
+            // fading up in place.
+            'text:top:y': ride([[0, 11], [0.12, 9]], EASE.settle),
+            'text:bottom:y': ride([[0, 82], [0.12, 79]], EASE.settle)
+          }
+        },
+        card: { aspect: '9:16', corner: 0, gradient: false, gradientOpacity: 0 },
+        frame: { aspect: '9:16', background: '#111110', corners: 0 },
+        effects: {
+          edgeShade: edgeShade({ mode: 'dark', colour: '#111110', edges: all(14), falloff: 'soft', softness: 70 })
+        },
+        export: { durationSec: 11, fps: 30 },
+        text: [
+          text({ id: 'top', text: 'We all', size: 13, colour: INK.yellow, x: 8, y: 9, align: 'left', weight: 400, font: 'Playfair Display', lineHeight: 1 }),
+          text({ id: 'brand', text: 'white ribbon', size: 1.6, colour: INK.yellow, x: 8, y: 31, align: 'left', weight: 500 }),
+          text({ id: 'site', text: 'whiteribbon.com', size: 1.6, colour: '#E9E7C4', x: 50, y: 31, align: 'center', weight: 400, opacity: 78 }),
+          text({ id: 'give', text: '/donate', size: 1.6, colour: '#E9E7C4', x: 92, y: 31, align: 'right', weight: 400, opacity: 78 }),
+          text({ id: 'bottom', text: 'Play\na role', size: 13, colour: INK.yellow, x: 8, y: 79, align: 'left', weight: 400, font: 'Playfair Display', lineHeight: 0.98 })
+        ]
+      })
+  },
+  {
+    id: 'ribbon-landscape',
+    name: 'Ribbon — landscape',
+    note: 'The cause poster widened: the line held left, the photograph carrying the rest.',
+    images: ['lantern', 'harbour'],
+    swatch: ['#8A8578', '#3A3630'],
+    build: (images) =>
+      base('slider', images, {
+        params: {
+          cards: 2, cardScale: 4, gap: 2.6, stagger: 0, depth: 0,
+          spinX: 0, spinY: 0, spinZ: 0, axis: 'x', mode: 'step',
+          stepSize: 1, direction: 'forward', hold: 3.4, transition: 1.1, drift: 4
+        },
+        doc: {
+          transform: { ...emptyDoc('slider').transform, positionX: 3, scale: 2.4 },
+          keys: {
+            'text:top:x': ride([[0, 4], [0.12, 6]], EASE.settle),
+            'text:bottom:x': ride([[0, 8], [0.16, 6]], EASE.settle)
+          }
+        },
+        card: { aspect: '16:9', corner: 0, gradient: false, gradientOpacity: 0 },
+        frame: { aspect: '16:9', background: '#111110', corners: 0 },
+        effects: {
+          edgeShade: edgeShade({ mode: 'dark', colour: '#111110', edges: reach({ left: 62, bottom: 18 }), falloff: 'soft', softness: 88 })
+        },
+        export: { durationSec: 11, fps: 30 },
+        text: [
+          text({ id: 'top', text: 'We all', size: 13, colour: INK.yellow, x: 6, y: 14, align: 'left', weight: 400, font: 'Playfair Display', lineHeight: 1 }),
+          text({ id: 'bottom', text: 'play a role', size: 13, colour: INK.yellow, x: 6, y: 42, align: 'left', weight: 400, font: 'Playfair Display', lineHeight: 1 }),
+          text({ id: 'brand', text: 'white ribbon', size: 2.2, colour: INK.yellow, x: 6, y: 88, align: 'left', weight: 500 }),
+          text({ id: 'give', text: 'whiteribbon.com  /donate', size: 2.2, colour: '#E9E7C4', x: 94, y: 88, align: 'right', weight: 400, opacity: 78 })
+        ]
+      })
+  },
+  {
+    id: 'habitts-landscape',
+    name: 'Habitts — landscape',
+    note: 'A course card: white on the left, a hot panel on the right with the portrait cut into it.',
+    images: ['ember', 'signal', 'lantern'],
+    swatch: ['#F3F0EA', '#C9C2B6'],
+    build: (images) =>
+      base('slider', images, {
+        params: {
+          cards: 2, cardScale: 3.4, gap: 1.7, stagger: 0, depth: 0,
+          spinX: 0, spinY: 0, spinZ: 0, axis: 'x', mode: 'step',
+          stepSize: 1, direction: 'forward', hold: 2.4, transition: 0.8, drift: 0
+        },
+        doc: {
+          // The portrait is the card, so it can change between courses. It is
+          // moved onto the panel rather than the panel drawn round it,
+          // because the panel is a shape a person can drag and the camera is
+          // not.
+          transform: { positionX: 3.5, positionY: 0, scale: 1 },
+          keys: {
+            'shape:badge:opacity': ride([[0, 55], [0.14, 100]], EASE.snap),
+            'text:head:x': ride([[0, 5], [0.08, 6]], EASE.settle)
+          }
+        },
+        card: { aspect: '4:5', corner: 10, gradient: false, gradientOpacity: 0, backOpacity: 0 },
+        frame: { aspect: '16:9', background: INK.white, corners: 10 },
+        effects: {
+          // The portrait sits on the panel rather than in it, so it casts.
+          dropShadow: cast({ angle: 0, distance: 1.4, blur: 16, density: 14, colour: '#7A2E06' })
+        },
+        export: { durationSec: 9, fps: 30 },
+        shapes: [
+          shape({ id: 'panel', kind: 'rect', width: 52, height: 100, x: 74, y: 50, colour: INK.orange, corner: 0 }),
+          shape({ id: 'badge', kind: 'pill', width: 11, height: 9, x: 11, y: 87, colour: INK.orange })
+        ],
+        text: [
+          text({
+            id: 'head', text: 'Oratoria para\nestudiantes:\nManuel Casaubón',
+            size: 7.4, colour: INK.black, x: 6, y: 26, align: 'left', weight: 500, lineHeight: 1.16
+          }),
+          text({ id: 'badge-label', text: 'Nuevo', size: 2.4, colour: INK.white, x: 11, y: 87, align: 'center', weight: 600, caps: true }),
+          text({ id: 'length', text: '3h 45m', size: 3.2, colour: '#4A4A4A', x: 20, y: 87, align: 'left', weight: 400 }),
+          text({ id: 'brand', text: 'habitts', size: 5, colour: INK.black, x: 44, y: 87, align: 'right', weight: 700 })
+        ]
+      })
+  },
+  {
+    id: 'habitts-portrait',
+    name: 'Habitts — portrait',
+    note: 'The course card stood up: the hot panel across the top, the words beneath it.',
+    images: ['signal', 'ember', 'lantern'],
+    swatch: ['#F3F0EA', '#C9C2B6'],
+    build: (images) =>
+      base('slider', images, {
+        params: {
+          cards: 2, cardScale: 3, gap: 1.7, stagger: 0, depth: 0,
+          spinX: 0, spinY: 0, spinZ: 0, axis: 'x', mode: 'step',
+          stepSize: 1, direction: 'forward', hold: 2.4, transition: 0.8, drift: 0
+        },
+        doc: {
+          transform: { positionX: 0, positionY: 1.6, scale: 1 },
+          keys: {
+            'shape:badge:opacity': ride([[0, 55], [0.14, 100]], EASE.snap),
+            'text:head:y': ride([[0, 59], [0.08, 58]], EASE.settle)
+          }
+        },
+        card: { aspect: '4:5', corner: 10, gradient: false, gradientOpacity: 0, backOpacity: 0 },
+        frame: { aspect: '9:16', background: INK.white, corners: 14 },
+        effects: {
+          dropShadow: cast({ angle: 0, distance: 1.4, blur: 16, density: 14, colour: '#7A2E06' })
+        },
+        export: { durationSec: 9, fps: 30 },
+        shapes: [
+          shape({ id: 'panel', kind: 'rect', width: 100, height: 46, x: 50, y: 23, colour: INK.orange, corner: 0 }),
+          shape({ id: 'badge', kind: 'pill', width: 22, height: 4.6, x: 19, y: 92, colour: INK.orange })
+        ],
+        text: [
+          text({
+            id: 'head', text: 'Oratoria para\nestudiantes:\nManuel Casaubón',
+            size: 5.8, colour: INK.black, x: 8, y: 58, align: 'left', weight: 500, lineHeight: 1.16
+          }),
+          text({ id: 'badge-label', text: 'Nuevo', size: 2, colour: INK.white, x: 19, y: 92, align: 'center', weight: 600, caps: true }),
+          text({ id: 'length', text: '3h 45m', size: 2.4, colour: '#4A4A4A', x: 34, y: 92, align: 'left', weight: 400 }),
+          text({ id: 'brand', text: 'habitts', size: 3.8, colour: INK.black, x: 92, y: 92, align: 'right', weight: 700 })
+        ]
+      })
+  },
+  {
+    id: 'taste-portrait',
+    name: 'Taste — portrait',
+    note: 'A long claim set straight over the photograph, wordmark small at the foot.',
+    images: ['dune', 'quarry', 'tide'],
+    swatch: ['#6E93A6', '#22485C'],
     build: (images) =>
       base('parallax', images, {
-        params: { layers: 4, perLayer: 7, cardScale: 1, speedSpread: 3, depthSpread: 3, span: 18 },
-        doc: {
-          pose: { tiltX: 4, tiltY: 0, tiltZ: 0 },
-          keys: { 'text:t1:x': ride([[0, 42], [0.5, 58]], EASE.breath) }
-        },
-        card: { aspect: '4:3', corner: 8, gradientOpacity: 26 },
-        frame: { background: '#12222e', corners: 12 },
-        effects: {
-          vignette: 28,
-          saturation: 108,
-          tint: '#3aa0d8',
-          tintAmount: 10,
-          edgeBlur: edgeBlur({ edges: reach({ left: 34, right: 34 }), amount: 36, falloff: 'soft', softness: 58 }),
-          dropShadow: cast({ angle: 0, distance: 10, blur: 30, density: 30, colour: '#04101a' })
-        },
-        imageOrder: 'scatter',
-        text: [
-          text({ id: 't1', text: 'Passing through', size: 5.2, weight: 600, y: 13, colour: '#dcecf3' }),
-          text({ id: 't2', text: 'four layers, four speeds', size: 2.1, weight: 400, y: 90, colour: '#6f97ab', tracking: 4 })
-        ]
-      })
-  },
-  {
-    id: 'elevator-list',
-    name: 'Elevator',
-    note: 'A steady climb beside credits that change as it rises.',
-    images: ['slate', 'quarry', 'drift', 'moss'],
-    swatch: ['#d8dbe0', '#16181c'],
-    build: (images) =>
-      base('elevator', images, {
-        params: { cards: 12, cardScale: 1.8, gap: 1.5, offsetX: 1.2, tilt: 12, depth: 1.4, speed: 1 },
-        doc: {
-          pose: { tiltX: 8, tiltY: 0, tiltZ: 0 },
-          transform: { positionX: -1.8, positionY: 0, scale: 1 }
-        },
-        card: { aspect: '4:5', corner: 10, gradientOpacity: 20 },
-        frame: { background: '#16181c', corners: 12 },
-        effects: {
-          vignette: 24,
-          saturation: 92,
-          dropShadow: cast({ angle: 20, distance: 14, blur: 26, density: 34, colour: '#000000' }),
-          edgeShade: edgeShade({ mode: 'dark', colour: '#000000', edges: reach({ right: 20 }), falloff: 'soft', softness: 72 })
-        },
-        export: { durationSec: 9 },
-        text: [
-          text({ id: 't0', text: 'With thanks to', size: 2, weight: 500, x: 62, y: 34, align: 'left', colour: '#6e747d', font: 'JetBrains Mono', tracking: 6 }),
-          text({ id: 't1', text: 'Everyone who\nshowed up', size: 4.4, weight: 600, x: 62, y: 46, align: 'left', colour: '#e7eaef', lineHeight: 1.2, from: 0.02, to: 0.34, fade: 0.06 }),
-          text({ id: 't2', text: 'Everyone who\nstayed late', size: 4.4, weight: 600, x: 62, y: 46, align: 'left', colour: '#e7eaef', lineHeight: 1.2, from: 0.36, to: 0.66, fade: 0.06 }),
-          text({ id: 't3', text: 'Everyone who\nsaid it first', size: 4.4, weight: 600, x: 62, y: 46, align: 'left', colour: '#e7eaef', lineHeight: 1.2, from: 0.68, to: 0.98, fade: 0.06 }),
-          text({ id: 't4', text: 'Terminal 42, 2026', size: 1.9, weight: 400, x: 62, y: 88, align: 'left', colour: '#585e67', font: 'JetBrains Mono' })
-        ]
-      })
-  },
-  {
-    id: 'cubic-box',
-    name: 'Cubic',
-    note: 'A box of cards that breathes as it turns, in oxblood.',
-    images: ['ember', 'signal', 'bloom', 'lantern', 'dune', 'orchard'],
-    swatch: ['#ffd0a6', '#3a0f16'],
-    build: (images) =>
-      base('cubic', images, {
-        params: { perFace: 2, size: 3.2, cardScale: 0.75, spread: 1.7, speed: 0.34, explode: 0.6, breathe: 0.8 },
-        doc: {
-          pose: { tiltX: 16, tiltY: 0, tiltZ: 0 },
-          keys: { 'param:explode': ride([[0, 0.35], [0.5, 1.3]]) }
-        },
-        card: { aspect: '1:1', corner: 8, gradientOpacity: 24 },
-        frame: { aspect: '1:1', background: '#3a0f16', corners: 16 },
-        effects: {
-          vignette: 34,
-          saturation: 114,
-          tint: '#ff5a3c',
-          tintAmount: 10,
-          dropShadow: cast({ angle: 30, distance: 16, blur: 34, density: 42, colour: '#16060a' }),
-          glass: glass({ width: 10, refraction: 38, curve: 2.2 })
-        },
-        text: [
-          text({ id: 't1', text: 'Six sides', size: 4.8, weight: 700, y: 47, colour: '#ffdcc8', font: 'Space Grotesk' }),
-          text({ id: 't2', text: 'none of them the front', size: 2.1, weight: 400, y: 55, colour: '#c08272', italic: true })
-        ]
-      })
-  },
-  {
-    id: 'spin-fan',
-    name: 'Fan',
-    note: 'A hand of cards that opens and closes.',
-    images: ['bloom', 'ember', 'signal', 'lantern', 'dune'],
-    swatch: ['#f6d3e2', '#2c1020'],
-    previewPhase: 0.5,
-    build: (images) =>
-      base('spin', images, {
         params: {
-          cards: 11, cardScale: 1, spread: 180, reach: 2.6, pivot: 0.5,
-          speed: 0.15, depth: 0.4, taper: 1, breathe: 0, lean: 0
+          layers: 2, perLayer: 6, cardScale: 3, speedSpread: 1.2,
+          depthSpread: 0.5, span: 11, direction: 'left'
         },
         doc: {
-          pose: { tiltX: 12, tiltY: 0, tiltZ: 0 },
-          // The one thing the arrangement cannot do on its own: the fan is a
-          // shape, not a movement, so opening and closing it is a keyed track.
+          // The claim is set over the photograph, so the photograph has to be
+          // the ground rather than a card floating on it.
+          transform: { ...emptyDoc('parallax').transform, scale: 1.3 },
           keys: {
-            'param:spread': ride([[0, 110], [0.5, 260]], EASE.snap),
-            'text:t1:y': ride([[0, 17], [0.5, 14]], EASE.snap)
+            'text:head:y': ride([[0, 23.4], [0.1, 22]], EASE.settle),
+            'text:note:opacity': ride([[0, 34], [0.3, 70]], EASE.settle)
           }
         },
-        card: { aspect: '4:5', corner: 12, gradientOpacity: 20 },
-        frame: { background: '#2c1020', corners: 12 },
+        card: { aspect: '9:16', corner: 0, gradient: true, gradientOpacity: 30, gradientSide: 'front' },
+        frame: { aspect: '9:16', background: '#0E3346', corners: 0 },
         effects: {
-          vignette: 28,
-          saturation: 110,
-          tint: '#ff4d8d',
-          tintAmount: 9,
-          dropShadow: cast({ angle: 0, distance: 18, blur: 28, density: 44, colour: '#12040a' })
+          edgeShade: edgeShade({ mode: 'dark', colour: '#0E3346', edges: reach({ top: 52, bottom: 18 }), falloff: 'soft', softness: 70 })
         },
-        export: { durationSec: 6 },
+        export: { durationSec: 13, fps: 30 },
         text: [
-          text({ id: 't1', text: 'Your hand', size: 5.8, weight: 700, y: 17, colour: '#ffdfea', font: 'Space Grotesk', tracking: -2 }),
-          text({ id: 't2', text: 'eleven cards, face up', size: 2.1, weight: 400, y: 90, colour: '#bb8098', tracking: 4 })
+          text({
+            id: 'head',
+            text: 'Wellness\nshouldn’t\nbe complicated.\nThat’s why we’ve\ncreated supplements\nthat do more.',
+            size: 5.4, colour: INK.sky, x: 6, y: 22, align: 'left', weight: 600, lineHeight: 1.14
+          }),
+          text({
+            id: 'note', text: 'Powerful nutrition meets modern\nsimplicity, crafted to make feeling\ngood second nature.',
+            size: 1.8, colour: '#DCEAF2', x: 94, y: 87, align: 'right', weight: 400, lineHeight: 1.4, opacity: 70
+          }),
+          text({ id: 'brand', text: 'Taste Health.', size: 3, colour: INK.white, x: 6, y: 94, align: 'left', weight: 700 })
         ]
       })
   },
   {
-    id: 'breathing-ring',
-    name: 'Breathing ring',
-    note: 'A ring that opens out and draws back in, once a loop.',
-    images: ['moss', 'tide', 'drift', 'harbour'],
-    swatch: ['#d6e6c3', '#0a1f1a'],
+    id: 'taste-landscape',
+    name: 'Taste — landscape',
+    note: 'The same claim, held to the left third so the photograph can breathe.',
+    images: ['quarry', 'dune', 'tide'],
+    swatch: ['#6E93A6', '#22485C'],
     build: (images) =>
-      base('ring', images, {
+      base('parallax', images, {
         params: {
-          cards: 24, rings: 1, cardScale: 0.6, radius: 3.2, ringGap: 1.2,
-          arc: 360, speed: 0.24, spiral: 0, sizeFalloff: 0.2, faceCentre: true
+          layers: 2, perLayer: 4, cardScale: 3, speedSpread: 1.2,
+          depthSpread: 0.5, span: 11, direction: 'left'
         },
         doc: {
-          pose: { tiltX: 34, tiltY: 0, tiltZ: 0 },
+          transform: { ...emptyDoc('parallax').transform, positionX: 3.4, scale: 1.25 },
           keys: {
-            'param:radius': ride([[0, 2.2], [0.5, 5.4]]),
-            'pose:tiltX': ride([[0, 28], [0.5, 46]]),
-            'fx:vignette': ride([[0, 30], [0.5, 48]]),
-            'text:t1:opacity': ride([[0, 100], [0.5, 55]])
+            'text:head:x': ride([[0, 7.4], [0.1, 6]], EASE.settle),
+            'text:note:opacity': ride([[0, 34], [0.3, 70]], EASE.settle)
           }
         },
-        card: { aspect: '1:1', corner: 50, gradientOpacity: 22 },
-        frame: { aspect: '1:1', background: '#0a1f1a', corners: 16 },
+        card: { aspect: '4:5', corner: 0, gradient: true, gradientOpacity: 30, gradientSide: 'front' },
+        frame: { aspect: '16:9', background: '#0E3346', corners: 0 },
         effects: {
-          vignette: 30,
-          saturation: 112,
-          tint: '#2fd6a0',
-          tintAmount: 10,
-          glass: glass({ width: 12, refraction: 46, curve: 2 })
+          edgeShade: edgeShade({ mode: 'dark', colour: '#0E3346', edges: reach({ left: 62 }), falloff: 'soft', softness: 84 })
         },
-        export: { durationSec: 6 },
+        export: { durationSec: 13, fps: 30 },
         text: [
-          text({ id: 't1', text: 'In and out', size: 4.2, weight: 500, y: 88, colour: '#c6dcd2', tracking: 6 }),
-          text({ id: 't2', text: 'four seconds each way', size: 1.9, weight: 400, y: 94, colour: '#5e8878', font: 'JetBrains Mono' })
-        ]
-      })
-  },
-  {
-    id: 'mono-grid',
-    name: 'Mono grid',
-    note: 'Black on white, square, and almost still.',
-    images: ['slate', 'quarry', 'harbour', 'drift'],
-    swatch: ['#f2f2f2', '#111111'],
-    build: (images) =>
-      base('grid', images, {
-        params: {
-          columns: 4, rows: 4, cardScale: 0.92, gapX: 1.2, gapY: 1.2,
-          driftX: 0, driftY: 1, curve: 0, depth: 0, lean: 0
-        },
-        doc: {
-          pose: { tiltX: 0, tiltY: 0, tiltZ: 0 },
-          keys: { 'fx:contrast': ride([[0, 112], [0.5, 128]]) }
-        },
-        card: { aspect: '1:1', corner: 0, gradient: false },
-        frame: { aspect: '1:1', background: '#f2f2f2', corners: 0 },
-        effects: {
-          saturation: 0,
-          contrast: 112,
-          grain: 14,
-          dropShadow: cast({ angle: 0, distance: 6, blur: 12, density: 18, colour: '#111111' })
-        },
-        text: [
-          text({ id: 't1', text: 'Sixteen', size: 2.6, weight: 500, x: 6, y: 6, align: 'left', colour: '#111111', font: 'JetBrains Mono', tracking: 10 }),
-          text({ id: 't2', text: 'one subject, sixteen times', size: 2, weight: 400, x: 94, y: 95, align: 'right', colour: '#7a7a7a', font: 'JetBrains Mono' })
-        ]
-      })
-  },
-
-  // A second take on ten of the arrangements.
-  //
-  // One template per arrangement teaches the arrangement; it does not teach
-  // that the arrangement is a range. A ring can be a harbour poster or a
-  // roulette wheel, and somebody who has only seen the poster reads the ring
-  // as "the blue one". So these ten deliberately share a shape with a piece
-  // above and agree with it about nothing else: different ground, different
-  // family, different pace, different reason to exist.
-  {
-    id: 'record-sleeve',
-    name: 'Record sleeve',
-    note: 'A square turn on black, with the title set enormous.',
-    images: ['ember', 'slate', 'signal', 'drift', 'quarry', 'bloom'],
-    swatch: ['#141414', '#f2b705'],
-    build: (images) =>
-      base('carousel', images, {
-        params: {
-          cards: 8, cardScale: 1.6, rows: 1, radius: 4.4, speed: 0.16,
-          bend: 0, type: 'continuous', spinAxis: 'y'
-        },
-        doc: {
-          pose: { tiltX: 0, tiltY: 0, tiltZ: 0 },
-          keys: { 'fx:vignette': ride([[0, 26], [0.5, 40]]) }
-        },
-        card: { aspect: '1:1', corner: 2, gradientOpacity: 10 },
-        frame: { aspect: '1:1', background: '#0d0d0d', corners: 4 },
-        effects: {
-          vignette: 30,
-          saturation: 88,
-          grain: 14,
-          dropShadow: cast({ angle: 0, distance: 10, blur: 40, density: 60, colour: '#000000' })
-        },
-        export: { durationSec: 8 },
-        text: [
-          text({ id: 't1', text: 'SIDE\nONE', size: 16, weight: 700, y: 44, colour: '#f2b705', font: 'Space Grotesk', lineHeight: 0.88, tracking: -4 }),
-          text({ id: 't2', text: 'eight tracks, one room, one night', size: 2, weight: 400, y: 93, colour: '#8a7a3f', font: 'JetBrains Mono', tracking: 6 })
-        ]
-      })
-  },
-  {
-    id: 'menu-drop',
-    name: 'Menu drop',
-    note: 'Plates land on a cream table, one after another.',
-    images: ['orchard', 'bloom', 'moss', 'dune'],
-    swatch: ['#f7efe2', '#8c3b1e'],
-    previewPhase: 0.9,
-    build: (images) => {
-      const doc = base('card-drop', images, {
-        params: {
-          cards: 7, cardScale: 2.1, spread: 5.2, dropHeight: 6,
-          squash: 0.5, spin: 8, stagger: 0.9, drops: 1
-        },
-        doc: { pose: { tiltX: 34, tiltY: 0, tiltZ: 0 } },
-        card: { aspect: '1:1', corner: 999, gradientOpacity: 8 },
-        frame: { background: '#f7efe2', corners: 10 },
-        effects: {
-          vignette: 8,
-          saturation: 112,
-          dropShadow: cast({ angle: 0, distance: 10, blur: 18, density: 26, colour: '#8c6a4a' })
-        },
-        export: { durationSec: 5 },
-        text: [
-          text({ id: 't1', text: 'Today only', size: 2.2, weight: 500, y: 10, colour: '#8c3b1e', font: 'JetBrains Mono', tracking: 8 }),
-          text({ id: 't2', text: 'Seven small plates', size: 7.6, weight: 400, y: 20, colour: '#2c1d14', font: 'Playfair Display', from: 0.3, to: 0.99, fade: 0.08 }),
-          text({ id: 't3', text: 'kitchen closes at ten', size: 2.2, weight: 400, y: 94, colour: '#9a7f68', font: 'Lora', italic: true, from: 0.6, to: 0.99, fade: 0.08 })
-        ]
-      })
-      return {
-        ...doc,
-        animation: {
-          ...doc.animation,
-          componentIn: { ...doc.animation.componentIn, enabled: true, shape: 'drop', duration: 0.8, stagger: 0.1 }
-        }
-      }
-    }
-  },
-  {
-    id: 'ticker-feed',
-    name: 'Ticker',
-    note: 'A column that will not stop, in newsprint red and black.',
-    images: ['signal', 'slate', 'harbour', 'drift', 'quarry', 'tide'],
-    swatch: ['#0b0b0b', '#e02020'],
-    build: (images) =>
-      base('feed', images, {
-        params: {
-          cards: 18, columns: 1, cardScale: 2.4, gap: 1.05, edgeFalloff: 0.4,
-          mode: 'continuous', direction: 'up', hold: 0.2, transition: 0.4
-        },
-        doc: {
-          pose: { tiltX: 0, tiltY: 0, tiltZ: 0 },
-          keys: { 'text:t2:opacity': ride([[0, 100], [0.25, 20], [0.5, 100]]) }
-        },
-        card: { aspect: '16:9', corner: 0, gradientOpacity: 30 },
-        frame: { background: '#0b0b0b', corners: 0 },
-        effects: {
-          vignette: 0,
-          saturation: 70,
-          contrast: 118,
-          grain: 18,
-          edgeShade: edgeShade({ mode: 'dark', colour: '#0b0b0b', edges: reach({ top: 34, bottom: 34 }), falloff: 'soft', softness: 80 })
-        },
-        export: { durationSec: 6 },
-        text: [
-          text({ id: 't1', text: 'STILL RUNNING', size: 4.6, weight: 700, x: 6, y: 8, align: 'left', colour: '#e02020', font: 'JetBrains Mono', tracking: 2 }),
-          text({ id: 't2', text: 'live', size: 2, weight: 500, x: 94, y: 8, align: 'right', colour: '#e02020', font: 'JetBrains Mono', tracking: 4 }),
-          text({ id: 't3', text: 'every frame filed in the last four hours', size: 2, weight: 400, x: 6, y: 94, align: 'left', colour: '#6e6e6e', font: 'JetBrains Mono' })
-        ]
-      })
-  },
-  {
-    id: 'split-slider',
-    name: 'Split slider',
-    note: 'Two at a time on gallery white, held long enough to read.',
-    images: ['moss', 'orchard', 'harbour', 'dune', 'tide', 'bloom'],
-    swatch: ['#fbfbf9', '#1d2b1f'],
-    build: (images) =>
-      base('slider', images, {
-        params: {
-          cards: 6, cardScale: 3.2, gap: 3.8, stagger: 0.2, depth: 0.6,
-          mode: 'stepped', stepSize: 2, hold: 2.4, transition: 0.8, drift: 0
-        },
-        doc: {
-          pose: { tiltX: 0, tiltY: 0, tiltZ: 0 },
-          transform: { positionX: 0, positionY: -0.4, scale: 0.94 }
-        },
-        card: { aspect: '4:5', corner: 0, gradientOpacity: 0 },
-        frame: { background: '#fbfbf9', corners: 0 },
-        effects: {
-          vignette: 0,
-          saturation: 96,
-          dropShadow: cast({ angle: 90, distance: 4, blur: 14, density: 14, colour: '#2b3524' })
-        },
-        export: { durationSec: 9 },
-        text: [
-          text({ id: 't1', text: 'Pairs', size: 4.2, weight: 400, x: 8, y: 9, align: 'left', colour: '#1d2b1f', font: 'Playfair Display' }),
-          text({ id: 't2', text: 'Twelve photographs hung as six', size: 2.1, weight: 400, x: 8, y: 14, align: 'left', colour: '#7d867b', font: 'Lora', italic: true }),
-          text({ id: 't3', text: 'Gallery two \u00b7 free entry', size: 1.9, weight: 400, x: 92, y: 94, align: 'right', colour: '#9aa398', font: 'JetBrains Mono', tracking: 3 })
-        ]
-      })
-  },
-  {
-    id: 'night-sky',
-    name: 'Night sky',
-    note: 'A slow drift outward, almost entirely dark.',
-    images: ['drift', 'signal', 'slate', 'tide'],
-    swatch: ['#05070c', '#7fb3d5'],
-    build: (images) =>
-      base('space', images, {
-        params: { cards: 120, cardScale: 0.24, spread: 12, depthRange: 34, speed: 1.1, direction: 'forward' },
-        doc: {
-          pose: { tiltX: 0, tiltY: 0, tiltZ: 0 },
-          keys: { 'fx:brightness': ride([[0, 92], [0.5, 104]]) }
-        },
-        card: { aspect: '1:1', corner: 999, gradientOpacity: 60 },
-        frame: { background: '#05070c', corners: 12 },
-        effects: {
-          vignette: 46,
-          saturation: 78,
-          brightness: 92,
-          grain: 10,
-          blur: 0
-        },
-        export: { durationSec: 12 },
-        text: [
-          text({ id: 't1', text: 'Nothing overhead', size: 3.6, weight: 400, y: 87, colour: '#9fc6e0', font: 'Lora', italic: true }),
-          text({ id: 't2', text: 'four hours of sky, one exposure', size: 1.8, weight: 400, y: 93, colour: '#4a6a80', font: 'JetBrains Mono', tracking: 4 })
-        ]
-      })
-  },
-  {
-    id: 'roulette',
-    name: 'Roulette',
-    note: 'A fan that reads as a wheel, in table green and gold.',
-    images: ['ember', 'quarry', 'lantern', 'bloom', 'slate'],
-    swatch: ['#0f3d2e', '#e8c46a'],
-    build: (images) =>
-      base('spin', images, {
-        params: {
-          cards: 24, cardScale: 0.7, spread: 330, reach: 3.2, pivot: 0.5,
-          speed: 0.55, depth: 0.1, taper: 0.1, breathe: 0, lean: 0
-        },
-        doc: {
-          pose: { tiltX: 62, tiltY: 0, tiltZ: 0 },
-          keys: { 'fx:vignette': ride([[0, 30], [0.5, 42]]) }
-        },
-        card: { aspect: '9:16', corner: 2, gradientOpacity: 18 },
-        frame: { aspect: '1:1', background: '#0f3d2e', corners: 999 },
-        effects: {
-          vignette: 34,
-          saturation: 108,
-          dropShadow: cast({ angle: 0, distance: 6, blur: 30, density: 44, colour: '#04150f' })
-        },
-        export: { durationSec: 7 },
-        text: [
-          text({ id: 't1', text: 'Round again', size: 5.4, weight: 700, y: 49, colour: '#e8c46a', font: 'Space Grotesk', tracking: -1 }),
-          text({ id: 't2', text: 'twenty-four ways to be wrong', size: 2, weight: 400, y: 57, colour: '#7f9c8d', font: 'JetBrains Mono', tracking: 3 })
-        ]
-      })
-  },
-  {
-    id: 'press-plate',
-    name: 'Press plate',
-    note: 'Two rings laid flat, printed in one ink on off-white.',
-    images: ['quarry', 'slate', 'harbour', 'drift'],
-    swatch: ['#f2efe6', '#1b3a6b'],
-    build: (images) =>
-      base('plate', images, {
-        params: {
-          cards: 18, rings: 2, cardScale: 1.1, radius: 3.6, ringGap: 1.9,
-          speed: 0.14, tip: 80, lift: 0, scatter: 0, heading: 'radial'
-        },
-        doc: { pose: { tiltX: 2, tiltY: 0, tiltZ: 0 } },
-        card: { aspect: '1:1', corner: 0, gradientOpacity: 0 },
-        frame: { aspect: '1:1', background: '#f2efe6', corners: 0 },
-        effects: {
-          vignette: 6,
-          saturation: 34,
-          contrast: 112,
-          grain: 22,
-          tint: '#1b3a6b',
-          tintAmount: 34
-        },
-        export: { durationSec: 10 },
-        text: [
-          text({ id: 't1', text: 'One ink', size: 5.6, weight: 500, x: 6, y: 7, align: 'left', colour: '#1b3a6b', font: 'JetBrains Mono', tracking: 8 }),
-          text({ id: 't2', text: 'Eighteen plates, one pass through the press', size: 2, weight: 400, x: 6, y: 94, align: 'left', colour: '#7b8496', font: 'JetBrains Mono' })
-        ]
-      })
-  },
-  {
-    id: 'product-box',
-    name: 'Product box',
-    note: 'A box that opens and closes on warm grey, for packaging.',
-    images: ['bloom', 'orchard', 'lantern'],
-    swatch: ['#2a2724', '#f0e4d2'],
-    build: (images) =>
-      base('cubic', images, {
-        params: { perFace: 1, size: 2.6, cardScale: 1.1, spread: 1, speed: 0.2, explode: 1.6, breathe: 0 },
-        doc: {
-          pose: { tiltX: 20, tiltY: 0, tiltZ: 0 },
-          keys: {
-            'pose:tiltY': ride([[0, -14], [0.5, 14]], EASE.settle),
-            'text:t2:opacity': ride([[0, 0], [0.45, 0], [0.6, 100]])
-          }
-        },
-        card: { aspect: '1:1', corner: 4, gradientOpacity: 14 },
-        frame: { aspect: '1:1', background: '#2a2724', corners: 10 },
-        effects: {
-          vignette: 20,
-          saturation: 102,
-          dropShadow: cast({ angle: 20, distance: 14, blur: 30, density: 40, colour: '#0d0c0a' })
-        },
-        export: { durationSec: 6 },
-        text: [
-          text({ id: 't1', text: 'Open it', size: 5.2, weight: 700, y: 12, colour: '#f0e4d2', font: 'Space Grotesk', tracking: -1 }),
-          text({ id: 't2', text: 'everything is on the inside', size: 2.1, weight: 400, y: 91, colour: '#9c8f7e', tracking: 4 })
-        ]
-      })
-  },
-  {
-    id: 'finish-line',
-    name: 'Finish line',
-    note: 'A ribbon that runs flat and fast, in high-visibility yellow.',
-    images: ['signal', 'ember', 'moss', 'harbour'],
-    swatch: ['#131313', '#e6ff3d'],
-    build: (images) =>
-      base('ribbon', images, {
-        params: {
-          cards: 40, cardScale: 0.5, length: 19, amplitude: 0.6,
-          wavelength: 4, twist: 0, depth: 0.8, speed: 2.6
-        },
-        doc: {
-          pose: { tiltX: 4, tiltY: 0, tiltZ: 0 },
-          keys: { 'pose:tiltX': ride([[0, 2], [0.5, 9]]) }
-        },
-        card: { aspect: '16:9', corner: 0, gradientOpacity: 16 },
-        frame: { background: '#131313', corners: 0 },
-        effects: {
-          vignette: 18,
-          saturation: 92,
-          contrast: 110,
-          edgeBlur: edgeBlur({ edges: reach({ left: 30, right: 30 }), amount: 60 })
-        },
-        export: { durationSec: 5 },
-        text: [
-          text({ id: 't1', text: '42.195', size: 12, weight: 700, y: 46, colour: '#e6ff3d', font: 'JetBrains Mono', tracking: -2 }),
-          text({ id: 't2', text: 'kilometres, and then a chair', size: 2.2, weight: 400, y: 56, colour: '#8a9430', font: 'JetBrains Mono', tracking: 6 }),
-          text({ id: 't3', text: 'Sunday, 09:00', size: 1.9, weight: 500, y: 94, colour: '#5e5e5e', font: 'JetBrains Mono', tracking: 4 })
-        ]
-      })
-  },
-  {
-    id: 'flash-cards',
-    name: 'Flash cards',
-    note: 'A board that turns over in steps, chalk on green.',
-    images: ['moss', 'dune', 'orchard', 'quarry', 'tide', 'bloom'],
-    swatch: ['#20362b', '#f4f1e4'],
-    build: (images) =>
-      base('flip', images, {
-        params: {
-          columns: 3, rows: 2, cardScale: 1.7, gapX: 1.8, gapY: 2.2, axis: 'x',
-          flips: 1, stagger: 0.8, hold: 1.6, transition: 0.5, depth: 0.2
-        },
-        doc: {
-          pose: { tiltX: 0, tiltY: 0, tiltZ: 0 },
-          transform: { positionX: 0, positionY: -0.5, scale: 0.9 }
-        },
-        card: { aspect: '4:3', corner: 6, gradientOpacity: 12 },
-        frame: { background: '#20362b', corners: 8 },
-        effects: {
-          vignette: 24,
-          saturation: 90,
-          grain: 16,
-          dropShadow: cast({ angle: 90, distance: 8, blur: 16, density: 34, colour: '#0b160f' })
-        },
-        export: { durationSec: 8 },
-        text: [
-          text({ id: 't1', text: 'Six things\nworth learning', size: 5.4, weight: 400, y: 82, colour: '#f4f1e4', font: 'Fraunces', lineHeight: 1.1 }),
-          text({ id: 't2', text: 'turn one over', size: 2, weight: 400, y: 94, colour: '#8fa596', font: 'JetBrains Mono', tracking: 5 })
+          text({
+            id: 'head',
+            text: 'Wellness shouldn’t\nbe complicated.',
+            size: 8, colour: INK.sky, x: 6, y: 26, align: 'left', weight: 600, lineHeight: 1.1
+          }),
+          text({
+            id: 'note', text: 'Powerful nutrition meets modern simplicity,\ncrafted to make feeling good second nature.',
+            size: 2.4, colour: '#DCEAF2', x: 6, y: 56, align: 'left', weight: 400, lineHeight: 1.4, opacity: 70
+          }),
+          text({ id: 'brand', text: 'Taste Health.', size: 3.4, colour: INK.white, x: 6, y: 88, align: 'left', weight: 700 })
         ]
       })
   }
