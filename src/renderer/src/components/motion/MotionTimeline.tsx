@@ -357,7 +357,7 @@ function Transport({
         type="button"
         onClick={onTogglePlaying}
         disabled={!onTogglePlaying}
-        title={playing ? 'Pause' : 'Play'}
+        title={playing ? 'Pause (Space)' : 'Play (Space)'}
         aria-label={playing ? 'Pause' : 'Play'}
         className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-action text-action-text transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:opacity-40"
       >

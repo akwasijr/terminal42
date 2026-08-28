@@ -295,7 +295,16 @@ export function DesignsListView({
   }, [scoped])
 
   const allLabel = scope === 'form' ? 'All forms' : 'All designs'
-  const heading = typeFilter === 'system' ? 'Design systems' : typeFilter === 'tokens' ? 'Tokens' : typeFilter === 'templates' ? 'Templates' : folderFilter !== 'all' ? folderFilter : allLabel
+  // The heading is the answer to "what am I looking at", so it has to name the
+  // tab you are on. It used to say "All designs" while the App tab was lit,
+  // which reads as the filter having failed to apply.
+  const heading =
+    typeFilter === 'system' ? 'Design systems'
+      : typeFilter === 'tokens' ? 'Tokens'
+        : typeFilter === 'templates' ? 'Templates'
+          : typeFilter !== 'all' && typeFilter !== 'form' && typeFilter in GROUP_LABEL ? GROUP_LABEL[typeFilter as DesignGroup]
+            : folderFilter !== 'all' ? folderFilter
+              : allLabel
 
   // Apply type + folder + search, then bucket by recency.
   const buckets = useMemo(() => {

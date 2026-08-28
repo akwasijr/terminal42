@@ -31,6 +31,7 @@ import {
 } from '../../lib/motion/history'
 import { IconChevronRight } from '../icons'
 import { Hint } from '../Hint'
+import { useSpaceToPlay } from '../../lib/useSpaceToPlay'
 
 type Tab = 'motion' | 'visual' | 'export'
 
@@ -86,6 +87,11 @@ export function MotionStudio({
   const [replayToken, setReplayToken] = useState(0)
   const [replayLooping, setReplayLooping] = useState(false)
   const [replayed, setReplayed] = useState(false)
+
+  // Space runs the loop and stops it, the way it does in Form's timeline and
+  // in every other tool with a playhead. Off while a picker or the export is
+  // over the studio, because then Space belongs to whatever is on top.
+  useSpaceToPlay(() => setPlaying((p) => !p), !pickerReq && !exporting && !naming)
   const stage = useRef<StageHandle | null>(null)
   const cancelRef = useRef({ cancelled: false })
 

@@ -4,6 +4,7 @@ import { bezierPts, isHold, isSpring, easingLabel } from '../lib/easing'
 import { ANIMATION_PRESETS, PRESET_GROUPS } from '../lib/animationPresets'
 import { type FObj } from '../lib/freeformTypes'
 import { timelineKeyframeSel } from '../lib/timelineSelection'
+import { useSpaceToPlay } from '../lib/useSpaceToPlay'
 import {
   type LayerMotion,
   type LayerState,
@@ -196,22 +197,10 @@ export function TimelinePanel({ objects, selIds, onSelect, setMotion, getDoc, on
     rafRef.current = requestAnimationFrame(loop)
   }
 
-  // Spacebar toggles play/pause while the timeline is open (After Effects style).
-  // Ignored when typing in a field or on auto-repeat. The canvas suppresses its
-  // own hold-space-to-pan while the timeline is open so the two don't clash.
-  const playRef = useRef(play)
-  playRef.current = play
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.code !== 'Space' || e.repeat) return
-      const n = e.target as HTMLElement | null
-      if (n && (n.tagName === 'INPUT' || n.tagName === 'TEXTAREA' || n.tagName === 'SELECT' || n.isContentEditable)) return
-      e.preventDefault()
-      playRef.current()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  // Spacebar toggles play/pause while the timeline is open (After Effects
+  // style). The canvas suppresses its own hold-space-to-pan while the timeline
+  // is open so the two don't clash.
+  useSpaceToPlay(play)
   const trackW = Math.max(laneW, Math.round(laneW * zoom))
   const xFromT = (t: number): number => (t / (duration || 1)) * trackW
   const tFromClientX = (cx: number): number => {

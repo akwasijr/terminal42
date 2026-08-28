@@ -49,8 +49,7 @@ describe('the designs filter tabs', () => {
     }
   })
 
-  it('holds the scrollbar gutter open so the centred page cannot slide', () => {
-    // Measured in the running app: without this the Templates state sat 5px
+  it('holds the scrollbar gutter open so the centred page cannot slide', () => {    // Measured in the running app: without this the Templates state sat 5px
     // to the left of the other four, because it was short enough not to
     // scroll and the page re-centred itself in the reclaimed width.
     expect(source).toContain('t42-stable-gutter')
@@ -61,5 +60,20 @@ describe('the designs filter tabs', () => {
     // wide, which is a margin pretending to be content and wraps on its own.
     expect(source).not.toMatch(/<span className="mx-[\d.]+" \/>/)
     expect(source).toContain('<div className="ml-3 inline-flex items-center gap-1">')
+  })
+})
+
+describe('the designs heading', () => {
+  it('names the tab you are on rather than saying "All designs" under a lit tab', () => {
+    // App and Decks are group filters, and they used to fall through to the
+    // "all" label, so the page said "All designs" while the App tab was
+    // selected — which reads as the filter having silently failed.
+    const heading = source.match(/const heading =[\s\S]{0,600}?\n\n/)
+    expect(heading, 'the heading expression has moved').toBeTruthy()
+    expect(heading![0]).toContain('GROUP_LABEL[typeFilter as DesignGroup]')
+    // The fall-through cases that should still reach it.
+    expect(heading![0]).toContain("typeFilter !== 'all'")
+    expect(heading![0]).toContain("typeFilter !== 'form'")
+    expect(heading![0]).toContain('allLabel')
   })
 })
