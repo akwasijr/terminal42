@@ -8,7 +8,7 @@
 import type {
   AnimationState, CardOverride, ComponentId, DropShadowFx, EdgeAmounts, EdgeBlurFx, EdgeFalloff,
   EdgeShadeFx, EffectScope, EffectsState, EntranceShape, EntranceSpec, GlassFx, LogoLayer,
-  MotionDoc, ParamSpec, ParamValue, PictureLayer, ShapeKind, ShapeLayer, Wave
+  MotionDoc, ParamSpec, ParamValue, PictureLayer, ShapeKind, ShapeLayer, TextLayer, Wave
 } from './types'
 import { SHAPE_KINDS } from './types'
 import { defaultEntrance, ENTRANCE_SHAPES } from './entrance'
@@ -125,7 +125,7 @@ export function hydrateDoc(raw: unknown): MotionDoc {
       ...(doc.visual ?? {}),
       card: { ...base.visual.card, ...(doc.visual?.card ?? {}) },
       images: doc.visual?.images ?? [],
-      text: doc.visual?.text ?? [],
+      text: hydrateTextSpans(doc.visual?.text),
       logos: hydrateLogos(doc.visual?.logos),
       shapes: hydrateShapes(doc.visual?.shapes),
       pictures: hydratePictures(doc.visual?.pictures),
@@ -424,20 +424,61 @@ function hydrateGlass(raw: unknown, base: GlassFx): GlassFx {
  * what the rest of the code reads as "the whole loop" — writing the bounds
  * out would make every layer look as though someone had set its timing.
  */
-function hydrateSpan(raw: Partial<Record<'from' | 'to' | 'fade', unknown>>): {
+/**
+ * A layer's timing, and the eye.
+ *
+ * The eye is carried here with the timing because both are read off the layer
+ * as one shape, but they mean different things: `from`/`to`/`fade` are part of
+ * the piece, and `hidden` is the person working saying "not while I deal with
+ * what is behind you". It is kept rather than dropped on load, because coming
+ * back to a piece with a layer you had put away already back on would be a
+ * surprise.
+ *
+ * A window whose ends are equal is repaired to no window at all. It has no
+ * width, so `layerVisibility` reads it as off for the whole loop, and the
+ * layer sits in the timeline with nothing on screen — the fault this file
+ * already says is the hardest kind to look at and understand. Nobody set one
+ * deliberately: it needs two floats to land exactly equal, which does not
+ * happen by hand. It came from dragging a bar whose end was 1, because the
+ * end wrapped round to 0 and shut the window on what was meant to be a click.
+ * That is fixed where it happened, but documents saved in the meantime carry
+ * the damage, and this is where they are read.
+ */
+/**
+ * Text layers, with their timing repaired.
+ *
+ * Unlike the other three kinds, text is otherwise taken as it was written:
+ * every field on it is typographic and a wrong one shows up as type that
+ * looks wrong rather than as nothing at all, so there is nothing here worth
+ * clamping. The span is the exception, because a span can be shut, and a shut
+ * layer is invisible with nothing to say why.
+ */
+function hydrateTextSpans(raw: unknown): TextLayer[] {
+  if (!Array.isArray(raw)) return []
+  return (raw as TextLayer[]).map((layer) => {
+    if (!layer || typeof layer !== 'object') return layer
+    const { from: _f, to: _t, fade: _d, hidden: _h, ...rest } = layer
+    return { ...rest, ...hydrateSpan(layer) }
+  })
+}
+
+function hydrateSpan(raw: Partial<Record<'from' | 'to' | 'fade' | 'hidden', unknown>>): {
   from?: number
   to?: number
   fade?: number
+  hidden?: boolean
 } {
   const unit = (v: unknown): number | undefined =>
     typeof v === 'number' && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : undefined
-  const span: { from?: number; to?: number; fade?: number } = {}
+  const span: { from?: number; to?: number; fade?: number; hidden?: boolean } = {}
   const from = unit(raw.from)
   const to = unit(raw.to)
   const fade = unit(raw.fade)
-  if (from !== undefined) span.from = from
-  if (to !== undefined) span.to = to
+  const shut = from !== undefined && to !== undefined && from === to
+  if (from !== undefined && !shut) span.from = from
+  if (to !== undefined && !shut) span.to = to
   if (fade !== undefined) span.fade = Math.min(0.5, fade)
+  if (raw.hidden === true) span.hidden = true
   return span
 }
 

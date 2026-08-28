@@ -1066,11 +1066,19 @@ function LayerRow({
     if (d.edge === 'from') onSpan({ from: t, to: d.to })
     else if (d.edge === 'to') onSpan({ from: d.from, to: t })
     else {
+      // A bar with no window covers the whole loop, and there is nowhere for
+      // "always" to be dragged to. Letting it move looked harmless and was
+      // not: it turned a layer with no timing into one with timing, on the
+      // strength of a click that was meant to select.
+      if (!bounded) return
       // The body keeps its width, so moving it never also resizes it. Both
       // ends wrap, which is what lets a window be dragged over the seam
-      // instead of stopping dead at the end of the loop.
+      // instead of stopping dead at the end of the loop. The end wraps with
+      // wrapEnd, not wrapUnit: the end of the loop has to stay the end, or a
+      // span reaching 1 would come back as 0 and the window would collapse to
+      // nothing — a layer gone for good, with nothing on screen to say why.
       const shift = t - d.grabbed
-      onSpan({ from: wrapUnit(d.from + shift), to: wrapUnit(d.to + shift) })
+      onSpan({ from: wrapUnit(d.from + shift), to: wrapEnd(d.to + shift) })
     }
   }
 
