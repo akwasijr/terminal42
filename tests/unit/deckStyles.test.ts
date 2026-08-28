@@ -1,11 +1,12 @@
-// A house style is prose, and prose does not fail loudly.
+// A house style is values plus prose, and neither fails loudly.
 //
-// If a style loses its palette, or two styles drift into describing the same
-// deck, nothing throws — the decks just quietly go back to looking alike,
+// If a house loses a chassis variable, or two houses drift into describing the
+// same deck, nothing throws — the decks just quietly go back to looking alike,
 // which is the exact problem the registry exists to solve. So the checks here
-// are about the shape of the data and about the promises pickDeckStyle makes:
-// same brief, same house; different decks, different houses; and anything the
-// user already answered is not answered again by the style.
+// are about the shape of the data, that every house drives every part of the
+// chassis, and about the promises pickDeckStyle makes: same brief, same house;
+// different decks, different houses; and anything the user already answered is
+// not answered again by the style.
 
 import { describe, it, expect } from 'vitest'
 import { DECK_STYLES, deckStyleById, pickDeckStyle } from '../../src/main/deckStyles'
@@ -37,20 +38,47 @@ describe('deck house styles', () => {
 
   for (const style of DECK_STYLES) {
     describe(style.label, () => {
-      it('names a palette of real colours with a role each', () => {
-        expect(style.palette.length).toBeGreaterThanOrEqual(4)
-        for (const p of style.palette) {
-          expect(p.hex, `${style.id} ${p.role}`).toMatch(/^#[0-9A-F]{6}$/)
-          expect(p.role.trim().length).toBeGreaterThan(2)
+      // A house that sets only some of the chassis variables is a half
+      // house: the rest fall back to the chassis default, which is one
+      // particular deck's dark grey, and the result reads as a mistake.
+      it('sets every variable the chassis reads', () => {
+        for (const key of [
+          '--deck-bg', '--deck-panel', '--deck-panel-2', '--deck-sheen',
+          '--deck-ink', '--deck-ink-2', '--deck-ink-3',
+          '--deck-accent-1', '--deck-accent-2', '--deck-accent-3', '--deck-accent-4',
+          '--deck-font', '--deck-mono', '--deck-radius'
+        ]) {
+          expect(style.tokens[key], `${style.id} ${key}`).toBeTruthy()
         }
-        expect(new Set(style.palette.map((p) => p.hex)).size).toBe(style.palette.length)
+      })
+
+      it('gives real colours and a ground that matches its tone', () => {
+        for (const key of ['--deck-bg', '--deck-ink', '--deck-ink-2', '--deck-ink-3']) {
+          expect(style.tokens[key], `${style.id} ${key}`).toMatch(/^#[0-9A-Fa-f]{6}$/)
+        }
+        const lum = (hex: string): number => {
+          const n = parseInt(hex.slice(1), 16)
+          return (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255
+        }
+        const bg = lum(style.tokens['--deck-bg'])
+        const ink = lum(style.tokens['--deck-ink'])
+        expect(style.tone === 'light' ? bg > 0.5 : bg < 0.5, `${style.id} tone`).toBe(true)
+        // Ink has to be on the other side of the ground or the deck is unreadable.
+        expect(Math.abs(bg - ink), `${style.id} contrast`).toBeGreaterThan(0.4)
+      })
+
+      it('loads the faces it names, or names only faces that need no loading', () => {
+        if (!style.fontsHref) return
+        expect(style.fontsHref).toMatch(/^https:\/\/fonts\.googleapis\.com\/css2\?/)
+        const first = /'([^']+)'/.exec(style.tokens['--deck-font'])?.[1] ?? ''
+        expect(style.fontsHref).toContain(first.replace(/ /g, '+'))
       })
 
       // Every field is instruction to a model. A one-word answer tells it
       // nothing it did not already assume, which is how a house style
       // silently becomes a default again.
       it('says enough in every part to actually direct a deck', () => {
-        for (const key of ['note', 'slideGrounds', 'type', 'furniture', 'imagery', 'data', 'sequence'] as const) {
+        for (const key of ['note', 'type', 'imagery', 'data', 'sequence'] as const) {
           expect(style[key].length, `${style.id}.${key}`).toBeGreaterThan(40)
         }
       })
@@ -78,18 +106,31 @@ describe('pickDeckStyle', () => {
     expect(seen.size).toBe(DECK_STYLES.length)
   })
 
-  it('names its house and gives the furniture, imagery, data and order every time', () => {
+  it('names its house and gives the tokens, imagery, numbers and order every time', () => {
     const text = pickDeckStyle(brief()).text
     expect(text).toContain('DECK HOUSE STYLE')
-    expect(text).toContain('Slide furniture:')
+    expect(text).toContain(':root{')
+    expect(text).toContain('--deck-bg:')
     expect(text).toContain('Imagery:')
-    expect(text).toContain('Numbers and charts:')
+    expect(text).toContain('Numbers:')
     expect(text).toContain('Running order:')
+  })
+
+  it('tells a light house to flip the chassis tone with it', () => {
+    // Otherwise the panels stay tinted for a dark ground and a light deck
+    // comes out with white-on-white cards, which is exactly the complaint.
+    for (const s of DECK_STYLES.filter((x) => x.tone === 'light')) {
+      const seed = Array.from({ length: 400 }, (_, i) => i)
+        .find((i) => pickDeckStyle(brief({ createdAt: i, idea: 'x' + i })).styleId === s.id)
+      expect(seed, `no seed found for ${s.id}`).toBeDefined()
+      const t = pickDeckStyle(brief({ createdAt: seed as number, idea: 'x' + seed })).text
+      expect(t, s.id).toContain('data-deck-tone="light"')
+    }
   })
 
   it('drops its own palette when the brief already picked one', () => {
     const free = pickDeckStyle(brief())
-    expect(free.text).toContain('Palette:')
+    expect(free.text).toContain('--deck-bg:')
     for (const pinned of [
       brief({ primaryColor: '#3b352c' }),
       brief({ paletteId: 'forest' }),
@@ -97,8 +138,11 @@ describe('pickDeckStyle', () => {
       brief({ tokensId: 'lib-1' }),
     ]) {
       const t = pickDeckStyle(pinned).text
-      expect(t).not.toContain('- Palette:')
-      expect(t).toContain('use the palette already given in this brief')
+      expect(t).not.toContain('--deck-bg:')
+      expect(t).not.toContain('--deck-accent-1:')
+      expect(t).toContain('derive --deck-bg')
+      // The radius is not a colour question, so the house keeps it.
+      expect(t).toContain('--deck-radius:')
       // The layout half of the house survives: that is the part doing the work.
       expect(t).toContain('Running order:')
     }
@@ -106,8 +150,12 @@ describe('pickDeckStyle', () => {
 
   it('drops its own type when the brief already picked fonts', () => {
     expect(pickDeckStyle(brief()).text).toContain('- Type:')
-    expect(pickDeckStyle(brief({ fontHeading: 'Fraunces' })).text).not.toContain('- Type:')
-    expect(pickDeckStyle(brief({ fontPairId: 'pair-2' })).text).not.toContain('- Type:')
+    for (const pinned of [brief({ fontHeading: 'Fraunces' }), brief({ fontPairId: 'pair-2' })]) {
+      const t = pickDeckStyle(pinned).text
+      expect(t).not.toContain('- Type:')
+      expect(t).not.toContain('--deck-font:')
+      expect(t).not.toContain('- Load the faces:')
+    }
   })
 
   it('defers to a look the user asked for instead of replacing it', () => {
@@ -131,6 +179,21 @@ describe('the house style reaches the prompt', () => {
     const text = buildPrefix('v2.html', brief())
     expect(text).toContain('DECK HOUSE STYLE')
     expect(text).toContain('Running order:')
+  })
+
+  it('ships the chassis itself, not a description of one', async () => {
+    const { buildPrefix } = await import('../../src/main/design')
+    const text = buildPrefix('v2.html', brief())
+    expect(text).toContain('DECK CHASSIS')
+    expect(text).toContain('<style id="deck-base">')
+    expect(text).toContain('<script id="deck-runtime"')
+    expect(text).toContain('THE CHASSIS IS THE DECK')
+  })
+
+  it('does not put a deck chassis on a web page', async () => {
+    const { buildPrefix } = await import('../../src/main/design')
+    const text = buildPrefix('v2.html', brief({ kind: 'landing', group: 'web' }))
+    expect(text).not.toContain('DECK CHASSIS')
   })
 
   it('leaves web pages to the art direction they already have', async () => {

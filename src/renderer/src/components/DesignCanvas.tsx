@@ -432,7 +432,11 @@ export function DesignCanvas({
       setSlideCount(slides.length)
       if (!slides.length) { setSlideIdx(0); return }
       // Scroll container = whichever element actually has horizontal overflow.
-      const scroller = doc.body.scrollWidth > doc.body.clientWidth ? doc.body : doc.documentElement
+      // A chassis deck keeps its overflow on <main class="deck">.
+      const deck = doc.querySelector<HTMLElement>('main.deck, .deck')
+      const scroller = deck && deck.scrollWidth > deck.clientWidth
+        ? deck
+        : doc.body.scrollWidth > doc.body.clientWidth ? doc.body : doc.documentElement
       // CRITICAL: each slide has its OWN width (typically 1920px for 16:9).
       // Don't divide by scroller.clientWidth: that's the iframe viewport,
       // which is smaller. Use the first slide's offsetWidth.
@@ -590,6 +594,9 @@ export function DesignCanvas({
     if (!doc) return null
     const body = doc.body
     if (!body) return null
+    // A chassis deck scrolls inside <main class="deck">, not on the body.
+    const deck = doc.querySelector<HTMLElement>('main.deck, .deck')
+    if (deck && deck.scrollWidth > deck.clientWidth) return deck
     // If body itself has horizontal overflow, use it. Otherwise fall back
     // to the document scrolling element (rare).
     if (body.scrollWidth > body.clientWidth) return body
@@ -1565,6 +1572,12 @@ function ExportMenu({ designId, disabled }: { designId: string; disabled: boolea
 // commands ('prev' | 'next' | 'go') from the parent. It also reports
 // {count, index} back to the parent on init / on scroll.
 function injectSlideRunner(html: string): string {
+  // A deck built on the chassis is already a horizontal snap stage with its
+  // own navigation, so this would be a second, conflicting one: turning body
+  // into the flex row would lay the frame, the nav cluster and the deck out
+  // side by side. Only decks that arrived as a bare stack of sections need it.
+  if (/id="deck-runtime"/i.test(html) || /<main[^>]*class="[^"]*\bdeck\b/i.test(html)) return html
+
   // CSS only: make the slide stack lay out horizontally with snap points.
   // Wheel-to-horizontal + arrow-key nav are kept as a tiny inline script
   // because they live inside the iframe's scroll context.

@@ -5,16 +5,18 @@
 // nothing, and it showed: every deck came back as centred white slides with a
 // heading, three bullets and a stock photograph, whatever the brief said.
 //
-// So decks get the same treatment, but drawn from real reference decks rather
-// than invented. Each style below is a whole house — palette, type, the
-// furniture along the edges of every slide, how photographs are used, how
-// numbers are shown, and the sequence a deck of that kind actually runs in.
-// A style is picked as a unit and committed to, because half a house style
-// reads as a mistake while a whole one reads as a decision.
+// A house used to be described in prose — the furniture along the edges, how
+// a slide is grounded, what the running order is — and a model reads prose and
+// approximates it. The chassis in deckChassis.ts now supplies the structure as
+// working code, so a house here is no longer a description of a deck. It is a
+// set of values for the chassis: its ground, its inks, its four accents, its
+// faces, and its corner radius, plus the handful of judgements the chassis
+// cannot make for itself — what a photograph is for, how a number is drawn,
+// and the order the deck runs in.
 //
 // Anything the user pinned in the brief wins. If they chose a palette, the
-// style keeps its layout and furniture and drops its colours; if they bound
-// the design to a token library, the tokens win over both.
+// house keeps its type, imagery and running order and drops its colours; if
+// they bound the design to a token library, the tokens win over both.
 
 import type { DesignBrief } from './design.types'
 
@@ -23,13 +25,14 @@ export type DeckStyle = {
   label: string
   /** One line, in the voice of the deck it came from. */
   note: string
-  /** Named colour roles, so the prompt can say what each colour is *for*. */
-  palette: { role: string; hex: string }[]
-  /** Which of the palette a slide is allowed to be, end to end. */
-  slideGrounds: string
+  /** Dark or light ground, so the chassis flips its panel tints to match. */
+  tone: 'dark' | 'light'
+  /** Chassis custom properties, written straight into the deck's :root. */
+  tokens: Record<string, string>
+  /** A Google Fonts href, or null when the faces are already on the system. */
+  fontsHref: string | null
+  /** How the faces are used, beyond which ones they are. */
   type: string
-  /** Repeating marks at the edge of every slide. The thing that makes a deck a deck. */
-  furniture: string
   imagery: string
   /** How a number, a chart or a percentage is drawn in this house. */
   data: string
@@ -37,97 +40,146 @@ export type DeckStyle = {
   sequence: string
 }
 
+/** Panel tints and sheen, which follow the ground rather than the palette. */
+function tints(tone: 'dark' | 'light'): Record<string, string> {
+  return tone === 'dark'
+    ? {
+        '--deck-panel': 'rgba(255,255,255,.045)',
+        '--deck-panel-2': 'rgba(255,255,255,.085)',
+        '--deck-sheen': 'rgba(255,255,255,.07)'
+      }
+    : {
+        '--deck-panel': 'rgba(15,17,26,.045)',
+        '--deck-panel-2': 'rgba(15,17,26,.085)',
+        '--deck-sheen': 'rgba(255,255,255,.55)'
+      }
+}
+
 export const DECK_STYLES: DeckStyle[] = [
   {
     id: 'press',
     label: 'Press — monochrome studio',
     note: 'Black, white, and one highlighter. The type does all the work.',
-    palette: [
-      { role: 'paper', hex: '#FFFFFF' },
-      { role: 'ink', hex: '#0A0A0A' },
-      { role: 'inverted slide ground', hex: '#000000' },
-      { role: 'highlight', hex: '#EFEE3C' },
-      { role: 'hairline', hex: '#E4E4E4' },
-      { role: 'caption grey', hex: '#8A8A8A' }
-    ],
-    slideGrounds: 'Every slide is either paper or the inverted black ground. Never a tint, never a gradient. Alternate them so a section reads as a change of gear.',
-    type: 'One neutral grotesque throughout (Helvetica Now, Inter Tight or Suisse). Headlines large and regular weight, never bold, never tracked out, sentence case, two or three words per line. Body at a small fixed size in caption grey. No second typeface.',
-    furniture: 'A bracketed index in the top left of every slide — [02], [03] — set small in caption grey. A hairline rule under the header. A footer with the brand word on the left and the URL on the right, both tiny. Nothing else touches the edges.',
-    imagery: 'Full-bleed architectural or documentary photography, square or tall, hard-cropped, no rounded corners and no shadow. One photograph per slide at most, and some slides carry none at all.',
-    data: 'A single number set enormous against a short label — 88%, 12.8K. Charts are hairline: grey bars with exactly one bar filled in the highlight colour, thin line charts with small dot markers, axis labels tiny.',
-    sequence: 'Cover, table of contents as a three-column numbered index, about, mission as a numbered list, services, a vision slide with one sentence and a phrase marked in the highlight, a numbers slide, a portfolio grid, contact.'
+    tone: 'light',
+    tokens: {
+      ...tints('light'),
+      '--deck-bg': '#FFFFFF',
+      '--deck-ink': '#0A0A0A',
+      '--deck-ink-2': '#5E5E5E',
+      '--deck-ink-3': '#8A8A8A',
+      '--deck-accent-1': '#0A0A0A',
+      '--deck-accent-2': '#EFEE3C',
+      '--deck-accent-3': '#0A0A0A',
+      '--deck-accent-4': '#EFEE3C',
+      '--deck-font': "'Inter Tight',-apple-system,system-ui,sans-serif",
+      '--deck-mono': "'IBM Plex Mono',ui-monospace,Menlo,monospace",
+      '--deck-radius': '0px'
+    },
+    fontsHref: 'https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap',
+    type: 'Headlines large and regular weight, never bold, never tracked out, sentence case, two or three words per line. Everything else small, in the mono. No third face.',
+    imagery: 'Full-bleed architectural or documentary photography, hard-cropped, square corners, no shadow. One photograph per slide at most, and several slides carry none.',
+    data: 'A single number set enormous against a short label. Charts are hairline: grey bars with exactly one bar in the highlight, thin lines with small dot markers.',
+    sequence: 'Cover, contents, the position in one sentence, the case in three or four reasons, a numbers slide, a two-up exhibit, a recap, contact.'
   },
   {
     id: 'cellar',
     label: 'Cellar — warm brand book',
     note: 'A brand guide you could hang on a wall. Deep maroon, cream and gold.',
-    palette: [
-      { role: 'deep maroon', hex: '#5C1A1B' },
-      { role: 'wheat cream', hex: '#F6E7B4' },
-      { role: 'harvest gold', hex: '#C9A44C' },
-      { role: 'rust clay', hex: '#99502A' },
-      { role: 'espresso', hex: '#3A2018' }
-    ],
-    slideGrounds: 'Whole slides in flat colour, and slides split down the middle into two flat colours. No white slides anywhere — cream is the light ground.',
-    type: 'A rounded geometric sans (Manrope) in exactly two roles: bold for headlines, regular for body and every label. Headlines short and left-set. Labels above a block, small, in the ground\'s complementary colour.',
-    furniture: 'Almost none. The style is carried by the colour blocking, not by marks. A small caption line at the foot of a slide where one is needed, and nothing else.',
-    imagery: 'Mosaics — a grid of four to eight photographs butted edge to edge with no gaps, mixing portraits, hands, materials and objects, all colour-graded warm to sit inside the palette.',
-    data: 'Colour, not charts. A row of full-height swatch columns, each labelled with its name, hex and role. Numbers appear inline in the body rather than as hero figures.',
-    sequence: 'Wordmark cover on maroon, positioning statement on cream, the mark in use on a real surface, digital touchpoints, the mark in all four colourways as a four-up grid, the palette as labelled columns, an image mosaic, type specimens with Aa set large, closing wordmark with the tagline.'
+    tone: 'dark',
+    tokens: {
+      ...tints('dark'),
+      '--deck-bg': '#5C1A1B',
+      '--deck-ink': '#F6E7B4',
+      '--deck-ink-2': '#D8B98A',
+      '--deck-ink-3': '#A97E62',
+      '--deck-accent-1': '#C9A44C',
+      '--deck-accent-2': '#99502A',
+      '--deck-accent-3': '#C9A44C',
+      '--deck-accent-4': '#99502A',
+      '--deck-font': "'Manrope',-apple-system,system-ui,sans-serif",
+      '--deck-mono': "'DM Mono',ui-monospace,Menlo,monospace",
+      '--deck-radius': '18px'
+    },
+    fontsHref: 'https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=DM+Mono:wght@400;500&display=swap',
+    type: 'One rounded geometric sans in exactly two roles: heavy for headlines, regular for everything else. Headlines short and left-set, with a small mono label above them.',
+    imagery: 'Mosaics — a grid of photographs butted edge to edge with no gaps, mixing portraits, hands, materials and objects, all graded warm.',
+    data: 'Colour rather than charts. A row of full-height swatches, each labelled with its name and role. Numbers appear inline rather than as hero figures.',
+    sequence: 'Wordmark cover, the position on one slide, the mark in use, a two-up exhibit of surfaces, the palette as labelled tiles, an image mosaic, type specimens, a closing wordmark with the line.'
   },
   {
     id: 'grove',
     label: 'Grove — dark product deck',
     note: 'Forest green and acid lime, with numbers big enough to read from the back.',
-    palette: [
-      { role: 'forest ground', hex: '#14302A' },
-      { role: 'acid lime', hex: '#A5E052' },
-      { role: 'mint', hex: '#4E9E7A' },
-      { role: 'paper', hex: '#F2F5F1' },
-      { role: 'white', hex: '#FFFFFF' }
-    ],
-    slideGrounds: 'Mostly the forest ground, with paper slides between sections to let the deck breathe, and occasional full lime slides for a single loud statement.',
-    type: 'A geometric sans (Space Grotesk or Poppins) set entirely in lower case, including headlines. Headlines large and light. Numerals are the display face: set them at three or four times the headline size, light weight, with a small raised plus or per-cent sign beside them.',
-    furniture: 'A tiny logo lock-up in one top corner and a slash-prefixed label in the other — /introduction, /market, /about us. Pill-shaped outlined tags for secondary labels. Thin rules between stacked rows.',
-    imagery: 'Two kinds only: cut-out portraits on flat colour, and faceted isometric shapes built from the palette that read as a logo fragment blown up. No stock photography of offices.',
-    data: 'Charts made of blocks — a waffle grid of small squares, half lime and half outlined; stepped bars that overlap and recede; enormous side-by-side percentages. Every chart carries a pill tag naming what it measures.',
-    sequence: 'Cover with a headline over a faceted shape, contents as three enormous numerals, a stats slide of three big figures, a ranked comparison, a leadership slide with cut-out portraits, a holdings chart, a full-bleed portrait slide, a section divider with a ghosted numeral, a closing statement.'
+    tone: 'dark',
+    tokens: {
+      ...tints('dark'),
+      '--deck-bg': '#14302A',
+      '--deck-ink': '#F2F5F1',
+      '--deck-ink-2': '#9DBBAC',
+      '--deck-ink-3': '#4E9E7A',
+      '--deck-accent-1': '#A5E052',
+      '--deck-accent-2': '#4E9E7A',
+      '--deck-accent-3': '#A5E052',
+      '--deck-accent-4': '#2C6B54',
+      '--deck-font': "'Space Grotesk',-apple-system,system-ui,sans-serif",
+      '--deck-mono': "'Space Mono',ui-monospace,Menlo,monospace",
+      '--deck-radius': '16px'
+    },
+    fontsHref: 'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Space+Mono:wght@400;700&display=swap',
+    type: 'Headlines large and set entirely in lower case. Numerals are the display face: set them very large and light, with a small raised plus or per-cent beside them.',
+    imagery: 'Two kinds only: cut-out portraits on flat colour, and faceted shapes built from the palette. No stock photography of offices.',
+    data: 'Stat tiles carrying one enormous figure each, and side-by-side percentages. Every figure gets a short label under it naming what it measures.',
+    sequence: 'Cover, contents, the problem in three reasons, a stats slide of three figures, a split comparison, a tiles slide of what ships, a carousel of the product, a recap, an ask.'
   },
   {
     id: 'orchid',
     label: 'Orchid — corporate report',
     note: 'Blush and plum. Built to carry a lot of text without looking heavy.',
-    palette: [
-      { role: 'blush ground', hex: '#F9E6F5' },
-      { role: 'deep plum', hex: '#3B0A34' },
-      { role: 'magenta accent', hex: '#A5219A' },
-      { role: 'ink', hex: '#241021' },
-      { role: 'paper', hex: '#FFFFFF' }
-    ],
-    slideGrounds: 'Blush by default, paper for the text-heaviest slides, deep plum for openers and closers, and a magenta-to-plum gradient reserved for the final slide only.',
-    type: 'A rounded sans (Poppins) for headings and a plain grotesque for body. Headlines run two lines with the second line in the magenta accent — that two-tone headline is the signature of the house and it appears on every content slide.',
-    furniture: 'The company name top left and the place or date top right, both small. A page number bottom left. A faint checkerboard of squares in the corner of plum slides, never over text.',
-    imagery: 'Photographs of people working, rectangular, hard-cropped, no rounded corners, always placed to one side of the text rather than behind it.',
-    data: 'Three or four labelled columns under a thin rule, each with a small asterisk mark, a bold label and a short paragraph. Milestones run along a horizontal rule with numbered nodes. Charts are plain and unfilled.',
-    sequence: 'Cover on plum, agenda, a split slide of image and headed paragraphs, a metrics slide of asterisked columns, a numbered milestone rail, a summary of main points, contact on the gradient with address, site, email and phone.'
+    tone: 'light',
+    tokens: {
+      ...tints('light'),
+      '--deck-bg': '#F9E6F5',
+      '--deck-ink': '#241021',
+      '--deck-ink-2': '#5D3557',
+      '--deck-ink-3': '#8A6483',
+      '--deck-accent-1': '#A5219A',
+      '--deck-accent-2': '#3B0A34',
+      '--deck-accent-3': '#A5219A',
+      '--deck-accent-4': '#3B0A34',
+      '--deck-font': "'Poppins',-apple-system,system-ui,sans-serif",
+      '--deck-mono': "'IBM Plex Mono',ui-monospace,Menlo,monospace",
+      '--deck-radius': '14px'
+    },
+    fontsHref: 'https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap',
+    type: 'Headlines run two lines with the second line inside a <span class="accent">. That two-tone headline is the signature of the house and belongs on every content slide.',
+    imagery: 'Photographs of people working, rectangular, hard-cropped, always beside the text rather than behind it.',
+    data: 'Three or four stat tiles under a heading, each a bold figure and a short label. Milestones run as a numbered recap rather than as a chart.',
+    sequence: 'Cover, agenda, a split of the situation and the response, a stats slide, a two-up exhibit, a tiles slide of workstreams, a numbered recap, contact.'
   },
   {
     id: 'atelier',
     label: 'Atelier — editorial fashion',
     note: 'Olive and cream, monospaced captions, and figures set very large.',
-    palette: [
-      { role: 'olive', hex: '#5A5A2E' },
-      { role: 'sage', hex: '#DDE0C8' },
-      { role: 'cream', hex: '#F6F4E9' },
-      { role: 'bark', hex: '#3A3A1E' },
-      { role: 'chalk', hex: '#FFFFFF' }
-    ],
-    slideGrounds: 'Cream and sage alternating, with olive slides for the loudest moments. The deck should read as a set of pages from one printed book.',
-    type: 'A wide sans for display set in upper case with generous tracking, and a monospace for every caption, label and annotation. That mono is the tell: ref numbers, versions and column headers are all monospaced. Body copy stays small.',
-    furniture: 'A reference mark in the top right — Ref. 01 / 26 — and the agency line bottom left, both monospaced. Thin rules boxing the slide into a visible grid. A small scalloped seal badge carrying a version number, placed over an image edge.',
-    imagery: 'Fashion and still-life photography, warm and slightly desaturated, often two frames side by side at different crops. Images bleed off one edge rather than sitting inside a margin.',
-    data: 'Figures set very large in the display face with a monospaced caption beneath. Bar charts drawn as tight vertical strokes rather than blocks. Percentage tiles arranged on a visible grid, one tile inverted to olive.',
-    sequence: 'Cover with a two-frame image pair and the title reversed out, a three-column principles slide, a metrics grid, a large statement slide, a strategy slide split image and colour, a lookbook slide, a manifesto paragraph with two figures, a closing headline with three arrowed statistics.'
+    tone: 'light',
+    tokens: {
+      ...tints('light'),
+      '--deck-bg': '#F6F4E9',
+      '--deck-ink': '#3A3A1E',
+      '--deck-ink-2': '#5A5A2E',
+      '--deck-ink-3': '#8C8C63',
+      '--deck-accent-1': '#5A5A2E',
+      '--deck-accent-2': '#8C8C63',
+      '--deck-accent-3': '#5A5A2E',
+      '--deck-accent-4': '#3A3A1E',
+      '--deck-font': "'Archivo',-apple-system,system-ui,sans-serif",
+      '--deck-mono': "'IBM Plex Mono',ui-monospace,Menlo,monospace",
+      '--deck-radius': '4px'
+    },
+    fontsHref: 'https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&family=IBM+Plex+Mono:wght@400;500&display=swap',
+    type: 'A wide sans for display and the mono for every caption, label and eyebrow. That mono is the tell: reference numbers, versions and column headers are all monospaced.',
+    imagery: 'Fashion and still-life photography, warm and slightly desaturated, often two frames side by side at different crops.',
+    data: 'Figures set very large in the display face with a monospaced label beneath. Percentage tiles on a visible grid, one tile inverted.',
+    sequence: 'Cover with a two-frame exhibit, a three-point principles slide, a stats grid, a single statement slide, a split of strategy, a lookbook carousel, a recap, a closing line.'
   }
 ]
 
@@ -157,9 +209,9 @@ export function deckStyleById(id: string): DeckStyle | null {
  *
  * Seeded from the brief the same way the web variety engine is, so a deck keeps
  * its house across every iteration turn while two different decks get different
- * houses. Colour and type lines drop out when the user has already answered
- * those questions — the layout, furniture and sequence still apply, because
- * those are the part that stops a deck looking generated.
+ * houses. The colour block drops out when the user has already answered that
+ * question — the type, imagery and running order still apply, because those are
+ * the part the chassis has no opinion about.
  */
 export function pickDeckStyle(brief: DesignBrief | null): { styleId: string; text: string } {
   const seedStr = `${brief?.createdAt ?? 0}|${brief?.kind ?? ''}|${brief?.idea ?? ''}|${brief?.audience ?? ''}`
@@ -168,23 +220,44 @@ export function pickDeckStyle(brief: DesignBrief | null): { styleId: string; tex
   const lines: string[] = ['DECK HOUSE STYLE (commit to this whole, not in part)']
   lines.push(`- House: ${style.label}. ${style.note}`)
 
-  if (pinsColour(brief)) {
-    lines.push('- Colour: use the palette already given in this brief, not this house\'s own. Keep the house\'s rule for how colour is applied:')
-    lines.push(`  ${style.slideGrounds}`)
-  } else {
-    lines.push(`- Palette: ${style.palette.map((p) => `${p.hex} (${p.role})`).join(', ')}.`)
-    lines.push(`- Grounds: ${style.slideGrounds}`)
-  }
+  const colourPinned = pinsColour(brief)
+  const fontsPinned = pinsFonts(brief)
 
-  if (!pinsFonts(brief)) lines.push(`- Type: ${style.type}`)
-  lines.push(`- Slide furniture: ${style.furniture}`)
+  // The chassis reads every one of these; setting them is how a house is
+  // applied. Anything the user already chose replaces the matching line
+  // rather than the whole block, so a pinned palette still gets this house's
+  // radius and faces.
+  const decl = Object.entries(style.tokens)
+    .filter(([k]) => {
+      if (colourPinned && (k.startsWith('--deck-accent') || k === '--deck-bg' || k.startsWith('--deck-ink') || k === '--deck-panel' || k === '--deck-panel-2' || k === '--deck-sheen')) return false
+      if (fontsPinned && (k === '--deck-font' || k === '--deck-mono')) return false
+      return true
+    })
+    .map(([k, v]) => `  ${k}: ${v};`)
+
+  if (decl.length) {
+    lines.push('- Put this in your own <style> after the chassis block:')
+    lines.push('  :root{')
+    lines.push(...decl)
+    lines.push('  }')
+  }
+  if (!colourPinned && style.tone === 'light') {
+    lines.push('- This is a light house: put data-deck-tone="light" on <html> so the chassis flips its panel tints and sheen with it.')
+  }
+  if (colourPinned) {
+    lines.push('- Colour: derive --deck-bg, --deck-ink, --deck-ink-2, --deck-ink-3 and --deck-accent-1..4 from the palette already given in this brief. Set data-deck-tone="light" on <html> if that ground is light.')
+  }
+  if (!fontsPinned && style.fontsHref) {
+    lines.push(`- Load the faces: <link rel="stylesheet" href="${style.fontsHref}">`)
+  }
+  if (!fontsPinned) lines.push(`- Type: ${style.type}`)
   lines.push(`- Imagery: ${style.imagery}`)
-  lines.push(`- Numbers and charts: ${style.data}`)
+  lines.push(`- Numbers: ${style.data}`)
   lines.push(`- Running order: ${style.sequence}`)
 
   if (brief?.look) lines.push(`- Express all of this within the requested "${brief.look}" look rather than replacing it.`)
   lines.push(
-    '- Do not produce the default deck: a centred title over three equal bullet points, a stock photograph behind a translucent panel, or a slide that is only a heading and a paragraph. Every slide must use the furniture above so the deck reads as one document.'
+    '- Do not produce the default deck: a centred title over three equal bullet points, a stock photograph behind a translucent panel, or a slide that is only a heading and a paragraph.'
   )
 
   return { styleId: style.id, text: lines.join('\n') }

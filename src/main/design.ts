@@ -19,6 +19,7 @@ import { upsertManagedBlock } from './htmlBlocks'
 import { buildEngineBaseBlock, ENGINE_USAGE, ENGINE_BASE_ID, ENGINE_MOTION_ID } from './designAssets'
 import { pickVariety } from './designVariety'
 import { pickDeckStyle } from './deckStyles'
+import { buildDeckBaseBlock, DECK_USAGE, DECK_BASE_ID, DECK_RUNTIME_ID } from './deckChassis'
 import {
   type ExportFormat,
   extFor,
@@ -402,10 +403,19 @@ export function buildPrefix(
     )
   }
 
-  // Decks get the same medicine for the same reason. Without it the model
-  // reaches for its own default deck every time, whatever the brief said, and
-  // the palette question in the wizard ends up decorating an identical layout.
-  if (brief && brief.group === 'presentation') blocks.push(pickDeckStyle(brief).text)
+  // Decks get the same medicine, and more of it. A deck is not a page: it
+  // needs navigation, a contents list and a snap stage before it needs any
+  // art direction at all, and asking for those in prose produced a stack of
+  // sections with the edges cut off. So the chassis ships as code and the
+  // house style is reduced to the values that drive it.
+  if (brief && brief.group === 'presentation') {
+    blocks.push(
+      `DECK CHASSIS (use exactly this, do not modify it)\n` +
+        `The deck must include this chassis: put the <style id="${DECK_BASE_ID}"> in <head> and the <script id="${DECK_RUNTIME_ID}"> just before </body>. If a previous version already contains them, keep them byte-for-byte.\n\n` +
+        `${buildDeckBaseBlock()}\n\n${DECK_USAGE}`,
+    )
+    blocks.push(pickDeckStyle(brief).text)
+  }
 
   const out: string[] = ['OUTPUT']
   if (previousVersionFileName) {
