@@ -335,7 +335,9 @@ export function DesignsListView({
   }, [scoped, search, typeFilter, folderFilter, designFolders])
 
   return (
-    <div className={['h-full w-full bg-bg', tokensFull ? 'overflow-hidden' : 'overflow-y-auto overflow-x-hidden'].join(' ')}>
+    <div
+      className={['h-full w-full bg-bg', tokensFull ? 'overflow-hidden' : 'overflow-y-auto overflow-x-hidden t42-stable-gutter'].join(' ')}
+    >
       <div className={tokensFull ? 'flex h-full min-h-0 flex-col' : 'mx-auto max-w-6xl px-8 pt-10'}>
         {!tokensFull && (
         <div className="sticky top-0 z-10 bg-bg pb-4">
@@ -398,12 +400,11 @@ export function DesignsListView({
               </ViewPill>
             ))}
             {scope === 'design' && (
-              <>
-                <span className="mx-1.5" />
+              <div className="ml-3 inline-flex items-center gap-1">
                 <ViewPill active={typeFilter === 'system'} onClick={() => setTypeFilter('system')}>Design systems</ViewPill>
                 <ViewPill active={typeFilter === 'tokens'} onClick={() => setTypeFilter('tokens')}>Tokens</ViewPill>
                 <ViewPill active={typeFilter === 'templates'} onClick={() => setTypeFilter('templates')}>Templates</ViewPill>
-              </>
+              </div>
             )}
           </div>
           )}
@@ -641,6 +642,10 @@ function ViewPill({ active, onClick, children }: { active: boolean; onClick: () 
       type="button"
       onClick={onClick}
       className={[
+        // Everything with a size lives on this line, so a pill is exactly the
+        // same shape whether or not it is the one you are on. The tab bar used
+        // to change width as you moved along it, which is what happens the
+        // moment the selected state carries a weight or a padding of its own.
         'rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors',
         active ? 'bg-raised text-text-primary shadow-row' : 'text-text-secondary hover:text-text-primary'
       ].join(' ')}

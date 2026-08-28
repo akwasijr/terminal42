@@ -592,3 +592,9 @@ html[data-translucent="true"] nav.t42-sidebar {
    not appear to arrive before the room has darkened. */
 .t42-scrim { animation: t42-veil 180ms ease-out both; }
 .t42-modal, .t42-scrim > * { animation: t42-lift 200ms cubic-bezier(.22, 1, .36, 1) both; }
+
+/* A centred page whose scrollbar comes and goes moves its whole layout
+   sideways by half a scrollbar as you switch between a long list and a short
+   one — filter tabs slide out from under the pointer. Holding the gutter open
+   costs nothing on overlay scrollbars and keeps the page still everywhere. */
+.t42-stable-gutter { scrollbar-gutter: stable; }
