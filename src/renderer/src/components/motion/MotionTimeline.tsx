@@ -989,7 +989,24 @@ function splitOnce(target: string): [string, string] {
 }
 
 /** The timing a layer carries, which is all this row cares about. */
-type LayerSpan = { from?: number; to?: number; fade?: number }
+type LayerSpan = { from?: number; to?: number; fade?: number; hidden?: boolean }
+
+/**
+ * The same eye Form draws in its layer list, at the same size.
+ *
+ * Copied rather than shared because it is nine path commands and importing it
+ * across two canvases that have nothing else in common would be the more
+ * expensive of the two. It has to be the same shape, though: the eye is the
+ * one control a person looks for without reading, and two different eyes in
+ * one app would mean two different things.
+ */
+function EyeGlyph({ on }: { on: boolean }): React.JSX.Element {
+  return on ? (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>
+  ) : (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><path d="M3 3l18 18" /><path d="M10.6 6.1A10.8 10.8 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3.2 3.8M6.2 6.3A17 17 0 0 0 2 12s3.5 6 10 6a10 10 0 0 0 3.3-.5" /></svg>
+  )
+}
 
 /**
  * One layer, and when it is on screen.
@@ -1071,20 +1088,36 @@ function LayerRow({
 
   return (
     <div className="flex items-center gap-2">
-      <button
-        type="button"
-        onClick={onSelect}
-        disabled={!onSelect}
-        aria-pressed={selected}
-        title={`${kind}: ${label}`}
-        className={`${LABEL_W} shrink-0 truncate rounded-sm px-1 text-left text-[10.5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
-          selected
-            ? 'bg-accent/15 text-accent'
-            : `${on ? 'text-text-secondary' : 'text-text-muted'} enabled:hover:bg-raised enabled:hover:text-text-primary`
-        }`}
-      >
-        {label}
-      </button>
+      {/* The eye and the name share the label column, so the lanes below a
+          layer still start where the layer's own lane starts. */}
+      <div className={`${LABEL_W} flex shrink-0 items-center gap-1`}>
+        <button
+          type="button"
+          onClick={() => onSpan({ hidden: !span.hidden })}
+          aria-pressed={!span.hidden}
+          aria-label={span.hidden ? `Show ${label}` : `Hide ${label}`}
+          title={span.hidden ? `Show ${label}` : `Hide ${label}, without changing the piece`}
+          className={`grid h-4 w-4 shrink-0 place-items-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+            span.hidden ? 'text-text-muted hover:text-text-primary' : 'text-text-secondary hover:bg-raised hover:text-text-primary'
+          }`}
+        >
+          <EyeGlyph on={!span.hidden} />
+        </button>
+        <button
+          type="button"
+          onClick={onSelect}
+          disabled={!onSelect}
+          aria-pressed={selected}
+          title={`${kind}: ${label}`}
+          className={`min-w-0 flex-1 truncate rounded-sm px-1 text-left text-[10.5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+            selected
+              ? 'bg-accent/15 text-accent'
+              : `${on ? 'text-text-secondary' : 'text-text-muted'} enabled:hover:bg-raised enabled:hover:text-text-primary`
+          } ${span.hidden ? 'opacity-60' : ''}`}
+        >
+          {label}
+        </button>
+      </div>
       <div ref={lane} className="relative h-5 flex-1 overflow-hidden rounded-sm bg-sunken">
         {pieces.map((p, i) => (
           <span

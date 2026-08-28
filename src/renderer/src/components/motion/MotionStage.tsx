@@ -681,15 +681,20 @@ type DragState = {
  * would mean a redraw on every frame of every fade — which is the cost this
  * exists to avoid. Two decimal places is finer than the eye reads on an
  * opacity ramp and coarse enough to hold still.
+ *
+ * A text or logo layer with no window is normally left out, since its
+ * visibility cannot change. Hiding it can change it, so a hidden layer is
+ * named here even when it has no timing — otherwise the eye would turn the
+ * layer off in the model and leave it on the screen.
  */
 function staticSignature(doc: MotionDoc, phase: number): string {
   let out = ''
   for (const t of doc.visual.text) {
-    if (t.from === undefined && t.to === undefined) continue
+    if (t.from === undefined && t.to === undefined && !t.hidden) continue
     out += `t${t.id}:${layerVisibility(t, phase).toFixed(2)};`
   }
   for (const l of doc.visual.logos) {
-    if (l.from === undefined && l.to === undefined) continue
+    if (l.from === undefined && l.to === undefined && !l.hidden) continue
     out += `l${l.id}:${layerVisibility(l, phase).toFixed(2)};`
   }
   // Shapes and pictures live on the backdrop, which is redrawn from this

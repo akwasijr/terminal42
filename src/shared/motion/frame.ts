@@ -236,10 +236,26 @@ function wrapEnd(v: number): number {
   return w === 0 && v !== 0 ? 1 : w
 }
 
+/**
+ * How much of a layer is on screen at this point in the loop, 0 to 1.
+ *
+ * Two different ideas share this answer, and they are not the same thing:
+ *
+ * - `from`/`to`/`fade` are the layer's own timing — when in the piece it
+ *   appears, which is part of the composition and belongs in the export.
+ * - `hidden` is the eye in the layer list. It is the person working saying
+ *   "not while I deal with what is behind you", and it applies to the whole
+ *   loop, so it wins over any window.
+ *
+ * Both land here because every drawing site, the hit test, the stage's cache
+ * key and the export already multiply by this one number. Anything that
+ * checked `hidden` separately would be a place that could forget to.
+ */
 export function layerVisibility(
-  span: { from?: number; to?: number; fade?: number },
+  span: { from?: number; to?: number; fade?: number; hidden?: boolean },
   p: number
 ): number {
+  if (span.hidden) return 0
   const from = span.from
   const to = span.to
   if (from === undefined && to === undefined) return 1

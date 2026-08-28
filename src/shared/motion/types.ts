@@ -222,6 +222,13 @@ export type TextLayer = {
   to?: number
   /** How long the layer takes to fade in and out, as a fraction of the loop. */
   fade?: number
+  /**
+   * Hidden by the eye in the layer list. Not part of the composition — it is
+   * how you get a layer out of the way while you work on what is behind it —
+   * but it is saved, because coming back to a piece with a layer you had put
+   * away already back on would be a surprise.
+   */
+  hidden?: boolean
 }
 
 export type TextAlign = 'left' | 'center' | 'right'
@@ -245,11 +252,12 @@ export const TEXT_DEFAULTS = {
  * Timing is left alone. Absent bounds mean the whole loop, and filling them
  * in with numbers would turn "always" into a window that merely happens to
  * cover everything — a difference that matters the moment the loop is
- * measured against something else.
+ * measured against something else. `hidden` is left alone for the same
+ * reason: it is not a typographic choice, it is the eye in the layer list.
  */
 export type ResolvedText =
   TextLayer &
-  Required<Omit<TextLayer, 'id' | 'text' | 'size' | 'colour' | 'x' | 'y' | 'from' | 'to' | 'fade'>>
+  Required<Omit<TextLayer, 'id' | 'text' | 'size' | 'colour' | 'x' | 'y' | 'from' | 'to' | 'fade' | 'hidden'>>
 
 export function resolvedText(layer: TextLayer): ResolvedText {
   return {
@@ -285,6 +293,13 @@ export type LogoLayer = {
   from?: number
   to?: number
   fade?: number
+  /**
+   * Hidden by the eye in the layer list. Not part of the composition — it is
+   * how you get a layer out of the way while you work on what is behind it —
+   * but it is saved, because coming back to a piece with a layer you had put
+   * away already back on would be a surprise.
+   */
+  hidden?: boolean
 }
 
 /**
@@ -487,6 +502,13 @@ export type ShapeLayer = {
   from?: number
   to?: number
   fade?: number
+  /**
+   * Hidden by the eye in the layer list. Not part of the composition — it is
+   * how you get a layer out of the way while you work on what is behind it —
+   * but it is saved, because coming back to a piece with a layer you had put
+   * away already back on would be a surprise.
+   */
+  hidden?: boolean
 }
 
 /** Whether a picture fills its mask or fits inside it. */
@@ -526,6 +548,13 @@ export type PictureLayer = {
   from?: number
   to?: number
   fade?: number
+  /**
+   * Hidden by the eye in the layer list. Not part of the composition — it is
+   * how you get a layer out of the way while you work on what is behind it —
+   * but it is saved, because coming back to a piece with a layer you had put
+   * away already back on would be a surprise.
+   */
+  hidden?: boolean
 }
 
 export type VisualState = {
