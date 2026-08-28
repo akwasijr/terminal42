@@ -54,7 +54,7 @@ export const CHECKS: Check[] = [
   {
     id: 'layers',
     label: 'A layer for each depth',
-    why: 'Without layers a card inside a panel inside a page is one colour three times, and the nesting a person is meant to read simply is not there.',
+    why: 'Without layers, a card in a panel in a page is one colour three times.',
     section: 'colour',
     need: 2,
     holds: (t) => colour(t) && says(t, 'layer')
@@ -62,7 +62,7 @@ export const CHECKS: Check[] = [
   {
     id: 'field',
     label: 'A field colour of its own',
-    why: 'An input has to stay legible as somewhere you can type on whichever surface it lands on; borrowing the surface colour makes it vanish on half of them.',
+    why: 'A field has to stay legible on whichever surface it lands on.',
     section: 'colour',
     need: 1,
     holds: (t) => colour(t) && says(t, 'field', 'input')
@@ -70,7 +70,7 @@ export const CHECKS: Check[] = [
   {
     id: 'focus',
     label: 'A focus ring',
-    why: 'Keyboard focus is the one state that cannot be left to each screen to invent, because an invisible focus ring makes the product unusable without a mouse.',
+    why: 'An invisible focus ring makes the product unusable without a mouse.',
     section: 'colour',
     need: 1,
     holds: (t) => colour(t) && says(t, 'focus')
@@ -78,7 +78,7 @@ export const CHECKS: Check[] = [
   {
     id: 'focusInset',
     label: 'A focus inset',
-    why: 'A ring drawn on a surface its own colour disappears; the inset is the hairline that keeps it visible everywhere.',
+    why: 'A ring the colour of its surface disappears; the inset keeps it visible.',
     section: 'colour',
     need: 1,
     holds: (t) => colour(t) && (says(t, 'inset') || /focus\.(inset|inverse)/i.test(t.path))
@@ -86,7 +86,7 @@ export const CHECKS: Check[] = [
   {
     id: 'icon',
     label: 'Icon colours',
-    why: 'An icon at 16px reads lighter than text at 16px, so icons that reuse the text colours come out faint everywhere.',
+    why: 'Icons read lighter than text, so text colours leave them faint.',
     section: 'colour',
     need: 2,
     holds: (t) => colour(t) && says(t, 'icon')
@@ -94,7 +94,7 @@ export const CHECKS: Check[] = [
   {
     id: 'link',
     label: 'Link colours, including visited',
-    why: 'A link with no visited colour tells a reader nothing about where they have already been.',
+    why: 'Without a visited colour, a reader cannot tell where they have been.',
     section: 'colour',
     need: 2,
     holds: (t) => colour(t) && says(t, 'link')
@@ -102,7 +102,7 @@ export const CHECKS: Check[] = [
   {
     id: 'inverse',
     label: 'An inverse surface',
-    why: 'A tooltip or a toast is meant to read as being on top of the page rather than in it, which only works if there is a deliberate opposite to sit on.',
+    why: 'A toast should read as on top of the page rather than in it.',
     section: 'colour',
     need: 2,
     holds: (t) => colour(t) && says(t, 'inverse')
@@ -110,7 +110,7 @@ export const CHECKS: Check[] = [
   {
     id: 'skeleton',
     label: 'Skeleton colours',
-    why: 'Loading states get invented per screen otherwise, and the product flickers through three different greys on its way to the same page.',
+    why: 'Otherwise every screen invents its own grey to load with.',
     section: 'colour',
     need: 1,
     holds: (t) => colour(t) && says(t, 'skeleton', 'placeholder')
@@ -118,7 +118,7 @@ export const CHECKS: Check[] = [
   {
     id: 'states',
     label: 'Hover and active colours',
-    why: 'If the library stops at the resting colour, every interactive state in the product is somebody darkening a hex by eye.',
+    why: 'Without them, each interactive state is a hex somebody darkened by eye.',
     section: 'colour',
     need: 2,
     holds: (t) => colour(t) && says(t, 'hover', 'active', 'pressed', 'selected')
@@ -126,7 +126,7 @@ export const CHECKS: Check[] = [
   {
     id: 'disabled',
     label: 'A disabled colour',
-    why: 'Disabled is the one state allowed to fail contrast, so it has to be chosen once on purpose rather than approximated with opacity.',
+    why: 'Disabled may fail contrast, so it has to be chosen once on purpose.',
     section: 'colour',
     need: 1,
     holds: (t) => colour(t) && says(t, 'disabled')
@@ -134,7 +134,7 @@ export const CHECKS: Check[] = [
   {
     id: 'status',
     label: 'Colours for success, warning and error',
-    why: 'Status colours invented at the call site are how one product ends up with three different reds.',
+    why: 'Invented per screen, this is how a product ends up with three reds.',
     section: 'colour',
     need: 3,
     holds: (t) => colour(t) && says(t, 'success', 'warning', 'danger', 'error', 'info')
@@ -142,7 +142,7 @@ export const CHECKS: Check[] = [
   {
     id: 'typeStyles',
     label: 'Whole type styles, not loose numbers',
-    why: 'A size and a weight in separate tokens is six numbers to reassemble in your head; a style is one thing to point at.',
+    why: 'A style is one thing to point at; a size and a weight are six numbers.',
     section: 'type',
     need: 4,
     holds: (t) => t.type === 'typography'
@@ -150,7 +150,7 @@ export const CHECKS: Check[] = [
   {
     id: 'typeCompact',
     label: 'A compact body style',
-    why: 'Prose wants air between lines and a label inside a control wants none; one body style asked to do both makes tall buttons and tight paragraphs.',
+    why: 'Prose wants air between lines; a label inside a control wants none.',
     section: 'type',
     need: 1,
     holds: (t) => t.type === 'typography' && says(t, 'compact', 'bodycompact', 'dense')
@@ -158,7 +158,7 @@ export const CHECKS: Check[] = [
   {
     id: 'tracking',
     label: 'Letter spacing',
-    why: 'Small text needs slightly more tracking and large text slightly less; a library without it renders both very slightly wrong forever.',
+    why: 'Small text needs a little more tracking, and large text a little less.',
     section: 'type',
     need: 1,
     holds: (t) => t.type === 'letterSpacing'
@@ -166,7 +166,7 @@ export const CHECKS: Check[] = [
   {
     id: 'mono',
     label: 'A monospace family',
-    why: 'Code, numbers in a table and anything meant to line up need a family that does; without one they get the body font and jitter.',
+    why: 'Code and numbers in a table need a family that lines them up.',
     section: 'type',
     need: 1,
     holds: (t) => t.type === 'fontFamily' && says(t, 'mono', 'code')
@@ -174,15 +174,15 @@ export const CHECKS: Check[] = [
   {
     id: 'spacing',
     label: 'A spacing scale worth the name',
-    why: 'Fewer than about eight steps and people start writing numbers that are not in the scale, which is the end of the scale.',
+    why: 'Under about eight steps, people start writing numbers off the scale.',
     section: 'space',
     need: 8,
     holds: (t) => t.type === 'dimension' && says(t, 'space', 'spacing', 'gap', 'pad', 'padding')
   },
   {
     id: 'layout',
-    label: 'A layout scale for space between sections',
-    why: 'Space between sections is not space inside a card, and one scale asked to do both either cramps the page or bloats the card.',
+    label: 'A scale for space between sections',
+    why: 'Space between sections is not the same as space inside a card.',
     section: 'space',
     need: 3,
     holds: (t) => t.type === 'dimension' && says(t, 'layout', 'section', 'stack')
@@ -190,7 +190,7 @@ export const CHECKS: Check[] = [
   {
     id: 'radius',
     label: 'A corner scale',
-    why: 'Corners chosen per component are the fastest way to make a product look like it was built by four people who never met.',
+    why: 'Corners chosen per component make a product look built by strangers.',
     section: 'shape',
     need: 3,
     holds: (t) => t.type === 'dimension' && says(t, 'radius', 'corner')
@@ -198,7 +198,7 @@ export const CHECKS: Check[] = [
   {
     id: 'stroke',
     label: 'Border widths',
-    why: 'A hairline and a focus ring are different thicknesses, and both get typed as 1px and 2px by hand until they are tokens.',
+    why: 'A hairline and a focus ring are not the same thickness.',
     section: 'shape',
     need: 2,
     holds: (t) => t.type === 'dimension' && says(t, 'stroke', 'border')
@@ -206,7 +206,7 @@ export const CHECKS: Check[] = [
   {
     id: 'elevation',
     label: 'An elevation scale',
-    why: 'Shadow is how the product says what is on top of what; three ad hoc shadows say it three different ways.',
+    why: 'Shadow says what sits on top; ad hoc shadows say it three ways.',
     section: 'elevation',
     need: 3,
     holds: (t) => t.type === 'shadow'
@@ -214,7 +214,7 @@ export const CHECKS: Check[] = [
   {
     id: 'durations',
     label: 'Durations across the range',
-    why: 'A button acknowledging a press and a panel arriving are not the same length, and a scale with three steps gives both the middle one.',
+    why: 'A button acknowledging a press is not as long as a panel arriving.',
     section: 'motion',
     need: 5,
     holds: (t) => t.type === 'duration'
@@ -222,7 +222,7 @@ export const CHECKS: Check[] = [
   {
     id: 'easings',
     label: 'Entrance, exit and standard curves',
-    why: 'Something arriving, something leaving and something moving in place need different curves; one ease-in-out cannot tell them apart.',
+    why: 'Arriving, leaving and moving in place each want a different curve.',
     section: 'motion',
     need: 3,
     holds: (t) => t.type === 'cubicBezier'
@@ -230,7 +230,7 @@ export const CHECKS: Check[] = [
   {
     id: 'expressive',
     label: 'An expressive set of curves',
-    why: 'Reserving a slower, more visible curve for the few moments that matter is what stops every transition competing for attention.',
+    why: 'Reserve the slow curve, or every transition competes for attention.',
     section: 'motion',
     need: 2,
     holds: (t) => t.type === 'cubicBezier' && says(t, 'expressive', 'emphasised', 'emphasized')
@@ -238,7 +238,7 @@ export const CHECKS: Check[] = [
   {
     id: 'breakpoints',
     label: 'Breakpoints',
-    why: 'Breakpoints written into each stylesheet by hand are how one product comes to change shape at four different widths.',
+    why: 'Hand-typed breakpoints make a product change shape at four widths.',
     section: 'grid',
     need: 3,
     holds: (t) => says(t, 'breakpoint', 'screen')
@@ -246,7 +246,7 @@ export const CHECKS: Check[] = [
   {
     id: 'gutters',
     label: 'Columns and gutters',
-    why: 'Without them the grid lives in whoever last built a page, and nothing lines up between two screens built a week apart.',
+    why: 'Without them, nothing lines up across screens built a week apart.',
     section: 'grid',
     need: 2,
     holds: (t) => says(t, 'column', 'columns', 'gutter', 'grid')

@@ -38,6 +38,7 @@ import {
   cssOptionsOf,
   type CssOptions
 } from '../../../../shared/tokens/types'
+import { ENFORCEMENT_OPTIONS } from '../../../../shared/tokens/enforcementCopy'
 import { toCSS } from '../../../../shared/tokens/export'
 import { flatten, problems, resolve, type Problem } from '../../../../shared/tokens/resolve'
 import { familiesOf, leafOf, SECTIONS, sectionOf, type Family, type SectionId } from '../../../../shared/tokens/groups'
@@ -1899,11 +1900,7 @@ function EnforcementPicker({ studio, onChange }: { studio: TokenStudio; onChange
   const current = enforcementOf(studio)
   const [open, setOpen] = useState(false)
   const box = useRef<HTMLDivElement | null>(null)
-  const options: { id: Enforcement; label: string; hint: string }[] = [
-    { id: 'advise', label: 'Advise', hint: 'Put the token names in the prompt and leave it there.' },
-    { id: 'check', label: 'Check', hint: 'Also count and name anything that came out off the library.' },
-    { id: 'block', label: 'Fix', hint: 'Also ask for the off-library values to be replaced.' }
-  ]
+  const options = ENFORCEMENT_OPTIONS
   const now = options.find((o) => o.id === current) ?? options[0]
 
   useEffect(() => {
@@ -1939,7 +1936,7 @@ function EnforcementPicker({ studio, onChange }: { studio: TokenStudio; onChange
           className="t42-menu absolute right-0 top-full z-30 mt-1 w-72 rounded-panel bg-elevated p-1 shadow-lg ring-1 ring-border"
         >
           <p className="px-2 py-1.5 text-[10.5px] text-text-muted">
-            When a design uses something this library does not have:
+            When a design goes off-library
           </p>
           {options.map((o) => (
             <button
@@ -1981,9 +1978,12 @@ function EnforcementPicker({ studio, onChange }: { studio: TokenStudio; onChange
  * A library screen shows what is in it, which means the one thing it can
  * never show is the gap: thirty swatches look finished whether or not any of
  * them is a focus ring. This is the only part of the screen that reads the
- * absence, so it leads with the count and says, for each thing missing, what
- * will go wrong in the product without it rather than merely that it is
- * absent.
+ * absence.
+ *
+ * Each gap has a reason worth reading, and printing all of them at once made
+ * a wall of prose nobody read any of. One line per gap, and the reason for
+ * whichever line is under the pointer, in a slot kept clear for it — one
+ * sentence at a time rather than fifteen.
  */
 function GapsMenu({
   studio,
@@ -1995,6 +1995,9 @@ function GapsMenu({
   onFill: (studio: TokenStudio, note: string) => void
 }): React.JSX.Element {
   const [open, setOpen] = useState(false)
+  // The gap whose reason is currently showing. One at a time, in a slot that
+  // is always there, so the panel does not change height as you move down it.
+  const [why, setWhy] = useState<string | null>(null)
   const box = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -2051,24 +2054,26 @@ function GapsMenu({
           <p className="text-[12.5px] font-medium text-text-primary">
             {whole ? 'Nothing left to decide' : `${score.met} of ${score.total} decided`}
           </p>
-          <p className="mt-0.5 text-[11px] leading-relaxed text-text-muted">
-            {whole
-              ? 'Every part a product reaches for is named here, so nothing has to be invented at the call site.'
-              : 'Anything not named here gets invented on whichever screen needs it first, and then twice.'}
-          </p>
 
           {!whole && (
-            <div className="mt-2.5 max-h-72 overflow-y-auto pr-1">
+            <div className="mt-2.5 max-h-72 overflow-y-auto pr-1" onMouseLeave={() => setWhy(null)}>
               {groups.map((g) => (
                 <div key={g.section} className="mb-2.5 last:mb-0">
                   <p className="mb-1 text-[10.5px] uppercase tracking-wide text-text-muted">
                     {label.get(g.section) ?? g.section}
                   </p>
-                  <ul className="flex flex-col gap-1.5">
+                  <ul className="flex flex-col gap-0.5">
                     {g.missing.map((m) => (
-                      <li key={m.check.id} className="rounded-md bg-bg px-2 py-1.5">
-                        <p className="text-[12px] text-text-primary">{m.check.label}</p>
-                        <p className="mt-0.5 text-[11px] leading-relaxed text-text-secondary">{m.check.why}</p>
+                      <li key={m.check.id}>
+                        <button
+                          type="button"
+                          onMouseEnter={() => setWhy(m.check.why)}
+                          onFocus={() => setWhy(m.check.why)}
+                          className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-[12px] text-text-primary hover:bg-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                        >
+                          <span aria-hidden="true" className="h-1 w-1 shrink-0 rounded-full bg-warning" />
+                          <span className="truncate">{m.check.label}</span>
+                        </button>
                       </li>
                     ))}
                   </ul>
@@ -2077,13 +2082,21 @@ function GapsMenu({
             </div>
           )}
 
+          {/* Always rendered, so nothing below it moves as the pointer travels. */}
+          <p className="mt-2 min-h-[2.5rem] border-t border-border pt-2 text-[11px] leading-relaxed text-text-secondary">
+            {why ??
+              (whole
+                ? 'Every part a product reaches for is named here.'
+                : 'Point at a gap to see what it costs.')}
+          </p>
+
           {!whole && (
             <button
               type="button"
               onClick={fill}
               className="mt-2.5 w-full rounded-md bg-action px-3 py-1.5 text-[12px] font-medium text-action-text hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
             >
-              Fill them from what is already here
+              Fill the gaps
             </button>
           )}
         </div>

@@ -54,10 +54,15 @@ async function load(p: Page, tone: 'dark' | 'light' = 'dark', hash = ''): Promis
   const url = `${ORIGIN}${++loadN}`
   await p.route(url, (route) => route.fulfill({ contentType: 'text/html', body: samplePage(tone) }))
   await p.goto(url + hash)
-  // Wait for the runtime to have claimed a slide rather than guessing at how
-  // long that takes. Under a loaded machine it is not 450ms, and a guess that
-  // is usually right is a test that usually passes.
-  await p.waitForFunction(() => !!document.querySelector('.slide.in-view'), null, { timeout: SETTLE })
+  // Wait for the runtime to have claimed a slide *and* finished fading it in,
+  // rather than guessing at how long that takes. Under a loaded machine it is
+  // not 450ms, and a guess that is usually right is a test that usually passes.
+  await p.waitForFunction(() => {
+    const s = document.querySelector('.slide.in-view')
+    if (!s) return false
+    const inner = s.querySelector('.inner') as HTMLElement | null
+    return !inner || parseFloat(getComputedStyle(inner).opacity) > 0.99
+  }, null, { timeout: SETTLE })
 }
 
 /** Waits until the deck has actually settled on a slide. */
