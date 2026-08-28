@@ -32,7 +32,7 @@ const LABEL_W = 'w-[104px]'
 const TAIL_W = 'w-[68px]'
 
 export function MotionTimeline({
-  doc, phase, onPhase, onChange, selected = null, onSelect, onRemove
+  doc, phase, onPhase, onChange, selected = null, onSelect, onRemove, playing = false, onTogglePlaying
 }: {
   doc: MotionDoc
   phase: number
@@ -42,6 +42,9 @@ export function MotionTimeline({
   selected?: Pick | null
   onSelect?: (pick: Pick | null) => void
   onRemove?: (pick: Pick) => void
+  /** Whether the piece is running, so the transport can say so and stop it. */
+  playing?: boolean
+  onTogglePlaying?: () => void
 }): React.JSX.Element {
   const targets = keyedTargets(doc.keys)
   const keys: Keyframes = doc.keys ?? {}
@@ -63,38 +66,30 @@ export function MotionTimeline({
 
   return (
     <div className="mx-3 mb-2 flex shrink-0 flex-col gap-1 rounded-panel bg-elevated p-2">
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          title={open ? 'Show the loop on its own' : 'Show every layer'}
-          className={`${LABEL_W} flex shrink-0 items-center gap-1 rounded-sm px-1 py-0.5 text-left text-[10.5px] text-text-secondary hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60`}
-        >
-          <span className={`inline-block transition-transform ${open ? 'rotate-90' : ''}`}>
-            <Chevron />
-          </span>
-          Loop
-          <span className="ml-auto pr-0.5 text-[10px] tabular-nums text-text-muted">{layerCount}</span>
-        </button>
-        <input
-          type="range"
-          min={0}
-          max={0.999}
-          step={0.001}
-          value={phase}
-          aria-label="Position in the loop"
-          onChange={(e) => onPhase(Number(e.target.value))}
-          className="motion-slider flex-1"
+      <Transport
+        doc={doc}
+        phase={phase}
+        onPhase={onPhase}
+        onChange={onChange}
+        playing={playing}
+        onTogglePlaying={onTogglePlaying}
+        open={open}
+        onOpen={() => setOpen((v) => !v)}
+        layerCount={layerCount}
+      />
+
+      <div className="relative flex flex-col gap-1">
+        {/* One playhead down every lane, so a key either is or is not under
+            the moment on screen. Inset by the label and tail columns so it
+            tracks the same span the lanes use. */}
+        <span
+          aria-hidden="true"
+          style={{ left: `calc(112px + (100% - 188px) * ${phase})` }}
+          className="pointer-events-none absolute bottom-0 top-0 z-10 w-px bg-accent/40"
         />
-        <span className={`${TAIL_W} shrink-0 text-right font-mono text-[10.5px] text-text-muted`}>
-          {Math.round(phase * 100)}%
-        </span>
-      </div>
+        <Ruler doc={doc} phase={phase} onPhase={onPhase} />
 
-      <LoopSettings doc={doc} phase={phase} onChange={onChange} />
-
-      {open ? (
+        {open ? (
         <>
           <GroupLabel>Scene</GroupLabel>
           <ComponentRow doc={doc} phase={phase} />
@@ -158,6 +153,7 @@ export function MotionTimeline({
           </div>
         </>
       ) : null}
+      </div>
     </div>
   )
 }
@@ -175,35 +171,77 @@ function Chevron(): React.JSX.Element {
 }
 
 /**
- * How long the loop is and how finely it is cut.
+ * The transport: what is playing, where it is, and how long it runs.
  *
- * Both used to live in the Export panel, two tabs away from the thing they
- * describe. A loop is judged by watching it, and the length is the first
- * thing you want to change while you are watching — so it belongs under the
- * scrubber, not in the panel you open once at the end.
+ * This used to be a bare range slider with a percentage beside it, which is
+ * the one reading nobody wants — a loop is judged in seconds and frames, and
+ * you cannot judge it at all without being able to start it. Play lived two
+ * components away in the frame toolbar, so the timeline could show you a
+ * position but not move it.
+ *
+ * Length and rate stay here rather than in the Export panel. A loop is
+ * judged by watching it, and its length is the first thing you want to
+ * change while you are watching.
  */
-function LoopSettings({
-  doc, phase, onChange
+function Transport({
+  doc, phase, onPhase, onChange, playing, onTogglePlaying, open, onOpen, layerCount
 }: {
   doc: MotionDoc
   phase: number
+  onPhase: (p: number) => void
   onChange: (patch: Partial<MotionDoc>) => void
+  playing: boolean
+  onTogglePlaying?: () => void
+  open: boolean
+  onOpen: () => void
+  layerCount: number
 }): React.JSX.Element {
   const { durationSec, fps } = doc.export
   const frames = Math.max(1, Math.round(durationSec * fps))
-  // Which frame is on screen, counted from one, because that is how every
-  // other tool counts them and how anyone reading it back will say it.
+  // Counted from one, because that is how every other tool counts frames and
+  // how anyone reading it back will say it.
   const frame = Math.min(frames, Math.floor(phase * frames) + 1)
-  const seconds = phase * durationSec
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className={`${LABEL_W} shrink-0 px-1 font-mono text-[10px] tabular-nums text-text-muted`}>
-        {seconds.toFixed(2)}s
+    <div className="flex flex-wrap items-center gap-1.5">
+      <button
+        type="button"
+        onClick={onTogglePlaying}
+        disabled={!onTogglePlaying}
+        title={playing ? 'Pause' : 'Play'}
+        aria-label={playing ? 'Pause' : 'Play'}
+        className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-action text-action-text transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:opacity-40"
+      >
+        {playing ? (
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+            <rect x="2" y="1.5" width="3" height="9" rx="1" />
+            <rect x="7" y="1.5" width="3" height="9" rx="1" />
+          </svg>
+        ) : (
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+            <path d="M3 1.5l7 4.5-7 4.5z" />
+          </svg>
+        )}
+      </button>
+      <button
+        type="button"
+        onClick={() => onPhase(0)}
+        title="Back to start"
+        aria-label="Back to start"
+        className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-text-secondary transition-colors hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+      >
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M4 3v10" />
+          <path d="M13 3.5L6 8l7 4.5z" />
+        </svg>
+      </button>
+      <span className="ml-0.5 shrink-0 font-mono text-[10.5px] tabular-nums text-text-primary">
+        {(phase * durationSec).toFixed(2)}s
       </span>
-      <span className="font-mono text-[10px] tabular-nums text-text-muted">
+      <span className="shrink-0 font-mono text-[10px] tabular-nums text-text-muted">
         frame {frame} of {frames}
       </span>
+
       <div className="ml-auto flex items-center gap-1">
         <label className="text-[10px] text-text-muted" htmlFor="motion-loop-length">Length</label>
         <input
@@ -235,9 +273,126 @@ function LoopSettings({
             <option key={r} value={r}>{r}</option>
           ))}
         </select>
+        <button
+          type="button"
+          onClick={onOpen}
+          aria-expanded={open}
+          title={open ? 'Hide the layers' : 'Show every layer'}
+          className="ml-1 flex shrink-0 items-center gap-1 rounded-sm px-1.5 py-0.5 text-[10.5px] text-text-secondary hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+        >
+          <span className={`inline-block transition-transform ${open ? 'rotate-90' : ''}`}>
+            <Chevron />
+          </span>
+          Layers
+          <span className="pl-0.5 text-[10px] tabular-nums text-text-muted">{layerCount}</span>
+        </button>
       </div>
     </div>
   )
+}
+
+/**
+ * The time axis, labelled, with the playhead on it.
+ *
+ * A percentage told you where you were in something whose length you had to
+ * remember. Seconds on the ruler mean the position, the keys under it and
+ * the length field all read in the same unit.
+ *
+ * The label column and tail are the same widths the lanes use, so a tick and
+ * the key beneath it line up by construction rather than by coincidence.
+ */
+function Ruler({
+  doc, phase, onPhase
+}: {
+  doc: MotionDoc
+  phase: number
+  onPhase: (p: number) => void
+}): React.JSX.Element {
+  const durationSec = doc.export.durationSec
+  const track = useRef<HTMLDivElement | null>(null)
+  const [dragging, setDragging] = useState(false)
+
+  const seek = useCallback(
+    (clientX: number): void => {
+      const el = track.current
+      if (!el) return
+      const r = el.getBoundingClientRect()
+      if (r.width <= 0) return
+      onPhase(Math.min(0.999, Math.max(0, (clientX - r.left) / r.width)))
+    },
+    [onPhase]
+  )
+
+  useEffect(() => {
+    if (!dragging) return
+    const move = (e: MouseEvent): void => seek(e.clientX)
+    const up = (): void => setDragging(false)
+    window.addEventListener('mousemove', move)
+    window.addEventListener('mouseup', up)
+    return () => {
+      window.removeEventListener('mousemove', move)
+      window.removeEventListener('mouseup', up)
+    }
+  }, [dragging, seek])
+
+  // Enough ticks to read, few enough to stay legible at this width. The step
+  // is chosen from a round set so the labels are numbers a person would say.
+  const step = tickStep(durationSec)
+  const ticks: number[] = []
+  for (let t = 0; t <= durationSec + 1e-6; t += step) ticks.push(Number(t.toFixed(4)))
+
+  return (
+    <div className="flex items-stretch gap-2">
+      <span className={`${LABEL_W} shrink-0`} />
+      <div
+        ref={track}
+        role="slider"
+        tabIndex={0}
+        aria-label="Position in the loop"
+        aria-valuemin={0}
+        aria-valuemax={durationSec}
+        aria-valuenow={Number((phase * durationSec).toFixed(2))}
+        aria-valuetext={`${(phase * durationSec).toFixed(2)} seconds`}
+        onMouseDown={(e) => { setDragging(true); seek(e.clientX) }}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowLeft') { e.preventDefault(); onPhase(Math.max(0, phase - 0.01)) }
+          if (e.key === 'ArrowRight') { e.preventDefault(); onPhase(Math.min(0.999, phase + 0.01)) }
+          if (e.key === 'Home') { e.preventDefault(); onPhase(0) }
+        }}
+        className="relative h-5 min-w-0 flex-1 cursor-ew-resize select-none rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+      >
+        {ticks.map((t) => (
+          <span
+            key={t}
+            style={{ left: `${(t / durationSec) * 100}%` }}
+            className="pointer-events-none absolute bottom-0 top-0 flex flex-col items-start"
+          >
+            <span className="pl-1 text-[9.5px] tabular-nums text-text-muted">{tickLabel(t)}</span>
+            <span className="mt-auto h-1.5 w-px bg-text-muted/40" />
+          </span>
+        ))}
+        <span
+          style={{ left: `${phase * 100}%` }}
+          className="pointer-events-none absolute bottom-0 top-0 w-px bg-accent"
+        >
+          <span className="absolute -left-[3px] top-0 h-1.5 w-[7px] rounded-[1px] bg-accent" />
+        </span>
+      </div>
+      <span className={`${TAIL_W} shrink-0`} />
+    </div>
+  )
+}
+
+/** A tick spacing a person would choose, for a loop of this length. */
+function tickStep(durationSec: number): number {
+  const target = durationSec / 8
+  for (const s of [0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10]) if (s >= target) return s
+  return 10
+}
+
+function tickLabel(t: number): string {
+  if (t === 0) return '0s'
+  return `${Number(t.toFixed(2))}s`
 }
 
 /**

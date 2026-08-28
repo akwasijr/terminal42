@@ -465,6 +465,8 @@ export function MotionStudio({
           selected={selected}
           onSelect={setSelected}
           onRemove={removeLayer}
+          playing={playing}
+          onTogglePlaying={() => setPlaying((p) => !p)}
         />
         {selected !== null ? (
           <div className="flex shrink-0 items-center gap-2 px-3 pb-2 text-[11px] text-text-secondary">
