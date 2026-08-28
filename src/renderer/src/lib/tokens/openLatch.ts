@@ -12,6 +12,14 @@
  */
 
 let pending = false
+/**
+ * "…and start a new one when you get there."
+ *
+ * Separate from the request above because arriving at the library and arriving
+ * at the library with the setup open are different intents, and the New menu
+ * is the only caller that means the second one.
+ */
+let pendingNew = false
 
 export function requestTokens(): void {
   pending = true
@@ -21,5 +29,17 @@ export function requestTokens(): void {
 export function takeTokensRequest(): boolean {
   const was = pending
   pending = false
+  return was
+}
+
+export function requestNewTokens(): void {
+  pending = true
+  pendingNew = true
+}
+
+/** True once per request. */
+export function takeNewTokensRequest(): boolean {
+  const was = pendingNew
+  pendingNew = false
   return was
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { takeTokensRequest } from '../lib/tokens/openLatch'
+import { requestNewTokens, takeTokensRequest } from '../lib/tokens/openLatch'
 import { formatAge } from '../lib/formatAge'
 import type { Design, DesignBrief, DesignGroup, TemplateInfo } from '../../../preload/index'
 import { DesignWizard } from './DesignWizard'
@@ -349,6 +349,7 @@ export function DesignsListView({
                   ) : (
                     [
                       { label: 'Design system', onClick: () => { setNewMenuOpen(false); setDsWizardOpen(true) } },
+                      { label: 'Token library', onClick: () => { setNewMenuOpen(false); requestNewTokens(); setTypeFilter('tokens'); window.dispatchEvent(new Event('t42:tokens-new')) } },
                       { label: 'Web experience', onClick: () => { setNewMenuOpen(false); openHtmlWizard() } },
                       { label: 'App', onClick: () => { setNewMenuOpen(false); openHtmlWizard() } }
                     ].map((o) => (

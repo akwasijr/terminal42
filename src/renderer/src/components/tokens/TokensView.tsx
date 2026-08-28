@@ -20,6 +20,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { TokensSetup } from './TokensSetup'
+import { takeNewTokensRequest } from '../../lib/tokens/openLatch'
 import {
   hydrateStudio,
   isAlias,
@@ -88,6 +89,25 @@ export function TokensView({ onFullPage }: { onFullPage?: (full: boolean) => voi
   }
   useEffect(() => {
     void refresh()
+  }, [])
+
+  // Starting a library is a New action, and New lives in one button at the top
+  // of the page. That button is in the designs list, which cannot reach in
+  // here, so it knocks and this answers. Kept alongside 't42:tokens-open',
+  // which is the same arrangement for getting to the list in the first place.
+  useEffect(() => {
+    const onNew = (): void => {
+      // Drains the latch as well, so a press heard live here does not leave a
+      // request behind that reopens the setup the next time this mounts.
+      takeNewTokensRequest()
+      setOpenId(null)
+      setSetupOpen(true)
+    }
+    // Taken on mount as well as heard live, because the first press arrives
+    // before this component exists: the tab has to switch first.
+    if (takeNewTokensRequest()) onNew()
+    window.addEventListener('t42:tokens-new', onNew)
+    return () => window.removeEventListener('t42:tokens-new', onNew)
   }, [])
 
   // An open library takes the whole page: the surrounding tab chrome belongs to
@@ -177,13 +197,6 @@ export function TokensView({ onFullPage }: { onFullPage?: (full: boolean) => voi
             }}
           />
         </label>
-        <button
-          type="button"
-          onClick={() => setSetupOpen(true)}
-          className="shrink-0 rounded-md bg-action px-3 py-1.5 text-[13px] font-medium text-action-text hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-        >
-          New library
-        </button>
       </div>
 
       {importNote ? (
