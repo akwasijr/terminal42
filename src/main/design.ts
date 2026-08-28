@@ -18,6 +18,7 @@ import { getTokenStudio } from './tokens'
 import { upsertManagedBlock } from './htmlBlocks'
 import { buildEngineBaseBlock, ENGINE_USAGE, ENGINE_BASE_ID, ENGINE_MOTION_ID } from './designAssets'
 import { pickVariety } from './designVariety'
+import { pickDeckStyle } from './deckStyles'
 import {
   type ExportFormat,
   extFor,
@@ -362,7 +363,7 @@ function buildStarterPrefix(cwd: string, brief: DesignBrief): string {
   return blocks.filter(Boolean).join('\n\n')
 }
 
-function buildPrefix(
+export function buildPrefix(
   versionFileName: string,
   brief: DesignBrief | null,
   previousVersionFileName: string | null = null,
@@ -400,6 +401,11 @@ function buildPrefix(
         `${buildEngineBaseBlock()}\n\n${ENGINE_USAGE}`,
     )
   }
+
+  // Decks get the same medicine for the same reason. Without it the model
+  // reaches for its own default deck every time, whatever the brief said, and
+  // the palette question in the wizard ends up decorating an identical layout.
+  if (brief && brief.group === 'presentation') blocks.push(pickDeckStyle(brief).text)
 
   const out: string[] = ['OUTPUT']
   if (previousVersionFileName) {
