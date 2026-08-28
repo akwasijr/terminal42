@@ -247,3 +247,56 @@ export function setMuted(keys: Keyframes, target: TrackTarget, muted: boolean): 
   if (!track) return keys
   return { ...keys, [target]: { ...track, muted } }
 }
+
+/**
+ * Where a key should land when it is dragged to `t`.
+ *
+ * A timeline that lets a key sit anywhere produces keys at 0.3874 of a loop,
+ * which is between two frames and so renders on one of them anyway — the
+ * number is precise and the result is not. So a drag lands on a frame, and on
+ * another key's frame in preference to its own, because lining two properties
+ * up to start together is the single most common thing anyone does here.
+ *
+ * `free` is the escape hatch (Alt), for the rare case where the grid is
+ * getting in the way rather than helping.
+ *
+ * @param t Where the pointer is, 0..1 along the loop.
+ * @param frames How many frames the loop is, so the grid has a spacing.
+ * @param others The times of the other keys in the lane, already 0..1.
+ * @param magnet How close another key has to be to win, as a fraction of the
+ *   loop. Callers pass a pixel distance converted to loop fraction, so the
+ *   pull feels the same at any lane width.
+ */
+export function snapKeyTime(
+  t: number,
+  frames: number,
+  others: readonly number[] = [],
+  magnet = 0,
+  free = false
+): number {
+  const clamped = Math.min(1, Math.max(0, t))
+  if (free) return clamped
+  let best = frames > 0 ? Math.round(clamped * frames) / frames : clamped
+  if (magnet > 0) {
+    // A neighbour inside the magnet beats the grid, and the nearest neighbour
+    // beats a further one. Ties go to the earlier key, which is stable.
+    let bestGap = magnet
+    for (const o of others) {
+      const gap = Math.abs(o - clamped)
+      if (gap < bestGap) { bestGap = gap; best = o }
+    }
+  }
+  return Math.min(1, Math.max(0, best))
+}
+
+/**
+ * One frame either side, for the arrow keys. Returns the new time rather than
+ * the whole map so it can be fed straight to `moveKey`.
+ */
+export function nudgeKeyTime(t: number, frames: number, steps: number): number {
+  const step = frames > 0 ? 1 / frames : 0.01
+  // Nudging from a time that is already off the grid should land on the grid,
+  // not carry the offset along forever.
+  const onGrid = frames > 0 ? Math.round(t * frames) / frames : t
+  return Math.min(1, Math.max(0, onGrid + step * steps))
+}

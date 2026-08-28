@@ -21,8 +21,8 @@ import { FRAME_RATES, SHAPE_LABELS } from '../../../../shared/motion/types'
 import { componentFor } from '../../../../shared/motion/registry'
 import { layerVisibility } from '../../../../shared/motion/frame'
 import {
-  keyedTargets, moveKey, removeKey, removeTrack, sampleTrack, setKey, setKeyEasing,
-  setKeyValue, setMuted,
+  keyedTargets, moveKey, nudgeKeyTime, removeKey, removeTrack, sampleTrack, setKey, setKeyEasing,
+  setKeyValue, setMuted, snapKeyTime,
   type Keyframes, type TrackTarget
 } from '../../../../shared/motion/keyframes'
 import { EasingEditor } from './EasingEditor'
@@ -51,6 +51,10 @@ export function MotionTimeline({
 }): React.JSX.Element {
   const targets = keyedTargets(doc.keys)
   const keys: Keyframes = doc.keys ?? {}
+  // The grid a key lands on. A loop is a whole number of frames, and a key
+  // between two of them renders on one of them regardless, so this is what
+  // every lane snaps and nudges by.
+  const frames = Math.max(1, Math.round(doc.export.durationSec * doc.export.fps))
   const [open, setOpen] = useState(false)
   // Selecting a caption on the frame and finding the layer list still closed
   // would leave the app quietly disagreeing with itself about what is in hand.
@@ -124,6 +128,7 @@ export function MotionTimeline({
               phase={phase}
               onPhase={onPhase}
               onKeys={(next) => onChange({ keys: next })}
+              frames={frames}
               nested
             />
           ))}
@@ -150,6 +155,7 @@ export function MotionTimeline({
                   phase={phase}
                   onPhase={onPhase}
                   onKeys={(next) => onChange({ keys: next })}
+                  frames={frames}
                   nested
                 />
               ))}
@@ -176,6 +182,7 @@ export function MotionTimeline({
                   phase={phase}
                   onPhase={onPhase}
                   onKeys={(next) => onChange({ keys: next })}
+                  frames={frames}
                   nested
                 />
               ))}
@@ -204,6 +211,7 @@ export function MotionTimeline({
                   phase={phase}
                   onPhase={onPhase}
                   onKeys={(next) => onChange({ keys: next })}
+                  frames={frames}
                   nested
                 />
               ))}
@@ -232,6 +240,7 @@ export function MotionTimeline({
                   phase={phase}
                   onPhase={onPhase}
                   onKeys={(next) => onChange({ keys: next })}
+                  frames={frames}
                   nested
                 />
               ))}
@@ -253,6 +262,7 @@ export function MotionTimeline({
                   phase={phase}
                   onPhase={onPhase}
                   onKeys={(next) => onChange({ keys: next })}
+                  frames={frames}
                 />
               ))}
             </>
@@ -270,6 +280,7 @@ export function MotionTimeline({
             phase={phase}
             onPhase={onPhase}
             onKeys={(next) => onChange({ keys: next })}
+            frames={frames}
           />
         ))
       )}
@@ -280,7 +291,7 @@ export function MotionTimeline({
             {targets.length === 1 ? '1 animated value' : `${targets.length} animated values`}
           </span>
           <span className="flex flex-1 items-center">
-            <Hint label="Double-click a lane to add a key. Click a key to set its time, value and easing; drag to move it; Delete to remove it. \u2318Z undoes." />
+            <Hint label="Double-click a lane to add a key. Click a key to set its time, value and easing; drag to move it, arrows to nudge it a frame at a time, Delete to remove it. Keys land on frames — hold Alt to place one between two. \u2318Z undoes." />
           </span>
           <button
             type="button"
@@ -564,7 +575,7 @@ function ComponentRow({ doc, phase }: { doc: MotionDoc; phase: number }): React.
 }
 
 function TrackRow({
-  label, target, keys, phase, onPhase, onKeys, nested = false
+  label, target, keys, phase, onPhase, onKeys, frames, nested = false
 }: {
   label: string
   target: TrackTarget
@@ -572,6 +583,8 @@ function TrackRow({
   phase: number
   onPhase: (p: number) => void
   onKeys: (k: Keyframes) => void
+  /** How many frames the loop is, which is the grid a key snaps to. */
+  frames: number
   /** Whether it hangs under a layer row, which is where the indent comes from. */
   nested?: boolean
 }): React.JSX.Element {
@@ -601,7 +614,13 @@ function TrackRow({
     const d = drag.current
     if (!d) return
     d.moved = true
-    onKeys(moveKey(keys, target, d.id, tAt(e.clientX)))
+    // A key lands on a frame, or on a neighbour within six pixels of the
+    // pointer — six pixels being a little wider than the key itself, so the
+    // pull is felt just before the two would overlap. Alt drags free.
+    const width = lane.current?.getBoundingClientRect().width ?? 0
+    const magnet = width > 0 ? 6 / width : 0
+    const others = (track?.keys ?? []).filter((k) => k.id !== d.id).map((k) => k.t)
+    onKeys(moveKey(keys, target, d.id, snapKeyTime(tAt(e.clientX), frames, others, magnet, e.altKey)))
   }
 
   const up = (e: React.PointerEvent<HTMLButtonElement>, t: number): void => {
@@ -629,12 +648,27 @@ function TrackRow({
     }
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') { setShaping(null); return }
+      const el = document.activeElement
+      const typing = !!el && /^(INPUT|TEXTAREA)$/.test(el.tagName)
+      // Arrows walk the open key along the frame grid, which is how you place
+      // a key exactly rather than by aiming a pointer at nine pixels. Shift
+      // takes ten frames at a time, the way a nudge does everywhere else.
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        if (typing) return
+        e.preventDefault()
+        const k = (keys[target]?.keys ?? []).find((x) => x.id === shaping)
+        if (!k) return
+        const steps = (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 10 : 1)
+        const next = nudgeKeyTime(k.t, frames, steps)
+        onKeys(moveKey(keys, target, shaping, next))
+        onPhase(next)
+        return
+      }
       // Delete removes the selected key, which is what the key does to a
       // selected thing everywhere else. Typing in the inspector's own fields
       // is excluded: there, Backspace means the character behind the caret.
       if (e.key !== 'Backspace' && e.key !== 'Delete') return
-      const el = document.activeElement
-      if (el && /^(INPUT|TEXTAREA)$/.test(el.tagName)) return
+      if (typing) return
       e.preventDefault()
       setShaping(null)
       onKeys(removeKey(keys, target, shaping))
@@ -645,7 +679,7 @@ function TrackRow({
       document.removeEventListener('mousedown', onDown)
       document.removeEventListener('keydown', onKey)
     }
-  }, [shaping, keys, target, onKeys])
+  }, [shaping, keys, target, onKeys, frames, onPhase])
 
   return (
     <div className="flex items-center gap-2">
@@ -666,7 +700,7 @@ function TrackRow({
           // Adds a control point without changing the shape: the new key takes
           // the value the track already has there, so the animation is
           // untouched until the key is dragged.
-          const t = tAt(e.clientX)
+          const t = snapKeyTime(tAt(e.clientX), frames, [], 0, e.altKey)
           onKeys(setKey(keys, target, t, sampleTrack(track, t, 0)))
         }}
       >
@@ -686,7 +720,7 @@ function TrackRow({
             onPointerUp={(e) => up(e, k.t)}
             onPointerCancel={(e) => up(e, k.t)}
             onContextMenu={(e) => { e.preventDefault(); setShaping(null); onKeys(removeKey(keys, target, k.id)) }}
-            title={`${Math.round(k.t * 100)}% — ${round(k.v)}. Click to open it, drag to move, Delete or right-click to remove.`}
+            title={`${Math.round(k.t * 100)}% — ${round(k.v)}. Click to open it, drag to move (Alt to ignore the frame grid), arrows to nudge, Delete or right-click to remove.`}
             className={`absolute top-1/2 h-[9px] w-[9px] -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
               dragging ? 'cursor-grabbing' : 'cursor-grab'
             } ${track?.muted ? 'bg-text-muted' : 'bg-accent'} ${
