@@ -81,6 +81,11 @@ export function MotionStudio({
   const [fit, setFit] = useState<FrameFit>('contain')
   const [leftWidth, setLeftWidth] = useStoredWidth('motion.leftPane', 240, 180, 420)
   const [rightWidth, setRightWidth] = useStoredWidth('motion.rightPane', 256, 200, 460)
+  // The timeline is a pane, not a caption: a piece with a dozen layers needs
+  // more of the window than one with two, and which of those you are working
+  // on changes hour to hour. The stage takes whatever is left, so growing the
+  // timeline shrinks the picture rather than pushing it off the bottom.
+  const [timelineHeight, setTimelineHeight] = useStoredWidth('motion.timelinePane', 240, 120, 620)
   const [panelOpen, setPanelOpen] = useState(true)
   // A replay is an event, not a state, so it travels as a counter the stage
   // watches: the same button pressed twice must fire twice.
@@ -501,17 +506,31 @@ export function MotionStudio({
           </div>
         ) : null}
 
-        <MotionTimeline
-          doc={doc}
-          phase={phase}
-          onPhase={(p) => { setPlaying(false); setPhase(p) }}
-          onChange={patch}
-          selected={selected}
-          onSelect={setSelected}
-          onRemove={removeLayer}
-          playing={playing}
-          onTogglePlaying={() => setPlaying((p) => !p)}
+        <ResizeHandle
+          label="Timeline height"
+          width={timelineHeight}
+          onWidth={setTimelineHeight}
+          side="bottom"
+          min={120}
+          max={620}
+          reset={240}
         />
+        <div
+          className="t42-stable-gutter shrink-0 overflow-y-auto"
+          style={{ height: timelineHeight }}
+        >
+          <MotionTimeline
+            doc={doc}
+            phase={phase}
+            onPhase={(p) => { setPlaying(false); setPhase(p) }}
+            onChange={patch}
+            selected={selected}
+            onSelect={setSelected}
+            onRemove={removeLayer}
+            playing={playing}
+            onTogglePlaying={() => setPlaying((p) => !p)}
+          />
+        </div>
         {selected !== null ? (
           <div className="flex shrink-0 items-center gap-2 px-3 pb-2 text-[11px] text-text-secondary">
             <span>{selectionLabel(doc, selected)}</span>
