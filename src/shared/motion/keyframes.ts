@@ -203,6 +203,24 @@ export function setKeyEasing(
   }
 }
 
+/**
+ * Change what a key holds, leaving it where it is.
+ *
+ * Moving a key along the lane and changing the value it holds are two
+ * different edits, and a timeline that only offers the first makes the second
+ * reachable exactly one way: scrub to the key, then drag the slider it belongs
+ * to and hope you land on the same phase. So the value is settable directly.
+ */
+export function setKeyValue(keys: Keyframes, target: TrackTarget, id: string, v: number): Keyframes {
+  const track = keys[target]
+  if (!track) return keys
+  if (!Number.isFinite(v)) return keys
+  return {
+    ...keys,
+    [target]: { ...track, keys: track.keys.map((k) => (k.id === id ? { ...k, v } : k)) }
+  }
+}
+
 export function moveKey(keys: Keyframes, target: TrackTarget, id: string, t: number): Keyframes {
   const track = keys[target]
   if (!track) return keys

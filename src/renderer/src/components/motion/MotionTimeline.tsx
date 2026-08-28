@@ -21,7 +21,8 @@ import { FRAME_RATES, SHAPE_LABELS } from '../../../../shared/motion/types'
 import { componentFor } from '../../../../shared/motion/registry'
 import { layerVisibility } from '../../../../shared/motion/frame'
 import {
-  keyedTargets, moveKey, removeKey, removeTrack, sampleTrack, setKey, setKeyEasing, setMuted,
+  keyedTargets, moveKey, removeKey, removeTrack, sampleTrack, setKey, setKeyEasing,
+  setKeyValue, setMuted,
   type Keyframes, type TrackTarget
 } from '../../../../shared/motion/keyframes'
 import { EasingEditor } from './EasingEditor'
@@ -279,7 +280,7 @@ export function MotionTimeline({
             {targets.length === 1 ? '1 animated value' : `${targets.length} animated values`}
           </span>
           <span className="flex flex-1 items-center">
-            <Hint label="Click a key to shape the segment after it, drag to move, right-click to remove, double-click a lane to add one." />
+            <Hint label="Double-click a lane to add a key. Click a key to set its time, value and easing; drag to move it; Delete to remove it. \u2318Z undoes." />
           </span>
           <button
             type="button"
@@ -626,14 +627,25 @@ function TrackRow({
       // close it, rather than closing and reopening in the same gesture.
       if (!(e.target as HTMLElement).closest('[data-segment-shape],[data-lane-key]')) setShaping(null)
     }
-    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') setShaping(null) }
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') { setShaping(null); return }
+      // Delete removes the selected key, which is what the key does to a
+      // selected thing everywhere else. Typing in the inspector's own fields
+      // is excluded: there, Backspace means the character behind the caret.
+      if (e.key !== 'Backspace' && e.key !== 'Delete') return
+      const el = document.activeElement
+      if (el && /^(INPUT|TEXTAREA)$/.test(el.tagName)) return
+      e.preventDefault()
+      setShaping(null)
+      onKeys(removeKey(keys, target, shaping))
+    }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
     return () => {
       document.removeEventListener('mousedown', onDown)
       document.removeEventListener('keydown', onKey)
     }
-  }, [shaping])
+  }, [shaping, keys, target, onKeys])
 
   return (
     <div className="flex items-center gap-2">
@@ -674,7 +686,7 @@ function TrackRow({
             onPointerUp={(e) => up(e, k.t)}
             onPointerCancel={(e) => up(e, k.t)}
             onContextMenu={(e) => { e.preventDefault(); setShaping(null); onKeys(removeKey(keys, target, k.id)) }}
-            title={`${Math.round(k.t * 100)}% — ${round(k.v)}. Click to shape the segment after it, drag to move, right-click to remove.`}
+            title={`${Math.round(k.t * 100)}% — ${round(k.v)}. Click to open it, drag to move, Delete or right-click to remove.`}
             className={`absolute top-1/2 h-[9px] w-[9px] -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
               dragging ? 'cursor-grabbing' : 'cursor-grab'
             } ${track?.muted ? 'bg-text-muted' : 'bg-accent'} ${
@@ -684,10 +696,14 @@ function TrackRow({
           />
         ))}
         {shapingKey ? (
-          <SegmentShape
+          <KeyInspector
             at={shapingKey.t}
+            value={shapingKey.v}
             easing={shapingKey.easing}
-            onChange={(e) => onKeys(setKeyEasing(keys, target, shapingKey.id, e))}
+            onTime={(t) => onKeys(moveKey(keys, target, shapingKey.id, t))}
+            onValue={(v) => onKeys(setKeyValue(keys, target, shapingKey.id, v))}
+            onEasing={(e) => onKeys(setKeyEasing(keys, target, shapingKey.id, e))}
+            onDelete={() => { setShaping(null); onKeys(removeKey(keys, target, shapingKey.id)) }}
             onClose={() => setShaping(null)}
           />
         ) : null}
@@ -713,13 +729,29 @@ function TrackRow({
  * It opens upward: the timeline sits at the foot of the window and a panel
  * dropping down would be off-screen.
  */
-function SegmentShape({
-  at, easing, onChange, onClose
+/**
+ * The selected key, and everything you can do to it.
+ *
+ * This used to be an easing shaper and nothing else, which left the timeline
+ * able to say *how* a value travels between two keys but not *what* either key
+ * holds. The only way to change a value was to scrub to the key, find the
+ * slider it belongs to and drag it, hoping to land back on the same phase —
+ * every other animation tool lets you select the key and type the number.
+ *
+ * Time is here for the same reason. Dragging is the fast way and stays the
+ * usual one; a field is the way to put a key exactly on the half.
+ */
+function KeyInspector({
+  at, value, easing, onTime, onValue, onEasing, onDelete, onClose
 }: {
   /** Where in the loop the key sits, so the panel opens next to it. */
   at: number
+  value: number
   easing: Easing | undefined
-  onChange: (e: Easing | undefined) => void
+  onTime: (t: number) => void
+  onValue: (v: number) => void
+  onEasing: (e: Easing | undefined) => void
+  onDelete: () => void
   onClose: () => void
 }): React.JSX.Element {
   // Held away from the ends so a key at 0 or 1 does not push the panel out of
@@ -732,26 +764,96 @@ function SegmentShape({
       className="t42-menu t42-menu-up absolute bottom-full z-30 mb-1.5 w-56 -translate-x-1/2 rounded-panel bg-raised p-2 shadow-overlay"
     >
       <div className="flex items-center justify-between pb-1">
-        <span className="text-[10.5px] text-text-secondary">This segment</span>
+        <span className="text-[10.5px] text-text-secondary">This key</span>
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close the segment shape"
+          aria-label="Close the key"
           className="rounded-sm px-1 text-[12px] leading-none text-text-muted hover:bg-elevated hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
         >
           ×
         </button>
       </div>
-      <EasingEditor easing={easing ?? LINEAR} onChange={onChange} />
+
+      <div className="flex gap-1.5 pb-1.5">
+        <NumField
+          label="At"
+          suffix="%"
+          value={Number((at * 100).toFixed(1))}
+          onChange={(n) => onTime(Math.min(100, Math.max(0, n)) / 100)}
+        />
+        <NumField label="Value" value={Number(value.toFixed(3))} onChange={onValue} />
+      </div>
+
+      <span className="block pb-1 text-[10.5px] text-text-secondary">The segment after it</span>
+      <EasingEditor easing={easing ?? LINEAR} onChange={onEasing} />
       <button
         type="button"
-        onClick={() => onChange(undefined)}
+        onClick={() => onEasing(undefined)}
         disabled={!easing}
         className="mt-1.5 w-full rounded-sm py-1 text-[10.5px] text-text-muted hover:bg-elevated hover:text-text-primary disabled:opacity-40 disabled:hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
       >
         Straight line
       </button>
+      <button
+        type="button"
+        onClick={onDelete}
+        className="mt-1 w-full rounded-sm py-1 text-[10.5px] text-text-muted hover:bg-elevated hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+      >
+        Delete key <span className="text-text-disabled">⌫</span>
+      </button>
     </div>
+  )
+}
+
+/**
+ * A number you can type.
+ *
+ * Local text state rather than the number straight from the document: typing
+ * "0.5" means passing through "0." and "0", and a field that rewrote itself
+ * from the document on every keystroke would fight the person using it.
+ */
+function NumField({
+  label, value, suffix, onChange
+}: {
+  label: string
+  value: number
+  suffix?: string
+  onChange: (n: number) => void
+}): React.JSX.Element {
+  const [text, setText] = useState(String(value))
+  const [editing, setEditing] = useState(false)
+  useEffect(() => { if (!editing) setText(String(value)) }, [value, editing])
+
+  const commitText = (): void => {
+    setEditing(false)
+    const n = Number(text)
+    if (Number.isFinite(n)) onChange(n)
+    else setText(String(value))
+  }
+
+  return (
+    <label className="min-w-0 flex-1">
+      <span className="block pb-0.5 text-[10px] text-text-muted">{label}</span>
+      <span className="flex items-center rounded-sm bg-elevated px-1.5">
+        <input
+          value={text}
+          inputMode="decimal"
+          onChange={(e) => { setEditing(true); setText(e.target.value) }}
+          onBlur={commitText}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.currentTarget.blur() }
+            if (e.key === 'Escape') { setEditing(false); setText(String(value)); e.currentTarget.blur() }
+            // The lane listens for Backspace to delete the selected key. In
+            // here it means the character behind the caret.
+            e.stopPropagation()
+          }}
+          aria-label={label}
+          className="min-w-0 flex-1 bg-transparent py-1 font-mono text-[11px] text-text-primary focus-visible:outline-none"
+        />
+        {suffix ? <span className="pl-0.5 font-mono text-[10px] text-text-muted">{suffix}</span> : null}
+      </span>
+    </label>
   )
 }
 

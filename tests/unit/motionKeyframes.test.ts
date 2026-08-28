@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  sampleTrack, setKey, removeKey, moveKey, removeTrack, setMuted, setKeyEasing,
+  sampleTrack, setKey, removeKey, moveKey, removeTrack, setMuted, setKeyEasing, setKeyValue,
   valueAt, isKeyed, keyedTargets, emptyKeyframes, type Track
 } from '../../src/shared/motion/keyframes'
 import { computePlacements, paramAffectsCount } from '../../src/shared/motion/frame'
@@ -279,5 +279,35 @@ describe('shaping one segment', () => {
     const keys = built()
     expect(setKeyEasing(keys, 'param:nothing', 'k1', EASE_OUT)).toBe(keys)
     expect(setKeyEasing(keys, 'param:radius', 'no-such-key', EASE_OUT)).toEqual(keys)
+  })
+})
+
+describe('setKeyValue', () => {
+  it('changes what a key holds and leaves it where it is', () => {
+    let k = setKey(emptyKeyframes(), 'param:speed', 0.25, 1)
+    const id = k['param:speed'].keys[0].id
+    k = setKeyValue(k, 'param:speed', id, 7)
+    expect(k['param:speed'].keys[0].v).toBe(7)
+    expect(k['param:speed'].keys[0].t).toBe(0.25)
+  })
+
+  it('keeps the easing that was already on the key', () => {
+    let k = setKey(emptyKeyframes(), 'param:speed', 0.5, 1)
+    const id = k['param:speed'].keys[0].id
+    k = setKeyEasing(k, 'param:speed', id, { x1: 0.2, y1: 0, x2: 0.4, y2: 1 })
+    k = setKeyValue(k, 'param:speed', id, 3)
+    expect(k['param:speed'].keys[0].easing).toEqual({ x1: 0.2, y1: 0, x2: 0.4, y2: 1 })
+  })
+
+  it('refuses a value that is not a number, rather than poisoning the track', () => {
+    const k = setKey(emptyKeyframes(), 'param:speed', 0.5, 1)
+    const id = k['param:speed'].keys[0].id
+    expect(setKeyValue(k, 'param:speed', id, Number.NaN)).toBe(k)
+    expect(setKeyValue(k, 'param:speed', id, Number.POSITIVE_INFINITY)).toBe(k)
+  })
+
+  it('does nothing on a track that is not there', () => {
+    const k = emptyKeyframes()
+    expect(setKeyValue(k, 'param:speed', 'nope', 3)).toBe(k)
   })
 })

@@ -54,7 +54,11 @@ export function FrameToolbar({
   fit,
   onFit,
   onResetView,
-  viewChanged
+  viewChanged,
+  onUndo,
+  onRedo,
+  undoable,
+  redoable
 }: {
   doc: MotionDoc
   onChange: (patch: Partial<MotionDoc>) => void
@@ -70,6 +74,10 @@ export function FrameToolbar({
   onResetView: () => void
   /** Whether the view has been turned or zoomed away from where it started. */
   viewChanged: boolean
+  onUndo: () => void
+  onRedo: () => void
+  undoable: boolean
+  redoable: boolean
 }): React.JSX.Element {
   const frame = doc.frame
   const setFrame = (p: Partial<MotionDoc['frame']>): void => onChange({ frame: { ...frame, ...p } })
@@ -84,6 +92,19 @@ export function FrameToolbar({
   // own, rather than floating over the frame where they covered the work.
   return (
     <div className="flex min-w-0 items-center gap-0.5">
+      {/* Undo first, where every other tool bar puts it. The shortcut works
+          whether or not these are pressed; they are here because a shortcut
+          with nothing on screen is a feature only the person who wrote it
+          knows about. */}
+      <ToolButton label="Undo" onClick={onUndo} disabled={!undoable}>
+        <UndoGlyph />
+      </ToolButton>
+      <ToolButton label="Redo" onClick={onRedo} disabled={!redoable}>
+        <UndoGlyph flip />
+      </ToolButton>
+
+      <Divider />
+
       <ToolButton
         label={replayLooping ? 'Stop replaying the entrance' : 'Replay the entrance animation'}
         onClick={onReplay}
@@ -410,6 +431,15 @@ function HexField({ value, onChange }: { value: string; onChange: (v: string) =>
 
 const S = { width: 14, height: 14, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor', strokeWidth: 1.4, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true }
 
+/** One arrow curving back on itself, mirrored for redo so the pair reads as a pair. */
+function UndoGlyph({ flip = false }: { flip?: boolean }): React.JSX.Element {
+  return (
+    <svg {...S} style={flip ? { transform: 'scaleX(-1)' } : undefined}>
+      <path d="M6 5H9.5a3.5 3.5 0 0 1 0 7H7" />
+      <path d="M8 2.5 5 5l3 2.5" />
+    </svg>
+  )
+}
 function PlayGlyph(): React.JSX.Element {
   return <svg {...S}><path d="M5 3.5l7 4.5-7 4.5z" fill="currentColor" stroke="none" /></svg>
 }

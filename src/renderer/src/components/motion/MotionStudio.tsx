@@ -25,6 +25,10 @@ import { ColorPicker, type PickerRequest } from '../ColorPicker'
 import { FrameToolbar, type FrameFit } from './FrameToolbar'
 import { ResizeHandle } from './ResizeHandle'
 import { useStoredWidth } from '../../lib/motion/paneWidth'
+import {
+  initialHistory, record, commit, undo as undoHistory, redo as redoHistory,
+  canUndo, canRedo, historyKey, type History
+} from '../../lib/motion/history'
 import { IconChevronRight } from '../icons'
 import { Hint } from '../Hint'
 
@@ -39,7 +43,22 @@ export function MotionStudio({
   onRename: (title: string) => void
   onClose: () => void
 }): React.JSX.Element {
-  const [doc, setDoc] = useState<MotionDoc>(initialDoc)
+  // Every edit goes through a history, so a piece can be walked backwards.
+  // `doc` is read straight off it; nothing else in the file needs to know.
+  const [hist, setHist] = useState<History<MotionDoc>>(() => initialHistory(initialDoc))
+  const doc = hist.present
+
+  /**
+   * An edit that is one act however long it took.
+   *
+   * Sliders coalesce — fifty patches from one drag are one step — but the
+   * edits that go through here replace whole sections at once, and folding one
+   * of those into a neighbouring drag would make undo step straight past the
+   * thing you wanted back.
+   */
+  const edit = useCallback((fn: (d: MotionDoc) => MotionDoc) => {
+    setHist((h) => commit(h, fn(h.present), Date.now()))
+  }, [])
   const [tab, setTab] = useState<Tab>('motion')
   // A piece opens still. Motion that runs the whole time you are working is
   // motion you cannot work against: a card you are aiming at has moved by the
@@ -74,7 +93,7 @@ export function MotionStudio({
   // one button that threw away the whole piece would be a different, much
   // more frightening thing than the section resets it sits above.
   const resetTab = useCallback((which: Tab) => {
-    setDoc((d) => {
+    edit((d) => {
       const fresh = emptyDoc(d.componentId)
       if (which === 'motion') {
         return {
@@ -99,8 +118,11 @@ export function MotionStudio({
   }, [])
 
   const patch = useCallback((p: Partial<MotionDoc>) => {
-    setDoc((d) => ({ ...d, ...p }))
+    setHist((h) => record(h, { ...h.present, ...p }, Date.now()))
   }, [])
+
+  const stepBack = useCallback(() => setHist(undoHistory), [])
+  const stepForward = useCallback(() => setHist(redoHistory), [])
 
   // Autosave, debounced. Motion has no Save button on purpose: every control
   // is a slider, so an explicit save would mean choosing a moment to press it
@@ -152,6 +174,13 @@ export function MotionStudio({
     const onKey = (e: KeyboardEvent): void => {
       const el = document.activeElement
       if (el && /^(INPUT|TEXTAREA)$/.test(el.tagName)) return
+      const step = historyKey(e)
+      if (step) {
+        e.preventDefault()
+        if (step === 'undo') stepBack()
+        else stepForward()
+        return
+      }
       if (e.key === 'Escape') setSelected(null)
       if ((e.key === 'Backspace' || e.key === 'Delete') && selected !== null) {
         e.preventDefault()
@@ -170,7 +199,7 @@ export function MotionStudio({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selected, doc.overrides, doc.visual, patch])
+  }, [selected, doc.overrides, doc.visual, patch, stepBack, stepForward])
 
   // Picking a caption on the frame and being left looking at the motion tab
   // would be the app agreeing that the layer is selected and then refusing to
@@ -330,7 +359,7 @@ export function MotionStudio({
     const next = hydrateDoc(l.doc)
     // The images you are working with survive a layout change; the look does
     // not. Swapping both would make "try this layout" destructive.
-    setDoc({ ...next, visual: { ...next.visual, images: doc.visual.images, text: doc.visual.text } })
+    edit((d) => ({ ...next, visual: { ...next.visual, images: d.visual.images, text: d.visual.text } }))
   }
 
   const deleteLayout = async (layoutId: string): Promise<void> => {
@@ -398,6 +427,10 @@ export function MotionStudio({
             onFit={setFit}
             onResetView={resetView}
             viewChanged={viewChanged}
+            onUndo={stepBack}
+            onRedo={stepForward}
+            undoable={canUndo(hist)}
+            redoable={canRedo(hist)}
           />
           <span className="ml-auto font-mono text-[10.5px] text-text-muted">{count} cards</span>
           {handEdits > 0 ? (
