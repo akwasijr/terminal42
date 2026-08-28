@@ -57,12 +57,25 @@ export function DesignsListView({
   // 't42:tokens-open' to land on the library list. The library is meant to be
   // the answer to "what is our blue", and an answer you have to navigate to
   // twice is one people stop asking for.
+  //
+  // Design only. This list is also the Form section, where the Tokens pill is
+  // not drawn — so a request taken there put Form on a screen with no way back
+  // to the forms, and the latch is global enough that it happened by accident.
   useEffect(() => {
+    if (scope !== 'design') return
     if (takeTokensRequest()) setTypeFilter('tokens')
     const onOpen = (): void => setTypeFilter('tokens')
     window.addEventListener('t42:tokens-open', onOpen)
     return () => window.removeEventListener('t42:tokens-open', onOpen)
-  }, [])
+  }, [scope])
+
+  // The Form section has no pill for the design-only views, so if it ever
+  // lands on one there is no way out but a restart. Cheap insurance.
+  useEffect(() => {
+    if (scope === 'form' && (typeFilter === 'system' || typeFilter === 'tokens' || typeFilter === 'templates')) {
+      setTypeFilter('all')
+    }
+  }, [scope, typeFilter])
   // Project folders: client/project organisation, stored renderer-side.
   const [folderFilter, setFolderFilter] = useState<string>('all')
   const [folders, setFolders] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('t42-design-folders') || '[]') } catch { return [] } })
