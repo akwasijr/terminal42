@@ -117,7 +117,7 @@ function TemplateTile({ template, onPick }: { template: MotionTemplate; onPick: 
             containerType: 'size'
           }}
         >
-          <Outline doc={doc} swatch={template.swatch} phase={phase} />
+          <Outline doc={doc} swatch={template.swatch} phase={phase} bankIds={template.images} />
           {doc.visual.text.map((raw) => {
             const layer = resolvedText(raw)
             // A layer with a window is not on screen for the whole loop, and
@@ -159,7 +159,7 @@ function TemplateTile({ template, onPick }: { template: MotionTemplate; onPick: 
 }
 
 /** The arrangement, flat, at one instant of its loop. */
-function Outline({ doc, swatch, phase }: { doc: ReturnType<MotionTemplate['build']>; swatch: readonly [string, string]; phase: number }): React.JSX.Element {
+function Outline({ doc, swatch, phase, bankIds }: { doc: ReturnType<MotionTemplate['build']>; swatch: readonly [string, string]; phase: number; bankIds: readonly string[] }): React.JSX.Element {
   const ref = useRef<HTMLCanvasElement | null>(null)
 
   useEffect(() => {
@@ -170,9 +170,10 @@ function Outline({ doc, swatch, phase }: { doc: ReturnType<MotionTemplate['build
       width: Math.max(1, Math.round(box?.width ?? 300)),
       height: Math.max(1, Math.round(box?.height ?? 190)),
       near: swatch[0],
-      far: swatch[1]
+      far: swatch[1],
+      bankIds
     })
-  }, [doc, swatch, phase])
+  }, [doc, swatch, phase, bankIds])
 
   return <canvas ref={ref} className="absolute inset-0 block h-full w-full" aria-hidden="true" />
 }

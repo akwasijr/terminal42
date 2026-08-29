@@ -147,7 +147,7 @@ describe('motion templates', () => {
           fx.dropShadow.enabled || fx.edgeBlur.enabled || fx.edgeShade.enabled || fx.glass.enabled
         const graded =
           fx.grain > 0 || fx.vignette > 0 || fx.tintAmount > 0 || fx.saturation !== 100 || fx.contrast !== 100
-        expect(treated || graded, `${t.id} is untreated`).toBe(true)
+        expect(treated || graded || t.flat === true, `${t.id} is untreated`).toBe(true)
       })
 
       // Transform is in scene units, not percentages, and the panel's own

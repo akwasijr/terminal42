@@ -119,11 +119,11 @@ describe('pickDeckStyle', () => {
   it('tells a light house to flip the chassis tone with it', () => {
     // Otherwise the panels stay tinted for a dark ground and a light deck
     // comes out with white-on-white cards, which is exactly the complaint.
+    // Pinned rather than hunted for by seed. Searching seeds for a house made
+    // this test depend on how many houses exist, so adding a sixth broke it
+    // without anything about the tone line changing.
     for (const s of DECK_STYLES.filter((x) => x.tone === 'light')) {
-      const seed = Array.from({ length: 400 }, (_, i) => i)
-        .find((i) => pickDeckStyle(brief({ createdAt: i, idea: 'x' + i })).styleId === s.id)
-      expect(seed, `no seed found for ${s.id}`).toBeDefined()
-      const t = pickDeckStyle(brief({ createdAt: seed as number, idea: 'x' + seed })).text
+      const t = pickDeckStyle(brief({ deckStyleId: s.id })).text
       expect(t, s.id).toContain('data-deck-tone="light"')
     }
   })

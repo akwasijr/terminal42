@@ -762,6 +762,8 @@ export type DesignBrief = {
   /** The token library this design is bound to, and which of its themes. */
   tokensId?: string | null
   tokensThemeId?: string | null
+  /** The deck house style chosen from the gallery, when one was. */
+  deckStyleId?: string | null
   audience?: string | null
   paletteId?: string | null
   paletteLabel?: string | null

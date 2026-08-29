@@ -5,6 +5,8 @@ import type { Design, DesignBrief, DesignGroup, TemplateInfo } from '../../../pr
 import { DesignWizard } from './DesignWizard'
 import { TokensView } from './tokens/TokensView'
 import { TemplatesGallery } from './TemplatesGallery'
+import { DeckHouseGallery } from './DeckHouseGallery'
+import type { DeckStyle } from '../../../shared/decks/houses'
 import { DesignSystemView } from './DesignSystemView'
 import { DesignSystemWizard } from './DesignSystemWizard'
 import { type DesignSystem, upsertSystem } from '../lib/designSystem'
@@ -17,7 +19,7 @@ const GROUP_LABEL: Record<DesignGroup, string> = {
 }
 // Display order for the chip row. Keeps the most common kinds on the left.
 const GROUP_ORDER: DesignGroup[] = ['web', 'app', 'presentation', 'content', 'print', 'data', 'social', 'figma', 'other']
-type TypeFilter = 'all' | 'form' | DesignGroup | 'system' | 'templates' | 'tokens'
+type TypeFilter = 'all' | 'form' | DesignGroup | 'system' | 'templates' | 'tokens' | 'decks'
 
 /**
  * Which family of files this list is showing. Forms (the freeform canvas) and
@@ -42,13 +44,18 @@ export function DesignsListView({
   const [wizardTarget, setWizardTarget] = useState<'html' | 'figma'>('html')
   const [wizardInitialIdea, setWizardInitialIdea] = useState<string>('')
   const [wizardStarter, setWizardStarter] = useState<TemplateInfo | null>(null)
+  // The house chosen from the deck gallery, stamped onto the brief when the
+  // wizard finishes. Held here rather than asked for inside the wizard: it is
+  // already answered by the time the wizard opens.
+  const [deckHouse, setDeckHouse] = useState<DeckStyle | null>(null)
   const [creating, setCreating] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<Design | null>(null)
   const [search, setSearch] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => (localStorage.getItem('t42-designs-view') === 'list' ? 'list' : 'grid'))
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
-  const showsDesigns = typeFilter !== 'system' && typeFilter !== 'tokens' && typeFilter !== 'templates'
+  const showsDesigns =
+    typeFilter !== 'system' && typeFilter !== 'tokens' && typeFilter !== 'templates' && typeFilter !== 'decks'
   // An open token library asks for the whole page, so the list chrome steps
   // aside rather than the library squeezing itself into what is left.
   const [tokensFull, setTokensFull] = useState(false)
@@ -72,7 +79,10 @@ export function DesignsListView({
   // The Form section has no pill for the design-only views, so if it ever
   // lands on one there is no way out but a restart. Cheap insurance.
   useEffect(() => {
-    if (scope === 'form' && (typeFilter === 'system' || typeFilter === 'tokens' || typeFilter === 'templates')) {
+    if (
+      scope === 'form' &&
+      (typeFilter === 'system' || typeFilter === 'tokens' || typeFilter === 'templates' || typeFilter === 'decks')
+    ) {
       setTypeFilter('all')
     }
   }, [scope, typeFilter])
@@ -127,10 +137,11 @@ export function DesignsListView({
     setDesigns(list)
   }
 
-  const handleWizardComplete = async (brief: DesignBrief, kickoff: string): Promise<void> => {
+  const handleWizardComplete = async (rawBrief: DesignBrief, kickoff: string): Promise<void> => {
     if (creating) return
     setCreating(true)
     try {
+      const brief = deckHouse ? { ...rawBrief, deckStyleId: deckHouse.id } : rawBrief
       const starter = wizardStarter
       const createOpts = starter
         ? { brief, title: `${starter.displayName} starter` }
@@ -205,6 +216,7 @@ export function DesignsListView({
   }
 
   const openHtmlWizard = (): void => {
+    setDeckHouse(null)
     setWizardTarget('html')
     setWizardInitialIdea('')
     setWizardOpen(true)
@@ -230,8 +242,19 @@ export function DesignsListView({
     onOpen(d)
   }
 
+  /** Start a deck already committed to one house. */
+  const createDeckInHouse = (style: DeckStyle): void => {
+    if (creating) return
+    setDeckHouse(style)
+    setWizardStarter(null)
+    setWizardTarget('html')
+    setWizardInitialIdea('')
+    setWizardOpen(true)
+  }
+
   const createFromTemplate = (t: TemplateInfo): void => {
     if (creating) return
+    setDeckHouse(null)
     setWizardStarter(t)
     setWizardTarget('html')
     setWizardInitialIdea('')
@@ -302,6 +325,7 @@ export function DesignsListView({
     typeFilter === 'system' ? 'Design systems'
       : typeFilter === 'tokens' ? 'Tokens'
         : typeFilter === 'templates' ? 'Templates'
+          : typeFilter === 'decks' ? 'Deck styles'
           : typeFilter !== 'all' && typeFilter !== 'form' && typeFilter in GROUP_LABEL ? GROUP_LABEL[typeFilter as DesignGroup]
             : folderFilter !== 'all' ? folderFilter
               : allLabel
@@ -309,7 +333,9 @@ export function DesignsListView({
   // Apply type + folder + search, then bucket by recency.
   const buckets = useMemo(() => {
     const q = search.trim().toLowerCase()
-    const isGroup = typeFilter !== 'all' && typeFilter !== 'form' && typeFilter !== 'system' && typeFilter !== 'templates' && typeFilter !== 'tokens'
+    const isGroup =
+      typeFilter !== 'all' && typeFilter !== 'form' && typeFilter !== 'system' &&
+      typeFilter !== 'templates' && typeFilter !== 'tokens' && typeFilter !== 'decks'
     const visible = scoped.filter((d) => {
       if (isGroup && (d.brief?.group ?? 'other') !== typeFilter) return false
       if (folderFilter !== 'all' && designFolders[d.id] !== folderFilter) return false
@@ -413,6 +439,7 @@ export function DesignsListView({
                 <ViewPill active={typeFilter === 'system'} onClick={() => setTypeFilter('system')}>Design systems</ViewPill>
                 <ViewPill active={typeFilter === 'tokens'} onClick={() => setTypeFilter('tokens')}>Tokens</ViewPill>
                 <ViewPill active={typeFilter === 'templates'} onClick={() => setTypeFilter('templates')}>Templates</ViewPill>
+                <ViewPill active={typeFilter === 'decks'} onClick={() => setTypeFilter('decks')}>Deck styles</ViewPill>
               </div>
             )}
           </div>
@@ -505,6 +532,8 @@ export function DesignsListView({
           <TokensView onFullPage={setTokensFull} />
         ) : typeFilter === 'templates' ? (
           <TemplatesGallery onUse={createFromTemplate} />
+        ) : typeFilter === 'decks' ? (
+          <DeckHouseGallery onUse={createDeckInHouse} />
         ) : designs.length === 0 ? (
           <EmptyState noun={scope === 'form' ? 'form' : 'design'} onCreate={() => { if (scope === 'form') void createFreeform(); else openHtmlWizard() }} />
         ) : (
@@ -564,8 +593,9 @@ export function DesignsListView({
             initialIdea={wizardInitialIdea}
             target={wizardTarget}
             starterTemplate={wizardStarter ?? undefined}
+              presetCategory={deckHouse ? 'presentation' : undefined}
             creating={creating}
-            onCancel={() => { if (!creating) { setWizardOpen(false); setWizardInitialIdea(''); setWizardStarter(null) } }}
+            onCancel={() => { if (!creating) { setWizardOpen(false); setWizardInitialIdea(''); setWizardStarter(null); setDeckHouse(null) } }}
             onComplete={(brief, kickoff) => void handleWizardComplete(brief, kickoff)}
           />
         )}

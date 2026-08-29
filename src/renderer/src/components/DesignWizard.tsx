@@ -551,7 +551,7 @@ function kindMock(id: DesignKind): ReactNode | null {
 
 // ─── Main wizard ────────────────────────────────────────────────────────────
 
-export function DesignWizard({ onCancel, onComplete, initialIdea, target = 'html', starterTemplate, creating = false }: {
+export function DesignWizard({ onCancel, onComplete, initialIdea, target = 'html', starterTemplate, presetCategory, creating = false }: {
   onCancel: () => void
   onComplete: (brief: DesignBrief, kickoff: string) => void
   initialIdea?: string
@@ -562,6 +562,9 @@ export function DesignWizard({ onCancel, onComplete, initialIdea, target = 'html
   // idea + palette pages are shown. The caller is expected to materialise
   // the template files into the new design's cwd before kicking off.
   starterTemplate?: TemplateInfo
+  // When the caller already knows what is being made (picking a deck house
+  // is a decision to make a deck), the first page is answered and skipped.
+  presetCategory?: DesignGroup
   // True while the parent is materialising the template + creating the
   // design row. The wizard shows a loading overlay so the user knows the
   // app didn't freeze after they clicked the final button.
@@ -580,9 +583,10 @@ export function DesignWizard({ onCancel, onComplete, initialIdea, target = 'html
       base.starterTemplateId = starterTemplate.id
       base.starterTemplateName = starterTemplate.displayName
     }
+    if (presetCategory) base.category = presetCategory
     return { ...base, idea: initialIdea ?? '', target }
   })
-  const [pageIdx, setPageIdx] = useState(0)
+  const [pageIdx, setPageIdx] = useState(presetCategory ? 1 : 0)
   const [direction, setDirection] = useState<'forward' | 'back'>('forward')
   // Reset the wizard body scroll to top whenever the page changes. Without
   // this, a long page (Look has 14 options, Palette has many) leaves you

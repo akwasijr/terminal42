@@ -167,9 +167,14 @@ describe('drawPictures', () => {
     const c = ctx()
     drawPictures(c, [picture({ placeholder: 'Portrait' })], new Map(), 800, 400)
     expect(c.ops()).toContain('fill')
-    expect(c.ops()).toContain('stroke')
     expect(c.ops()).toContain('fillText')
     expect(c.find('drawImage')).toBeUndefined()
+  })
+
+  it('leaves the empty slot unstroked, so a template is not full of crossed-out boxes', () => {
+    const c = ctx()
+    drawPictures(c, [picture({ placeholder: 'Portrait' })], new Map(), 800, 400)
+    expect(c.ops()).not.toContain('stroke')
   })
 
   it('draws the placeholder when the named picture has not loaded', () => {

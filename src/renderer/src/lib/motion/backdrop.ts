@@ -393,10 +393,11 @@ export function drawPictures(
 /**
  * What an empty picture slot looks like.
  *
- * Deliberately plain and obviously unfinished — a flat tint, a light rule
- * corner to corner and the words for what belongs there. It has to read as a
- * slot at a glance so that nobody exports one by accident, which a
- * convincing grey rectangle would let them do.
+ * A flat tint and the words for what belongs there, and nothing else. It used
+ * to carry a rule corner to corner and a dark plate behind the label; both
+ * were removed because a template full of crossed-out boxes reads as cheap
+ * rather than as unfinished, and the label alone already says the slot is
+ * empty.
  *
  * Assumes the path for the mask is already on the context, so the placeholder
  * takes the shape of the slot rather than always being a rectangle.
@@ -408,31 +409,15 @@ function drawPlaceholder(
   label: string
 ): void {
   ctx.save()
-  ctx.fillStyle = 'rgba(128,128,132,0.28)'
+  ctx.fillStyle = 'rgba(128,128,132,0.22)'
   ctx.fill()
   ctx.clip()
-  ctx.strokeStyle = 'rgba(128,128,132,0.5)'
-  ctx.lineWidth = Math.max(1, Math.min(w, h) * 0.005)
-  ctx.beginPath()
-  ctx.moveTo(-w / 2, -h / 2)
-  ctx.lineTo(w / 2, h / 2)
-  ctx.moveTo(w / 2, -h / 2)
-  ctx.lineTo(-w / 2, h / 2)
-  ctx.stroke()
 
-  const size = Math.max(9, Math.min(w, h) * 0.09)
+  const size = Math.max(9, Math.min(w, h) * 0.075)
   ctx.font = `500 ${size}px "DM Sans", system-ui, sans-serif`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  // A dark plate behind the words, because the slot sits on whatever the
-  // composition happens to be and pale text on a pale frame says nothing.
-  const pad = size * 0.5
-  const tw = ctx.measureText(label).width
-  ctx.fillStyle = 'rgba(20,20,22,0.72)'
-  ctx.beginPath()
-  ctx.roundRect(-tw / 2 - pad, -size * 0.8, tw + pad * 2, size * 1.6, size * 0.35)
-  ctx.fill()
-  ctx.fillStyle = 'rgba(255,255,255,0.92)'
+  ctx.fillStyle = 'rgba(128,128,132,0.85)'
   ctx.fillText(label, 0, 0)
   ctx.restore()
 }

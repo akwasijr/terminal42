@@ -10,6 +10,27 @@
 import type { CardPlacement, MotionDoc, Pose } from '../../../../shared/motion/types'
 import { computePlacements, resolvedPictureLayers, resolvedShapeLayers } from '../../../../shared/motion/frame'
 import { drawPictures, drawShapes } from './backdrop'
+import { drawBankImage } from './bank'
+
+/**
+ * Starter pictures, drawn once each and kept.
+ *
+ * The bank generates its pictures from an id rather than loading files, so a
+ * tile can have the real picture on its cards without touching disk or waiting
+ * for a decode. Cached because a gallery redraws on every animation frame and
+ * regenerating twelve pictures per frame is not free.
+ */
+const bankCache = new Map<string, HTMLCanvasElement>()
+
+function bankFace(id: string): HTMLCanvasElement {
+  let c = bankCache.get(id)
+  if (!c) {
+    c = document.createElement('canvas')
+    drawBankImage(c, id, 256)
+    bankCache.set(id, c)
+  }
+  return c
+}
 
 /**
  * The engine's camera, mirrored here.
@@ -31,7 +52,7 @@ export function drawPresetThumb(
   canvas: HTMLCanvasElement,
   doc: MotionDoc,
   phase: number,
-  opts: { width: number; height: number; near: string; far: string }
+  opts: { width: number; height: number; near: string; far: string; bankIds?: readonly string[] }
 ): void {
   const dpr = Math.min(2, window.devicePixelRatio || 1)
   canvas.width = Math.round(opts.width * dpr)
@@ -63,16 +84,41 @@ export function drawPresetThumb(
   // frustum. Anything the real frame would crop, the tile crops too.
   const scale = opts.height / (2 * Math.tan((FOV_DEG * Math.PI) / 360) * FOCAL)
 
-  for (const p of projected) {
+  // The card's own corner, not a fixed one. A tile that rounds every card by
+  // 16% tells you a square-cornered template is a rounded one, which is the
+  // opposite of what a template gallery is for.
+  const cornerPct = doc.visual.card.corner ?? 0
+  // The pictures the template names, in the order its cards receive them. With
+  // these the tile shows the piece; without them it shows a scatter of empty
+  // coloured boxes, which is what every one of these templates used to look
+  // like in the gallery and nothing like what it makes.
+  const bankIds = opts.bankIds ?? []
+
+  projected.forEach((p, i) => {
     const x = opts.width / 2 + p.x * scale
     const y = opts.height / 2 + p.y * scale
     const w = Math.max(1.5, CARD_W * p.depth * scale * p.scale)
     const h = Math.max(2, CARD_H * p.depth * scale * p.scale)
     ctx.globalAlpha = Math.max(0.12, Math.min(1, p.opacity * (0.45 + p.depth * 0.55)))
-    ctx.fillStyle = p.depth > 0.9 ? opts.near : opts.far
-    roundRect(ctx, x - w / 2, y - h / 2, w, h, Math.min(w, h) * 0.16)
-    ctx.fill()
-  }
+    roundRect(ctx, x - w / 2, y - h / 2, w, h, (Math.min(w, h) * cornerPct) / 100)
+    const bankId = bankIds.length ? bankIds[i % bankIds.length] : null
+    if (bankId) {
+      ctx.save()
+      ctx.clip()
+      const face = bankFace(bankId)
+      // Cover, matching drawCardFace: a picture squeezed to the card is the
+      // single most obvious sign of a template doing the arranging.
+      const ir = face.width / face.height
+      const cr = w / h
+      const dw = ir > cr ? h * ir : w
+      const dh = ir > cr ? h : w / ir
+      ctx.drawImage(face, x - dw / 2, y - dh / 2, dw, dh)
+      ctx.restore()
+    } else {
+      ctx.fillStyle = p.depth > 0.9 ? opts.near : opts.far
+      ctx.fill()
+    }
+  })
   ctx.globalAlpha = 1
 }
 

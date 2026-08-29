@@ -26,7 +26,6 @@
 
 import type {
   Displacement,
-  DropShadowFx,
   EdgeAmounts,
   EdgeBlurFx,
   EdgeShadeFx,
@@ -67,6 +66,16 @@ export type MotionTemplate = {
    * caught there tells you nothing about the piece that lands.
    */
   previewPhase?: number
+  /**
+   * This house is flat on purpose.
+   *
+   * Every other template earns its depth from a treatment — a vignette, an
+   * edge blur, a grade. A few of the references are simply flat: a hard
+   * two-colour split with no light in it at all. Saying so here keeps that a
+   * decision on the record rather than a treatment somebody forgot, which is
+   * what the template tests check for.
+   */
+  flat?: true
   build: (images: ImageRef[]) => MotionDoc
 }
 
@@ -161,9 +170,10 @@ function all(n: number): EdgeAmounts {
 // changing. These four builders turn that into naming the treatment and the
 // two or three numbers that make it the one you meant.
 
-function cast(p: Partial<DropShadowFx>): DropShadowFx {
-  return { ...defaultEffects().dropShadow, enabled: true, ...p }
-}
+// No `cast` helper: templates carry no drop shadows. A shadow under a flat
+// panel is the tell of a mock-up rather than a piece of design, and every
+// reference these templates are drawn from lays its elements flat. A user can
+// still switch one on per document from the effects panel.
 
 function edgeBlur(p: Partial<EdgeBlurFx>): EdgeBlurFx {
   return { ...defaultEffects().edgeBlur, enabled: true, ...p }
@@ -370,7 +380,6 @@ export const MOTION_TEMPLATES: readonly MotionTemplate[] = [
         card: { aspect: '4:5', corner: 10, gradient: false, gradientOpacity: 0 },
         frame: { aspect: '9:16', background: INK.paper, corners: 18 },
         effects: {
-          dropShadow: cast({ density: 16, blur: 30, distance: 10, angle: 0 }),
           edgeBlur: edgeBlur({ amount: 16, edges: reach({ top: 18, bottom: 24 }), falloff: 'soft', softness: 62 })
         },
         export: { durationSec: 10, fps: 30 },
@@ -415,7 +424,6 @@ export const MOTION_TEMPLATES: readonly MotionTemplate[] = [
         card: { aspect: '4:5', corner: 10, gradient: false, gradientOpacity: 0 },
         frame: { aspect: '16:9', background: INK.paper, corners: 14 },
         effects: {
-          dropShadow: cast({ density: 16, blur: 30, distance: 10, angle: 0 }),
           edgeBlur: edgeBlur({ amount: 14, edges: reach({ top: 20, bottom: 20 }), falloff: 'soft', softness: 62 })
         },
         export: { durationSec: 10, fps: 30 },
@@ -591,6 +599,7 @@ export const MOTION_TEMPLATES: readonly MotionTemplate[] = [
   },
   {
     id: 'habitts-landscape',
+    flat: true,
     name: 'Habitts — landscape',
     note: 'A course card: white on the left, a hot panel on the right with the portrait cut into it.',
     images: ['ember', 'signal', 'lantern'],
@@ -613,12 +622,9 @@ export const MOTION_TEMPLATES: readonly MotionTemplate[] = [
             'text:head:x': ride([[0, 5], [0.08, 6]], EASE.settle)
           }
         },
-        card: { aspect: '4:5', corner: 10, gradient: false, gradientOpacity: 0, backOpacity: 0 },
+        card: { aspect: '1:1', corner: 50, gradient: false, gradientOpacity: 0, backOpacity: 0 },
         frame: { aspect: '16:9', background: INK.white, corners: 10 },
-        effects: {
-          // The portrait sits on the panel rather than in it, so it casts.
-          dropShadow: cast({ angle: 0, distance: 1.4, blur: 16, density: 14, colour: '#7A2E06' })
-        },
+        effects: {},
         export: { durationSec: 9, fps: 30 },
         shapes: [
           shape({ id: 'panel', kind: 'rect', width: 52, height: 100, x: 74, y: 50, colour: INK.orange, corner: 0 }),
@@ -637,6 +643,7 @@ export const MOTION_TEMPLATES: readonly MotionTemplate[] = [
   },
   {
     id: 'habitts-portrait',
+    flat: true,
     name: 'Habitts — portrait',
     note: 'The course card stood up: the hot panel across the top, the words beneath it.',
     images: ['signal', 'ember', 'lantern'],
@@ -655,11 +662,9 @@ export const MOTION_TEMPLATES: readonly MotionTemplate[] = [
             'text:head:y': ride([[0, 59], [0.08, 58]], EASE.settle)
           }
         },
-        card: { aspect: '4:5', corner: 10, gradient: false, gradientOpacity: 0, backOpacity: 0 },
+        card: { aspect: '1:1', corner: 50, gradient: false, gradientOpacity: 0, backOpacity: 0 },
         frame: { aspect: '9:16', background: INK.white, corners: 14 },
-        effects: {
-          dropShadow: cast({ angle: 0, distance: 1.4, blur: 16, density: 14, colour: '#7A2E06' })
-        },
+        effects: {},
         export: { durationSec: 9, fps: 30 },
         shapes: [
           shape({ id: 'panel', kind: 'rect', width: 100, height: 46, x: 50, y: 23, colour: INK.orange, corner: 0 }),
