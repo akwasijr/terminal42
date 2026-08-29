@@ -11,6 +11,7 @@ import { DesignSystemView } from './DesignSystemView'
 import { DesignSystemWizard } from './DesignSystemWizard'
 import { type DesignSystem, upsertSystem } from '../lib/designSystem'
 import { IconClose, IconEdit, IconPlus, IconSearch, IconTrash } from './icons'
+import { Modal, ModalHeader, ModalBody, ModalFooter } from './Modal'
 
 // Pretty labels for the kind-group filter chips at the top of the page.
 const GROUP_LABEL: Record<DesignGroup, string> = {
@@ -948,30 +949,30 @@ function ConfirmDelete({ design, onCancel, onConfirm }: {
   onConfirm: () => void
 }): JSX.Element {
   return (
-    <div className="t42-scrim fixed inset-0 z-50 grid place-items-center bg-black/50 px-4">
-      <div className="w-full max-w-md rounded-xl bg-raised p-5 shadow-overlay">
-        <h3 className="text-[15px] font-medium text-text-primary">Delete this design?</h3>
-        <p className="mt-1.5 text-[13px] text-text-muted">
+    <Modal title="Delete this design?" onClose={onCancel} size="small" closeOnBackdrop={false}>
+      <ModalHeader title="Delete this design?" />
+      <ModalBody>
+        <p className="text-[13px] text-text-muted">
           “{design.title}” and all its versions will be removed permanently.
         </p>
-        <div className="mt-4 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-md px-3 py-1.5 text-[13px] text-text-secondary hover:bg-elevated hover:text-text-primary"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            className="rounded-md bg-error px-3 py-1.5 text-[13px] font-medium text-white hover:opacity-90"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-    </div>
+      </ModalBody>
+      <ModalFooter>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-md px-3 py-1.5 text-[13px] text-text-secondary hover:bg-elevated hover:text-text-primary"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={onConfirm}
+          className="rounded-md bg-error px-3 py-1.5 text-[13px] font-medium text-white hover:opacity-90"
+        >
+          Delete
+        </button>
+      </ModalFooter>
+    </Modal>
   )
 }
 

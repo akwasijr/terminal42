@@ -3,6 +3,7 @@ import { Transformer } from 'markmap-lib'
 import { Markmap, deriveOptions } from 'markmap-view'
 import type { Project } from '../../../preload/index'
 import { IconFolder, IconPlus } from './icons'
+import { Modal, ModalHeader, ModalBody, ModalFooter } from './Modal'
 
 const transformer = new Transformer()
 
@@ -548,13 +549,11 @@ function BrainOnboarding({
   const prev = (): void => setStep((s) => Math.max(0, s - 1))
 
   return (
-    <div className="t42-scrim fixed inset-0 z-40 grid place-items-center bg-bg/80 px-4 backdrop-blur-sm">
-      <div className="flex w-full max-w-[640px] flex-col overflow-hidden rounded-xl bg-raised shadow-overlay">
-        <header className="flex items-center justify-between px-5 py-3">
-          <div className="flex items-center gap-3">
-            <div className="text-[14px] font-semibold text-text-primary">Set up your Brain</div>
-            <div className="text-[11px] text-text-muted">{isReview ? 'Review' : `Step ${step + 1} of ${total}`}</div>
-          </div>
+    <Modal title="Set up your Brain" onClose={onClose} size="medium" closeOnBackdrop={false}>
+      <ModalHeader
+        title="Set up your Brain"
+        note={isReview ? 'Review' : `Step ${step + 1} of ${total}`}
+        right={
           <button
             type="button"
             onClick={onClose}
@@ -563,16 +562,18 @@ function BrainOnboarding({
           >
             ×
           </button>
-        </header>
+        }
+      />
 
-        <div className="h-1 w-full bg-elevated">
-          <div
-            className="h-full bg-accent transition-all"
-            style={{ width: `${((isReview ? total : step) / total) * 100}%` }}
-          />
-        </div>
+      <div className="h-1 w-full bg-elevated">
+        <div
+          className="h-full bg-accent transition-all"
+          style={{ width: `${((isReview ? total : step) / total) * 100}%` }}
+        />
+      </div>
 
-        <div className="flex flex-col gap-4 px-5 py-5">
+      <ModalBody>
+        <div className="flex flex-col gap-4">
           {q?.kind === 'chips' && (
             <ChipQuestion
               q={q}
@@ -595,8 +596,10 @@ function BrainOnboarding({
             </div>
           )}
         </div>
+      </ModalBody>
 
-        <footer className="flex items-center justify-between bg-elevated/30 px-5 py-3">
+      <ModalFooter
+        left={
           <button
             type="button"
             onClick={prev}
@@ -605,37 +608,36 @@ function BrainOnboarding({
           >
             Back
           </button>
-          <div className="flex items-center gap-1.5">
-            {!isReview && (
-              <button
-                type="button"
-                onClick={next}
-                className="rounded-md px-2.5 py-1 text-[12px] text-text-secondary hover:bg-elevated hover:text-text-primary"
-              >
-                Skip
-              </button>
-            )}
-            {!isReview ? (
-              <button
-                type="button"
-                onClick={next}
-                className="rounded-md bg-action px-3 py-1 text-[12px] font-medium text-action-text hover:opacity-90"
-              >
-                {step === total - 1 ? 'Review' : 'Next'}
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => onFinish(preview)}
-                className="rounded-md bg-action px-3 py-1 text-[12px] font-medium text-action-text hover:opacity-90"
-              >
-                Save to Brain
-              </button>
-            )}
-          </div>
-        </footer>
-      </div>
-    </div>
+        }
+      >
+          {!isReview && (
+            <button
+              type="button"
+              onClick={next}
+              className="rounded-md px-2.5 py-1 text-[12px] text-text-secondary hover:bg-elevated hover:text-text-primary"
+            >
+              Skip
+            </button>
+          )}
+          {!isReview ? (
+            <button
+              type="button"
+              onClick={next}
+              className="rounded-md bg-action px-3 py-1 text-[12px] font-medium text-action-text hover:opacity-90"
+            >
+              {step === total - 1 ? 'Review' : 'Next'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onFinish(preview)}
+              className="rounded-md bg-action px-3 py-1 text-[12px] font-medium text-action-text hover:opacity-90"
+            >
+              Save to Brain
+            </button>
+          )}
+      </ModalFooter>
+    </Modal>
   )
 }
 

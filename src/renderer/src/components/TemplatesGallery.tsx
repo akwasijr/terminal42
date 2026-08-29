@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { TemplateInfo } from '../../../preload/index'
 import { IconClose } from './icons'
+import { Modal, ModalHeader, ModalFooter } from './Modal'
 
 // Visual templates gallery for the Design view.
 //
@@ -174,27 +175,23 @@ function PreviewModal({
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
   return (
-    <div className="t42-scrim fixed inset-0 z-40 flex items-center justify-center bg-bg/80 p-6 backdrop-blur-sm" onClick={onClose}>
-      <div
-        className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-raised shadow-overlay"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="flex items-start justify-between px-5 py-3">
-          <div className="min-w-0">
-            <h2 className="truncate text-[15px] font-semibold text-text-primary">{template.displayName}</h2>
-            <p className="mt-0.5 line-clamp-2 text-[12.5px] text-text-secondary">{template.description}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close preview"
-            className="grid h-8 w-8 place-items-center rounded-md text-text-muted hover:bg-elevated hover:text-text-primary"
-          >
-            <IconClose size={14} />
-          </button>
-        </header>
+    <Modal title={template.displayName} onClose={onClose} size="xlarge">
+        <ModalHeader
+          title={template.displayName}
+          note={template.description}
+          right={
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close preview"
+              className="grid h-8 w-8 place-items-center rounded-md text-text-muted hover:bg-elevated hover:text-text-primary"
+            >
+              <IconClose size={14} />
+            </button>
+          }
+        />
 
-        <div className="relative flex-1 overflow-hidden bg-elevated">
+        <div className="relative min-h-0 flex-1 overflow-hidden bg-elevated">
           {state.dataUrl ? (
             <img src={state.dataUrl} alt={`${template.displayName} preview`} className="h-full w-full object-contain" />
           ) : (
@@ -211,11 +208,13 @@ function PreviewModal({
           )}
         </div>
 
-        <footer className="flex items-center justify-between gap-3 px-5 py-3">
-          <div className="text-[12px] text-text-muted">
-            {state.status === 'error' ? `Preview failed: ${state.error || 'unknown error'}` : null}
-          </div>
-          <div className="flex gap-2">
+        <ModalFooter
+          left={
+            <div className="text-[12px] text-text-muted">
+              {state.status === 'error' ? `Preview failed: ${state.error || 'unknown error'}` : null}
+            </div>
+          }
+        >
             {!state.dataUrl && state.status !== 'generating' && (
               <button
                 type="button"
@@ -232,10 +231,8 @@ function PreviewModal({
             >
               Use this template
             </button>
-          </div>
-        </footer>
-      </div>
-    </div>
+        </ModalFooter>
+    </Modal>
   )
 }
 

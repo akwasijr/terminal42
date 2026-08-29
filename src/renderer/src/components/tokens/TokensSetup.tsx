@@ -14,9 +14,10 @@
 // step: if a question had nowhere to go, it is not in the list.
 
 import { useState } from 'react'
+import { Modal, ModalAside, ModalHeader, ModalBody, ModalFooter, ModalSteps, ModalButton } from '../Modal'
 import { FEEL_PRESETS, type Vibe } from '../../lib/designSystem'
 import { buildFeelPrompt, parseFeelReply } from '../../lib/tokenBrief'
-import { emptyStudio, ramp, studioFromFeel, type Feel } from '../../../../shared/tokens/scaffold'
+import { emptyStudio, ramp, studioFromFeel, SEMANTIC_DEFAULTS, type Feel, type SemanticRole } from '../../../../shared/tokens/scaffold'
 import { feelFromVibe } from '../../lib/tokens/feelFromVibe'
 import { DEFAULT_CSS, type TokenStudio } from '../../../../shared/tokens/types'
 
@@ -25,11 +26,13 @@ const VIBES: Vibe[] = [
   'elegant', 'brutalist', 'technical', 'luxe'
 ]
 
-type StepId = 'feel' | 'colour' | 'corner' | 'air' | 'scale' | 'lift' | 'naming' | 'review'
+type StepId = 'feel' | 'colour' | 'support' | 'meaning' | 'corner' | 'air' | 'scale' | 'lift' | 'naming' | 'review'
 
 const STEPS: { id: StepId; question: string }[] = [
   { id: 'feel',   question: 'Where should it start?' },
   { id: 'colour', question: 'What is the brand colour?' },
+  { id: 'support', question: 'What sits beside it?' },
+  { id: 'meaning', question: 'What do good and bad look like?' },
   { id: 'corner', question: 'How round are things?' },
   { id: 'air',    question: 'How much air is there?' },
   { id: 'scale',  question: 'How far apart are the type sizes?' },
@@ -124,6 +127,64 @@ function varName(casing: 'kebab' | 'camel' | 'snake', prefix: string): string {
   return `--${p ? `${p}-` : ''}${body}`
 }
 
+const SEMANTIC_LABELS: Record<SemanticRole, string> = {
+  success: 'Good',
+  warning: 'Careful',
+  danger: 'Wrong',
+  info: 'Worth knowing'
+}
+
+const SEMANTIC_HINTS: Record<SemanticRole, string> = {
+  success: 'Saved, connected, passing',
+  warning: 'Nearly out, about to expire',
+  danger: 'Failed, destructive, blocked',
+  info: 'Tips, notes, neutral notices'
+}
+
+/** One colour, named and explained, so the row says what it is for. */
+function Swatch({
+  label,
+  hint,
+  value,
+  onChange,
+  onReset
+}: {
+  label: string
+  hint: string
+  value: string
+  onChange: (hex: string) => void
+  onReset: () => void
+}): React.JSX.Element {
+  return (
+    <div className="flex max-w-xl items-center gap-3">
+      <input
+        type="color"
+        aria-label={label}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-9 w-11 flex-none cursor-pointer rounded-md bg-transparent"
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block text-[12.5px] text-text-primary">{label}</span>
+        <span className="block truncate text-[11px] text-text-muted">{hint}</span>
+      </span>
+      <input
+        aria-label={`${label} hex`}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-28 flex-none rounded-md bg-sunken px-2.5 py-1.5 font-mono text-[12px] text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+      />
+      <button
+        type="button"
+        onClick={onReset}
+        className="flex-none rounded-md px-2 py-1.5 text-[11.5px] text-text-muted hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+      >
+        Reset
+      </button>
+    </div>
+  )
+}
+
 function tile(selected: boolean): string {
   return [
     'w-full rounded-md p-3 text-left transition-colors',
@@ -143,6 +204,9 @@ export function TokensSetup({
   const [vibe, setVibe] = useState<Vibe>('minimal')
   const [name, setName] = useState('')
   const [primary, setPrimary] = useState<string | null>(null)
+  const [secondary, setSecondary] = useState<string | null>(null)
+  const [tertiary, setTertiary] = useState<string | null>(null)
+  const [semantic, setSemantic] = useState<Partial<Record<SemanticRole, string>>>({})
   const [corner, setCorner] = useState<Feel['corner'] | null>(null)
   const [density, setDensity] = useState<Feel['density'] | null>(null)
   const [scale, setScale] = useState<Feel['scale'] | null>(null)
@@ -163,6 +227,9 @@ export function TokensSetup({
     ...base,
     name: name.trim() || FEEL_PRESETS[vibe].label,
     primary: primary ?? base.primary,
+    secondary: secondary ?? base.secondary,
+    tertiary: tertiary ?? base.tertiary,
+    semantic,
     corner: corner ?? base.corner,
     density: density ?? base.density,
     scale: scale ?? base.scale,
@@ -191,6 +258,8 @@ export function TokensSetup({
     // already been made for them.
     const got = parseFeelReply(res.text, base)
     setPrimary(got.primary)
+    setSecondary(got.secondary)
+    setTertiary(got.tertiary)
     setCorner(got.corner)
     setDensity(got.density)
     setScale(got.scale)
@@ -202,17 +271,11 @@ export function TokensSetup({
   const r = ramp(feel.primary)
 
   return (
-    <div
-      className="t42-scrim fixed inset-0 z-50 grid place-items-center bg-black/40 p-6"
-      role="dialog"
-      aria-label="New token library"
-      onKeyDown={(e) => { if (e.key === 'Escape') onCancel() }}
-    >
-      <div className="flex w-full max-w-3xl overflow-hidden rounded-panel bg-elevated">
-        {/* The library as it stands. The only thing on screen that is not a
-            question, and it changes on every answer, so the effect of a choice
-            is visible at the moment it is made. */}
-        <aside className="w-56 flex-none bg-sunken p-4">
+    // Losing eight answers to a misplaced click is worse than reaching for
+    // Escape, so the backdrop does not close this one.
+    <Modal title="New token library" onClose={onCancel} size="large" closeOnBackdrop={false}>
+      <div className="flex min-h-0 flex-1">
+        <ModalAside>
           <span className="text-[11px] text-text-muted">Building</span>
           <p className="mt-0.5 truncate text-[13px] text-text-primary" style={{ fontFamily: feel.headingFont }}>
             {feel.name}
@@ -241,27 +304,16 @@ export function TokensSetup({
               Button
             </span>
           </div>
-        </aside>
+        </ModalAside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="px-5 pt-5">
-            <div className="flex items-center gap-1.5" aria-hidden="true">
-              {STEPS.map((s, i) => (
-                <span
-                  key={s.id}
-                  className={`h-0.5 flex-1 rounded-full transition-colors ${i <= stepIdx ? 'bg-accent' : 'bg-raised'}`}
-                />
-              ))}
-            </div>
+          <div className="px-5 pt-5">
+            <ModalSteps count={STEPS.length} at={stepIdx} />
             <p className="mt-3 text-[11px] text-text-muted">Step {stepIdx + 1} of {STEPS.length}</p>
-            <h2 className="text-[15px] font-medium text-text-primary">{step.question}</h2>
-          </header>
+          </div>
+          <ModalHeader title={step.question} />
 
-          {/* Fixed, not hugging. The steps hold very different amounts — nine
-              swatch cards against three corner choices — and a dialog that
-              resizes under the pointer between one question and the next
-              reads as cheap. */}
-          <div className="h-[300px] overflow-y-auto px-5 py-4">
+          <ModalBody height={300}>
             {step.id === 'feel' && (
               <>
                 <ul className="grid grid-cols-3 gap-2">
@@ -340,6 +392,58 @@ export function TokensSetup({
                     <span key={s} style={{ background: r[s] }} className="flex-1" />
                   ))}
                 </span>
+              </div>
+            )}
+
+            {step.id === 'support' && (
+              <div>
+                <p className="max-w-prose text-[12px] text-text-secondary">
+                  The accent carries the second-most important thing on a page, and the
+                  third colour is what is left for charts and categories. Both start
+                  from the feel, so leaving them alone is a real answer.
+                </p>
+                <div className="mt-4 space-y-3">
+                  <Swatch
+                    label="Accent"
+                    hint="Highlights, selected states, links"
+                    value={feel.secondary}
+                    onChange={setSecondary}
+                    onReset={() => setSecondary(null)}
+                  />
+                  <Swatch
+                    label="Third colour"
+                    hint="Charts, categories, illustration"
+                    value={feel.tertiary}
+                    onChange={setTertiary}
+                    onReset={() => setTertiary(null)}
+                  />
+                </div>
+              </div>
+            )}
+
+            {step.id === 'meaning' && (
+              <div>
+                <p className="max-w-prose text-[12px] text-text-secondary">
+                  These four mean something rather than look like something, so
+                  convention matters more than taste. The defaults are the
+                  convention; change them only where the brand demands it.
+                </p>
+                <div className="mt-4 space-y-2.5">
+                  {(Object.keys(SEMANTIC_DEFAULTS) as SemanticRole[]).map((role) => (
+                    <Swatch
+                      key={role}
+                      label={SEMANTIC_LABELS[role]}
+                      hint={SEMANTIC_HINTS[role]}
+                      value={semantic[role] ?? SEMANTIC_DEFAULTS[role]}
+                      onChange={(v) => setSemantic({ ...semantic, [role]: v })}
+                      onReset={() => {
+                        const next = { ...semantic }
+                        delete next[role]
+                        setSemantic(next)
+                      }}
+                    />
+                  ))}
+                </div>
               </div>
             )}
 
@@ -431,7 +535,8 @@ export function TokensSetup({
                 />
                 <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-[12px]">
                   {([
-                    ['Colour', feel.primary],
+                    ['Brand', feel.primary],
+                    ['Accent', feel.secondary],
                     ['Corners', CORNERS.find((c) => c.id === feel.corner)!.label],
                     ['Air', AIRS.find((a) => a.id === feel.density)!.label],
                     ['Type sizes', SCALES.find((s) => s.id === feel.scale)!.label],
@@ -446,34 +551,24 @@ export function TokensSetup({
                 </dl>
               </div>
             )}
-          </div>
+          </ModalBody>
 
-          <footer className="flex items-center gap-2 px-5 pb-5">
-            <button
-              type="button"
-              onClick={() => onCreate(emptyStudio('Untitled'))}
-              className="rounded-md px-3 py-1.5 text-[12.5px] text-text-muted hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-            >
-              Start empty
-            </button>
-            <span className="flex-1" />
-            <button
-              type="button"
-              onClick={() => (stepIdx === 0 ? onCancel() : setStepIdx(stepIdx - 1))}
-              className="rounded-md px-3 py-1.5 text-[12.5px] text-text-muted hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-            >
+          <ModalFooter
+            left={
+              <ModalButton tone="plain" onClick={() => onCreate(emptyStudio('Untitled'))}>
+                Start empty
+              </ModalButton>
+            }
+          >
+            <ModalButton tone="plain" onClick={() => (stepIdx === 0 ? onCancel() : setStepIdx(stepIdx - 1))}>
               {stepIdx === 0 ? 'Cancel' : 'Back'}
-            </button>
-            <button
-              type="button"
-              onClick={() => (step.id === 'review' ? build() : setStepIdx(stepIdx + 1))}
-              className="rounded-md bg-action px-3 py-1.5 text-[12.5px] font-medium text-action-text hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-            >
+            </ModalButton>
+            <ModalButton tone="primary" onClick={() => (step.id === 'review' ? build() : setStepIdx(stepIdx + 1))}>
               {step.id === 'review' ? 'Build' : 'Next'}
-            </button>
-          </footer>
+            </ModalButton>
+          </ModalFooter>
         </div>
       </div>
-    </div>
+    </Modal>
   )
 }

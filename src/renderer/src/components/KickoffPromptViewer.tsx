@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { buildKickoffPrompt } from '../lib/brief'
+import { Modal, ModalHeader } from './Modal'
 import type { ProjectBrief } from '../../../preload/index'
 
 export function KickoffPromptButton({
@@ -79,10 +80,7 @@ function KickoffPromptModal({
   const [brandDir, setBrandDir] = useState<string | undefined>(undefined)
   const [toast, setToast] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
 
-  const dialogRef = useRef<HTMLDivElement | null>(null)
-  const closeBtnRef = useRef<HTMLButtonElement | null>(null)
   const previouslyFocused = useRef<HTMLElement | null>(null)
-  const backdropMouseDown = useRef(false)
   const toastTimer = useRef<number | null>(null)
 
   // Load brief + inspiration dir + brand dir for this projectId. Cancel on unmount or project change.
@@ -109,17 +107,11 @@ function KickoffPromptModal({
     return () => { cancelled = true }
   }, [projectId])
 
-  // Esc closes.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  // Esc closes and the backdrop is handled by Modal.
 
-  // Focus management: trap inside dialog, restore on close.
+  // Restore focus to whatever opened the dialog once it closes.
   useEffect(() => {
     previouslyFocused.current = (document.activeElement as HTMLElement) ?? null
-    closeBtnRef.current?.focus()
     return () => {
       previouslyFocused.current?.focus?.()
     }
@@ -175,44 +167,21 @@ function KickoffPromptModal({
     }
   }
 
-  // Backdrop click: only close if the mousedown started on the backdrop too.
-  // Prevents drag-selecting text inside the dialog from closing the modal
-  // when the mouseup happens to land outside.
-  const onBackdropMouseDown = (e: React.MouseEvent) => {
-    backdropMouseDown.current = e.target === e.currentTarget
-  }
-  const onBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget && backdropMouseDown.current) onClose()
-    backdropMouseDown.current = false
-  }
+  // Backdrop click and Escape are handled by Modal.
 
   return (
-    <div
-      className="t42-scrim fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6"
-      onMouseDown={onBackdropMouseDown}
-      onClick={onBackdropClick}
-    >
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="kickoff-modal-title"
-        className="flex h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-bg shadow-2xl"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-5 py-3">
-          <div>
-            <div id="kickoff-modal-title" className="text-sm font-semibold text-text-primary">
-              Kickoff prompt
-            </div>
-            <div className="text-xs text-text-secondary">
-              {load.kind === 'ok'
-                ? `${lines} lines · regenerated from this project's brief`
-                : load.kind === 'loading' ? 'Loading brief…'
-                : load.kind === 'empty' ? 'No brief saved for this project'
-                : `Error: ${load.message}`}
-            </div>
-          </div>
+    <Modal title="Kickoff prompt" onClose={onClose} size="large" labelledBy="kickoff-modal-title">
+      <ModalHeader
+        title="Kickoff prompt"
+        id="kickoff-modal-title"
+        note={
+          load.kind === 'ok'
+            ? `${lines} lines · regenerated from this project's brief`
+            : load.kind === 'loading' ? 'Loading brief…'
+            : load.kind === 'empty' ? 'No brief saved for this project'
+            : `Error: ${load.message}`
+        }
+        right={
           <div className="flex items-center gap-2">
             <button
               onClick={onCopy}
@@ -234,7 +203,6 @@ function KickoffPromptModal({
               Paste into terminal
             </button>
             <button
-              ref={closeBtnRef}
               onClick={onClose}
               className="rounded-md p-1.5 text-text-secondary hover:bg-surface hover:text-text-primary"
               aria-label="Close kickoff prompt"
@@ -245,33 +213,33 @@ function KickoffPromptModal({
               </svg>
             </button>
           </div>
+        }
+      />
+
+      {toast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className={[
+            'mx-5 mt-3 rounded-md px-3 py-2 text-xs text-white',
+            toast.kind === 'success' ? 'bg-accent' : 'bg-red-500'
+          ].join(' ')}
+        >
+          {toast.text}
         </div>
+      )}
 
-        {toast && (
-          <div
-            role="status"
-            aria-live="polite"
-            className={[
-              'mx-5 mt-3 rounded-md px-3 py-2 text-xs text-white shadow',
-              toast.kind === 'success' ? 'bg-accent' : 'bg-red-500'
-            ].join(' ')}
-          >
-            {toast.text}
-          </div>
-        )}
+      <pre className="mt-3 min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words bg-surface/30 p-5 font-mono text-[12px] leading-relaxed text-text-primary">
+        {load.kind === 'ok' ? prompt :
+         load.kind === 'loading' ? 'Loading…' :
+         load.kind === 'empty' ? 'This project has no brief yet.' :
+         `Could not load brief: ${load.message}`}
+      </pre>
 
-        <pre className="flex-1 overflow-auto whitespace-pre-wrap break-words bg-surface/30 p-5 font-mono text-[12px] leading-relaxed text-text-primary">
-          {load.kind === 'ok' ? prompt :
-           load.kind === 'loading' ? 'Loading…' :
-           load.kind === 'empty' ? 'This project has no brief yet.' :
-           `Could not load brief: ${load.message}`}
-        </pre>
-
-        <div className="px-5 py-2 text-[11px] text-text-secondary">
-          Tip: paste inserts the prompt into the active terminal but does not press Enter.
-          Review it, then hit Return when you're ready.
-        </div>
+      <div className="px-5 py-2 text-[11px] text-text-secondary">
+        Tip: paste inserts the prompt into the active terminal but does not press Enter.
+        Review it, then hit Return when you're ready.
       </div>
-    </div>
+    </Modal>
   )
 }

@@ -10,6 +10,7 @@ import { MODELS } from './ModelDropdown'
 import { type LayerMotion } from '../lib/timelineModel'
 import { addBrainPreference, addBrainSkill, brainPrompt, loadAssistantBrain, saveAssistantBrain, DEFAULT_PREFS, type AssistantBrain } from '../lib/assistantBrain'
 import { BoxesThinking } from './PencilThinking'
+import { Modal } from './Modal'
 
 type ActionKind = 'create' | 'animate' | 'edit' | 'delete'
 interface Msg { id: string; role: 'user' | 'assistant'; text: string; options?: string[]; kind?: 'question' | 'done' | 'error'; action?: ActionKind }
@@ -249,8 +250,7 @@ export function CanvasAssistant({ getContext, onCreate, onAnimate, onEdit, onDel
       )}
 
       {debugOpen && (
-        <div className="t42-scrim fixed inset-0 z-[300] grid place-items-center bg-black/55 p-6" onMouseDown={(e) => { if (e.target === e.currentTarget) setDebugOpen(false) }} role="presentation">
-          <div className="flex h-[82vh] w-[940px] max-w-full flex-col overflow-hidden rounded-xl bg-bg shadow-2xl">
+        <Modal title="Generation inspector" onClose={() => setDebugOpen(false)} size="large">
             <div className="flex items-center justify-between px-4 py-3">
               <div className="text-[13px] font-semibold text-text-primary">Generation inspector</div>
               <button type="button" onClick={() => setDebugOpen(false)} className="grid h-6 w-6 place-items-center rounded text-text-muted hover:bg-elevated hover:text-text-primary"><svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M3 3l8 8M11 3l-8 8" /></svg></button>
@@ -294,12 +294,10 @@ export function CanvasAssistant({ getContext, onCreate, onAnimate, onEdit, onDel
                 </div>
               </div>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
       {brainOpen && (
-        <div className="t42-scrim fixed inset-0 z-[300] grid place-items-center bg-black/55 p-6" onMouseDown={(e) => { if (e.target === e.currentTarget) setBrainOpen(false) }} role="presentation">
-          <div className="flex h-[78vh] w-[860px] max-w-full flex-col overflow-hidden rounded-xl bg-bg shadow-2xl">
+        <Modal title="Assistant preferences" onClose={() => setBrainOpen(false)} size="large">
             <header className="flex items-center justify-between px-5 py-3">
               <div className="flex items-center gap-2 text-[14px] font-semibold text-text-primary">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4.5h8M4 8h8M4 11.5h5" /></svg>
@@ -441,8 +439,7 @@ export function CanvasAssistant({ getContext, onCreate, onAnimate, onEdit, onDel
                 </div>
               )}
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-4">

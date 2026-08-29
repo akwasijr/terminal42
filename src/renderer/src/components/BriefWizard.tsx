@@ -9,6 +9,7 @@ import {
 } from '../lib/brief'
 import type { ProjectBrief } from '../../../preload/index'
 import { DECK_TEMPLATES } from '../../../shared/decks/templates'
+import { Modal, ModalHeader, ModalBody, ModalFooter, ModalSteps, ModalButton } from './Modal'
 
 type Props = {
   folderPath: string
@@ -223,14 +224,6 @@ export function BriefWizard({ folderPath, projectId, initial, onCancel, onComple
     if (pageIdx >= pages.length) setPageIdx(pages.length - 1)
   }, [pages, pageIdx])
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onCancel])
-
   const set = <K extends keyof WizardState>(k: K, v: WizardState[K]) =>
     setState((s) => ({ ...s, [k]: v }))
 
@@ -296,21 +289,14 @@ export function BriefWizard({ folderPath, projectId, initial, onCancel, onComple
     true
 
   return (
-    <div
-      className="t42-scrim fixed inset-0 z-[200] grid place-items-center bg-black/60 p-6"
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel() }}
-      role="presentation"
-    >
-      <div className="flex h-[82vh] max-h-[800px] w-[860px] max-w-full flex-col overflow-hidden rounded-xl bg-bg shadow-2xl">
-        <header className="flex items-center gap-6 bg-surface/40 px-6 py-4">
-          <h2 className="flex-shrink-0 text-2xl font-semibold text-text-primary">
-            {PAGE_TITLES[currentPage] ?? ''}
-          </h2>
-          <div className="flex flex-1 items-center justify-end gap-1.5" title={folderPath}>
-            {Array.from({ length: total }).map((_, i) => (
-              <span key={i} className={`h-1.5 rounded-full transition-all ${i === pageIdx ? 'w-8 bg-accent' : i < pageIdx ? 'w-1.5 bg-text-secondary' : 'w-1.5 bg-border'}`} />
-            ))}
-          </div>
+    <Modal title={PAGE_TITLES[currentPage] ?? ''} onClose={onCancel} size="large">
+      <div className="px-5 pt-5" title={folderPath}>
+        <ModalSteps count={total} at={pageIdx} />
+        <p className="mt-3 text-[11px] text-text-muted">Step {pageIdx + 1} of {total}</p>
+      </div>
+      <ModalHeader
+        title={PAGE_TITLES[currentPage] ?? ''}
+        right={
           <button
             onClick={onCancel}
             aria-label="Close"
@@ -321,13 +307,14 @@ export function BriefWizard({ folderPath, projectId, initial, onCancel, onComple
               <path d="M3 3l8 8M11 3l-8 8" />
             </svg>
           </button>
-        </header>
+        }
+      />
 
-        <main className="flex-1 overflow-y-auto px-8 py-8">
-          <div
-            key={currentPage}
-            className={direction === 'forward' ? 'wizard-page-fwd' : 'wizard-page-back'}
-          >
+      <ModalBody>
+        <div
+          key={currentPage}
+          className={direction === 'forward' ? 'wizard-page-fwd' : 'wizard-page-back'}
+        >
           {currentPage === 'type' && <PageType state={state} set={set} />}
           {currentPage === 'subType' && <PageSubType state={state} set={set} />}
           {currentPage === 'surfaces' && <PageSurfaces state={state} set={set} />}
@@ -371,47 +358,24 @@ export function BriefWizard({ folderPath, projectId, initial, onCancel, onComple
           {currentPage === 'data' && <PageData state={state} set={set} />}
           {currentPage === 'final' && <PageFinal state={state} set={set} projectId={projectId} />}
           {currentPage === 'preview' && <PagePreview state={state} projectId={projectId} />}
-          </div>
-        </main>
+        </div>
+      </ModalBody>
 
-        <footer className="flex items-center justify-between bg-surface/40 px-6 py-4">
-          <button
-            onClick={back}
-            disabled={pageIdx === 0 || saving}
-            className="rounded-md px-3 py-2 text-sm text-text-secondary hover:bg-surface disabled:opacity-30 disabled:hover:bg-transparent"
-          >
-            ← Back
-          </button>
-          <div className="text-xs text-text-secondary">{pageIdx + 1} of {total}</div>
-          {isLast ? (
-            <div className="flex gap-2">
-              <button
-                onClick={() => finish(false)}
-                disabled={saving || !state.type}
-                className="rounded-md px-4 py-2 text-sm text-text-secondary hover:bg-surface disabled:opacity-30"
-              >
-                Save without starting
-              </button>
-              <button
-                onClick={() => finish(true)}
-                disabled={saving || !state.type}
-                className="rounded-md bg-action px-4 py-2 text-sm font-medium text-action-text hover:opacity-90 disabled:opacity-30"
-              >
-                {saving ? 'Saving' : 'Save and start with Copilot'}
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={next}
-              disabled={!canAdvance}
-              className="rounded-md bg-action px-4 py-2 text-sm font-medium text-action-text hover:opacity-90 disabled:opacity-30"
-            >
-              {state.type === 'blank' ? 'Create blank project' : 'Next →'}
-            </button>
-          )}
-        </footer>
-      </div>
-    </div>
+      <ModalFooter
+        left={
+          <ModalButton tone="plain" onClick={back} disabled={pageIdx === 0 || saving}>← Back</ModalButton>
+        }
+      >
+        {isLast ? (
+          <>
+            <ModalButton tone="plain" onClick={() => finish(false)} disabled={saving || !state.type}>Save without starting</ModalButton>
+            <ModalButton tone="primary" onClick={() => finish(true)} disabled={saving || !state.type}>{saving ? 'Saving' : 'Save and start with Copilot'}</ModalButton>
+          </>
+        ) : (
+          <ModalButton tone="primary" onClick={next} disabled={!canAdvance}>{state.type === 'blank' ? 'Create blank project' : 'Next →'}</ModalButton>
+        )}
+      </ModalFooter>
+    </Modal>
   )
 }
 

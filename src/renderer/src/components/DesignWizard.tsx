@@ -11,6 +11,7 @@ import {
 import type { DesignBrief, TemplateInfo } from '../../../preload/index'
 import { TokensPicker } from './tokens/TokensPicker'
 import { IconClose } from './icons'
+import { Modal } from './Modal'
 import {
   AI_RULES, AI_RULE_GROUPS, disabledCount, saveGlobalAiRules,
   type AiRuleId
@@ -608,14 +609,6 @@ export function DesignWizard({ onCancel, onComplete, initialIdea, target = 'html
     if (scrollMainRef.current) scrollMainRef.current.scrollTop = 0
   }, [currentPage])
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape' && !creating) onCancel()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onCancel, creating])
-
   const set = <K extends keyof DesignWizardState>(k: K, v: DesignWizardState[K]): void =>
     setState((s) => ({ ...s, [k]: v }))
 
@@ -655,12 +648,14 @@ export function DesignWizard({ onCancel, onComplete, initialIdea, target = 'html
   }
 
   return (
-    <div
-      className="t42-scrim fixed inset-0 z-[200] grid place-items-center bg-black/60 p-6"
-      onMouseDown={(e) => { if (e.target === e.currentTarget && !creating) onCancel() }}
-      role="presentation"
+    <Modal
+      title={currentPage === 'subtype'
+        ? (DESIGN_KINDS.find((k) => k.id === state.kind)?.subtypeLabel ?? PAGE_TITLES[currentPage])
+        : PAGE_TITLES[currentPage]}
+      onClose={() => { if (!creating) onCancel() }}
+      size="large"
     >
-      <div className="relative flex h-[82vh] max-h-[760px] w-[820px] max-w-full flex-col overflow-hidden rounded-xl bg-bg shadow-2xl">
+      <div className="relative flex min-h-0 flex-1 flex-col">
         {/* Header */}
         <header className="flex items-center gap-5 bg-surface/40 px-6 py-4">
           <div className="flex flex-shrink-0 flex-col gap-0.5">
@@ -786,7 +781,7 @@ export function DesignWizard({ onCancel, onComplete, initialIdea, target = 'html
           </div>
         </footer>
       </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -3016,11 +3011,6 @@ function PromptPreviewModal({ brief, onClose }: { brief: NonNullable<ReturnType<
     })()
     return () => { cancelled = true }
   }, [brief])
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
   const charCount = text?.length ?? 0
   const tokenEstimate = Math.round(charCount / 4)
   const copy = async (): Promise<void> => {
@@ -3032,14 +3022,7 @@ function PromptPreviewModal({ brief, onClose }: { brief: NonNullable<ReturnType<
     } catch {}
   }
   return (
-    <div
-      className="t42-scrim fixed inset-0 z-50 grid place-items-center bg-black/60 p-6"
-      onClick={onClose}
-    >
-      <div
-        className="flex h-[80vh] w-[760px] max-w-full flex-col overflow-hidden rounded-xl bg-bg shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Modal title="Prompt preview" onClose={onClose} size="large">
         <header className="flex items-center gap-3 bg-surface/40 px-5 py-3">
           <h3 className="text-[14px] font-semibold text-text-primary">Prompt preview</h3>
           <span className="rounded-full bg-elevated/60 px-2 py-0.5 text-[10.5px] tabular-nums text-text-muted">
@@ -3072,8 +3055,7 @@ function PromptPreviewModal({ brief, onClose }: { brief: NonNullable<ReturnType<
             </pre>
           )}
         </main>
-      </div>
-    </div>
+    </Modal>
   )
 }
 

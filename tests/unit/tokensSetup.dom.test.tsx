@@ -24,13 +24,13 @@ describe('the new token library wizard', () => {
   it('opens on a question rather than a wall of cards', () => {
     open()
     expect(screen.getByText('Where should it start?')).toBeTruthy()
-    expect(screen.getByText('Step 1 of 8')).toBeTruthy()
+    expect(screen.getByText('Step 1 of 10')).toBeTruthy()
   })
 
   it('asks about every decision that changes the library', () => {
     open()
     const asked: string[] = []
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 9; i++) {
       asked.push(screen.getByRole('heading', { level: 2 }).textContent ?? '')
       next()
     }
@@ -38,6 +38,8 @@ describe('the new token library wizard', () => {
     expect(asked).toEqual([
       'Where should it start?',
       'What is the brand colour?',
+      'What sits beside it?',
+      'What do good and bad look like?',
       'How round are things?',
       'How much air is there?',
       'How far apart are the type sizes?',
@@ -58,9 +60,11 @@ describe('the new token library wizard', () => {
   it('carries the answers into the library it builds', () => {
     const made = vi.fn()
     open(made)
-    // colour
+    // brand colour
     next()
     act(() => { fireEvent.change(screen.getByLabelText('Brand colour hex'), { target: { value: '#1166ee' } }) })
+    // supporting colours, then the four that mean something
+    next(); next()
     // corners
     next()
     act(() => { fireEvent.click(screen.getByRole('button', { name: /Pill/ })) })
@@ -86,7 +90,7 @@ describe('the new token library wizard', () => {
     open()
     // The running preview names the library, so changing the name on the last
     // step has to show up there rather than only on Build.
-    for (let i = 0; i < 7; i++) next()
+    for (let i = 0; i < 9; i++) next()
     act(() => { fireEvent.change(screen.getByLabelText('Name this library'), { target: { value: 'Harbour' } }) })
     expect(screen.getAllByText('Harbour').length).toBeGreaterThan(0)
   })
@@ -96,5 +100,32 @@ describe('the new token library wizard', () => {
     open(made)
     act(() => { fireEvent.click(screen.getByRole('button', { name: 'Start empty' })) })
     expect(made).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('the colours a library is actually made of', () => {
+  it('carries the accent and the four meaning colours into the tokens', () => {
+    const made = vi.fn()
+    open(made)
+    next() // brand
+    act(() => { fireEvent.change(screen.getByLabelText('Brand colour hex'), { target: { value: '#1166ee' } }) })
+    next() // supporting
+    act(() => { fireEvent.change(screen.getByLabelText('Accent hex'), { target: { value: '#ff8800' } }) })
+    next() // meaning
+    act(() => { fireEvent.change(screen.getByLabelText('Wrong hex'), { target: { value: '#990000' } }) })
+    for (let i = 0; i < 6; i++) next()
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Build' })) })
+
+    const studio = made.mock.calls[0][0] as TokenStudio
+    const value = (name: string): unknown =>
+      studio.sets.flatMap((s) => s.tokens).find((t) => t.path === name)?.value
+
+    // The anchor step is where the given colour lands on its own ramp, so
+    // these are the swatches that must be exactly what was typed.
+    expect(value('palette.brand.600')).toBe('#1166ee')
+    expect(value('palette.accent.600')).toBe('#ff8800')
+    expect(value('palette.danger.600')).toBe('#990000')
+    // Untouched roles keep the convention rather than following the brand.
+    expect(value('palette.success.600')).toBe('#16a34a')
   })
 })

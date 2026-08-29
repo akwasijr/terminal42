@@ -6,6 +6,7 @@ import { DS_CATEGORIES, DS_COMPONENTS } from './dsComponents'
 import { DsIcon, ICON_SAMPLE, iconSnippet } from './dsIcons'
 import { studioFromDesignSystem } from '../lib/tokens/fromDesignSystem'
 import { tokenLibrariesChanged } from '../lib/tokens/useTokenLibraries'
+import { Modal, ModalHeader, ModalBody, ModalFooter } from './Modal'
 
 function fontStack(name: string): string {
   return FONT_OPTIONS.find((f) => f.id === name)?.stack ?? `'${name}', system-ui, sans-serif`
@@ -584,16 +585,16 @@ export function DesignSystemView({ openSystemId, onConsumeOpen }: { openSystemId
 
       {wizardEl}
       {confirmDel && (
-        <div className="t42-scrim fixed inset-0 z-[200] grid place-items-center bg-black/60 p-6" onMouseDown={(e) => { if (e.target === e.currentTarget) setConfirmDel(false) }} role="presentation">
-          <div className="w-[380px] max-w-full rounded-xl bg-bg p-5 shadow-2xl">
-            <h3 className="text-[15px] font-semibold text-text-primary">Delete this design system?</h3>
-            <p className="mt-1.5 text-[12.5px] leading-relaxed text-text-muted">“{s.name}” and its documentation will be removed. This cannot be undone.</p>
-            <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => setConfirmDel(false)} className="rounded-md px-3 py-1.5 text-[12.5px] text-text-secondary hover:bg-elevated">Cancel</button>
-              <button type="button" onClick={() => { setSystems(deleteSystem(s.id)); setConfirmDel(false); setOpenId(null) }} className="rounded-md bg-error px-3 py-1.5 text-[12.5px] font-medium text-white hover:opacity-90">Delete</button>
-            </div>
-          </div>
-        </div>
+        <Modal title="Delete this design system?" onClose={() => setConfirmDel(false)} size="small">
+          <ModalHeader title="Delete this design system?" />
+          <ModalBody>
+            <p className="text-[12.5px] leading-relaxed text-text-muted">“{s.name}” and its documentation will be removed. This cannot be undone.</p>
+          </ModalBody>
+          <ModalFooter>
+            <button type="button" onClick={() => setConfirmDel(false)} className="rounded-md px-3 py-1.5 text-[12.5px] text-text-secondary hover:bg-elevated">Cancel</button>
+            <button type="button" onClick={() => { setSystems(deleteSystem(s.id)); setConfirmDel(false); setOpenId(null) }} className="rounded-md bg-error px-3 py-1.5 text-[12.5px] font-medium text-white hover:opacity-90">Delete</button>
+          </ModalFooter>
+        </Modal>
       )}
     </div>
   )

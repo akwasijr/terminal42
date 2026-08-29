@@ -6,6 +6,7 @@ import {
 import { AI_RULE_GROUPS, type AiRuleId } from '../lib/aiRules'
 import { FONT_OPTIONS } from '../lib/brief'
 import { DsIcon } from './dsIcons'
+import { Modal, ModalHeader, ModalBody, ModalFooter, ModalSteps, ModalButton } from './Modal'
 
 function fontStack(name: string): string {
   return FONT_OPTIONS.find((f) => f.id === name)?.stack ?? `'${name}', system-ui, sans-serif`
@@ -366,14 +367,18 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
   const needsScreenshotDecision = (a.shots?.length ?? 0) > 0 && !visionApplied && !analysisSkipped
 
   return (
-    <div className="t42-scrim fixed inset-0 z-[200] grid place-items-center bg-black/60 p-6" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onCancel() }} role="presentation">
-      <div className="relative flex h-[82vh] max-h-[760px] w-[820px] max-w-full flex-col overflow-hidden rounded-xl bg-bg shadow-2xl">
-        <header className="flex items-center gap-5 bg-surface/40 px-6 py-4">
-          <h2 className="text-[18px] font-semibold text-text-primary">{TITLES[page]}</h2>
-          <span className="flex-shrink-0 rounded-full bg-elevated/60 px-2 py-0.5 text-[11px] font-medium tabular-nums text-text-muted">{idx + 1} / {PAGES.length}</span>
-          <div className="flex flex-1" />
-          <button onClick={onCancel} disabled={busy} aria-label="Close" title="Close" className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-md text-text-secondary hover:bg-surface hover:text-text-primary disabled:opacity-30"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M3 3l8 8M11 3l-8 8" /></svg></button>
-        </header>
+    <Modal title={TITLES[page]} onClose={() => { if (!busy) onCancel() }} size="large">
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <div className="px-5 pt-5">
+          <ModalSteps count={PAGES.length} at={idx} />
+          <p className="mt-3 text-[11px] text-text-muted">Step {idx + 1} of {PAGES.length}</p>
+        </div>
+        <ModalHeader
+          title={TITLES[page]}
+          right={
+            <button onClick={onCancel} disabled={busy} aria-label="Close" title="Close" className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-md text-text-secondary hover:bg-surface hover:text-text-primary disabled:opacity-30"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M3 3l8 8M11 3l-8 8" /></svg></button>
+          }
+        />
 
         {busy && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-bg/90 backdrop-blur-sm" role="status" aria-live="polite">
@@ -386,7 +391,7 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
           </div>
         )}
 
-        <main className="flex-1 overflow-y-auto px-7 py-6">
+        <ModalBody>
           {page === 'style' && (
             <div className="space-y-5">
               <div>
@@ -573,15 +578,17 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
               </div>
             </div>
           )}
-        </main>
+        </ModalBody>
 
-        <footer className="flex items-center justify-between bg-surface/40 px-6 py-3.5">
-          <button onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0 || busy} className="rounded-md px-3 py-1.5 text-[13px] text-text-secondary hover:bg-surface disabled:opacity-30 disabled:hover:bg-transparent">← Back</button>
-          <div className="flex-1" />
+        <ModalFooter
+          left={
+            <ModalButton tone="plain" onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0 || busy}>← Back</ModalButton>
+          }
+        >
           {isLast && needsScreenshotDecision && <span className="mr-3 text-[11.5px] text-text-muted">Finish screenshot analysis or skip it first.</span>}
-          <button onClick={() => { if (isLast) void handleGenerate(); else setIdx((i) => i + 1) }} disabled={busy || (isLast && needsScreenshotDecision)} className="rounded-md bg-action px-4 py-1.5 text-[13px] font-medium text-action-text hover:opacity-90 disabled:opacity-50">{isLast ? 'Generate' : 'Next →'}</button>
-        </footer>
+          <ModalButton tone="primary" onClick={() => { if (isLast) void handleGenerate(); else setIdx((i) => i + 1) }} disabled={busy || (isLast && needsScreenshotDecision)}>{isLast ? 'Generate' : 'Next →'}</ModalButton>
+        </ModalFooter>
       </div>
-    </div>
+    </Modal>
   )
 }

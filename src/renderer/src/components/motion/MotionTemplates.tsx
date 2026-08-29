@@ -21,6 +21,7 @@ import { drawPresetThumb } from '../../lib/motion/thumb'
 import { ensureTextFonts, requestTextFonts } from '../../lib/motion/fonts'
 import { fontByLabel } from '../../lib/freeformTypes'
 import { IconClose } from '../icons'
+import { Modal, ModalHeader, ModalBody } from '../Modal'
 
 /** The tile's own shape, which every frame is fitted inside. */
 const TILE_RATIO = 16 / 10
@@ -48,49 +49,30 @@ export function MotionTemplates({
     return () => { alive = false }
   }, [])
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
-
   return (
-    // A scrim and a panel, not a takeover. Filling the window edge to edge
-    // left nothing to say the app was still behind it, so picking a template
-    // felt like leaving Motion rather than reaching into a drawer.
-    <div
-      className="t42-scrim fixed inset-0 z-40 grid place-items-center bg-black/40 p-6 backdrop-blur-sm"
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Motion templates"
-        className="flex max-h-[82vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-bg shadow-overlay"
-      >
-      <header className="flex flex-shrink-0 items-center justify-between gap-4 px-6 pb-4 pt-6">
-        <div>
-          <h2 className="text-[17px] font-semibold text-text-primary">Templates</h2>
-          <p className="mt-0.5 text-[12px] text-text-muted">Finished pieces to start from. Everything stays editable.</p>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close templates"
-          className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-md text-text-muted transition-colors hover:bg-elevated hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-        >
-          <IconClose size={12} />
-        </button>
-      </header>
-      <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">
+    <Modal title="Motion templates" onClose={onClose} size="xlarge">
+      <ModalHeader
+        title="Templates"
+        note="Finished pieces to start from. Everything stays editable."
+        right={
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close templates"
+            className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-md text-text-muted transition-colors hover:bg-elevated hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+          >
+            <IconClose size={12} />
+          </button>
+        }
+      />
+      <ModalBody>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {MOTION_TEMPLATES.map((t) => (
             <TemplateTile key={t.id} template={t} onPick={() => onPick(t)} fontsReady={fontsReady} />
           ))}
         </div>
-      </div>
-      </div>
-    </div>
+      </ModalBody>
+    </Modal>
   )
 }
 

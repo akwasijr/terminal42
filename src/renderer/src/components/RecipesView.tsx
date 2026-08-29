@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Recipe, RecipeSchedule } from '../../../preload/index'
 import { IconPlay, IconRefresh, IconClock, IconTrash, IconClose } from './icons'
+import { Modal, ModalHeader, ModalBody } from './Modal'
 
 function formatNext(ts: number): string {
   const d = new Date(ts)
@@ -195,17 +196,11 @@ function ScheduleDialog({
   }
 
   return (
-    <div
-      className="t42-scrim fixed inset-0 z-[60] grid place-items-center bg-black/40"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
-      onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}
-    >
-      <div className="w-[420px] rounded-md bg-surface p-4 shadow-md">
-        <div className="mb-3 flex items-start justify-between">
-          <div>
-            <div className="text-[13px] font-semibold text-text-primary">Schedule</div>
-            <div className="text-[12px] text-text-secondary">{recipe.name}</div>
-          </div>
+    <Modal title="Schedule" onClose={onClose} size="small">
+      <ModalHeader
+        title="Schedule"
+        note={recipe.name}
+        right={
           <button
             type="button"
             onClick={onClose}
@@ -214,8 +209,9 @@ function ScheduleDialog({
           >
             <IconClose size={11} />
           </button>
-        </div>
-
+        }
+      />
+      <ModalBody>
         <div className="mb-3 grid grid-cols-3 gap-1 rounded-md bg-bg p-1 text-[12px]">
           {(['daily', 'weekdays', 'interval'] as const).map((k) => (
             <button
@@ -316,7 +312,7 @@ function ScheduleDialog({
             </ul>
           </div>
         )}
-      </div>
-    </div>
+      </ModalBody>
+    </Modal>
   )
 }

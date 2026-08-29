@@ -14,7 +14,8 @@
  * make one, which a menu that renders nothing could never do.
  */
 
-import { useEffect, useState, type JSX } from 'react'
+import { useState, type JSX } from 'react'
+import { Modal, ModalHeader, ModalBody, ModalFooter } from '../Modal'
 import { resolveAll } from '../../../../shared/tokens/resolve'
 import { countTokens } from '../../../../shared/tokens/types'
 import { sectionOf, SECTIONS, type SectionId } from '../../../../shared/tokens/groups'
@@ -67,30 +68,12 @@ function Shell({
   children: React.ReactNode
   footer?: React.ReactNode
 }): JSX.Element {
-  useEffect(() => {
-    const esc = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', esc)
-    return () => document.removeEventListener('keydown', esc)
-  }, [onClose])
-
   return (
-    <div
-      className="fixed inset-0 z-[60] grid place-items-center bg-black/55 p-6"
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
-    >
-      <div className="max-h-[86vh] w-full max-w-2xl overflow-y-auto rounded-panel bg-surface p-5">
-        <div className="mb-4 flex items-start gap-3">
-          <div className="min-w-0 flex-1">
-            <h2 className="text-[15px] font-medium text-text-primary">{title}</h2>
-            {note ? <p className="mt-0.5 text-[12px] text-text-muted">{note}</p> : null}
-          </div>
+    <Modal title={title} onClose={onClose} size="medium">
+      <ModalHeader
+        title={title}
+        note={note}
+        right={
           <button
             type="button"
             onClick={onClose}
@@ -101,11 +84,11 @@ function Shell({
               <path d="M4 4l8 8M12 4l-8 8" />
             </svg>
           </button>
-        </div>
-        {children}
-        {footer ? <div className="mt-5">{footer}</div> : null}
-      </div>
-    </div>
+        }
+      />
+      <ModalBody>{children}</ModalBody>
+      {footer ? <ModalFooter>{footer}</ModalFooter> : null}
+    </Modal>
   )
 }
 

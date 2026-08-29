@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import type { Skill } from '../../../preload/index'
 import { STARTER_PACK, DOMAIN_LABEL, DOMAIN_DESCRIPTION, DOMAIN_ORDER, type StarterSkill, type SkillDomain } from './starterPack'
 import { IconClose, IconCheck, IconChat, IconUser, IconCode, IconWorkflow, IconChevronRight } from './icons'
+import { Modal, ModalHeader, ModalFooter } from './Modal'
 
 const FORMAT_LABEL: Record<StarterSkill['format'], string> = {
   prompt: 'Prompt',
@@ -90,24 +91,12 @@ export function StarterPackModal({
   ).length
 
   return (
-    <div className="t42-scrim fixed inset-0 z-[100] grid place-items-center bg-black/50 p-6" onClick={onClose} role="presentation">
-      <div
-        className="flex h-[82vh] w-[1000px] max-w-full flex-col overflow-hidden rounded-lg bg-bg shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-labelledby="starter-pack-title"
-      >
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 px-6 py-4">
-          <div>
-            <h2 id="starter-pack-title" className="text-[16px] font-semibold text-text-primary">
-              Starter pack
-            </h2>
-            <p className="mt-1 text-[12px] text-text-muted">
-              Curated skills grouped by domain. {totalNew} new · {STARTER_PACK.length - totalNew} already installed.
-              Pick what you want: edit, rescope, or delete them later.
-            </p>
-          </div>
+    <Modal title="Starter pack" onClose={onClose} size="xlarge" labelledBy="starter-pack-title">
+      <ModalHeader
+        title="Starter pack"
+        id="starter-pack-title"
+        note={`Curated skills grouped by domain. ${totalNew} new · ${STARTER_PACK.length - totalNew} already installed. Pick what you want: edit, rescope, or delete them later.`}
+        right={
           <button
             type="button"
             onClick={onClose}
@@ -116,11 +105,12 @@ export function StarterPackModal({
           >
             <IconClose size={12} />
           </button>
-        </div>
+        }
+      />
 
-        {/* Body: domain list + preview */}
-        <div className="flex flex-1 overflow-hidden">
-          <div className="flex w-[440px] shrink-0 flex-col overflow-y-auto">
+      {/* Body: domain list + preview */}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <div className="flex w-[440px] shrink-0 flex-col overflow-y-auto">
             {groupedByDomain.map(([domain, items]) => {
               const isCollapsed = collapsed.has(domain)
               const eligible = items.filter((it) => !existingNames.has(it.name.toLowerCase()))
@@ -246,36 +236,35 @@ export function StarterPackModal({
               </div>
             )}
           </div>
-        </div>
+      </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between gap-3 px-6 py-3">
+      <ModalFooter
+        left={
           <span className="text-[12px] text-text-muted">
             {selectedNew} new selected · {selected.size} total selected
           </span>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-md px-3 py-1.5 text-[12px] text-text-secondary hover:bg-elevated hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={() => void install()}
-              disabled={selectedNew === 0 || installing}
-              className="flex items-center gap-1.5 rounded-md bg-action px-3 py-1.5 text-[12px] font-medium text-action-text disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
-            >
-              {installing ? 'Installing…' : (
-                <>
-                  <IconCheck size={12} /> Install {selectedNew} skill{selectedNew === 1 ? '' : 's'}
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+        }
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-md px-3 py-1.5 text-[12px] text-text-secondary hover:bg-elevated hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={() => void install()}
+          disabled={selectedNew === 0 || installing}
+          className="flex items-center gap-1.5 rounded-md bg-action px-3 py-1.5 text-[12px] font-medium text-action-text disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
+        >
+          {installing ? 'Installing…' : (
+            <>
+              <IconCheck size={12} /> Install {selectedNew} skill{selectedNew === 1 ? '' : 's'}
+            </>
+          )}
+        </button>
+      </ModalFooter>
+    </Modal>
   )
 }

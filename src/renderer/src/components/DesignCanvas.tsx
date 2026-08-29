@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import type { Design, DesignVersion } from '../../../preload/index'
 import { IconBrain, IconChat, IconCheck, IconChevronRight, IconClose, IconDesktop, IconDownload, IconEdit, IconExternal, IconFluid, IconFolder, IconMobile, IconRefresh, IconSparkle, IconTablet } from './icons'
 import { PencilThinking, pickAnimationForKind } from './PencilThinking'
+import { Modal } from './Modal'
 import { MotionTimeline } from './MotionTimeline'
 import { MOTION_PRESETS, presetSpec, generateMotionCss, type MotionSpec } from '../lib/motionCss'
 import { SHADER_PRESETS, buildShaderScript, type ShaderConfig, type ShaderId } from '../lib/shaderAssets'
@@ -1832,23 +1833,13 @@ function FigmaSendDialog({ designTitle: _designTitle, onCancel, onSend }: {
   const urlValid = !trimmedUrl || /figma\.com\/(design|file|board|proto)\/[A-Za-z0-9]{8,40}/i.test(trimmedUrl)
   const canSend = mode === 'newFile' || (urlValid && trimmedUrl.length > 0)
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') onCancel() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onCancel])
-
   const submit = (): void => {
     if (!canSend) return
     onSend(mode === 'existingFile' ? { mode, fileUrl: trimmedUrl } : { mode })
   }
 
   return (
-    <div
-      className="t42-scrim fixed inset-0 z-[150] grid place-items-center bg-black/50 p-6"
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel() }}
-    >
-      <div className="w-[440px] max-w-full overflow-hidden rounded-xl bg-raised shadow-overlay">
+    <Modal title="Send to Figma" onClose={onCancel} size="small">
         <header className="flex items-center justify-between gap-3 px-5 pb-1 pt-4">
           <div className="flex items-center gap-2">
             <FigmaPill />
@@ -1917,8 +1908,7 @@ function FigmaSendDialog({ designTitle: _designTitle, onCancel, onSend }: {
             Send to Figma
           </button>
         </footer>
-      </div>
-    </div>
+    </Modal>
   )
 }
 

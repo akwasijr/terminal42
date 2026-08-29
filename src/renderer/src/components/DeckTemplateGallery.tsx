@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { JSX } from 'react'
 import { DECK_TEMPLATES, type DeckTemplate } from '../../../shared/decks/templates'
+import { Modal } from './Modal'
 
 /**
  * The deck templates, shown under Decks.
@@ -201,62 +202,42 @@ function TemplateDetail({
   onUse: () => void
   onClose: () => void
 }): JSX.Element {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
   return (
-    <div
-      role="presentation"
-      onClick={onClose}
-      className="t42-scrim fixed inset-0 z-50 grid place-items-center bg-black/40 p-6"
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={t.name}
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[560px] overflow-hidden rounded-2xl bg-surface"
-      >
-        <div className="relative aspect-[16/9] w-full overflow-hidden">
-          <CoverPreview t={t} />
+    <Modal title={t.name} onClose={onClose} size="medium">
+      <div className="relative aspect-[16/9] w-full overflow-hidden">
+        <CoverPreview t={t} />
+      </div>
+      <div className="px-5 py-4">
+        <div className="flex items-baseline gap-2">
+          <h2 className="text-[15px] font-semibold text-text-primary">{t.name}</h2>
+          <span className="text-[12px] text-text-muted">{t.source}</span>
         </div>
-        <div className="px-5 py-4">
-          <div className="flex items-baseline gap-2">
-            <h2 className="text-[15px] font-semibold text-text-primary">{t.name}</h2>
-            <span className="text-[12px] text-text-muted">{t.source}</span>
-          </div>
-          <ul className="mt-3 space-y-1.5">
-            {t.moves.map((m) => (
-              <li key={m} className="flex gap-2 text-[12.5px] leading-snug text-text-secondary">
-                <span aria-hidden="true" className="mt-[7px] h-[3px] w-[3px] shrink-0 rounded-full bg-text-muted" />
-                {m}
-              </li>
-            ))}
-          </ul>
-          <div className="mt-4 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-md px-3 py-1.5 text-[12.5px] text-text-secondary hover:text-text-primary"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={onUse}
-              className="rounded-md bg-text-primary px-3 py-1.5 text-[12.5px] font-medium text-bg"
-            >
-              Use this template
-            </button>
-          </div>
+        <ul className="mt-3 space-y-1.5">
+          {t.moves.map((m) => (
+            <li key={m} className="flex gap-2 text-[12.5px] leading-snug text-text-secondary">
+              <span aria-hidden="true" className="mt-[7px] h-[3px] w-[3px] shrink-0 rounded-full bg-text-muted" />
+              {m}
+            </li>
+          ))}
+        </ul>
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md px-3 py-1.5 text-[12.5px] text-text-secondary hover:text-text-primary"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onUse}
+            className="rounded-md bg-text-primary px-3 py-1.5 text-[12.5px] font-medium text-bg"
+          >
+            Use this template
+          </button>
         </div>
       </div>
-    </div>
+    </Modal>
   )
 }
 

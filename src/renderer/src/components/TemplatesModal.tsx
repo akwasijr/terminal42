@@ -8,7 +8,6 @@
 // Picking fills the composer rather than sending, matching the tiles: these
 // are starting points to edit, not commands.
 
-import { useEffect, useRef } from 'react'
 import {
   STARTER_IDS,
   STARTER_POOL,
@@ -16,6 +15,7 @@ import {
   type StarterPromptText
 } from './starterPrompts'
 import { STARTER_ART } from './starterArt'
+import { Modal, ModalHeader, ModalBody } from './Modal'
 
 export function TemplatesModal({
   onPick,
@@ -24,46 +24,26 @@ export function TemplatesModal({
   onPick: (prompt: string) => void
   onClose: () => void
 }): JSX.Element {
-  const dialogRef = useRef<HTMLDivElement | null>(null)
-
-  // Escape closes, and focus moves into the dialog so the keyboard lands
-  // somewhere useful instead of staying on the button behind the overlay.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', onKey)
-    dialogRef.current?.focus()
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
-
   return (
-    <div
-      className="t42-scrim fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-6"
-      onClick={onClose}
-    >
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Templates"
-        tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[80vh] w-full max-w-3xl flex-col gap-5 overflow-y-auto rounded-2xl bg-bg p-6 shadow-xl focus:outline-none"
-      >
-        <h2 className="text-[15px] font-medium text-text-primary">Templates</h2>
-        {STARTER_IDS.map((kind) => (
-          <section key={kind} className="flex flex-col gap-2.5">
-            <h3 className="text-[12px] text-text-muted">{STARTER_GROUP_LABELS[kind]}</h3>
-            <ul className="grid gap-3 sm:grid-cols-3">
-              {STARTER_POOL[kind].map((t) => (
-                <li key={t.title} className="contents">
-                  <TemplateCard template={t} onPick={onPick} />
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))}
-      </div>
-    </div>
+    <Modal title="Templates" onClose={onClose} size="large">
+      <ModalHeader title="Templates" />
+      <ModalBody>
+        <div className="flex flex-col gap-5">
+          {STARTER_IDS.map((kind) => (
+            <section key={kind} className="flex flex-col gap-2.5">
+              <h3 className="text-[12px] text-text-muted">{STARTER_GROUP_LABELS[kind]}</h3>
+              <ul className="grid gap-3 sm:grid-cols-3">
+                {STARTER_POOL[kind].map((t) => (
+                  <li key={t.title} className="contents">
+                    <TemplateCard template={t} onPick={onPick} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      </ModalBody>
+    </Modal>
   )
 }
 

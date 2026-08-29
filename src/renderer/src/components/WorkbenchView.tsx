@@ -6,6 +6,7 @@ import {
   IconPlus, IconClose, IconTerminal, IconChat, IconUser, IconCode, IconWorkflow,
   IconSearch, IconTrash, IconClock, IconPlay, IconRefresh
 } from './icons'
+import { Modal, ModalHeader, ModalBody, ModalFooter } from './Modal'
 
 type FilterKind = 'all' | 'skill' | 'recipe' | 'starter'
 type Entry =
@@ -494,46 +495,39 @@ function StarterPreview({
   const dirty = body !== starter.body
   const reset = () => setBody(starter.body)
   return (
-    <div
-      className="t42-scrim fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-6"
-      onClick={onClose}
-    >
-      <div
-        role="dialog"
-        aria-label={starter.name}
-        className="flex h-[78vh] w-full max-w-[760px] flex-col overflow-hidden rounded-2xl bg-raised/95 shadow-overlay"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="flex shrink-0 items-center justify-between gap-3 px-6 py-4">
-          <h2 className="truncate text-[16px] font-semibold leading-tight text-text-primary">{starter.name}</h2>
-          <div className="flex items-center gap-3 text-[12.5px]">
-            <button
-              type="button"
-              onClick={reset}
-              disabled={!dirty}
-              className="text-text-muted hover:text-text-secondary disabled:cursor-default disabled:opacity-40"
-            >
-              Clear
-            </button>
-            <span title={starter.description} className="grid h-5 w-5 cursor-help place-items-center rounded-full text-text-muted">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 16v-4" />
-                <path d="M12 8h.01" />
-              </svg>
-            </span>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close"
-              className="grid h-7 w-7 place-items-center rounded-md text-text-secondary hover:bg-bg/40 hover:text-text-primary"
-            >
-              <IconClose size={13} />
-            </button>
-          </div>
-        </header>
+    <Modal title={starter.name} onClose={onClose} size="large">
+        <ModalHeader
+          title={starter.name}
+          right={
+            <div className="flex items-center gap-3 text-[12.5px]">
+              <button
+                type="button"
+                onClick={reset}
+                disabled={!dirty}
+                className="text-text-muted hover:text-text-secondary disabled:cursor-default disabled:opacity-40"
+              >
+                Clear
+              </button>
+              <span title={starter.description} className="grid h-5 w-5 cursor-help place-items-center rounded-full text-text-muted">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 16v-4" />
+                  <path d="M12 8h.01" />
+                </svg>
+              </span>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close"
+                className="grid h-7 w-7 place-items-center rounded-md text-text-secondary hover:bg-bg/40 hover:text-text-primary"
+              >
+                <IconClose size={13} />
+              </button>
+            </div>
+          }
+        />
 
-        <div className="flex-1 overflow-y-auto px-6">
+        <div className="min-h-0 flex-1 overflow-y-auto px-6">
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
@@ -544,17 +538,19 @@ function StarterPreview({
           />
         </div>
 
-        <footer className="flex shrink-0 items-center justify-between gap-3 px-6 py-3.5">
-          <div className="flex items-center gap-1 text-[12px] text-text-secondary">
-            <Chip>
-              <Icon size={11} className={tint} />
-              {FORMAT_LABEL[starter.format]}
-            </Chip>
-            {starter.tags.slice(0, 3).map((t) => (
-              <Chip key={t}>#{t}</Chip>
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
+        <ModalFooter
+          left={
+            <div className="flex items-center gap-1 text-[12px] text-text-secondary">
+              <Chip>
+                <Icon size={11} className={tint} />
+                {FORMAT_LABEL[starter.format]}
+              </Chip>
+              {starter.tags.slice(0, 3).map((t) => (
+                <Chip key={t}>#{t}</Chip>
+              ))}
+            </div>
+          }
+        >
             <button
               type="button"
               onClick={onClose}
@@ -580,10 +576,8 @@ function StarterPreview({
             >
               {installing ? 'Adding…' : 'Add'}
             </button>
-          </div>
-        </footer>
-      </div>
-    </div>
+        </ModalFooter>
+    </Modal>
   )
 }
 
@@ -860,18 +854,16 @@ function ScheduleDialog({
   }
 
   return (
-    <div
-      className="t42-scrim fixed inset-0 z-[60] grid place-items-center bg-black/40"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div className="w-[440px] rounded-lg bg-bg p-5 shadow-xl">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-[14px] font-semibold text-text-primary">Schedule “{skill.name}”</h3>
+    <Modal title={`Schedule "${skill.name}"`} onClose={onClose} size="small">
+      <ModalHeader
+        title={`Schedule “${skill.name}”`}
+        right={
           <button type="button" onClick={onClose} aria-label="Close" className="text-text-muted hover:text-text-primary">
             <IconClose size={11} />
           </button>
-        </div>
-
+        }
+      />
+      <ModalBody>
         {!recipeId ? (
           <div className="text-[12px] text-text-muted">Save the recipe first to enable scheduling.</div>
         ) : (
@@ -965,7 +957,7 @@ function ScheduleDialog({
             )}
           </>
         )}
-      </div>
-    </div>
+      </ModalBody>
+    </Modal>
   )
 }

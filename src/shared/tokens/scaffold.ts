@@ -29,6 +29,24 @@ export type Feel = {
   scale: 'compact' | 'balanced' | 'expressive'
   /** Whether anything lifts off the page. */
   elevation: 'flat' | 'subtle' | 'elevated'
+  /**
+   * The four colours that mean something rather than look like something.
+   * They were hard-coded until it became clear that a library which cannot
+   * say what its own error red is has not really been configured. Optional,
+   * because the defaults are right far more often than not.
+   */
+  semantic?: Partial<Record<SemanticRole, string>>
+}
+
+/** Colours that carry a meaning, so they are chosen against convention. */
+export type SemanticRole = 'success' | 'warning' | 'danger' | 'info'
+
+/** What those roles are when nobody has said otherwise. */
+export const SEMANTIC_DEFAULTS: Record<SemanticRole, string> = {
+  success: '#16a34a',
+  warning: '#d97706',
+  danger: '#dc2626',
+  info: '#2563eb'
 }
 
 const RAMP = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950] as const
@@ -59,8 +77,15 @@ const SCALE_RATIO: Record<Feel['scale'], number> = {
 
 const SHADE_STEPS = ['none', 'sm', 'md', 'lg', 'xl'] as const
 
-/** The five steps a ramp gets when it is a supporting colour, not a lead. */
-const SHORT = [100, 300, 500, 700, 900] as const
+/**
+ * The five steps a ramp gets when it is a supporting colour, not a lead.
+ *
+ * The middle step is the anchor, not 500. It used to be 500, which meant the
+ * accent someone actually chose appeared nowhere in their own library — every
+ * swatch was a shade of it and none of them was it. Nothing aliases the fifth
+ * step of a short ramp, so moving it costs nothing.
+ */
+const SHORT = [100, 300, ANCHOR, 700, 900] as const
 
 function clamp(n: number, lo: number, hi: number): number {
   return n < lo ? lo : n > hi ? hi : n
@@ -149,12 +174,13 @@ function palette(feel: Feel): Token[] {
     const r = ramp(hex)
     for (const step of RAMP) out.push(tok(`palette.${name}.${step}`, 'color', 'primitive', r[step]))
   }
+  const semantic = { ...SEMANTIC_DEFAULTS, ...(feel.semantic ?? {}) }
   for (const [name, hex] of [
     ['accent', feel.secondary],
-    ['success', '#16a34a'],
-    ['warning', '#d97706'],
-    ['danger', '#dc2626'],
-    ['info', '#2563eb']
+    ['success', semantic.success],
+    ['warning', semantic.warning],
+    ['danger', semantic.danger],
+    ['info', semantic.info]
   ] as const) {
     const r = ramp(hex)
     for (const step of SHORT) out.push(tok(`palette.${name}.${step}`, 'color', 'primitive', r[step]))
