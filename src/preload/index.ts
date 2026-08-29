@@ -529,6 +529,12 @@ export type ProjectBrief = {
   outline?: 'none' | 'subtle' | 'strong'
   theme?: 'light' | 'dark' | 'auto' | 'both'
   surfaces?: string[]   // e.g. ['mobile','desktop']: target form factors
+  // Slide decks only. A deck template already decides the look, the type and
+  // the shape of a slide, so a deck is asked about the things a template
+  // cannot know: which template, how long it runs, and what it has to land.
+  deckTemplate?: string
+  deckLength?: string
+  deckArc?: string
   stack?: string
   language?: string
   auth?: string

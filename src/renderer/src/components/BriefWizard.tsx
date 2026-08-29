@@ -3,10 +3,12 @@ import {
   PROJECT_TYPES, SUB_TYPES_BY_TYPE, SURFACE_OPTIONS, AUDIENCE_OPTIONS, LOOK_OPTIONS, BRAND_SWATCHES, FONT_OPTIONS,
   ICON_LIBRARY_OPTIONS, IMAGE_SOURCE_OPTIONS, MOTION_OPTIONS, DESIGN_SYSTEM_OPTIONS, DATA_BACKEND_OPTIONS,
   THEME_OPTIONS, RADIUS_STEPS, SHADOW_STEPS, OUTLINE_STEPS, STACK_BY_TYPE, LANGUAGE_OPTIONS,
-  AUTH_OPTIONS, STORE_OPTIONS, DEPLOY_OPTIONS, emptyWizard, buildKickoffPrompt,
+  AUTH_OPTIONS, STORE_OPTIONS, DEPLOY_OPTIONS, DECK_LENGTH_OPTIONS, DECK_ARC_OPTIONS,
+  emptyWizard, buildKickoffPrompt,
   type WizardState, type ProjectTypeId, type Branch
 } from '../lib/brief'
 import type { ProjectBrief } from '../../../preload/index'
+import { DECK_TEMPLATES } from '../../../shared/decks/templates'
 
 type Props = {
   folderPath: string
@@ -88,12 +90,12 @@ const ICO_TAG    = Ico(<><path d="M3 10V4h6l8 8-6 6z" /><circle cx="6.5" cy="6.5
 const ICO_UPLOAD = Ico(<><path d="M10 13V4M6 8l4-4 4 4M3 14v2a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2" /></>)
 const ICO_PENCIL = Ico(<><path d="M14 3l3 3-9 9H5v-3z" /><path d="M12 5l3 3" /></>)
 
-function branchOf(type: ProjectTypeId | null): Branch {
+export function branchOf(type: ProjectTypeId | null): Branch {
   if (!type) return 'none'
   return PROJECT_TYPES.find((t) => t.id === type)?.branch ?? 'none'
 }
 
-function pageList(branch: Branch, type: ProjectTypeId | null, designSystem?: string | null): string[] {
+export function pageList(branch: Branch, type: ProjectTypeId | null, designSystem?: string | null): string[] {
   const hasSub = !!(type && SUB_TYPES_BY_TYPE[type]?.length)
   const isApp = type === 'web-app' || type === 'productivity'
   const isSite = type === 'marketing-site' || type === 'content-site'
@@ -106,7 +108,19 @@ function pageList(branch: Branch, type: ProjectTypeId | null, designSystem?: str
       if (isPrint) {
         // Static / print-style pieces: no surfaces, no motion, no UI radius/shadow,
         // no theme toggle. Brand and inspiration matter most.
-        const wantsIcons  = type === 'slide-deck' || type === 'one-pager' || type === 'resume'
+        // A deck is not a small app. Its template has already decided the
+        // look, the type, the corner shape and the palette, so re-asking those
+        // is noise, and a tech stack means nothing for a presentation. Ask
+        // what the template cannot know, and stop.
+        if (type === 'slide-deck') {
+          return [
+            'type',
+            ...(hasSub ? ['subType'] : []),
+            'context', 'audience', 'deck', 'colors', 'icons',
+            'inspiration', 'final', 'preview'
+          ]
+        }
+        const wantsIcons  = type === 'one-pager' || type === 'resume'
         const wantsImages = type !== 'resume'
         return [
           'type',
@@ -165,6 +179,7 @@ const PAGE_TITLES: Record<string, string> = {
   subType: 'What kind exactly?',
   surfaces: 'Where will it run?',
   audience: 'Who is this for?',
+  deck: 'How should the deck run?',
   look: 'Look and feel',
   colors: 'Brand colors',
   fonts: 'Typography',
@@ -317,6 +332,7 @@ export function BriefWizard({ folderPath, projectId, initial, onCancel, onComple
           {currentPage === 'subType' && <PageSubType state={state} set={set} />}
           {currentPage === 'surfaces' && <PageSurfaces state={state} set={set} />}
           {currentPage === 'audience' && <PageAudience state={state} set={set} />}
+          {currentPage === 'deck' && <PageDeck state={state} set={set} />}
           {currentPage === 'look' && <PageLook state={state} set={set} />}
           {currentPage === 'colors' && <PageColors state={state} set={set} />}
           {currentPage === 'fonts' && <PageFonts state={state} set={set} />}
@@ -564,6 +580,81 @@ function PageAudience({ state, set }: { state: WizardState; set: <K extends keyo
   )
 }
 
+const ICO_LEN  = Ico(<><path d="M3 6h14M3 10h9M3 14h5" /></>)
+const ICO_ARC  = Ico(<><path d="M3 15c3-8 11-8 14 0" /><circle cx="3" cy="15" r="1.4" /><circle cx="17" cy="15" r="1.4" /></>)
+
+/**
+ * The one page a slide deck gets that an app does not.
+ *
+ * Everything a template already decides — palette, type, corner shape, how a
+ * slide is laid out — is not asked here, because asking again only invites an
+ * answer that fights the template. What is left is the three things a template
+ * genuinely cannot know: which template, how long the deck runs, and the shape
+ * of the argument it has to carry.
+ */
+function PageDeck({ state, set }: { state: WizardState; set: <K extends keyof WizardState>(k: K, v: WizardState[K]) => void }) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <div className="mb-2.5 text-sm font-medium text-text-primary">Template</div>
+        <div className="grid grid-cols-3 gap-2.5">
+          {DECK_TEMPLATES.map((t) => {
+            const selected = state.deckTemplate === t.id
+            return (
+              <button key={t.id} onClick={() => set('deckTemplate', t.id)} className={tileClass(selected, 'p-2.5')}>
+                <span
+                  className="mb-2 block h-12 w-full rounded-md"
+                  style={{ background: t.tokens['--deck-bg'] }}
+                >
+                  <span
+                    className="ml-2 mt-2 inline-block h-2 w-8 rounded-sm"
+                    style={{ background: t.tokens['--deck-accent-1'] }}
+                  />
+                </span>
+                <span className="block text-sm font-medium text-text-primary">{t.name}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <div>
+        <div className="mb-2.5 text-sm font-medium text-text-primary">Length</div>
+        <div className="grid grid-cols-3 gap-2.5">
+          {DECK_LENGTH_OPTIONS.map((o) => {
+            const selected = state.deckLength === o.id
+            return (
+              <button key={o.id} onClick={() => set('deckLength', o.id)} className={tileClass(selected)}>
+                <span className={iconWrapClass(selected)}><ICO_LEN /></span>
+                <span className="block text-sm font-medium text-text-primary">{o.label}</span>
+                <span className="block text-xs text-text-secondary">{o.hint}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <div>
+        <div className="mb-2.5 text-sm font-medium text-text-primary">Shape of the argument</div>
+        <div className="grid grid-cols-2 gap-2.5">
+          {DECK_ARC_OPTIONS.map((o) => {
+            const selected = state.deckArc === o.id
+            return (
+              <button key={o.id} onClick={() => set('deckArc', o.id)} className={tileClass(selected, 'flex items-center gap-3')}>
+                <span className={iconWrapClass(selected, false)}><ICO_ARC /></span>
+                <span>
+                  <span className="block text-sm font-medium text-text-primary">{o.label}</span>
+                  <span className="block text-xs text-text-secondary">{o.hint}</span>
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function PageChoice({
   title, hint, options, value, onPick, Icon
 }: {
@@ -697,9 +788,33 @@ function ColorPickerRow({
 }
 
 function PageColors({ state, set }: { state: WizardState; set: <K extends keyof WizardState>(k: K, v: WizardState[K]) => void }) {
+  // A deck template arrives with a palette that was taken from a real deck and
+  // balanced there. Overriding it is a choice worth offering, but it is not the
+  // default, so keeping it is the first thing on the page.
+  const template = DECK_TEMPLATES.find((t) => t.id === state.deckTemplate)
+  const overriding = !!(state.brandColor || state.secondaryColor || state.tertiaryColor)
   return (
     <div>
       <PageHeading title="Brand colors" hint="Primary required, secondary and tertiary optional" />
+      {template && (
+        <div className="mb-4 space-y-2.5">
+          <button
+            onClick={() => { set('brandColor', ''); set('secondaryColor', ''); set('tertiaryColor', '') }}
+            className={tileClass(!overriding, 'flex w-full items-center gap-3')}
+          >
+            <span className="flex flex-none gap-1">
+              {['--deck-bg', '--deck-accent-1', '--deck-ink'].map((k) => (
+                <span key={k} className="h-7 w-7 rounded-md" style={{ background: template.tokens[k] }} />
+              ))}
+            </span>
+            <span>
+              <span className="block text-sm font-medium text-text-primary">Keep the {template.name} palette</span>
+              <span className="block text-xs text-text-secondary">{template.note}</span>
+            </span>
+          </button>
+          <div className="text-xs text-text-secondary">Or set your own below, which overrides it.</div>
+        </div>
+      )}
       <div className="space-y-3">
         <ColorPickerRow label="Primary" value={state.brandColor} onChange={(v) => set('brandColor', v)} />
         <ColorPickerRow label="Secondary" value={state.secondaryColor} onChange={(v) => set('secondaryColor', v)} />

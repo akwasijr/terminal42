@@ -59,14 +59,18 @@ export type DesignBrief = {
   tokensId?: string | null
   tokensThemeId?: string | null
   /**
-   * The deck house style the user chose from the gallery.
+   * The deck template the user chose, from the gallery or from the brief.
    *
-   * Optional because a deck made without opening the gallery has none, and
-   * must keep getting a house picked for it — the automatic pick is what
-   * stops every deck looking the same, and it should stay the default rather
-   * than becoming a question everybody has to answer.
+   * Optional because a deck made without picking one has none, and must keep
+   * getting a template picked for it — the automatic pick is what stops every
+   * deck looking the same, and it should stay the default rather than becoming
+   * a question everybody has to answer.
    */
   deckStyleId?: string | null
+  /** How long the deck runs: 'short' | 'medium' | 'long'. Decks only. */
+  deckLength?: string | null
+  /** The shape of the argument the deck carries. Decks only. */
+  deckArc?: string | null
   /**
    * The fingerprint of the library as it was when this design last had the
    * files written beside it.

@@ -44,6 +44,25 @@ export const SURFACE_OPTIONS: { id: string; label: string; hint: string }[] = [
   { id: 'tv',      label: 'TV / large display', hint: 'Big-screen ambient or kiosk display' }
 ]
 
+// Slide decks. A deck template already carries the palette, the type, the
+// corner shape and the way a slide is laid out, so asking a deck author to
+// choose fonts, an icon set, an image source, a brand identity and a tech
+// stack is asking them to answer questions the template has already answered.
+// These are the two things a template genuinely cannot know.
+export const DECK_LENGTH_OPTIONS: { id: string; label: string; hint: string }[] = [
+  { id: 'short',  label: '5 to 8 slides',   hint: 'A single point, made once' },
+  { id: 'medium', label: '10 to 15 slides', hint: 'The usual room, 15 to 20 minutes' },
+  { id: 'long',   label: '20 or more',      hint: 'A full session, or a document to read alone' }
+]
+
+export const DECK_ARC_OPTIONS: { id: string; label: string; hint: string }[] = [
+  { id: 'problem',  label: 'Problem to solution', hint: 'Open on what is wrong, close on the fix' },
+  { id: 'progress', label: 'Where we are now',    hint: 'What shipped, what moved, what is next' },
+  { id: 'proposal', label: 'Ask and rationale',   hint: 'What you want, and why it is worth it' },
+  { id: 'teach',    label: 'Teach one idea',      hint: 'Build understanding step by step' },
+  { id: 'story',    label: 'Tell what happened',  hint: 'A narrative, in order' }
+]
+
 // Sub-types per project type. Helps Copilot understand the actual kind of app.
 export const SUB_TYPES_BY_TYPE: Record<string, string[]> = {
   'web-app': [
@@ -297,6 +316,16 @@ export function buildKickoffPrompt(b: ProjectBrief, opts: KickoffOptions = {}): 
   if (b.typeLabel) parts.push(`Type: ${b.typeLabel}`)
   if (b.lookNote) parts.push(`Look: ${b.lookNote}`)
   if (b.audience) parts.push(`Audience: ${b.audience}`)
+  // A deck's answers are worth nothing if they stop at the wizard.
+  if (b.deckTemplate) parts.push(`Deck template: ${b.deckTemplate}`)
+  if (b.deckLength) {
+    const o = DECK_LENGTH_OPTIONS.find((x) => x.id === b.deckLength)
+    if (o) parts.push(`Deck length: ${o.label}`)
+  }
+  if (b.deckArc) {
+    const o = DECK_ARC_OPTIONS.find((x) => x.id === b.deckArc)
+    if (o) parts.push(`Deck arc: ${o.label} — ${o.hint}`)
+  }
   return parts.join('\n')
 }
 

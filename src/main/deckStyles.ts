@@ -100,6 +100,21 @@ export function pickDeckStyle(brief: DesignBrief | null): { styleId: string; tex
 
   lines.push(`- Put data-cover="${t.cover}" on the cover section. The chassis lays it out from that; do not lay it out yourself.`)
   lines.push(`- ${COVER_BRIEF[t.cover]}`)
+  // The two things the template cannot know, when the brief answered them.
+  const LEN: Record<string, string> = {
+    short: 'Five to eight slides. One point, made once, and no filler to reach a number.',
+    medium: 'Ten to fifteen slides, for fifteen to twenty minutes in a room.',
+    long: 'Twenty or more slides. It has to hold up read alone, so every slide carries its own caption.'
+  }
+  const ARC: Record<string, string> = {
+    problem: 'Run it problem to solution: open on what is wrong, spend the middle on why it persists, close on the fix.',
+    progress: 'Run it as a state of play: what shipped, what moved, what is next. Numbers early, not saved for the end.',
+    proposal: 'Run it as an ask: say what you want in the first three slides, then spend the rest earning it.',
+    teach: 'Run it as a lesson: one idea, built up a step at a time, with the recap restating the steps in order.',
+    story: 'Run it as a narrative in order, and let the turn land on its own slide.'
+  }
+  if (brief?.deckLength && LEN[brief.deckLength]) lines.push(`- ${LEN[brief.deckLength]}`)
+  if (brief?.deckArc && ARC[brief.deckArc]) lines.push(`- ${ARC[brief.deckArc]}`)
   lines.push('- The moves that make this template itself. Use every one of them at least once:')
   for (const m of t.moves) lines.push(`  - ${m}`)
 
