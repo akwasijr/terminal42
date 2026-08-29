@@ -7,7 +7,15 @@ import prettier from 'eslint-config-prettier'
 
 export default tseslint.config(
   {
-    ignores: ['out/**', 'dist/**', 'node_modules/**', 'build/**', 'test-results/**', '*.config.js', '*.config.ts']
+    ignores: [
+      'out/**', 'dist/**', 'node_modules/**', 'build/**', 'test-results/**',
+      '*.config.js', '*.config.ts',
+      // Vendored verbatim from ~/deck-template, which is the deck templates'
+      // foundation. Kept byte for byte so it can be re-synced; not ours to lint.
+      'resources/deck-templates/**',
+      // Throwaway render probes. Never committed.
+      '*.local.mjs'
+    ]
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

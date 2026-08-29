@@ -42,13 +42,28 @@ const GROUNDS = ['invert', 'accent', 'soft'] as const
 
 /** Every custom property the doc says you can redeclare. */
 const TOKENS = [
-  '--deck-bg', '--deck-panel', '--deck-panel-2', '--deck-sheen', '--deck-blur',
+  '--deck-bg', '--deck-panel', '--deck-panel-2',
   '--deck-ink', '--deck-ink-2', '--deck-ink-3',
   '--deck-accent-1', '--deck-accent-2', '--deck-accent-3', '--deck-accent-4',
-  '--deck-gradient', '--deck-font', '--deck-mono', '--deck-ease', '--deck-radius'
+  '--deck-font', '--deck-mono', '--deck-ease', '--deck-radius',
+  '--deck-heading-weight', '--deck-heading-case', '--deck-heading-track'
 ] as const
 
 describe('the deck chassis CSS', () => {
+  // Every template names a cover composition, and the composition is the main
+  // reason two decks do not look alike. If the chassis only lays out one of
+  // them, every template collapses back into the same slide recoloured, which
+  // is the exact complaint this whole rebuild came from.
+  it('lays out every cover composition a template can ask for', () => {
+    for (const c of ['marker', 'wordmark', 'photo', 'panel', 'editorial']) {
+      expect(DECK_CSS, c).toContain(`.slide.cover[data-cover="${c}"]`)
+    }
+  })
+
+  it('tells the generator to put the composition on the cover', () => {
+    expect(DECK_USAGE).toContain('data-cover=')
+  })
+
   it('styles every class the usage doc asks for', () => {
     for (const cls of PROMISED_CLASSES) {
       expect(DECK_CSS, cls).toMatch(new RegExp(`\\.${cls}[\\s,{:.>]`))
@@ -70,10 +85,13 @@ describe('the deck chassis CSS', () => {
   // A house that asks for square corners and gets soft ones has had its
   // decision overridden by the chassis, which is the one thing the chassis is
   // not allowed to do.
-  it('lets the house set every corner that is not deliberately a pill or a dot', () => {
+  // 0 is allowed too, but only to square off something that runs to the edge
+  // of the slide: a full-bleed photograph with rounded corners is a mistake
+  // whatever radius the house asked for.
+  it('lets the house set every corner that is not deliberately a pill, a dot or full bleed', () => {
     for (const decl of DECK_CSS.match(/border-radius:[^;}]*/g) ?? []) {
       const v = decl.slice('border-radius:'.length)
-      if (v === '999px' || v === '50%' || v === 'inherit') continue
+      if (v === '999px' || v === '50%' || v === 'inherit' || v === '0') continue
       expect(v, decl).toContain('var(--deck-radius)')
     }
   })
@@ -84,7 +102,7 @@ describe('the deck chassis CSS', () => {
     for (const g of GROUNDS) expect(DECK_CSS, g).toContain(`.slide[data-ground="${g}"]`)
     const inv = DECK_CSS.slice(DECK_CSS.indexOf('.slide[data-ground="invert"]>.inner'))
     const body = inv.slice(0, inv.indexOf('}'))
-    for (const t of ['--deck-ink', '--deck-ink-2', '--deck-ink-3', '--deck-panel', '--deck-panel-2', '--deck-sheen']) {
+    for (const t of ['--deck-ink', '--deck-ink-2', '--deck-ink-3', '--deck-panel', '--deck-panel-2']) {
       expect(body, t).toContain(`${t}:`)
     }
   })
@@ -107,7 +125,7 @@ describe('the deck chassis CSS', () => {
 
   it('turns its tints over for a light deck rather than forking', () => {
     const light = DECK_CSS.slice(DECK_CSS.indexOf('[data-deck-tone="light"]'))
-    for (const t of ['--deck-bg', '--deck-panel', '--deck-panel-2', '--deck-sheen', '--deck-ink', '--deck-ink-2', '--deck-ink-3']) {
+    for (const t of ['--deck-bg', '--deck-panel', '--deck-panel-2', '--deck-ink', '--deck-ink-2', '--deck-ink-3']) {
       expect(light.slice(0, light.indexOf('}')), t).toContain(t)
     }
   })

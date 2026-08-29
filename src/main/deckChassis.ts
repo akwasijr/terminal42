@@ -24,28 +24,41 @@
 export const DECK_BASE_ID = 'deck-base'
 export const DECK_RUNTIME_ID = 'deck-runtime'
 
-export const DECK_CSS = `:root{
+export const DECK_CSS = `/* The palette lives in a layer of its own, and it is the only layer the
+   chassis declares. An unlayered rule always beats a layered one whatever
+   its specificity or position, so the house palette a deck declares in its
+   own <style> wins here without having to out-specify anything.
+
+   This is not a nicety. The light tone below is an attribute selector, so
+   before it was layered it beat the :root the houses are declared on, and
+   every light house — cream, blush, off-white — rendered as the same
+   neutral grey deck. Six houses, one look. */
+@layer deck-defaults{
+:root{
 --deck-bg:#0a0a0d;
 --deck-panel:rgba(255,255,255,.032);
 --deck-panel-2:rgba(255,255,255,.06);
---deck-sheen:rgba(255,255,255,.07);
---deck-blur:blur(30px) saturate(180%);
 --deck-ink:#f2f3f7;--deck-ink-2:#8d94a8;--deck-ink-3:#5b6076;
 --deck-accent-1:#f2a573;--deck-accent-2:#f45a9b;--deck-accent-3:#7e80ee;--deck-accent-4:#1376bf;
---deck-gradient:linear-gradient(100deg,var(--deck-accent-1),var(--deck-accent-2) 36%,var(--deck-accent-3) 66%,var(--deck-accent-4));
 --deck-font:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
 --deck-heading-weight:800;--deck-heading-case:none;--deck-heading-track:-.02em;
 --deck-mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
 --deck-ease:cubic-bezier(.16,1,.3,1);
 --deck-radius:14px}
 /* A light deck is the same deck with the tints turned over, not a second
-   stylesheet. Panels become tinted paper, the sheen becomes a shadow. */
-[data-deck-tone="light"]{
+   stylesheet. Panels become tinted paper.
+
+   Scoped to the root element on purpose. A deck that also puts the attribute
+   on <body> — an easy and reasonable thing to do — would otherwise set these
+   directly on body, and a declaration that matches an element beats one it
+   merely inherits, layer or no layer. The house palette on :root would lose
+   to it and the deck would come out grey. */
+:root[data-deck-tone="light"]{
 --deck-bg:#f6f6f4;
 --deck-panel:rgba(15,17,26,.045);
 --deck-panel-2:rgba(15,17,26,.085);
---deck-sheen:rgba(255,255,255,.55);
 --deck-ink:#14161d;--deck-ink-2:#4d5364;--deck-ink-3:#7c8296}
+}
 *,*::before,*::after{box-sizing:border-box}
 html,body{margin:0;padding:0;height:100%}
 /* figure, figcaption and blockquote carry a UA margin of 1em 40px. Left
@@ -77,27 +90,26 @@ button:focus-visible,a:focus-visible{outline:2px solid currentColor;outline-offs
 .slide[data-ground="invert"]{background:var(--deck-ink)}
 .slide[data-ground="accent"]{background:var(--deck-accent-1)}
 .slide[data-ground="soft"]{background:color-mix(in srgb,var(--deck-ink) 7%,var(--deck-bg))}
-.slide[data-ground="invert"]>.inner,.slide[data-ground="accent"]>.inner{
+.slide[data-ground="invert"]>.inner,.slide[data-ground="accent"]>.inner,
+.slide.cover[data-cover="panel"]>.inner,.slide.cover[data-cover="photo"]>.inner{
 --deck-ink:var(--deck-bg);
 --deck-ink-2:color-mix(in srgb,var(--deck-bg) 68%,transparent);
 --deck-ink-3:color-mix(in srgb,var(--deck-bg) 44%,transparent);
 --deck-panel:color-mix(in srgb,var(--deck-bg) 10%,transparent);
 --deck-panel-2:color-mix(in srgb,var(--deck-bg) 17%,transparent);
---deck-sheen:color-mix(in srgb,var(--deck-bg) 12%,transparent);
 color:var(--deck-bg)}
 /* On an accent ground the accent is the ground, so anything still painted
    with it would vanish. */
-.slide[data-ground="accent"]>.inner{--deck-gradient:none;--deck-accent-3:var(--deck-bg)}
+.slide[data-ground="accent"]>.inner{--deck-accent-1:var(--deck-bg);--deck-accent-3:var(--deck-bg)}
 [data-slide-ground="invert"] .frame,[data-slide-ground="invert"] .nav-cluster,
 [data-slide-ground="accent"] .frame,[data-slide-ground="accent"] .nav-cluster{
 --deck-ink:var(--deck-bg);
 --deck-ink-2:color-mix(in srgb,var(--deck-bg) 68%,transparent);
 --deck-ink-3:color-mix(in srgb,var(--deck-bg) 46%,transparent);
 --deck-panel-2:color-mix(in srgb,var(--deck-bg) 15%,transparent);
---deck-sheen:color-mix(in srgb,var(--deck-bg) 12%,transparent);
 color:var(--deck-bg)}
 .slide[data-ground="accent"]>.inner .accent,.slide[data-ground="accent"]>.inner .accent .w{background:none;color:var(--deck-bg);-webkit-text-fill-color:currentColor}
-.slide[data-ground="invert"]>.inner .accent,.accent .w{background:var(--deck-gradient);-webkit-background-clip:text;background-clip:text;color:transparent}
+.slide[data-ground="invert"]>.inner .accent,.accent .w{background:none;color:var(--deck-accent-1);-webkit-text-fill-color:currentColor}
 .accent .wmask{background:none}
 /* One word carried on a highlighter is how every reference deck points at the
    thing it wants you to read. It is a <mark>, so it survives being copied. */
@@ -120,11 +132,17 @@ h2.display{font-size:clamp(30px,4.2vw,60px)}
 .wmask{display:inline-block;overflow:hidden;vertical-align:top}
 .eyebrow{display:block;font-family:var(--deck-mono);font-size:clamp(11px,.92vw,13px);font-weight:500;letter-spacing:.04em;color:var(--deck-ink-2);margin:0 0 clamp(12px,1.4vw,18px)}
 .lede{max-width:62ch;margin:clamp(16px,1.8vw,24px) 0 0;font-size:clamp(15px,1.2vw,19px);line-height:1.5;color:var(--deck-ink-2)}
-.accent{background:var(--deck-gradient);-webkit-background-clip:text;background-clip:text;color:transparent}
+/* The words that carry the claim are set in the house accent. A gradient
+   clipped through four stops is the giveaway of a generated deck and none of
+   the references do it — they pick one colour and mean it. */
+.accent{color:var(--deck-accent-1)}
 
 /* ---- glass ---- */
-.reason,.card,.tile,.tile-detail,.stat,.outrow .item,.recap li,.chip,.exhibit-slot{position:relative;backdrop-filter:var(--deck-blur);-webkit-backdrop-filter:var(--deck-blur);box-shadow:none}
-.reason::before,.card::before,.tile::before,.stat::before,.outrow .item::before,.exhibit-slot::before{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:linear-gradient(180deg,var(--deck-sheen),rgba(255,255,255,0) 45%)}
+/* Every one of the reference decks is printed matter: a panel is a flat
+   tint with a hard edge. Frosted glass, a gradient sheen down the top half
+   and a shadow under each card are web-app habits that read as generic the
+   moment a slide is projected, so none of them are here. */
+.reason,.card,.tile,.tile-detail,.stat,.outrow .item,.recap li,.chip,.exhibit-slot{position:relative;box-shadow:none}
 
 /* ---- reveal ---- */
 [data-reveal]{opacity:0;transform:translateY(18px);transition:opacity .6s ease,transform .6s var(--deck-ease)}
@@ -137,27 +155,32 @@ h2.display{font-size:clamp(30px,4.2vw,60px)}
 .reason,.card,.tile,.stat,.outrow .item,.recap li,.figure,.specimen{opacity:0;transform:translateY(26px) scale(.86);transition:opacity .7s var(--deck-ease),transform .7s var(--deck-ease),background-color .25s ease,box-shadow .25s ease}
 .slide.in-view .reason,.slide.in-view .card,.slide.in-view .tile,.slide.in-view .stat,.slide.in-view .outrow .item,.slide.in-view .recap li,.slide.in-view .figure,.slide.in-view .specimen{opacity:1;transform:translateY(0) scale(1)}
 .reasonlist>*:nth-child(n),.split>*:nth-child(n),.tiles>*:nth-child(n),.statgrid>*:nth-child(n),.outrow>*:nth-child(n),.recap>*:nth-child(n),.figures>*:nth-child(n),.swatches>*:nth-child(n),.specimens>*:nth-child(n){transition-delay:calc(var(--n,0) * 70ms + 50ms)}
-.reason:hover,.card:hover,.tile:hover,.stat:hover,.outrow .item:hover{transform:translateY(-4px) scale(1.02);box-shadow:0 18px 36px rgba(0,0,0,.28)}
-.picto{display:inline-flex;transition:transform .35s var(--deck-ease)}
-.picto svg{width:100%;height:100%;display:block}
-.reason:hover .picto,.card:hover .picto,.tile:hover .picto{transform:scale(1.18) rotate(-4deg)}
+/* A panel on a slide is not a link. It deepens very slightly under the
+   pointer so a clickable tile still answers, and does not lift or cast. */
+.reason:hover,.card:hover,.tile:hover,.stat:hover,.outrow .item:hover{background:var(--deck-panel-2)}
+.picto{display:inline-flex}
+/* fill:none is the default here rather than something every icon has to
+   remember. The spec asks for stroke-drawn 24x24 icons, and an svg that
+   omits fill="none" paints solid black — a shape meant to be a circle
+   arrives as a blob. */
+.picto svg{width:100%;height:100%;display:block;fill:none}
 
 /* ---- chrome ---- */
 .frame{position:fixed;inset:0;z-index:40;pointer-events:none;padding:clamp(20px,2.4vw,36px);display:flex;flex-direction:column;justify-content:space-between}
 .brand{align-self:flex-start;display:flex;align-items:center;gap:9px;font-weight:700;font-size:clamp(14px,1.1vw,17px);letter-spacing:-.01em;pointer-events:auto;background:none;border:none;padding:0;color:var(--deck-ink);font-family:var(--deck-font);cursor:pointer;transition:opacity .2s ease}
 .brand:hover{opacity:.75}
-.brand .dot{width:8px;height:8px;border-radius:50%;background:var(--deck-gradient)}
+.brand .dot{width:8px;height:8px;border-radius:50%;background:var(--deck-accent-1)}
 .foot{align-self:flex-start;display:flex;flex-direction:column;gap:4px}
 .footnote{align-self:flex-start;font-family:var(--deck-mono);font-size:11px;letter-spacing:.03em;color:var(--deck-ink-3)}
 .nav-cluster{position:fixed;right:clamp(20px,2.4vw,36px);bottom:clamp(20px,2.4vw,30px);z-index:41;display:flex;align-items:center;gap:12px}
-.toc-btn{flex:none;width:34px;height:34px;display:grid;place-items:center;border:none;border-radius:999px;background:var(--deck-panel-2);color:var(--deck-ink-2);cursor:pointer;padding:0;backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%);box-shadow:inset 0 1px 0 var(--deck-sheen);transition:color .18s ease}
+.toc-btn{flex:none;width:34px;height:34px;display:grid;place-items:center;border:none;border-radius:999px;background:var(--deck-panel-2);color:var(--deck-ink-2);cursor:pointer;padding:0;backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%);transition:color .18s ease}
 .toc-btn:hover,.toc-btn[aria-expanded="true"]{color:var(--deck-ink)}
 .toc-btn svg{width:16px;height:16px}
-.dots{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:999px;background:var(--deck-panel-2);backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%);box-shadow:inset 0 1px 0 var(--deck-sheen)}
+.dots{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:999px;background:var(--deck-panel-2);backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%)}
 .dots button{width:7px;height:7px;flex:none;border-radius:999px;border:none;background:var(--deck-ink-3);padding:0;cursor:pointer;transition:width .25s var(--deck-ease),background .2s ease,transform .2s ease}
 .dots button:hover{background:var(--deck-ink);transform:scale(1.2)}
 .dots button.active{background:var(--deck-ink);width:22px}
-.toc{position:absolute;right:0;bottom:calc(100% + 10px);width:min(320px,calc(100vw - 40px));padding:10px;border-radius:calc(var(--deck-radius) * 1.1);background:var(--deck-bg);backdrop-filter:blur(24px) saturate(160%);-webkit-backdrop-filter:blur(24px) saturate(160%);box-shadow:inset 0 1px 0 var(--deck-sheen),0 18px 48px rgba(0,0,0,.45);opacity:0;transform:translateY(8px) scale(.98);transform-origin:100% 100%;pointer-events:none;transition:opacity .22s ease,transform .22s var(--deck-ease)}
+.toc{position:absolute;right:0;bottom:calc(100% + 10px);width:min(320px,calc(100vw - 40px));padding:10px;border-radius:calc(var(--deck-radius) * 1.1);background:var(--deck-bg);backdrop-filter:blur(24px) saturate(160%);-webkit-backdrop-filter:blur(24px) saturate(160%);box-shadow:0 10px 28px rgba(0,0,0,.28);opacity:0;transform:translateY(8px) scale(.98);transform-origin:100% 100%;pointer-events:none;transition:opacity .22s ease,transform .22s var(--deck-ease)}
 .toc.open{opacity:1;transform:none;pointer-events:auto}
 .toc-head{display:flex;align-items:center;justify-content:space-between;padding:4px 6px 10px 10px}
 .toc-heading{font-size:12px;font-weight:600;color:var(--deck-ink-3)}
@@ -175,6 +198,42 @@ h2.display{font-size:clamp(30px,4.2vw,60px)}
 .cover-bg img,.cover-bg video{width:100%;height:100%;object-fit:cover}
 .slide.cover>.inner{max-width:56%;margin:0}
 .cover-meta{display:flex;gap:clamp(16px,2vw,28px);flex-wrap:wrap;margin-top:clamp(24px,2.8vw,36px);font-family:var(--deck-mono);font-size:12px;color:var(--deck-ink-2)}
+
+/* Five cover compositions. A template picks one with data-cover on the cover
+   section, and which one it picks is most of the reason two decks built on
+   this chassis do not look like each other. Without these there is one cover
+   and every template is a recolour of it. marker is the default because it is
+   the only one that needs no artwork. */
+
+/* marker — the heading sits on the floor of the slide and the section index
+   sits up in the top corner on its own. Deck 01. */
+.slide.cover[data-cover="marker"]>.inner{max-width:74%;height:100%;display:flex;flex-direction:column;justify-content:space-between}
+.slide.cover[data-cover="marker"] .eyebrow{margin:0}
+.slide.cover[data-cover="marker"] .display{margin-top:auto}
+
+/* wordmark — one name, centred, and nothing else on the slide. Deck 02. */
+.slide.cover[data-cover="wordmark"]{align-items:center;justify-content:center;text-align:center}
+.slide.cover[data-cover="wordmark"]>.inner{max-width:none}
+.slide.cover[data-cover="wordmark"] .cover-bg{display:none}
+.slide.cover[data-cover="wordmark"] .cover-meta{justify-content:center}
+
+/* photo — full bleed, heading over the lower half. Deck 03. */
+.slide.cover[data-cover="photo"]{justify-content:flex-end}
+.slide.cover[data-cover="photo"]>.inner{max-width:78%;position:relative;z-index:6}
+.slide.cover[data-cover="photo"] .cover-bg{position:absolute;left:0;top:0;right:0;bottom:0;width:100%;height:100%;transform:none;border-radius:0;z-index:0}
+/* The only scrim in the chassis. It is not decoration: type over a photograph
+   has to clear 4.5:1 and the photograph is not ours to choose. */
+.slide.cover[data-cover="photo"]::after{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(to top,var(--deck-ink) 0%,color-mix(in srgb,var(--deck-ink) 72%,transparent) 30%,transparent 62%)}
+
+/* panel — a portrait down the left, the heading on a turned-over right. Deck 04. */
+.slide.cover[data-cover="panel"]{display:grid;grid-template-columns:38% 1fr;align-items:stretch;padding:0;--deck-panel-ground:var(--deck-ink)}
+.slide.cover[data-cover="panel"] .cover-bg{position:relative;grid-column:1;inset:auto;right:auto;top:auto;width:auto;height:auto;transform:none;border-radius:0}
+.slide.cover[data-cover="panel"]>.inner{grid-column:2;max-width:none;align-self:center;padding:clamp(40px,6vw,90px);background:var(--deck-panel-ground)}
+
+/* editorial — two frames cropped differently, the heading laid across them. */
+.slide.cover[data-cover="editorial"]>.inner{max-width:52%;position:relative;z-index:6}
+.slide.cover[data-cover="editorial"] .cover-bg{right:clamp(24px,4vw,64px);top:clamp(60px,8vw,96px);transform:none;width:clamp(180px,21vw,290px);height:clamp(240px,30vw,380px)}
+.slide.cover[data-cover="editorial"] .cover-bg+.cover-bg{right:auto;left:56%;top:auto;bottom:clamp(60px,7vw,92px);width:clamp(150px,17vw,230px);height:clamp(170px,21vw,270px)}
 
 /* ---- layout: reason list ---- */
 .reasonlist{display:flex;flex-direction:column;gap:12px;margin-top:clamp(28px,3.2vw,40px);max-width:760px}
@@ -558,11 +617,11 @@ EVERY SLIDE:
 - Headings are <h1 class="display"> on the cover and <h2 class="display"> everywhere else. The chassis splits them into words; write plain text.
 - data-reveal="1".."5" on blocks you want to arrive in order.
 - Optional above the heading: <span class="eyebrow">Section 02</span>. Optional under it: <p class="lede">…</p>.
-- Colour a phrase with <span class="accent">…</span> — it takes the brand gradient. Highlight one with <mark>…</mark>.
+- Colour a phrase with <span class="accent">…</span> — it takes the house accent colour. Highlight one with <mark>…</mark>.
 - data-ground="invert" | "accent" | "soft" on the <section> changes that slide's ground and turns every colour in it over for you. Use it to break a run of identical slides: roughly every third or fourth slide, and always on the recap. Do not restate colours yourself.
 
 THE LAYOUTS:
-1. Cover — <section class="slide cover" data-title="Cover">, an <h1 class="display">, an optional <div class="cover-bg"><img …></div>, and an optional <div class="cover-meta"><span>Author</span><span>Date</span></div>.
+1. Cover — <section class="slide cover" data-cover="marker|wordmark|photo|panel|editorial" data-title="Cover">, an <h1 class="display">, an optional <div class="cover-bg"><img …></div>, and an optional <div class="cover-meta"><span>Author</span><span>Date</span></div>. data-cover is not decoration and it is not yours to pick — the template names one and you use that one, because it is the main thing that stops two decks looking alike. marker wants an <span class="eyebrow"> for the index and no artwork. wordmark wants the name alone, no cover-bg and no lede. photo and editorial want the cover-bg filled; editorial wants two of them. panel wants one cover-bg and turns its own right half over, so do not also set data-ground on it.
 2. Reason list — <div class="reasonlist"> of <div class="reason" data-reveal="n"><span class="picto"><svg…></svg></span><p>One sentence.</p></div>. Three to five. The workhorse.
 3. Carousel — <div class="carousel" data-carousel><div class="carousel-stage"><img class="carousel-img active" src="…" alt="…" data-note="Caption"> …</div><div class="carousel-bar"><button class="carousel-nav" data-car-prev aria-label="Previous">←</button><button class="carousel-nav" data-car-next aria-label="Next">→</button><div class="carousel-dots" data-car-dots></div><p class="carousel-note" data-car-note></p></div></div>.
 4. Split — <div class="split"> of two <div class="card" data-reveal="n"> each with a .picto, an <h3> and a <ul> of three to five <li>.
@@ -578,7 +637,7 @@ Also available: <div class="statgrid"> of <div class="stat"><div class="num">88%
 
 MAKING IT YOURS:
 - Redeclare the tokens in your own <style> after the chassis: --deck-bg, --deck-panel, --deck-panel-2, --deck-ink, --deck-ink-2, --deck-ink-3, --deck-accent-1..4, --deck-font, --deck-mono, --deck-radius, --deck-heading-weight, --deck-heading-case, --deck-heading-track. That is how the palette is applied — do not hardcode colours on elements.
-- For a light deck put data-deck-tone="light" on <html> as well, so the panel tints and the sheen turn over with it. Never set a light --deck-bg without it.
+- For a light deck put data-deck-tone="light" on <html> as well, so the panel tints turn over with it. Never set a light --deck-bg without it.
 - Load your fonts with a <link> to Google Fonts and point --deck-font at them.
 - Icons are inline <svg> inside <span class="picto">, stroke="currentColor", 24×24 viewBox. Never emoji.
 - Images you do not have: use <div class="exhibit-slot" data-slot="A short description of the picture that belongs here">, or an <img> pointing at a real, stable, hotlinkable URL. Never invent a local file path.

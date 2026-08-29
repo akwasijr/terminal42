@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deck template</title>
+<base href="/">
+<link rel="icon" type="image/svg+xml" href="images/favicon.svg">
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+
+<!--
+  EMPTY DECK TEMPLATE
+  Structure, styling and interactions are identical to the source deck.
+  All copy, images and video are placeholders. See README.md.
+
+  Each <section class="slide"> is one slide.
+  data-title  = the label shown in the Contents (TOC) list and the dots nav.
+  data-reveal = the reveal step an element animates in on (1, 2, 3 ...).
+-->
+
+<div class="frame">
+  <div class="brand-row">
+    <button type="button" class="brand" aria-label="Go to first slide"><span class="dot"></span>Brand name</button>
+  </div>
+  <div class="promptbar" hidden>
+    <button type="button" class="prompt-toggle" aria-expanded="false" aria-controls="prompt-panel">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M4 10h11M4 15h16M4 20h7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      Prompt
+    </button>
+    <div class="prompt-panel" id="prompt-panel" aria-hidden="true" inert>
+      <p class="prompt-text"></p>
+      <button type="button" class="prompt-copy">Copy</button>
+    </div>
+  </div>
+</div>
+<div class="nav-cluster">
+  <nav class="toc" id="toc" aria-label="All slides" aria-hidden="true" inert>
+    <div class="toc-head">
+      <span class="toc-heading">Contents</span>
+      <button type="button" class="toc-close" aria-label="Close contents">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <ol class="toc-list"></ol>
+  </nav>
+  <span class="nav-nudge" aria-hidden="true">
+    <svg class="nav-nudge-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M4 4l7.07 17 2.51-7.39L21 11.07z" fill="currentColor"/>
+    </svg>
+    <span class="nav-nudge-text">Click to navigate</span>
+  </span>
+  <div class="dots"></div>
+</div>
+
+<main class="deck">
+
+  <!-- 00 · COVER — full-bleed background behind one large title.
+       For a video background, swap the <img> for the commented block below. -->
+  <section class="slide" data-title="Cover">
+    <div class="cover-bg">
+      <img src="images/bg-placeholder.svg" alt="">
+      <!--
+      <video id="cover-video-loop" autoplay muted loop playsinline poster="images/bg-placeholder.svg">
+        <source src="images/cover-loop.mp4" type="video/mp4">
+      </video>
+      -->
+    </div>
+    <div class="inner">
+      <h1 class="display">Deck title goes here.</h1>
+    </div>
+  </section>
+
+  <!-- 01 · REASON LIST — a heading plus stacked points, each revealed in turn.
+       The workhorse layout. Three to five points reads best. -->
+  <section class="slide" data-title="Slide title">
+    <div class="slide-bg" data-depth="0.05"><img src="images/bg-placeholder.svg" alt=""></div>
+    <div class="inner">
+      <h2 class="display">Section heading.</h2>
+      <div class="reasonlist">
+        <div class="reason" data-reveal="1"><span class="picto" data-picto="build"></span><p>First point. One sentence, written the way you would say it out loud.</p></div>
+        <div class="reason" data-reveal="2"><span class="picto" data-picto="vision"></span><p>Second point. Keep it to a single idea per line.</p></div>
+        <div class="reason" data-reveal="3"><span class="picto" data-picto="insight"></span><p>Third point. Cut anything the audience can already see on screen.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 · CAROUSEL — a set of full images you step through, each with a caption. -->
+  <section class="slide" data-title="Examples">
+    <div class="slide-bg" data-depth="0.05"><img src="images/bg-placeholder.svg" alt=""></div>
+    <div class="inner">
+      <h2 class="display">Examples heading.</h2>
+      <div class="carousel" data-carousel>
+        <div class="carousel-stage">
+          <img class="carousel-img active" src="images/placeholder.svg" alt="Describe this example" data-note="Caption for the first example">
+          <img class="carousel-img" src="images/placeholder.svg" alt="Describe this example" data-note="Caption for the second example">
+          <img class="carousel-img" src="images/placeholder.svg" alt="Describe this example" data-note="Caption for the third example">
+        </div>
+        <div class="carousel-bar">
+          <button class="carousel-nav" data-car-prev aria-label="Previous example">&#8592;</button>
+          <button class="carousel-nav" data-car-next aria-label="Next example">&#8594;</button>
+          <div class="carousel-dots" data-car-dots></div>
+          <p class="carousel-note" data-car-note>Caption for the first example</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 03 · SPLIT — two cards side by side. Use for this-versus-that comparisons. -->
+  <section class="slide" data-title="Comparison">
+    <div class="slide-bg" data-depth="0.05"><img src="images/bg-placeholder.svg" alt=""></div>
+    <div class="inner">
+      <h2 class="display">Comparison heading?</h2>
+      <div class="split">
+        <div class="card" data-reveal="1">
+          <span class="picto" data-picto="build"></span>
+          <h3>Left card title</h3>
+          <ul>
+            <li>Supporting point one</li>
+            <li>Supporting point two</li>
+            <li>Supporting point three</li>
+            <li>The line that lands the point</li>
+          </ul>
+        </div>
+        <div class="card" data-reveal="2">
+          <span class="picto" data-picto="vision"></span>
+          <h3>Right card title</h3>
+          <ul>
+            <li>Supporting point one</li>
+            <li>Supporting point two</li>
+            <li>Supporting point three</li>
+            <li>The line that lands the point</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 · EXHIBIT — two captioned images (before and after), with a short
+       reason list underneath. Use the compact list so it all fits. -->
+  <section class="slide" data-title="Before and after">
+    <div class="slide-bg" data-depth="0.05"><img src="images/bg-placeholder.svg" alt=""></div>
+    <div class="inner">
+      <h2 class="display">Before and after heading.</h2>
+      <div class="exhibit" data-reveal="2">
+        <figure class="exhibit-pane">
+          <figcaption class="exhibit-cap">Before</figcaption>
+          <img src="images/placeholder.svg" alt="Describe what is wrong in this image">
+        </figure>
+        <figure class="exhibit-pane">
+          <figcaption class="exhibit-cap">After</figcaption>
+          <img src="images/placeholder.svg" alt="Describe what changed in this image">
+        </figure>
+      </div>
+      <div class="reasonlist compact">
+        <div class="reason" data-reveal="3"><span class="picto" data-picto="story"></span><p>What the audience should notice in the comparison.</p></div>
+        <div class="reason" data-reveal="4"><span class="picto" data-picto="insight"></span><p>What to do about it.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 05 · TILES — a clickable list. Selecting a tile opens the detail panel.
+       The tile text must match a key in `itemDetails` in script.js. -->
+  <section class="slide" data-title="Clickable list">
+    <div class="slide-bg" data-depth="0.05"><img src="images/bg-placeholder.svg" alt=""></div>
+    <div class="inner">
+      <h2 class="display">Clickable list heading.</h2>
+      <div class="defaults-split">
+        <div class="tiles tiles-list">
+          <button class="tile" data-name="Item one">Item one</button>
+          <button class="tile" data-name="Item two">Item two</button>
+          <button class="tile" data-name="Item three">Item three</button>
+          <button class="tile" data-name="Item four">Item four</button>
+          <button class="tile" data-name="Item five">Item five</button>
+          <button class="tile" data-name="Item six">Item six</button>
+        </div>
+        <div class="tile-detail">
+          <span class="picto"></span>
+          <div>
+            <h4></h4>
+            <ul></ul>
+          </div>
+          <button type="button" class="detail-close" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 5l14 14M19 5L5 19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 06 · RECAP — a numbered summary of everything covered. -->
+  <section class="slide" data-title="Recap">
+    <div class="slide-bg" data-depth="0.05"><img src="images/bg-placeholder.svg" alt=""></div>
+    <div class="inner">
+      <h2 class="display">Recap heading.</h2>
+      <ol class="recap">
+        <li data-reveal="1"><span class="recap-n">1.</span>First takeaway</li>
+        <li data-reveal="1"><span class="recap-n">2.</span>Second takeaway</li>
+        <li data-reveal="2"><span class="recap-n">3.</span>Third takeaway</li>
+        <li data-reveal="2"><span class="recap-n">4.</span>Fourth takeaway</li>
+        <li data-reveal="3"><span class="recap-n">5.</span>Fifth takeaway</li>
+        <li data-reveal="3"><span class="recap-n">6.</span>Sixth takeaway</li>
+      </ol>
+    </div>
+  </section>
+
+</main>
+
+<script src="pictograms.js?v=1"></script>
+<script src="script.js?v=1"></script>
+</body>
+</html>

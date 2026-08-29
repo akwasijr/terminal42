@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900" role="presentation">
+  <rect width="1600" height="900" fill="#141620"/>
+  <g fill="none" stroke="#2a2e3d" stroke-width="4">
+    <path d="M0 0l1600 900M1600 0L0 900"/>
+  </g>
+  <text x="800" y="470" text-anchor="middle" fill="#5b6076"
+        font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="52" font-weight="600">
+    Image placeholder
+  </text>
+</svg>

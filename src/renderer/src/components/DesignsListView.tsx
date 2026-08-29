@@ -5,8 +5,8 @@ import type { Design, DesignBrief, DesignGroup, TemplateInfo } from '../../../pr
 import { DesignWizard } from './DesignWizard'
 import { TokensView } from './tokens/TokensView'
 import { TemplatesGallery } from './TemplatesGallery'
-import { DeckHouseGallery } from './DeckHouseGallery'
-import type { DeckStyle } from '../../../shared/decks/houses'
+import { DeckTemplateGallery } from './DeckTemplateGallery'
+import type { DeckTemplate } from '../../../shared/decks/templates'
 import { DesignSystemView } from './DesignSystemView'
 import { DesignSystemWizard } from './DesignSystemWizard'
 import { type DesignSystem, upsertSystem } from '../lib/designSystem'
@@ -19,7 +19,7 @@ const GROUP_LABEL: Record<DesignGroup, string> = {
 }
 // Display order for the chip row. Keeps the most common kinds on the left.
 const GROUP_ORDER: DesignGroup[] = ['web', 'app', 'presentation', 'content', 'print', 'data', 'social', 'figma', 'other']
-type TypeFilter = 'all' | 'form' | DesignGroup | 'system' | 'templates' | 'tokens' | 'decks'
+type TypeFilter = 'all' | 'form' | DesignGroup | 'system' | 'templates' | 'tokens'
 
 /**
  * Which family of files this list is showing. Forms (the freeform canvas) and
@@ -47,7 +47,7 @@ export function DesignsListView({
   // The house chosen from the deck gallery, stamped onto the brief when the
   // wizard finishes. Held here rather than asked for inside the wizard: it is
   // already answered by the time the wizard opens.
-  const [deckHouse, setDeckHouse] = useState<DeckStyle | null>(null)
+  const [deckHouse, setDeckHouse] = useState<DeckTemplate | null>(null)
   const [creating, setCreating] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<Design | null>(null)
   const [search, setSearch] = useState('')
@@ -55,7 +55,7 @@ export function DesignsListView({
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => (localStorage.getItem('t42-designs-view') === 'list' ? 'list' : 'grid'))
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const showsDesigns =
-    typeFilter !== 'system' && typeFilter !== 'tokens' && typeFilter !== 'templates' && typeFilter !== 'decks'
+    typeFilter !== 'system' && typeFilter !== 'tokens' && typeFilter !== 'templates'
   // An open token library asks for the whole page, so the list chrome steps
   // aside rather than the library squeezing itself into what is left.
   const [tokensFull, setTokensFull] = useState(false)
@@ -81,7 +81,7 @@ export function DesignsListView({
   useEffect(() => {
     if (
       scope === 'form' &&
-      (typeFilter === 'system' || typeFilter === 'tokens' || typeFilter === 'templates' || typeFilter === 'decks')
+      (typeFilter === 'system' || typeFilter === 'tokens' || typeFilter === 'templates')
     ) {
       setTypeFilter('all')
     }
@@ -242,8 +242,8 @@ export function DesignsListView({
     onOpen(d)
   }
 
-  /** Start a deck already committed to one house. */
-  const createDeckInHouse = (style: DeckStyle): void => {
+  /** Start a deck already committed to one template. */
+  const createDeckFromTemplate = (style: DeckTemplate): void => {
     if (creating) return
     setDeckHouse(style)
     setWizardStarter(null)
@@ -314,8 +314,12 @@ export function DesignsListView({
   const presentTypes = useMemo(() => {
     const s = new Set<DesignGroup>()
     for (const d of scoped) s.add((d.brief?.group ?? 'other') as DesignGroup)
+    // Decks is the one kind that is always offered: it is where the deck
+    // templates live, so hiding it until you already own a deck would hide the
+    // only way of making one.
+    if (scope === 'design') s.add('presentation')
     return { groups: GROUP_ORDER.filter((g) => s.has(g)) }
-  }, [scoped])
+  }, [scoped, scope])
 
   const allLabel = scope === 'form' ? 'All forms' : 'All designs'
   // The heading is the answer to "what am I looking at", so it has to name the
@@ -325,7 +329,6 @@ export function DesignsListView({
     typeFilter === 'system' ? 'Design systems'
       : typeFilter === 'tokens' ? 'Tokens'
         : typeFilter === 'templates' ? 'Templates'
-          : typeFilter === 'decks' ? 'Deck styles'
           : typeFilter !== 'all' && typeFilter !== 'form' && typeFilter in GROUP_LABEL ? GROUP_LABEL[typeFilter as DesignGroup]
             : folderFilter !== 'all' ? folderFilter
               : allLabel
@@ -335,7 +338,7 @@ export function DesignsListView({
     const q = search.trim().toLowerCase()
     const isGroup =
       typeFilter !== 'all' && typeFilter !== 'form' && typeFilter !== 'system' &&
-      typeFilter !== 'templates' && typeFilter !== 'tokens' && typeFilter !== 'decks'
+      typeFilter !== 'templates' && typeFilter !== 'tokens'
     const visible = scoped.filter((d) => {
       if (isGroup && (d.brief?.group ?? 'other') !== typeFilter) return false
       if (folderFilter !== 'all' && designFolders[d.id] !== folderFilter) return false
@@ -439,7 +442,6 @@ export function DesignsListView({
                 <ViewPill active={typeFilter === 'system'} onClick={() => setTypeFilter('system')}>Design systems</ViewPill>
                 <ViewPill active={typeFilter === 'tokens'} onClick={() => setTypeFilter('tokens')}>Tokens</ViewPill>
                 <ViewPill active={typeFilter === 'templates'} onClick={() => setTypeFilter('templates')}>Templates</ViewPill>
-                <ViewPill active={typeFilter === 'decks'} onClick={() => setTypeFilter('decks')}>Deck styles</ViewPill>
               </div>
             )}
           </div>
@@ -532,8 +534,31 @@ export function DesignsListView({
           <TokensView onFullPage={setTokensFull} />
         ) : typeFilter === 'templates' ? (
           <TemplatesGallery onUse={createFromTemplate} />
-        ) : typeFilter === 'decks' ? (
-          <DeckHouseGallery onUse={createDeckInHouse} />
+        ) : typeFilter === 'presentation' ? (
+          /* Decks lead with the templates. A deck is the one thing here nobody
+             wants to start from an empty page, and the saved decks follow
+             underneath rather than being replaced by them. */
+          <>
+            <DeckTemplateGallery onUse={createDeckFromTemplate} />
+            {buckets.length > 0 && (
+              <section className="mt-2">
+                <h2 className="mb-2.5 text-[11.5px] font-medium text-text-muted">Your decks</h2>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {buckets.flatMap((b) => b.items).map((d) => (
+                    <DesignCard
+                      key={d.id}
+                      design={d}
+                      onOpen={() => onOpen(d)}
+                      onDelete={() => setConfirmDelete(d)}
+                      folders={folders}
+                      folder={designFolders[d.id] ?? null}
+                      onAssign={assignFolder}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+          </>
         ) : designs.length === 0 ? (
           <EmptyState noun={scope === 'form' ? 'form' : 'design'} onCreate={() => { if (scope === 'form') void createFreeform(); else openHtmlWizard() }} />
         ) : (

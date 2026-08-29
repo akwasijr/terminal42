@@ -1,14 +1,13 @@
-// Choosing a house style for a deck.
+// Turning a chosen deck template into direction the model can follow.
 //
-// The houses themselves live in shared/decks/houses.ts so the gallery can draw
-// its previews from the same values the deck is built from. What is left here
-// is the choosing and the writing-out: which house a deck gets, and how that
-// becomes direction the model can follow.
+// The templates themselves live in shared/decks/templates.ts so the gallery
+// draws its previews from the same values the deck is built from. What is left
+// here is the choosing and the writing-out.
 
 import type { DesignBrief } from './design.types'
-import { DECK_STYLES, deckStyleById, type DeckStyle } from '../shared/decks/houses'
+import { DECK_TEMPLATES, deckTemplateById, type DeckTemplate } from '../shared/decks/templates'
 
-export { DECK_STYLES, deckStyleById, type DeckStyle }
+export { DECK_TEMPLATES, deckTemplateById, type DeckTemplate }
 
 function hash(s: string): number {
   let h = 2166136261
@@ -27,37 +26,57 @@ function pinsFonts(b: DesignBrief | null): boolean {
   return !!(b && (b.fontPairId || b.fontPrimary || b.fontHeading || b.customFonts))
 }
 
+/** How a cover is composed, as an instruction rather than a label. */
+const COVER_BRIEF: Record<DeckTemplate['cover'], string> = {
+  marker:
+    'Cover: a bracketed index marker at the top left, the heading sitting low at the left, a hairline rule above a footer carrying a name and a URL. No photograph.',
+  wordmark:
+    'Cover: the wordmark alone, centred, on the saturated ground. Nothing else on the slide — no strapline, no date, no logo lock-up.',
+  photo:
+    'Cover: a photograph filling the upper two thirds, the heading beneath it in a solid accent band with the type knocked out of it.',
+  panel:
+    'Cover: split vertically. A portrait photograph on the narrow left against the page ground; the heading on a dark accent panel filling the wider right, with a rule and a short list of section names under it.',
+  editorial:
+    'Cover: two photographic frames side by side at different crops along the lower half, the heading in light capitals above them, a monospaced reference number top left and the year top right.'
+}
+
 /**
- * Pick one house style for a deck and write it out as prompt direction.
+ * Pick one template for a deck and write it out as prompt direction.
  *
  * Seeded from the brief the same way the web variety engine is, so a deck keeps
- * its house across every iteration turn while two different decks get different
- * houses. The colour block drops out when the user has already answered that
- * question — the type, imagery and running order still apply, because those are
- * the part the chassis has no opinion about.
+ * its template across every iteration turn while two different decks get
+ * different ones. The colour block drops out when the user has already answered
+ * that question — the composition and running order still apply, because those
+ * are the part the chassis has no opinion about.
  */
 export function pickDeckStyle(brief: DesignBrief | null): { styleId: string; text: string } {
-  // A house chosen from the gallery wins. The automatic pick exists so that
+  // A template chosen from the gallery wins. The automatic pick exists so that
   // two decks do not look alike; once somebody has said which one they want,
   // varying it would be overruling them.
   const seedStr = `${brief?.createdAt ?? 0}|${brief?.kind ?? ''}|${brief?.idea ?? ''}|${brief?.audience ?? ''}`
-  const style =
-    (brief?.deckStyleId ? deckStyleById(brief.deckStyleId) : null) ??
-    DECK_STYLES[hash(seedStr) % DECK_STYLES.length]
+  const t =
+    (brief?.deckStyleId ? deckTemplateById(brief.deckStyleId) : null) ??
+    DECK_TEMPLATES[hash(seedStr) % DECK_TEMPLATES.length]
 
-  const lines: string[] = ['DECK HOUSE STYLE (commit to this whole, not in part)']
-  lines.push(`- House: ${style.label}. ${style.note}`)
+  const lines: string[] = ['DECK TEMPLATE (commit to this whole, not in part)']
+  lines.push(`- Template: ${t.name}. ${t.note}`)
 
   const colourPinned = pinsColour(brief)
   const fontsPinned = pinsFonts(brief)
 
-  // The chassis reads every one of these; setting them is how a house is
-  // applied. Anything the user already chose replaces the matching line
-  // rather than the whole block, so a pinned palette still gets this house's
-  // radius and faces.
-  const decl = Object.entries(style.tokens)
+  // The chassis reads every one of these; setting them is how a template is
+  // applied. Anything the user already chose replaces the matching line rather
+  // than the whole block, so a pinned palette still gets this template's radius
+  // and faces.
+  const tokens: Record<string, string> = {
+    ...t.tokens,
+    '--deck-heading-weight': String(t.heading.weight),
+    '--deck-heading-case': t.heading.case,
+    '--deck-heading-track': t.heading.track
+  }
+  const decl = Object.entries(tokens)
     .filter(([k]) => {
-      if (colourPinned && (k.startsWith('--deck-accent') || k === '--deck-bg' || k.startsWith('--deck-ink') || k === '--deck-panel' || k === '--deck-panel-2' || k === '--deck-sheen')) return false
+      if (colourPinned && (k.startsWith('--deck-accent') || k === '--deck-bg' || k.startsWith('--deck-ink') || k === '--deck-panel' || k === '--deck-panel-2')) return false
       if (fontsPinned && (k === '--deck-font' || k === '--deck-mono')) return false
       return true
     })
@@ -69,24 +88,25 @@ export function pickDeckStyle(brief: DesignBrief | null): { styleId: string; tex
     lines.push(...decl)
     lines.push('  }')
   }
-  if (!colourPinned && style.tone === 'light') {
-    lines.push('- This is a light house: put data-deck-tone="light" on <html> so the chassis flips its panel tints and sheen with it.')
+  if (!colourPinned && t.tone === 'light') {
+    lines.push('- This is a light template: put data-deck-tone="light" on <html> so the chassis turns its panel tints over with it. Put it on <html> only, never on <body>.')
   }
   if (colourPinned) {
     lines.push('- Colour: derive --deck-bg, --deck-ink, --deck-ink-2, --deck-ink-3 and --deck-accent-1..4 from the palette already given in this brief. Set data-deck-tone="light" on <html> if that ground is light.')
   }
-  if (!fontsPinned && style.fontsHref) {
-    lines.push(`- Load the faces: <link rel="stylesheet" href="${style.fontsHref}">`)
+  if (!fontsPinned && t.fontsHref) {
+    lines.push(`- Load the faces: <link rel="stylesheet" href="${t.fontsHref}">`)
   }
-  if (!fontsPinned) lines.push(`- Type: ${style.type}`)
-  lines.push(`- Imagery: ${style.imagery}`)
-  lines.push(`- Numbers: ${style.data}`)
-  lines.push(`- Running order: ${style.sequence}`)
+
+  lines.push(`- Put data-cover="${t.cover}" on the cover section. The chassis lays it out from that; do not lay it out yourself.`)
+  lines.push(`- ${COVER_BRIEF[t.cover]}`)
+  lines.push('- The moves that make this template itself. Use every one of them at least once:')
+  for (const m of t.moves) lines.push(`  - ${m}`)
 
   if (brief?.look) lines.push(`- Express all of this within the requested "${brief.look}" look rather than replacing it.`)
   lines.push(
     '- Do not produce the default deck: a centred title over three equal bullet points, a stock photograph behind a translucent panel, or a slide that is only a heading and a paragraph.'
   )
 
-  return { styleId: style.id, text: lines.join('\n') }
+  return { styleId: t.id, text: lines.join('\n') }
 }
