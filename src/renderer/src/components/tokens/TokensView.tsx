@@ -36,6 +36,7 @@ import {
   type Enforcement,
   type SetState,
   cssOptionsOf,
+  countTokens as countStudioTokens,
   type CssOptions
 } from '../../../../shared/tokens/types'
 import { ENFORCEMENT_OPTIONS } from '../../../../shared/tokens/enforcementCopy'
@@ -254,7 +255,7 @@ export function TokensView({ onFullPage }: { onFullPage?: (full: boolean) => voi
 }
 
 function countTokens(raw: unknown): number {
-  return hydrateStudio(raw).sets.reduce((n, s) => n + s.tokens.length, 0)
+  return countStudioTokens(hydrateStudio(raw))
 }
 
 /** The first few colours of a studio, so the list is recognisable at a glance. */

@@ -322,3 +322,17 @@ function isToken(t: unknown): t is Token {
     (typeof c.value === 'string' || typeof c.value === 'number' || (!!c.value && typeof c.value === 'object'))
   )
 }
+
+/**
+ * How many tokens a library holds.
+ *
+ * Counted over every set rather than over what one theme resolves to, because
+ * a theme switches sets off and the answer would then change depending on
+ * which theme happened to be active. Shared rather than written out at each
+ * call site: the library list and the library detail once counted different
+ * ways, and the same library reported 325 tokens in one place and 233 in the
+ * other, which reads as a bug even though both numbers were true.
+ */
+export function countTokens(studio: Pick<TokenStudio, 'sets'>): number {
+  return studio.sets.reduce((n, s) => n + s.tokens.length, 0)
+}

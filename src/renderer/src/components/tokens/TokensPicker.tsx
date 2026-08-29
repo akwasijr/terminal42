@@ -9,36 +9,40 @@
  *
  * Visual on purpose. A library is chosen by recognising it, not by reading its
  * name, so every option carries the colours it would actually bring.
+ *
+ * It reads as an attachment rather than as a setting: nothing but a plus until
+ * something is attached, and then the library's own name. A dropdown sitting
+ * permanently in a panel says "here is a field you must fill in"; a plus says
+ * "you may bring one", which is the truth. The same modal opens from the chat
+ * composer, so the choice looks identical wherever it is made.
  */
 
-import type { JSX } from 'react'
-import { useTokenLibraries } from '../../lib/tokens/useTokenLibraries'
-
-/** The colours a library brings, as a strip small enough to sit in a row. */
-export function LibraryMark({ colours, className }: { colours: string[]; className?: string }): JSX.Element {
-  if (colours.length === 0) {
-    return <span className={`block h-4 w-16 rounded bg-sunken ${className ?? ''}`} />
+/** Leave for the Tokens page, optionally with the setup already open. */
+function openLibrary(fresh: boolean): void {
+  window.dispatchEvent(new Event('t42:open-tokens'))
+  if (fresh) {
+    requestNewTokens()
+    window.dispatchEvent(new Event('t42:tokens-new'))
   }
-  return (
-    <span className={`flex h-4 w-16 shrink-0 overflow-hidden rounded ${className ?? ''}`}>
-      {colours.map((c, i) => (
-        <span key={`${c}-${i}`} style={{ background: c }} className="flex-1" />
-      ))}
-    </span>
-  )
 }
+
+import { useState, type JSX } from 'react'
+import { useTokenLibraries } from '../../lib/tokens/useTokenLibraries'
+import { TokenGlyph, TokenLibraryDetail, TokenLibraryModal } from './TokenLibraryModal'
+import { requestNewTokens } from '../../lib/tokens/openLatch'
 
 /**
  * Pick a library, and which of its themes.
  *
- * Renders nothing when there are no libraries: an empty picker is an
- * invitation to wonder what is broken.
+ * Shown even when there are none. The old picker hid itself in that case,
+ * which meant somebody with an empty library never learnt that tokens existed
+ * at all — the modal's empty state offers to build one instead.
  */
 export function TokensPicker({
   tokensId,
   themeId,
   onChange,
-  label = 'Tokens',
+  label = '',
   allowNone = true,
   showThemes = true
 }: {
@@ -53,32 +57,55 @@ export function TokensPicker({
   showThemes?: boolean
 }): JSX.Element | null {
   const { libraries } = useTokenLibraries()
-  if (libraries.length === 0) return null
+  const [pickOpen, setPickOpen] = useState(false)
+  const [detailOpen, setDetailOpen] = useState(false)
   const chosen = libraries.find((s) => s.id === tokensId) ?? null
 
   return (
     <div className="flex flex-wrap items-center gap-2">
       {label ? <span className="text-[12.5px] text-text-secondary">{label}</span> : null}
-      <div className="flex min-w-0 flex-1 items-center gap-2 rounded-md bg-elevated/60 pl-2.5 focus-within:ring-1 focus-within:ring-accent/40">
-        {chosen ? <LibraryMark colours={chosen.swatches} /> : null}
-        <select
-          value={tokensId ?? ''}
-          aria-label={label || 'Token library'}
-          onChange={(e) => {
-            const id = e.target.value || null
-            const next = libraries.find((s) => s.id === id) ?? null
-            onChange(id, next?.themes[0]?.id ?? null)
-          }}
-          className="min-w-0 flex-1 bg-transparent py-2 pr-2.5 text-[13px] text-text-primary focus:outline-none"
+
+      {chosen ? (
+        <>
+          <button
+            type="button"
+            onClick={() => setDetailOpen(true)}
+            title="What is in this library"
+            className="flex min-w-0 items-center gap-1.5 text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+          >
+            <TokenGlyph className="shrink-0 text-text-muted" />
+            <span className="min-w-0 truncate text-[12.5px] underline underline-offset-2">{chosen.name}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setPickOpen(true)}
+            className="text-[12px] text-text-muted hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+          >
+            Change
+          </button>
+          {allowNone && (
+            <button
+              type="button"
+              onClick={() => onChange(null, null)}
+              className="text-[12px] text-text-muted hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            >
+              Remove
+            </button>
+          )}
+        </>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setPickOpen(true)}
+          className="flex items-center gap-1.5 rounded-md bg-elevated/60 px-2.5 py-1.5 text-[12.5px] text-text-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
         >
-          {allowNone ? <option value="">None</option> : null}
-          {libraries.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-      </div>
+          <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+            <path d="M8 3.5v9M3.5 8h9" />
+          </svg>
+          Design tokens
+        </button>
+      )}
+
       {showThemes && chosen && chosen.themes.length > 1 ? (
         <div className="flex shrink-0 items-center gap-0.5 rounded-md bg-sunken p-0.5">
           {chosen.themes.map((t) => (
@@ -98,6 +125,23 @@ export function TokensPicker({
           ))}
         </div>
       ) : null}
+
+      {pickOpen && (
+        <TokenLibraryModal
+          chosen={tokensId ? { id: tokensId, themeId } : null}
+          onChoose={(next) => onChange(next?.id ?? null, next?.themeId ?? null)}
+          onClose={() => setPickOpen(false)}
+          onCreate={() => { setPickOpen(false); openLibrary(true) }}
+          onOpenFull={() => { setPickOpen(false); openLibrary(false) }}
+        />
+      )}
+      {detailOpen && chosen && (
+        <TokenLibraryDetail
+          library={chosen}
+          onClose={() => setDetailOpen(false)}
+          onOpenFull={() => { setDetailOpen(false); openLibrary(false) }}
+        />
+      )}
     </div>
   )
 }

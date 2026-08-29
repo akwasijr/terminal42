@@ -16,6 +16,7 @@
 
 import { useEffect, useState, type JSX } from 'react'
 import { resolveAll } from '../../../../shared/tokens/resolve'
+import { countTokens } from '../../../../shared/tokens/types'
 import { sectionOf, SECTIONS, type SectionId } from '../../../../shared/tokens/groups'
 import type { TokenLibrary } from '../../lib/tokens/useTokenLibraries'
 import { useTokenLibraries } from '../../lib/tokens/useTokenLibraries'
@@ -126,13 +127,9 @@ export function TokenLibraryDetail({
 }): JSX.Element {
   const resolved = resolveAll(library.studio, library.studio.activeTheme)
   const counts = new Map<SectionId, number>()
-  // Counted over every set rather than over what the active theme resolves to,
-  // because the library list on the Tokens page counts that way too, and one
-  // library reporting two different sizes in two places reads as a bug.
-  let total = 0
+  const total = countTokens(library.studio)
   for (const set of library.studio.sets) {
     for (const token of set.tokens) {
-      total += 1
       const section = sectionOf(token)
       counts.set(section, (counts.get(section) ?? 0) + 1)
     }
@@ -229,7 +226,7 @@ export function TokenLibraryModal({
   }
 
   return (
-    <Shell title="Design tokens" note="Every turn follows the one you attach." onClose={onClose}>
+    <Shell title="Design tokens" note="The colours, type and spacing this work is held to." onClose={onClose}>
       <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {libraries.map((lib) => {
           const active = chosen?.id === lib.id
