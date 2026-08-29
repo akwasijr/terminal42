@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as Dropdown from '@radix-ui/react-dropdown-menu'
-import { IconArrowUp, IconMic, IconPlus, IconStop } from './icons'
+import { IconArrowUp, IconCheck, IconMic, IconPlus, IconStop } from './icons'
 import { ModelDropdown } from './ModelDropdown'
 import { ModePicker, getDefaultMode, persistMode, type AgentMode } from './ModePicker'
 import { ContextRing } from './ContextRing'
@@ -9,6 +9,7 @@ import { analyzeGoalQuality, shouldShowGoalQualityHint } from '../../../shared/g
 import { GoalHint } from './GoalHint'
 import { COMPOSER_FILL_EVENT } from './composerFill'
 import { TokensChip } from './tokens/TokensChip'
+import { LibraryMark } from './tokens/TokensPicker'
 import { useChatTokens } from '../lib/tokens/chatTokens'
 
 // Legacy local 2-mode type kept as a no-op so old localStorage entries don't crash.
@@ -237,7 +238,9 @@ export function Composer({
             </>
           ) : (
             <>
-              {(onAttachFile || onAttachImage) && <AttachMenu onAttachFile={onAttachFile} onAttachImage={onAttachImage} />}
+              {(onAttachFile || onAttachImage) && (
+                <AttachMenu onAttachFile={onAttachFile} onAttachImage={onAttachImage} tokens={tokens} />
+              )}
               <TokensChip libraries={tokens.libraries} chosen={tokens.chosen} onChoose={tokens.choose} />
               <ModePicker value={mode} onChange={setMode} />
               <ModelDropdown
@@ -310,18 +313,23 @@ function ComposerWaveform({ levels }: { levels: number[] }): JSX.Element {
 
 function AttachMenu({
   onAttachFile,
-  onAttachImage
+  onAttachImage,
+  tokens
 }: {
   onAttachFile?: () => void
   onAttachImage?: () => void
+  tokens: ReturnType<typeof useChatTokens>
 }) {
+  const item =
+    'cursor-pointer rounded-md px-2 py-1.5 outline-none data-[highlighted]:bg-surface data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40'
+  const { libraries, chosen, choose } = tokens
   return (
     <Dropdown.Root>
       <Dropdown.Trigger asChild>
         <button
           type="button"
           aria-label="Attach"
-          title="Attach a file or image"
+          title="Attach a file, an image or a token library"
           className="grid h-7 w-7 place-items-center rounded-md text-text-secondary outline-none hover:bg-elevated hover:text-text-primary focus:outline-none data-[state=open]:bg-elevated data-[state=open]:text-text-primary"
         >
           <IconPlus size={14} />
@@ -333,20 +341,48 @@ function AttachMenu({
           sideOffset={6}
           className="z-50 min-w-[180px] rounded-lg bg-raised p-1 text-[12px] text-text-primary shadow-overlay"
         >
-          <Dropdown.Item
-            onSelect={() => onAttachFile?.()}
-            disabled={!onAttachFile}
-            className="cursor-pointer rounded-md px-2 py-1.5 outline-none data-[highlighted]:bg-surface data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40"
-          >
+          <Dropdown.Item onSelect={() => onAttachFile?.()} disabled={!onAttachFile} className={item}>
             Upload files…
           </Dropdown.Item>
-          <Dropdown.Item
-            onSelect={() => onAttachImage?.()}
-            disabled={!onAttachImage}
-            className="cursor-pointer rounded-md px-2 py-1.5 outline-none data-[highlighted]:bg-surface data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40"
-          >
+          <Dropdown.Item onSelect={() => onAttachImage?.()} disabled={!onAttachImage} className={item}>
             Upload images…
           </Dropdown.Item>
+          {/* A library is attached to a turn the same way a file is, because
+              that is what it is: something you bring along so the answer is
+              built from it. Kept beside the uploads rather than in a control
+              of its own — a chip off to the side reads as a setting, and a
+              setting is something you never think to look for. */}
+          <Dropdown.Sub>
+            <Dropdown.SubTrigger disabled={libraries.length === 0} className={item}>
+              Design tokens…
+            </Dropdown.SubTrigger>
+            <Dropdown.Portal>
+              <Dropdown.SubContent
+                sideOffset={4}
+                className="z-50 min-w-[200px] rounded-lg bg-raised p-1 text-[12px] text-text-primary shadow-overlay"
+              >
+                {libraries.map((lib) => (
+                  <Dropdown.Item
+                    key={lib.id}
+                    onSelect={() => choose({ id: lib.id, themeId: lib.studio.activeTheme })}
+                    className={`flex items-center gap-2 ${item}`}
+                  >
+                    <LibraryMark colours={lib.swatches} />
+                    <span className="min-w-0 flex-1 truncate">{lib.name}</span>
+                    {chosen?.id === lib.id && <IconCheck size={12} />}
+                  </Dropdown.Item>
+                ))}
+                {chosen && (
+                  <>
+                    <Dropdown.Separator className="my-1 h-px bg-border" />
+                    <Dropdown.Item onSelect={() => choose(null)} className={item}>
+                      Remove
+                    </Dropdown.Item>
+                  </>
+                )}
+              </Dropdown.SubContent>
+            </Dropdown.Portal>
+          </Dropdown.Sub>
         </Dropdown.Content>
       </Dropdown.Portal>
     </Dropdown.Root>
