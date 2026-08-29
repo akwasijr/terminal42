@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as Dropdown from '@radix-ui/react-dropdown-menu'
-import { IconArrowUp, IconCheck, IconMic, IconPlus, IconStop } from './icons'
+import { IconArrowUp, IconMic, IconPlus, IconStop } from './icons'
 import { ModelDropdown } from './ModelDropdown'
 import { ModePicker, getDefaultMode, persistMode, type AgentMode } from './ModePicker'
 import { ContextRing } from './ContextRing'
@@ -8,12 +8,29 @@ import { useVoiceInput, formatVoiceTime, isVoiceInputSupported } from '../lib/vo
 import { analyzeGoalQuality, shouldShowGoalQualityHint } from '../../../shared/goalQuality'
 import { GoalHint } from './GoalHint'
 import { COMPOSER_FILL_EVENT } from './composerFill'
-import { TokensChip } from './tokens/TokensChip'
-import { LibraryMark } from './tokens/TokensPicker'
+import { TokenGlyph, TokenLibraryDetail, TokenLibraryModal } from './tokens/TokenLibraryModal'
 import { useChatTokens } from '../lib/tokens/chatTokens'
+import { requestNewTokens } from '../lib/tokens/openLatch'
+import type { TokenLibrary } from '../lib/tokens/useTokenLibraries'
 
 // Legacy local 2-mode type kept as a no-op so old localStorage entries don't crash.
 type Mode = AgentMode
+
+/**
+ * Leave chat for the token library.
+ *
+ * Two events rather than one because landing on the library and landing on it
+ * with the setup already open are different intents, and the list has to be
+ * mounted before it can hear the second — App handles the tab switch on the
+ * first, so the second is dispatched behind it and read from the latch.
+ */
+function openLibrary(fresh: boolean): void {
+  window.dispatchEvent(new Event('t42:open-tokens'))
+  if (fresh) {
+    requestNewTokens()
+    window.dispatchEvent(new Event('t42:tokens-new'))
+  }
+}
 
 export function Composer({
   sessionId,
@@ -55,6 +72,11 @@ export function Composer({
   const [mode, setMode] = useState<Mode>(() => getDefaultMode())
   const [copilotSessionId, setCopilotSessionId] = useState<string | null>(null)
   const [dismissedGoalHintFor, setDismissedGoalHintFor] = useState('')
+  const [tokensOpen, setTokensOpen] = useState(false)
+  const [detailOpen, setDetailOpen] = useState(false)
+  const attached = tokens.chosen
+    ? tokens.libraries.find((l) => l.id === tokens.chosen?.id) ?? null
+    : null
 
   useEffect(() => {
     let cancelled = false
@@ -239,9 +261,13 @@ export function Composer({
           ) : (
             <>
               {(onAttachFile || onAttachImage) && (
-                <AttachMenu onAttachFile={onAttachFile} onAttachImage={onAttachImage} tokens={tokens} />
+                <AttachMenu
+                  onAttachFile={onAttachFile}
+                  onAttachImage={onAttachImage}
+                  onOpenTokens={() => setTokensOpen(true)}
+                />
               )}
-              <TokensChip libraries={tokens.libraries} chosen={tokens.chosen} onChoose={tokens.choose} />
+              <AttachedTokens active={attached} onOpen={() => setDetailOpen(true)} />
               <ModePicker value={mode} onChange={setMode} />
               <ModelDropdown
                 value={model}
@@ -290,7 +316,57 @@ export function Composer({
         </div>
       </div>
       <p className="mt-1.5 text-center text-[11px] text-text-muted">AI-generated content may be incorrect</p>
+      {tokensOpen && (
+        <TokenLibraryModal
+          chosen={tokens.chosen}
+          onChoose={tokens.choose}
+          onClose={() => setTokensOpen(false)}
+          onCreate={() => {
+            setTokensOpen(false)
+            openLibrary(true)
+          }}
+        />
+      )}
+      {detailOpen && attached && (
+        <TokenLibraryDetail
+          library={attached}
+          onClose={() => setDetailOpen(false)}
+          onOpenFull={() => {
+            setDetailOpen(false)
+            openLibrary(false)
+          }}
+        />
+      )}
     </div>
+  )
+}
+
+/**
+ * Which library this chat is following, and nothing when it follows none.
+ *
+ * There used to be a standing "Tokens" chip here whether or not one was
+ * attached. It duplicated the entry point under "+" and read as a setting, so
+ * what is left is only the statement: the library's own name, marked as a
+ * token and underlined, because it opens what it names.
+ */
+function AttachedTokens({
+  active,
+  onOpen
+}: {
+  active: TokenLibrary | null
+  onOpen: () => void
+}): JSX.Element | null {
+  if (!active) return null
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      title={`Every turn follows ${active.name}`}
+      className="flex h-6 items-center gap-1.5 rounded-md px-1.5 text-[11.5px] text-text-secondary underline underline-offset-2 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+    >
+      <TokenGlyph className="shrink-0" />
+      <span className="max-w-[10rem] truncate">{active.name}</span>
+    </button>
   )
 }
 
@@ -314,15 +390,14 @@ function ComposerWaveform({ levels }: { levels: number[] }): JSX.Element {
 function AttachMenu({
   onAttachFile,
   onAttachImage,
-  tokens
+  onOpenTokens
 }: {
   onAttachFile?: () => void
   onAttachImage?: () => void
-  tokens: ReturnType<typeof useChatTokens>
+  onOpenTokens: () => void
 }) {
   const item =
     'cursor-pointer rounded-md px-2 py-1.5 outline-none data-[highlighted]:bg-surface data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40'
-  const { libraries, chosen, choose } = tokens
   return (
     <Dropdown.Root>
       <Dropdown.Trigger asChild>
@@ -349,40 +424,13 @@ function AttachMenu({
           </Dropdown.Item>
           {/* A library is attached to a turn the same way a file is, because
               that is what it is: something you bring along so the answer is
-              built from it. Kept beside the uploads rather than in a control
-              of its own — a chip off to the side reads as a setting, and a
-              setting is something you never think to look for. */}
-          <Dropdown.Sub>
-            <Dropdown.SubTrigger disabled={libraries.length === 0} className={item}>
-              Design tokens…
-            </Dropdown.SubTrigger>
-            <Dropdown.Portal>
-              <Dropdown.SubContent
-                sideOffset={4}
-                className="z-50 min-w-[200px] rounded-lg bg-raised p-1 text-[12px] text-text-primary shadow-overlay"
-              >
-                {libraries.map((lib) => (
-                  <Dropdown.Item
-                    key={lib.id}
-                    onSelect={() => choose({ id: lib.id, themeId: lib.studio.activeTheme })}
-                    className={`flex items-center gap-2 ${item}`}
-                  >
-                    <LibraryMark colours={lib.swatches} />
-                    <span className="min-w-0 flex-1 truncate">{lib.name}</span>
-                    {chosen?.id === lib.id && <IconCheck size={12} />}
-                  </Dropdown.Item>
-                ))}
-                {chosen && (
-                  <>
-                    <Dropdown.Separator className="my-1 h-px bg-border" />
-                    <Dropdown.Item onSelect={() => choose(null)} className={item}>
-                      Remove
-                    </Dropdown.Item>
-                  </>
-                )}
-              </Dropdown.SubContent>
-            </Dropdown.Portal>
-          </Dropdown.Sub>
+              built from it. It opens a modal rather than a submenu: a library
+              is chosen by recognising its colours, a menu row is too small to
+              show them, and a submenu that renders nothing when you have none
+              cannot tell you how to make one. */}
+          <Dropdown.Item onSelect={() => onOpenTokens()} className={item}>
+            Design tokens…
+          </Dropdown.Item>
         </Dropdown.Content>
       </Dropdown.Portal>
     </Dropdown.Root>

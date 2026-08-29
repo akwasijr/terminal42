@@ -52,10 +52,13 @@ export function ChipsRow({
         title={onOpenFolder ? `${cwd} (click to reveal in Finder)` : cwd}
         onClick={onOpenFolder}
       />
-      {isRepo && (
+      {/* Only when there is a branch to name. A repo with no current branch
+          showed "detached", which names a git state the person reading it did
+          not ask about and cannot act on from here. */}
+      {isRepo && branch && (
         <Chip
           icon={<IconBranch size={12} />}
-          label={branch ?? 'detached'}
+          label={branch}
           title={branchTitle}
           dot={dirty ? 'amber' : 'green'}
         />
