@@ -61,6 +61,11 @@ function HousePreview({ style }: { style: DeckStyle }): JSX.Element {
   const font = tok(style, '--deck-font', 'system-ui, sans-serif')
   const mono = tok(style, '--deck-mono', 'ui-monospace, monospace')
   const radius = tok(style, '--deck-radius', '0px')
+  // The preview is only honest if it sets type the way the chassis does, so it
+  // reads the same three heading tokens rather than assuming bold lower case.
+  const headWeight = tok(style, '--deck-heading-weight', '800')
+  const headCase = tok(style, '--deck-heading-case', 'none') as 'none' | 'uppercase'
+  const headTrack = tok(style, '--deck-heading-track', '-0.02em')
 
   return (
     <div
@@ -78,10 +83,11 @@ function HousePreview({ style }: { style: DeckStyle }): JSX.Element {
           <div
             style={{
               fontFamily: font,
-              fontWeight: 700,
+              fontWeight: Number(headWeight),
               fontSize: '19px',
               lineHeight: 1.05,
-              letterSpacing: '-0.02em',
+              letterSpacing: headTrack,
+              textTransform: headCase,
               color: ink
             }}
           >
@@ -91,11 +97,11 @@ function HousePreview({ style }: { style: DeckStyle }): JSX.Element {
           </div>
           <div style={{ height: 1, background: ink3, opacity: 0.45, margin: '7px 0 6px' }} />
           <div className="flex items-end gap-[6%]">
-            <span style={{ fontFamily: font, fontWeight: 700, fontSize: '17px', lineHeight: 1, color: accent }}>
+            <span style={{ fontFamily: font, fontWeight: 800, fontSize: '17px', lineHeight: 1, color: accent }}>
               88<span style={{ fontSize: '9px' }}>%</span>
             </span>
             <span style={{ font: `400 7px/1.35 ${mono}`, color: ink2, maxWidth: '52%' }}>
-              {style.tone === 'dark' ? 'dark ground' : 'light ground'}
+              {style.tone === 'dark' ? 'dark' : 'light'}
             </span>
             <span className="ml-auto flex gap-[3px]">
               {[accent, accent2, ink2].map((c, i) => (

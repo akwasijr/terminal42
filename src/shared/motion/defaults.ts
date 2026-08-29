@@ -509,10 +509,32 @@ function hydrateShapes(raw: unknown): ShapeLayer[] | undefined {
       ...(typeof l.corner === 'number' && Number.isFinite(l.corner)
         ? { corner: Math.min(50, Math.max(0, l.corner)) }
         : {}),
+      ...hydrateTiling(l),
       ...hydrateSpan(l)
     })
   }
   return out.length > 0 ? out : undefined
+}
+
+/**
+ * The repeat counts, if the layer is a tiled motif.
+ *
+ * Capped rather than trusted: the counts multiply, so a bad pair from a
+ * hand-edited document would ask the canvas for millions of draws.
+ */
+function hydrateTiling(l: Partial<Record<keyof ShapeLayer, unknown>>): Partial<ShapeLayer> {
+  const count = (v: unknown): number | undefined =>
+    typeof v === 'number' && Number.isFinite(v) && v > 1
+      ? Math.min(64, Math.round(v))
+      : undefined
+  const x = count(l.tileX)
+  const y = count(l.tileY)
+  if (x === undefined && y === undefined) return {}
+  return {
+    ...(x === undefined ? {} : { tileX: x }),
+    ...(y === undefined ? {} : { tileY: y }),
+    ...(l.tileStagger === true ? { tileStagger: true } : {})
+  }
 }
 
 /** Pictures cut to a shape, with anything unusable dropped. See hydrateShapes. */

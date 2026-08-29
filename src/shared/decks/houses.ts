@@ -173,10 +173,19 @@ export const DECK_STYLES: DeckStyle[] = [
       '--deck-accent-4': '#3A3A1E',
       '--deck-font': "'Archivo',-apple-system,system-ui,sans-serif",
       '--deck-mono': "'IBM Plex Mono',ui-monospace,Menlo,monospace",
-      '--deck-radius': '4px'
+      '--deck-radius': '4px',
+      // Light and upper case, which is the whole character of the reference:
+      // the headlines are wide, airy and set in capitals, and setting them
+      // bold — the default everywhere else — turns an editorial deck into a
+      // corporate one.
+      '--deck-heading-weight': '300',
+      '--deck-heading-case': 'uppercase',
+      // Capitals need air, not the negative tracking a bold lower-case
+      // headline wants.
+      '--deck-heading-track': '.01em'
     },
-    fontsHref: 'https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&family=IBM+Plex+Mono:wght@400;500&display=swap',
-    type: 'A wide sans for display and the mono for every caption, label and eyebrow. That mono is the tell: reference numbers, versions and column headers are all monospaced.',
+    fontsHref: 'https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;600&family=IBM+Plex+Mono:wght@400;500&display=swap',
+    type: 'Display set light and wide in capitals, never bold, with the mono for every caption, label and eyebrow. That mono is the tell: reference numbers, versions and column headers are all monospaced.',
     imagery: 'Fashion and still-life photography, warm and slightly desaturated, often two frames side by side at different crops.',
     data: 'Figures set very large in the display face with a monospaced label beneath. Percentage tiles on a visible grid, one tile inverted.',
     sequence: 'Cover with a two-frame exhibit, a three-point principles slide, a stats grid, a single statement slide, a split of strategy, a lookbook carousel, a recap, a closing line.'
@@ -202,7 +211,10 @@ export const DECK_STYLES: DeckStyle[] = [
       '--deck-accent-4': '#FFE3D2',
       '--deck-font': "'Archivo',-apple-system,system-ui,sans-serif",
       '--deck-mono': "'Archivo',ui-monospace,Menlo,monospace",
-      '--deck-radius': '0px'
+      '--deck-radius': '0px',
+      '--deck-heading-weight': '900',
+      '--deck-heading-case': 'uppercase',
+      '--deck-heading-track': '-.01em'
     },
     fontsHref: 'https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800;900&display=swap',
     type: 'Headings in heavy capitals, tight and stacked over two or three lines. Body stays small and regular underneath. Inside a sentence, the words that carry the claim are set in the orange.',

@@ -34,6 +34,7 @@ export const DECK_CSS = `:root{
 --deck-accent-1:#f2a573;--deck-accent-2:#f45a9b;--deck-accent-3:#7e80ee;--deck-accent-4:#1376bf;
 --deck-gradient:linear-gradient(100deg,var(--deck-accent-1),var(--deck-accent-2) 36%,var(--deck-accent-3) 66%,var(--deck-accent-4));
 --deck-font:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+--deck-heading-weight:800;--deck-heading-case:none;--deck-heading-track:-.02em;
 --deck-mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
 --deck-ease:cubic-bezier(.16,1,.3,1);
 --deck-radius:14px}
@@ -111,7 +112,7 @@ mark,.mark{background:var(--deck-accent-2);color:var(--deck-bg)}
 .slide-bg img,.slide-bg video{width:100%;height:100%;object-fit:cover}
 
 /* ---- type ---- */
-h1.display,h2.display{font-weight:800;letter-spacing:-.02em;line-height:1.04;margin:0;text-wrap:balance;color:var(--deck-ink)}
+h1.display,h2.display{font-weight:var(--deck-heading-weight);text-transform:var(--deck-heading-case);letter-spacing:var(--deck-heading-track);line-height:1.04;margin:0;text-wrap:balance;color:var(--deck-ink)}
 h1.display{font-size:clamp(38px,6vw,96px)}
 h2.display{font-size:clamp(30px,4.2vw,60px)}
 .display .w{display:inline-block;transform:translateY(115%);filter:blur(6px);transition:transform .8s var(--deck-ease),filter .8s var(--deck-ease);transition-delay:calc(var(--i) * 45ms)}
@@ -576,7 +577,7 @@ THE LAYOUTS:
 Also available: <div class="statgrid"> of <div class="stat"><div class="num">88%</div><div class="lbl">…</div></div>; <div class="chips"> of <span class="chip">; <div class="outrow"> of <span class="item">; <div class="ctarow"><button class="btn">…</button><span class="note">…</span></div>.
 
 MAKING IT YOURS:
-- Redeclare the tokens in your own <style> after the chassis: --deck-bg, --deck-panel, --deck-panel-2, --deck-ink, --deck-ink-2, --deck-ink-3, --deck-accent-1..4, --deck-font, --deck-mono, --deck-radius. That is how the palette is applied — do not hardcode colours on elements.
+- Redeclare the tokens in your own <style> after the chassis: --deck-bg, --deck-panel, --deck-panel-2, --deck-ink, --deck-ink-2, --deck-ink-3, --deck-accent-1..4, --deck-font, --deck-mono, --deck-radius, --deck-heading-weight, --deck-heading-case, --deck-heading-track. That is how the palette is applied — do not hardcode colours on elements.
 - For a light deck put data-deck-tone="light" on <html> as well, so the panel tints and the sheen turn over with it. Never set a light --deck-bg without it.
 - Load your fonts with a <link> to Google Fonts and point --deck-font at them.
 - Icons are inline <svg> inside <span class="picto">, stroke="currentColor", 24×24 viewBox. Never emoji.

@@ -628,6 +628,13 @@ export const MOTION_TEMPLATES: readonly MotionTemplate[] = [
         export: { durationSec: 9, fps: 30 },
         shapes: [
           shape({ id: 'panel', kind: 'rect', width: 52, height: 100, x: 74, y: 50, colour: INK.orange, corner: 0 }),
+          // The wall of half-circles the reference puts behind the portrait.
+          // One layer rather than thirty: recolour it, move it or take it off
+          // in a single go, and the pattern follows the panel it sits on.
+          shape({
+            id: 'arches', kind: 'half', width: 52, height: 100, x: 74, y: 50,
+            colour: '#FFFFFF', opacity: 16, tileX: 5, tileY: 4, tileStagger: true
+          }),
           shape({ id: 'badge', kind: 'pill', width: 11, height: 9, x: 11, y: 87, colour: INK.orange })
         ],
         text: [
@@ -668,6 +675,10 @@ export const MOTION_TEMPLATES: readonly MotionTemplate[] = [
         export: { durationSec: 9, fps: 30 },
         shapes: [
           shape({ id: 'panel', kind: 'rect', width: 100, height: 46, x: 50, y: 23, colour: INK.orange, corner: 0 }),
+          shape({
+            id: 'arches', kind: 'half', width: 100, height: 46, x: 50, y: 23,
+            colour: '#FFFFFF', opacity: 16, tileX: 6, tileY: 3, tileStagger: true
+          }),
           shape({ id: 'badge', kind: 'pill', width: 22, height: 4.6, x: 19, y: 92, colour: INK.orange })
         ],
         text: [

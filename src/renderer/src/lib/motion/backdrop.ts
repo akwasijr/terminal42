@@ -330,9 +330,50 @@ export function drawShapes(
       h
     })
     ctx.fillStyle = layer.colour
+    drawTiled(ctx, layer, w, h)
+    ctx.restore()
+  }
+}
+
+
+/**
+ * One shape, or the same shape repeated across its box.
+ *
+ * The box stays the layer's box either way: turning the repeat up divides the
+ * space rather than growing it, so a pattern cannot escape the panel it was
+ * put on and the layer's own handles still mean what they show.
+ */
+function drawTiled(
+  ctx: CanvasRenderingContext2D,
+  layer: ShapeLayer,
+  w: number,
+  h: number
+): void {
+  const cols = Math.max(1, Math.round(layer.tileX ?? 1))
+  const rows = Math.max(1, Math.round(layer.tileY ?? 1))
+  if (cols === 1 && rows === 1) {
     shapePath(ctx, layer.kind, 0, 0, w, h, layer.corner ?? 0)
     ctx.fill()
-    ctx.restore()
+    return
+  }
+  const tw = w / cols
+  const th = h / rows
+  for (let row = 0; row < rows; row++) {
+    // A staggered row is offset by half a tile and drawn one tile wider, so
+    // the shift does not leave a gap at one edge and a stub at the other.
+    const shift = layer.tileStagger && row % 2 === 1 ? tw / 2 : 0
+    for (let col = shift ? -1 : 0; col < cols; col++) {
+      const cx = -w / 2 + tw * (col + 0.5) + shift
+      const cy = -h / 2 + th * (row + 0.5)
+      ctx.save()
+      // Clipped to the layer's box so a staggered row cannot bleed past it.
+      ctx.beginPath()
+      ctx.rect(-w / 2, -h / 2, w, h)
+      ctx.clip()
+      shapePath(ctx, layer.kind, cx, cy, tw, th, layer.corner ?? 0)
+      ctx.fill()
+      ctx.restore()
+    }
   }
 }
 
@@ -413,11 +454,19 @@ function drawPlaceholder(
   ctx.fill()
   ctx.clip()
 
-  const size = Math.max(9, Math.min(w, h) * 0.075)
+  // Sized to the slot with no floor under it. There used to be a 9px minimum,
+  // which is a sensible legibility floor and a bad idea here: a small slot in
+  // a gallery tile got a label far too big for it, drawn at the clip's centre,
+  // so all anyone saw was the middle three letters — "Picture" showing as
+  // "ctu". A slot too small to say what it is says nothing and stays a tint,
+  // which is honest; three letters of a word is just wrong.
+  const size = Math.min(w, h) * 0.075
   ctx.font = `500 ${size}px "DM Sans", system-ui, sans-serif`
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillStyle = 'rgba(128,128,132,0.85)'
-  ctx.fillText(label, 0, 0)
+  if (size >= 7 && ctx.measureText(label).width <= w * 0.86) {
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillStyle = 'rgba(128,128,132,0.85)'
+    ctx.fillText(label, 0, 0)
+  }
   ctx.restore()
 }

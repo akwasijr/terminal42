@@ -3,21 +3,22 @@
 // A tile is a genuine preview rather than a picture of one: the arrangement
 // is projected from the template's own document, the frame carries its own
 // background and aspect, and the headline is set in the family, size, weight
-// and colour the piece will actually use. What it does not show is the
-// photographs, because the tile draws a flat outline rather than the scene,
-// so a card is a shape here and a picture in the frame.
+// and colour the piece will actually use, over the starter pictures the
+// template names. It is a flat outline rather than the running scene, so the
+// arrangement is a still and the depth is implied — but the colours, the
+// crops and the type are the piece's own.
 //
 // It opens as an overlay rather than living on the home screen, because the
 // home screen is a list of your work and twenty starting points would bury
 // it. One button away is close enough.
 
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MotionTemplate } from '../../../../shared/motion/templates'
 import { MOTION_TEMPLATES } from '../../../../shared/motion/templates'
 import { resolvedText } from '../../../../shared/motion/types'
 import { layerVisibility } from '../../../../shared/motion/frame'
 import { drawPresetThumb } from '../../lib/motion/thumb'
-import { requestTextFonts } from '../../lib/motion/fonts'
+import { ensureTextFonts, requestTextFonts } from '../../lib/motion/fonts'
 import { fontByLabel } from '../../lib/freeformTypes'
 import { IconClose } from '../icons'
 
@@ -32,9 +33,19 @@ export function MotionTemplates({
   onPick: (template: MotionTemplate) => void
   onClose: () => void
 }): React.JSX.Element {
-  // Every family a tile might set, asked for once rather than per tile.
+  // Every family a tile might set, asked for once rather than per tile, and
+  // then waited for. Asking without waiting is what made the gallery lie: the
+  // tiles painted with the fallback face, which is wider, so headlines wrapped
+  // onto more lines than the template actually produces and ran into whatever
+  // was beneath them. The template was fine; only its portrait was wrong,
+  // which is the worst kind of wrong for a gallery to be.
+  const [fontsReady, setFontsReady] = useState(false)
   useEffect(() => {
-    requestTextFonts(MOTION_TEMPLATES.flatMap((t) => t.build([]).visual.text))
+    const layers = MOTION_TEMPLATES.flatMap((t) => t.build([]).visual.text)
+    requestTextFonts(layers)
+    let alive = true
+    void ensureTextFonts(layers).then(() => { if (alive) setFontsReady(true) })
+    return () => { alive = false }
   }, [])
 
   useEffect(() => {
@@ -74,7 +85,7 @@ export function MotionTemplates({
       <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {MOTION_TEMPLATES.map((t) => (
-            <TemplateTile key={t.id} template={t} onPick={() => onPick(t)} />
+            <TemplateTile key={t.id} template={t} onPick={() => onPick(t)} fontsReady={fontsReady} />
           ))}
         </div>
       </div>
@@ -83,7 +94,7 @@ export function MotionTemplates({
   )
 }
 
-function TemplateTile({ template, onPick }: { template: MotionTemplate; onPick: () => void }): React.JSX.Element {
+function TemplateTile({ template, onPick, fontsReady }: { template: MotionTemplate; onPick: () => void; fontsReady: boolean }): React.JSX.Element {
   // The document is the preview's only source of truth, so a tile cannot
   // drift from the piece it makes: change the template and the tile follows.
   const doc = useMemo(() => template.build([]), [template])
@@ -117,7 +128,7 @@ function TemplateTile({ template, onPick }: { template: MotionTemplate; onPick: 
             containerType: 'size'
           }}
         >
-          <Outline doc={doc} swatch={template.swatch} phase={phase} bankIds={template.images} />
+          <Outline doc={doc} swatch={template.swatch} phase={phase} bankIds={template.images} fontsReady={fontsReady} />
           {doc.visual.text.map((raw) => {
             const layer = resolvedText(raw)
             // A layer with a window is not on screen for the whole loop, and
@@ -128,7 +139,7 @@ function TemplateTile({ template, onPick }: { template: MotionTemplate; onPick: 
             return (
               <span
                 key={layer.id}
-                className="pointer-events-none absolute block whitespace-pre leading-none"
+                className="pointer-events-none absolute block whitespace-pre"
                 style={{
                   left: `${layer.x}%`,
                   top: `${layer.y}%`,
@@ -136,6 +147,12 @@ function TemplateTile({ template, onPick }: { template: MotionTemplate; onPick: 
                   // point, left-aligned text starts at it.
                   transform: `translate(${layer.align === 'center' ? '-50%' : layer.align === 'right' ? '-100%' : '0'}, -50%)`,
                   fontSize: `${layer.size}cqh`,
+                  // Both taken from the layer rather than left to the tile's
+                  // own defaults. The renderer steps by size × lineHeight and
+                  // upper-cases when the layer says so, so a tile that used
+                  // leading-none and the typed case showed a block a different
+                  // height and shape from the one the template makes.
+                  lineHeight: layer.lineHeight,
                   fontFamily: fontByLabel(layer.font).stack,
                   fontWeight: layer.weight,
                   fontStyle: layer.italic ? 'italic' : 'normal',
@@ -144,7 +161,7 @@ function TemplateTile({ template, onPick }: { template: MotionTemplate; onPick: 
                   opacity: (layer.opacity / 100) * seen
                 }}
               >
-                {layer.text}
+                {layer.caps ? layer.text.toLocaleUpperCase() : layer.text}
               </span>
             )
           })}
@@ -159,9 +176,11 @@ function TemplateTile({ template, onPick }: { template: MotionTemplate; onPick: 
 }
 
 /** The arrangement, flat, at one instant of its loop. */
-function Outline({ doc, swatch, phase, bankIds }: { doc: ReturnType<MotionTemplate['build']>; swatch: readonly [string, string]; phase: number; bankIds: readonly string[] }): React.JSX.Element {
+function Outline({ doc, swatch, phase, bankIds, fontsReady }: { doc: ReturnType<MotionTemplate['build']>; swatch: readonly [string, string]; phase: number; bankIds: readonly string[]; fontsReady: boolean }): React.JSX.Element {
   const ref = useRef<HTMLCanvasElement | null>(null)
 
+  // fontsReady is in the dependencies rather than the body: it is not read
+  // here, it is the signal to paint again now that the real faces exist.
   useEffect(() => {
     const canvas = ref.current
     if (!canvas) return
@@ -173,7 +192,7 @@ function Outline({ doc, swatch, phase, bankIds }: { doc: ReturnType<MotionTempla
       far: swatch[1],
       bankIds
     })
-  }, [doc, swatch, phase, bankIds])
+  }, [doc, swatch, phase, bankIds, fontsReady])
 
   return <canvas ref={ref} className="absolute inset-0 block h-full w-full" aria-hidden="true" />
 }

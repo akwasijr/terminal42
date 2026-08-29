@@ -279,3 +279,39 @@ describe('hand edits', () => {
     expect(imageAssignment(doc, 2)).toEqual([0, 0])
   })
 })
+
+/**
+ * Tiling repeats one layer instead of adding thirty, so the counts have to
+ * survive a save and come back sane: they multiply, and a bad pair would ask
+ * the canvas for millions of draws.
+ */
+describe('tiled scenery survives a load', () => {
+  const withShape = (shape: Record<string, unknown>): Record<string, unknown> => ({
+    ...emptyDoc(),
+    visual: {
+      ...emptyDoc().visual,
+      shapes: [{ id: 's', kind: 'half', x: 0, y: 0, w: 50, h: 50, colour: '#fff', ...shape }]
+    }
+  })
+
+  it('keeps the counts and the stagger', () => {
+    const doc = hydrateDoc(withShape({ tileX: 5, tileY: 4, tileStagger: true }))
+    expect(doc.visual.shapes?.[0]).toMatchObject({ tileX: 5, tileY: 4, tileStagger: true })
+  })
+
+  it('drops counts that would not repeat anything', () => {
+    const shape = hydrateDoc(withShape({ tileX: 1, tileY: 0 })).visual.shapes?.[0]
+    expect(shape).not.toHaveProperty('tileX')
+    expect(shape).not.toHaveProperty('tileY')
+  })
+
+  it('caps a count that would flood the canvas', () => {
+    expect(hydrateDoc(withShape({ tileX: 9999 })).visual.shapes?.[0]).toMatchObject({ tileX: 64 })
+  })
+
+  it('ignores a stagger on a layer that does not tile', () => {
+    expect(hydrateDoc(withShape({ tileStagger: true })).visual.shapes?.[0]).not.toHaveProperty(
+      'tileStagger'
+    )
+  })
+})

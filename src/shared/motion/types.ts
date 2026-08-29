@@ -527,6 +527,23 @@ export type ShapeLayer = {
   opacity: number
   /** Corner radius as a percentage of the shorter side. Rectangles only. */
   corner?: number
+  /**
+   * Repeat the shape across its box as a tiled motif.
+   *
+   * The references these templates come from lean on repeating geometry — a
+   * wall of half-circles behind a portrait, a row of arches along a panel —
+   * and the only way to build that from single shapes was to place forty of
+   * them. Forty layers is forty things to move when the panel moves, and a
+   * layer list nobody can read. So the repeat belongs to the layer: one row
+   * in the list, one thing to recolour, one thing to animate.
+   *
+   * Absent or 1×1 means a single shape, which is what every existing piece
+   * has and why this is optional.
+   */
+  tileX?: number
+  tileY?: number
+  /** Every other row shifted half a tile, as a masonry or scale pattern. */
+  tileStagger?: boolean
   /** When in the loop this layer is on screen. See TextLayer.from. */
   from?: number
   to?: number
