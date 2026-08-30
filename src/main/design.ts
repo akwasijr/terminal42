@@ -21,6 +21,8 @@ import { pickVariety } from './designVariety'
 import { pickDeckStyle } from './deckStyles'
 import { pickWebsiteStyle } from './websiteStyles'
 import { applyBaseHref, effectiveBase, inlineLocalAssets } from './versionBase'
+import { serveDesign } from './designOrigin'
+import { looksLikeSpa } from '../shared/spa'
 import { buildDeckBaseBlock, DECK_USAGE, DECK_BASE_ID, DECK_RUNTIME_ID } from './deckChassis'
 import {
   EXPORT_PREP_JS,
@@ -2038,6 +2040,14 @@ export function registerDesignIpc(getWin: () => BrowserWindow | null): void {
     if (!v) return { ok: false as const, error: 'Not found' }
     try {
       const content = await fs.readFile(v.filePath, 'utf8')
+      // An app built around a router is served over a loopback origin rather
+      // than put in srcDoc (see spa.ts), and none of what follows applies to
+      // it: it is fetching its own files over http, from a directory the
+      // server is already serving. Worse than unnecessary, a file:// base
+      // would be actively harmful -- the router's first pushState would
+      // resolve against it, rewriting history to an origin the frame does
+      // not own, which Chromium answers by killing the renderer.
+      if (looksLikeSpa(content)) return { ok: true as const, content, spa: true as const }
       // See versionBase.ts: rendered through srcDoc, relative URLs resolve
       // against about:srcdoc unless the design's directory is set as the
       // base — and a document that already declares its own base has to be
@@ -2051,11 +2061,29 @@ export function registerDesignIpc(getWin: () => BrowserWindow | null): void {
       const inlined = await inlineLocalAssets(based, effectiveBase(based, baseHref), async (fileUrl) => {
         try { return await fs.readFile(fileURLToPath(fileUrl), 'utf8') } catch { return null }
       })
-      return { ok: true as const, content: inlined }
+      return { ok: true as const, content: inlined, spa: false as const }
     } catch (err) {
       return { ok: false as const, error: String(err) }
     }
   })
+  /**
+   * Put a design's preview on a loopback origin and hand back its URL.
+   *
+   * Only for previews that need an address -- see spa.ts. The document is
+   * the one the canvas has already prepared, so what is on screen does not
+   * change; only where it lives does.
+   */
+  ipcMain.handle('designs:serve', async (_e, args: { designId: string; html: string }) => {
+    const d = getDesign(args.designId)
+    if (!d) return { ok: false as const, error: 'Not found' }
+    if (typeof args.html !== 'string') return { ok: false as const, error: 'No document' }
+    try {
+      return { ok: true as const, url: await serveDesign(d.cwd, args.html) }
+    } catch (err) {
+      return { ok: false as const, error: String(err) }
+    }
+  })
+
   ipcMain.handle('designs:watch', async (_e, designId: string) => {
     watchDesign(getWin, designId)
     return { ok: true }

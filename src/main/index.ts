@@ -12,6 +12,7 @@ import { registerCanvasAssistIpc } from './canvasAssist'
 import { registerDesignIpc, stopAllDesignWatchers, killAllDesignRuns } from './design'
 import { registerMotionIpc } from './motion'
 import { registerTokensIpc } from './tokens'
+import { stopDesignOrigins } from './designOrigin'
 import { registerPreviewIpc, killAllPreviews, runningPreviewCount, runningPreviewList, stopPreview } from './preview'
 import { registerSkillsIpc } from './skills'
 import { registerRecipesIpc } from './recipes'
@@ -452,6 +453,7 @@ app.on('before-quit', (event) => {
   killAllChats()
   killAllDesignRuns()
   stopAllDesignWatchers()
+  stopDesignOrigins()
   stopTasksWatcher()
   stopAutoPoke()
   stopInsightsScheduler()

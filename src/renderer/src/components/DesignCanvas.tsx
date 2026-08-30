@@ -278,6 +278,13 @@ export function DesignCanvas({
   const empty = versions.length === 0
 
   const [activeContent, setActiveContent] = useState<string>('')
+  // Where the preview lives. Null means srcDoc, which is right for a page:
+  // one document, nothing to fetch, and the app's own origin, so the canvas
+  // can reach in to annotate and edit. An app built around a router cannot
+  // work there -- about:srcdoc gives it a pathname of "srcdoc" and no route
+  // matches that -- so it is served from a loopback origin instead, where it
+  // sits at "/". See src/main/spa.ts.
+  const [previewSrc, setPreviewSrc] = useState<string | null>(null)
   const [annotate, setAnnotate] = useState(false)
   const [pick, setPick] = useState<{ selector: string; text: string } | null>(null)
   const [pickComment, setPickComment] = useState('')
@@ -325,6 +332,10 @@ export function DesignCanvas({
         setActiveContent(`<!doctype html><pre style="padding:24px;font:13px ui-monospace">Failed to load: ${res.error}</pre>`)
         return
       }
+      // Decided while the file was read, because an app is recognised by
+      // having nothing on the page but its mount point -- and the annotator
+      // and editor are about to put their own markup on it.
+      const spa = res.spa === true
       let html = res.content
       if (profile.id === 'slides') html = injectSlideRunner(html)
       // Always inject the annotator + tweak runner + editor so toggles are
@@ -333,6 +344,13 @@ export function DesignCanvas({
       html = injectTweakRunner(html)
       html = injectEditor(html)
       setActiveContent(html)
+      if (!spa) { setPreviewSrc(null); return }
+      void window.terminal42.designs.serve(designId, html).then((r) => {
+        if (cancelled) return
+        // If it cannot be served it still gets srcDoc: a preview that half
+        // works beats no preview and a message about a port.
+        setPreviewSrc(r.ok ? `${r.url}?v=${encodeURIComponent(String(active.modifiedAt))}` : null)
+      })
     })
     return () => { cancelled = true }
   }, [designId, active?.id, active?.modifiedAt, reloadKey, profile.id])
@@ -504,6 +522,10 @@ export function DesignCanvas({
   }, [])
 
   // Mutually exclusive overlays
+  // An app served from its own origin is out of the canvas's reach. Ask it
+  // in chat instead, which goes through the file rather than the preview.
+  const served = previewSrc !== null
+
   const enterAnnotate = (): void => { setEditMode(false); setCompareMode(false); setMotionMode(false); setShaderMode(false); setAnnotate((a) => !a) }
   const enterEdit     = (): void => { setAnnotate(false); setCompareMode(false); setMotionMode(false); setShaderMode(false); setEditMode((e) => !e) }
   const enterMotion   = (): void => { setAnnotate(false); setEditMode(false); setCompareMode(false); setShaderMode(false); setMotionMode((m) => !m) }
@@ -1009,15 +1031,20 @@ export function DesignCanvas({
               the rest of the bar off the end of the row. Only the chosen one
               carries its name; the others are their icon, as the viewport
               pills already are. */}
+          {/* Picking an element means reaching into the preview's document,
+              which the app can only do while the preview is its own. An app
+              built around a router is served from a loopback origin instead
+              (see src/main/spa.ts) and is out of reach there, so the modes
+              that pick say so rather than quietly doing nothing. */}
           <ModePicker
             modes={[
               { id: 'annotate', label: 'Annotate', on: 'Annotating',
-                hint: 'Click an element to leave a comment for the AI',
-                active: annotate, disabled: empty, onPick: enterAnnotate,
+                hint: served ? OUT_OF_REACH : 'Click an element to leave a comment for the AI',
+                active: annotate, disabled: empty || served, onPick: enterAnnotate,
                 icon: <IconChat size={12} /> },
               { id: 'edit', label: 'Edit', on: 'Editing',
-                hint: 'Edit elements (granular) or project tokens (global)',
-                active: editMode, disabled: empty, onPick: enterEdit,
+                hint: served ? OUT_OF_REACH : 'Edit elements (granular) or project tokens (global)',
+                active: editMode, disabled: empty || served, onPick: enterEdit,
                 icon: <IconEdit size={12} /> },
               { id: 'compare', label: 'Compare', on: 'Comparing',
                 hint: versions.length < 2
@@ -1033,8 +1060,8 @@ export function DesignCanvas({
                   </svg>
                 ) },
               { id: 'motion', label: 'Motion', on: 'Motion on',
-                hint: 'Click an element to add an animation',
-                active: motionMode, disabled: empty || active?.kind === 'pptx',
+                hint: served ? OUT_OF_REACH : 'Click an element to add an animation',
+                active: motionMode, disabled: empty || served || active?.kind === 'pptx',
                 onPick: enterMotion,
                 icon: (
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -1042,8 +1069,8 @@ export function DesignCanvas({
                   </svg>
                 ) },
               { id: 'shader', label: 'Shader', on: 'Shader on',
-                hint: 'Click an element to add a shader background',
-                active: shaderMode, disabled: empty || active?.kind === 'pptx',
+                hint: served ? OUT_OF_REACH : 'Click an element to add a shader background',
+                active: shaderMode, disabled: empty || served || active?.kind === 'pptx',
                 onPick: enterShader,
                 icon: (
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -1267,7 +1294,7 @@ export function DesignCanvas({
                   <iframe
                     key={`${active.id}-${reloadKey}`}
                     ref={iframeRef}
-                    srcDoc={activeContent}
+                    {...(previewSrc ? { src: previewSrc } : { srcDoc: activeContent })}
                     title="Design preview"
                     onLoad={onIframeLoad}
                     className="block border-0 bg-white"
@@ -1285,7 +1312,7 @@ export function DesignCanvas({
                   <iframe
                     key={`${active.id}-${reloadKey}`}
                     ref={iframeRef}
-                    srcDoc={activeContent}
+                    {...(previewSrc ? { src: previewSrc } : { srcDoc: activeContent })}
                     title="Design preview"
                     onLoad={onIframeLoad}
                     className="block border-0 bg-white"
@@ -1709,6 +1736,9 @@ function friendlyElementLabel(selector: string): string {
   // For semantic tags like header/nav/main/footer, the class adds detail.
   return `<${tag}> · ${cls}`
 }
+
+const OUT_OF_REACH =
+  'This app runs on its own address so its routes work, which puts it out of reach of the picker. Ask for the change in chat.'
 
 function computeSelector(el: Element | null): string {
   if (!el || el.nodeType !== 1) return ''

@@ -839,7 +839,11 @@ const api = {
     history: (designId: string) => ipcRenderer.invoke('designs:history', designId) as Promise<DesignMessage[]>,
     listVersions: (designId: string) => ipcRenderer.invoke('designs:listVersions', designId) as Promise<DesignVersion[]>,
     readVersion: (designId: string, fileName: string) =>
-      ipcRenderer.invoke('designs:readVersion', designId, fileName) as Promise<{ ok: true; content: string } | { ok: false; error: string }>,
+      ipcRenderer.invoke('designs:readVersion', designId, fileName) as
+        Promise<{ ok: true; content: string; spa?: boolean } | { ok: false; error: string }>,
+    serve: (designId: string, html: string) =>
+      ipcRenderer.invoke('designs:serve', { designId, html }) as
+        Promise<{ ok: true; url: string } | { ok: false; error: string }>,
     watch: (designId: string) => ipcRenderer.invoke('designs:watch', designId) as Promise<{ ok: boolean }>,
     unwatch: (designId: string) => ipcRenderer.invoke('designs:unwatch', designId) as Promise<{ ok: boolean }>,
     revealLatest: (designId: string) => ipcRenderer.invoke('designs:revealLatest', designId) as Promise<{ ok: boolean }>,
