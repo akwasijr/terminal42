@@ -1,4 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { applyFeel, DEFAULT_ANSWERS, type SystemAnswers } from '../lib/designSystem'
+import { TokenTemplates } from './tokens/TokenTemplates'
+import { studioFromPreset } from '../lib/tokenPresets'
+import type { Vibe } from '../lib/designSystem'
 import { CardMenu, ConfirmDelete } from './CardMenu'
 import { requestNewTokens, takeTokensRequest } from '../lib/tokens/openLatch'
 import { formatAge } from '../lib/formatAge'
@@ -15,12 +19,25 @@ import { IconClose, IconEdit, IconPlus, IconSearch } from './icons'
 
 // Pretty labels for the kind-group filter chips at the top of the page.
 const GROUP_LABEL: Record<DesignGroup, string> = {
-  web: 'Web', app: 'App', presentation: 'Decks', content: 'Content',
+  web: 'Website', app: 'App', presentation: 'Decks', content: 'Content',
   print: 'Print', data: 'Data', social: 'Social', figma: 'Figma', other: 'Other'
 }
 // Display order for the chip row. Keeps the most common kinds on the left.
 const GROUP_ORDER: DesignGroup[] = ['web', 'app', 'presentation', 'content', 'print', 'data', 'social', 'figma', 'other']
-type TypeFilter = 'all' | 'form' | DesignGroup | 'system' | 'templates' | 'tokens'
+
+/** Kinds you can start from nothing, so their tabs are always on the row. */
+const ALWAYS_OFFERED: DesignGroup[] = ['web', 'app', 'presentation']
+type TypeFilter = 'all' | 'form' | DesignGroup | 'system' | 'tokens'
+
+/**
+ * Which shelf of a type you are looking at.
+ *
+ * Templates used to be a tab of their own, sitting alongside App and Decks as
+ * though "template" were a kind of thing you make. It is not — it is a state
+ * every kind of thing can be in, so every type now has both shelves and you
+ * never have to leave the type you came for to find its starting points.
+ */
+type Shelf = 'mine' | 'templates'
 
 /**
  * Which family of files this list is showing. Forms (the freeform canvas) and
@@ -55,8 +72,23 @@ export function DesignsListView({
   const [searchOpen, setSearchOpen] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => (localStorage.getItem('t42-designs-view') === 'list' ? 'list' : 'grid'))
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
+  const [shelf, setShelf] = useState<Shelf>('mine')
+
+  // Which types have starting points to offer. "All" does not: a gallery
+  // mixing deck templates with token templates is the thing this replaced.
+  const hasTemplates =
+    scope === 'design' &&
+    (typeFilter === 'app' || typeFilter === 'web' || typeFilter === 'presentation' ||
+     typeFilter === 'tokens' || typeFilter === 'system')
+
+  // What your own work is called depends on what it is. "Ongoing projects" is
+  // right for an app and wrong for a token library, which is not a project.
+  const mineLabel =
+    typeFilter === 'tokens' ? 'My libraries'
+      : typeFilter === 'system' ? 'My systems'
+        : 'Ongoing projects'
   const showsDesigns =
-    typeFilter !== 'system' && typeFilter !== 'tokens' && typeFilter !== 'templates'
+    typeFilter !== 'system' && typeFilter !== 'tokens' && shelf === 'mine'
   // An open token library asks for the whole page, so the list chrome steps
   // aside rather than the library squeezing itself into what is left.
   const [tokensFull, setTokensFull] = useState(false)
@@ -82,7 +114,7 @@ export function DesignsListView({
   useEffect(() => {
     if (
       scope === 'form' &&
-      (typeFilter === 'system' || typeFilter === 'tokens' || typeFilter === 'templates')
+      (typeFilter === 'system' || typeFilter === 'tokens')
     ) {
       setTypeFilter('all')
     }
@@ -97,6 +129,7 @@ export function DesignsListView({
   const [newMenuOpen, setNewMenuOpen] = useState(false)
   const newMenuRef = useRef<HTMLDivElement>(null)
   const [dsWizardOpen, setDsWizardOpen] = useState(false)
+  const [dsSeed, setDsSeed] = useState<SystemAnswers | null>(null)
   const [pendingDsId, setPendingDsId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -207,6 +240,41 @@ export function DesignsListView({
       }
     } finally {
       setCreating(false)
+    }
+  }
+
+  /** Open the token wizard with this template's feel already chosen. */
+  const useTokenTemplate = (vibe: Vibe): void => {
+    // Left in the latch rather than fired as an event: the list that answers
+    // this does not exist until the tab has switched, and an event sent in
+    // between is heard by nobody.
+    requestNewTokens(vibe)
+    setTypeFilter('tokens')
+    setShelf('mine')
+  }
+
+  /** Same feel, but into the design system wizard rather than the token one. */
+  const useSystemTemplate = (vibe: Vibe): void => {
+    setTypeFilter('system')
+    setShelf('mine')
+    setDsSeed(applyFeel(DEFAULT_ANSWERS, vibe))
+    setDsWizardOpen(true)
+  }
+
+  /**
+   * Take the built library as it stands, without the wizard's questions.
+   * Lands on your own shelf, because a copy you cannot find is not a copy.
+   */
+  const duplicateTokenTemplate = async (vibe: Vibe): Promise<string | null> => {
+    try {
+      const built = studioFromPreset(vibe)
+      await window.terminal42.tokens.create(built.name, built)
+      setTypeFilter('tokens')
+      setShelf('mine')
+      window.dispatchEvent(new Event('t42:tokens-changed'))
+      return null
+    } catch (e) {
+      return String((e as Error).message || e)
     }
   }
 
@@ -331,10 +399,11 @@ export function DesignsListView({
   const presentTypes = useMemo(() => {
     const s = new Set<DesignGroup>()
     for (const d of scoped) s.add((d.brief?.group ?? 'other') as DesignGroup)
-    // Decks is the one kind that is always offered: it is where the deck
-    // templates live, so hiding it until you already own a deck would hide the
-    // only way of making one.
-    if (scope === 'design') s.add('presentation')
+    // The kinds you can start something as are always offered, whether or not
+    // you already own one. Each carries its own templates, and a tab that only
+    // appears once you own the thing hides the very shelf you would use to
+    // make your first.
+    if (scope === 'design') for (const g of ALWAYS_OFFERED) s.add(g)
     return { groups: GROUP_ORDER.filter((g) => s.has(g)) }
   }, [scoped, scope])
 
@@ -345,7 +414,6 @@ export function DesignsListView({
   const heading =
     typeFilter === 'system' ? 'Design systems'
       : typeFilter === 'tokens' ? 'Tokens'
-        : typeFilter === 'templates' ? 'Templates'
           : typeFilter !== 'all' && typeFilter !== 'form' && typeFilter in GROUP_LABEL ? GROUP_LABEL[typeFilter as DesignGroup]
             : folderFilter !== 'all' ? folderFilter
               : allLabel
@@ -355,7 +423,7 @@ export function DesignsListView({
     const q = search.trim().toLowerCase()
     const isGroup =
       typeFilter !== 'all' && typeFilter !== 'form' && typeFilter !== 'system' &&
-      typeFilter !== 'templates' && typeFilter !== 'tokens'
+      typeFilter !== 'tokens'
     const visible = scoped.filter((d) => {
       if (isGroup && (d.brief?.group ?? 'other') !== typeFilter) return false
       if (folderFilter !== 'all' && designFolders[d.id] !== folderFilter) return false
@@ -449,19 +517,28 @@ export function DesignsListView({
               <ViewPill
                 key={g}
                 active={typeFilter === g}
-                onClick={() => setTypeFilter(typeFilter === g ? 'all' : g)}
+                onClick={() => { setTypeFilter(typeFilter === g ? 'all' : g); setShelf('mine') }}
               >
                 {GROUP_LABEL[g]}
               </ViewPill>
             ))}
             {scope === 'design' && (
               <div className="ml-3 inline-flex items-center gap-1">
-                <ViewPill active={typeFilter === 'system'} onClick={() => setTypeFilter('system')}>Design systems</ViewPill>
-                <ViewPill active={typeFilter === 'tokens'} onClick={() => setTypeFilter('tokens')}>Tokens</ViewPill>
-                <ViewPill active={typeFilter === 'templates'} onClick={() => setTypeFilter('templates')}>Templates</ViewPill>
+                <ViewPill active={typeFilter === 'system'} onClick={() => { setTypeFilter('system'); setShelf('mine') }}>Design systems</ViewPill>
+                <ViewPill active={typeFilter === 'tokens'} onClick={() => { setTypeFilter('tokens'); setShelf('mine') }}>Tokens</ViewPill>
               </div>
             )}
           </div>
+          )}
+
+          {/* The second shelf. Templates are a state a thing can be in, not a
+              kind of thing, so this row sits under whichever type you picked
+              and never takes you out of it. */}
+          {hasTemplates && (
+            <div className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-sunken p-1">
+              <ViewPill active={shelf === 'mine'} onClick={() => setShelf('mine')}>{mineLabel}</ViewPill>
+              <ViewPill active={shelf === 'templates'} onClick={() => setShelf('templates')}>Templates</ViewPill>
+            </div>
           )}
           <div className="ml-auto flex items-center gap-2">
               {/* The toggle only means something where a list of designs is on
@@ -526,7 +603,7 @@ export function DesignsListView({
               </div>
           </div>
         </div>
-        {typeFilter !== 'system' && typeFilter !== 'templates' && typeFilter !== 'tokens' && (folders.length > 0 || newFolderOpen) && (
+        {typeFilter !== 'system' && shelf === 'mine' && typeFilter !== 'tokens' && (folders.length > 0 || newFolderOpen) && (
           <div className="-mt-1 mb-3 flex flex-wrap items-center gap-1.5">
             <span className="mr-1 text-[11px] font-medium text-text-muted">Folders</span>
             <FolderChip active={folderFilter === 'all'} onClick={() => setFolderFilter('all')} label="All" />
@@ -545,44 +622,52 @@ export function DesignsListView({
         )}
 
         <div className={tokensFull ? 'min-h-0 flex-1' : 'pb-10'}>
-        {typeFilter === 'system' ? (
+        {/* The templates shelf. Each type shows its own starting points and
+            nothing else, which is the whole reason the shared gallery went. */}
+        {shelf === 'templates' ? (
+          typeFilter === 'presentation' ? (
+            <DeckTemplateGallery onUse={createDeckFromTemplate} />
+          ) : typeFilter === 'tokens' ? (
+            <TokenTemplates onUse={useTokenTemplate} onDuplicate={duplicateTokenTemplate} />
+          ) : typeFilter === 'system' ? (
+            <TokenTemplates onUse={useSystemTemplate} onDuplicate={duplicateTokenTemplate} />
+          ) : (
+            <TemplatesGallery onUse={createFromTemplate} onDuplicate={duplicateTemplate} />
+          )
+        ) : typeFilter === 'system' ? (
           <DesignSystemView openSystemId={pendingDsId} onConsumeOpen={() => setPendingDsId(null)} />
         ) : typeFilter === 'tokens' ? (
           <TokensView onFullPage={setTokensFull} />
-        ) : typeFilter === 'templates' ? (
-          <TemplatesGallery onUse={createFromTemplate} onDuplicate={duplicateTemplate} />
-        ) : typeFilter === 'presentation' ? (
-          /* Decks lead with the templates. A deck is the one thing here nobody
-             wants to start from an empty page, and the saved decks follow
-             underneath rather than being replaced by them. */
-          <>
-            <DeckTemplateGallery onUse={createDeckFromTemplate} />
-            {buckets.length > 0 && (
-              <section className="mt-2">
-                <h2 className="mb-2.5 text-[11.5px] font-medium text-text-muted">Your decks</h2>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {buckets.flatMap((b) => b.items).map((d) => (
-                    <DesignCard
-                      key={d.id}
-                      design={d}
-                      onOpen={() => onOpen(d)}
-                      onDelete={() => setConfirmDelete(d)} onDuplicate={() => void duplicate(d)}
-                      folders={folders}
-                      folder={designFolders[d.id] ?? null}
-                      onAssign={assignFolder}
-                    />
-                  ))}
-                </div>
-              </section>
-            )}
-          </>
         ) : designs.length === 0 ? (
           <EmptyState noun={scope === 'form' ? 'form' : 'design'} onCreate={() => { if (scope === 'form') void createFreeform(); else openHtmlWizard() }} />
         ) : (
           <>
             {buckets.length === 0 ? (
+              /* Two different nothings. Searching and finding no match is not
+                 the same as never having made one of these, and saying "no
+                 designs match" to somebody who has simply never built a
+                 website reads as though the list were broken. */
               <div className="rounded-xl bg-surface/40 px-6 py-10 text-center text-[13px] text-text-muted">
-                No {scope === 'form' ? 'forms' : 'designs'} match.
+                {search || folderFilter !== 'all' ? (
+                  <>No {scope === 'form' ? 'forms' : 'designs'} match.</>
+                ) : (
+                  <>
+                    Nothing here yet.
+                    {hasTemplates && (
+                      <>
+                        {' '}
+                        <button
+                          type="button"
+                          onClick={() => setShelf('templates')}
+                          className="text-text-primary underline underline-offset-2 hover:text-accent"
+                        >
+                          Start from a template
+                        </button>
+                        {' or make one from scratch.'}
+                      </>
+                    )}
+                  </>
+                )}
               </div>
             ) : viewMode === 'list' ? (
               <div className="overflow-hidden">
@@ -645,8 +730,9 @@ export function DesignsListView({
         )}
         {dsWizardOpen && (
           <DesignSystemWizard
-            onCancel={() => setDsWizardOpen(false)}
-            onComplete={(gen: DesignSystem) => { upsertSystem(gen); setDsWizardOpen(false); setTypeFilter('system'); setPendingDsId(gen.id) }}
+            initial={dsSeed ?? undefined}
+            onCancel={() => { setDsWizardOpen(false); setDsSeed(null) }}
+            onComplete={(gen: DesignSystem) => { upsertSystem(gen); setDsWizardOpen(false); setDsSeed(null); setTypeFilter('system'); setPendingDsId(gen.id) }}
           />
         )}
       </div>

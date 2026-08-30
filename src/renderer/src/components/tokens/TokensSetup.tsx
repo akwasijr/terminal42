@@ -195,13 +195,20 @@ function tile(selected: boolean): string {
 
 export function TokensSetup({
   onCancel,
-  onCreate
+  onCreate,
+  startFrom
 }: {
   onCancel: () => void
   onCreate: (studio: TokenStudio) => void
+  /**
+   * The feel to open on. Arriving from a template means the first question is
+   * already answered, so the wizard starts there instead of on Minimal and
+   * makes you find your way back to what you clicked.
+   */
+  startFrom?: Vibe
 }): React.JSX.Element {
   const [stepIdx, setStepIdx] = useState(0)
-  const [vibe, setVibe] = useState<Vibe>('minimal')
+  const [vibe, setVibe] = useState<Vibe>(startFrom ?? 'minimal')
   const [name, setName] = useState('')
   const [primary, setPrimary] = useState<string | null>(null)
   const [secondary, setSecondary] = useState<string | null>(null)

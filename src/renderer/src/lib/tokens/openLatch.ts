@@ -20,6 +20,14 @@ let pending = false
  * is the only caller that means the second one.
  */
 let pendingNew = false
+/**
+ * "…starting from this feel."
+ *
+ * A template card knows which of the nine feels you pressed. The wizard is
+ * the thing that can act on it, and it does not exist yet at that moment, so
+ * the answer waits here with the request it belongs to.
+ */
+let pendingFeel: string | null = null
 
 export function requestTokens(): void {
   pending = true
@@ -32,9 +40,17 @@ export function takeTokensRequest(): boolean {
   return was
 }
 
-export function requestNewTokens(): void {
+export function requestNewTokens(feel?: string): void {
   pending = true
   pendingNew = true
+  pendingFeel = feel ?? null
+}
+
+/** The feel the new library should start on, if a template named one. */
+export function takeNewTokensFeel(): string | null {
+  const was = pendingFeel
+  pendingFeel = null
+  return was
 }
 
 /** True once per request. */

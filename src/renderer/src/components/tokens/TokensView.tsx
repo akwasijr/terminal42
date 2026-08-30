@@ -19,9 +19,10 @@
 // faster than any amount of writing on the subject.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { Vibe } from '../../lib/designSystem'
 import { CardMenu, ConfirmDelete } from '../CardMenu'
 import { TokensSetup } from './TokensSetup'
-import { takeNewTokensRequest } from '../../lib/tokens/openLatch'
+import { takeNewTokensRequest, takeNewTokensFeel } from '../../lib/tokens/openLatch'
 import {
   hydrateStudio,
   isAlias,
@@ -79,6 +80,7 @@ export function TokensView({ onFullPage }: { onFullPage?: (full: boolean) => voi
   const [studio, setStudio] = useState<TokenStudio | null>(null)
   const [loading, setLoading] = useState(true)
   const [setupOpen, setSetupOpen] = useState(false)
+  const [startFrom, setStartFrom] = useState<Vibe | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<StudioRow | null>(null)
   const [importNote, setImportNote] = useState<string | null>(null)
 
@@ -103,14 +105,32 @@ export function TokensView({ onFullPage }: { onFullPage?: (full: boolean) => voi
       // Drains the latch as well, so a press heard live here does not leave a
       // request behind that reopens the setup the next time this mounts.
       takeNewTokensRequest()
+      setStartFrom((takeNewTokensFeel() as Vibe | null) ?? null)
       setOpenId(null)
       setSetupOpen(true)
     }
+    // A template can name the feel it wants the wizard to open on.
+    const onNewFrom = (e: Event): void => {
+      const vibe = (e as CustomEvent<{ vibe?: Vibe }>).detail?.vibe
+      setStartFrom(vibe ?? null)
+      setOpenId(null)
+      setSetupOpen(true)
+    }
+    window.addEventListener('t42:tokens-new-from', onNewFrom as EventListener)
+    // Something outside this view can add a library — duplicating a template
+    // does. Without this the list only caught up on a remount, which happened
+    // to be true and would have stopped being true silently.
+    const onChanged = (): void => { void refresh() }
+    window.addEventListener('t42:tokens-changed', onChanged)
     // Taken on mount as well as heard live, because the first press arrives
     // before this component exists: the tab has to switch first.
-    if (takeNewTokensRequest()) onNew()
+    if (takeNewTokensRequest()) { setStartFrom((takeNewTokensFeel() as Vibe | null) ?? null); setOpenId(null); setSetupOpen(true) }
     window.addEventListener('t42:tokens-new', onNew)
-    return () => window.removeEventListener('t42:tokens-new', onNew)
+    return () => {
+      window.removeEventListener('t42:tokens-new', onNew)
+      window.removeEventListener('t42:tokens-new-from', onNewFrom as EventListener)
+      window.removeEventListener('t42:tokens-changed', onChanged)
+    }
   }, [])
 
   // An open library takes the whole page: the surrounding tab chrome belongs to
@@ -237,7 +257,11 @@ export function TokensView({ onFullPage }: { onFullPage?: (full: boolean) => voi
       )}
 
       {setupOpen ? (
-        <TokensSetup onCancel={() => setSetupOpen(false)} onCreate={(s) => void create(s)} />
+        <TokensSetup
+          startFrom={startFrom ?? undefined}
+          onCancel={() => { setSetupOpen(false); setStartFrom(null) }}
+          onCreate={(s) => { void create(s); setStartFrom(null) }}
+        />
       ) : null}
 
       {confirmDelete ? (
