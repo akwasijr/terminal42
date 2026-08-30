@@ -71,6 +71,9 @@ export function DesignsListView({
   // already answered by the time the wizard opens.
   const [deckHouse, setDeckHouse] = useState<DeckTemplate | null>(null)
   const [webHouse, setWebHouse] = useState<WebsiteTemplate | null>(null)
+  // The type the New project menu already committed to, so the wizard does
+  // not open by asking what you just told it.
+  const [wizardCategory, setWizardCategory] = useState<DesignGroup | null>(null)
   const [creating, setCreating] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<Design | null>(null)
   const [search, setSearch] = useState('')
@@ -300,6 +303,7 @@ export function DesignsListView({
     setDeckHouse(null)
     setWebHouse(style)
     setWizardStarter(null)
+    setWizardCategory(null)
     setWizardTarget('html')
     setWizardInitialIdea('')
     setWizardOpen(true)
@@ -362,9 +366,10 @@ export function DesignsListView({
     await refresh()
   }
 
-  const openHtmlWizard = (): void => {
+  const openHtmlWizard = (category?: DesignGroup): void => {
     setDeckHouse(null)
     setWebHouse(null)
+    setWizardCategory(category ?? null)
     setWizardTarget('html')
     setWizardInitialIdea('')
     setWizardOpen(true)
@@ -396,6 +401,7 @@ export function DesignsListView({
     setDeckHouse(style)
     setWebHouse(null)
     setWizardStarter(null)
+    setWizardCategory(null)
     setWizardTarget('html')
     setWizardInitialIdea('')
     setWizardOpen(true)
@@ -406,6 +412,7 @@ export function DesignsListView({
     setDeckHouse(null)
     setWebHouse(null)
     setWizardStarter(t)
+    setWizardCategory(null)
     setWizardTarget('html')
     setWizardInitialIdea('')
     setWizardOpen(true)
@@ -564,8 +571,15 @@ export function DesignsListView({
                     [
                       { label: 'Design system', onClick: () => { setNewMenuOpen(false); setDsWizardOpen(true) } },
                       { label: 'Token library', onClick: () => { setNewMenuOpen(false); requestNewTokens(); setTypeFilter('tokens'); window.dispatchEvent(new Event('t42:tokens-new')) } },
-                      { label: 'Web experience', onClick: () => { setNewMenuOpen(false); openHtmlWizard() } },
-                      { label: 'App', onClick: () => { setNewMenuOpen(false); openHtmlWizard() } }
+                      // Each of these names a type and starts there. They used
+                      // to be "Web experience" and "App" calling the identical
+                      // handler, so both landed on "What are you designing?"
+                      // and you answered the question you had just answered.
+                      // Decks were missing outright: the menu could not make
+                      // the one thing the shelf beside it was full of.
+                      { label: 'Website', onClick: () => { setNewMenuOpen(false); openHtmlWizard('web') } },
+                      { label: 'App', onClick: () => { setNewMenuOpen(false); openHtmlWizard('app') } },
+                      { label: 'Deck', onClick: () => { setNewMenuOpen(false); openHtmlWizard('presentation') } }
                     ].map((o) => (
                       <button key={o.label} type="button" onClick={o.onClick} className="flex w-full items-center px-3 py-2 text-left text-[12.5px] font-medium text-text-primary hover:bg-elevated">
                         {o.label}
@@ -807,9 +821,9 @@ export function DesignsListView({
             initialIdea={wizardInitialIdea}
             target={wizardTarget}
             starterTemplate={wizardStarter ?? undefined}
-              presetCategory={deckHouse ? 'presentation' : webHouse ? 'web' : undefined}
+            presetCategory={deckHouse ? 'presentation' : webHouse ? 'web' : wizardCategory ?? undefined}
             creating={creating}
-            onCancel={() => { if (!creating) { setWizardOpen(false); setWizardInitialIdea(''); setWizardStarter(null); setDeckHouse(null) } }}
+            onCancel={() => { if (!creating) { setWizardOpen(false); setWizardInitialIdea(''); setWizardStarter(null); setDeckHouse(null); setWebHouse(null); setWizardCategory(null) } }}
             onComplete={(brief, kickoff) => void handleWizardComplete(brief, kickoff)}
           />
         )}

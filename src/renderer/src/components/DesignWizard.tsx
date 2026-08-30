@@ -257,21 +257,59 @@ function kindMock(id: DesignKind): ReactNode | null {
           <line x1="58" y1="50" x2="86" y2="50" stroke={COL.muted} strokeWidth="0.5" />
         </>
       )
+    // Four deck kinds used to share one slide-stack drawing, so the tiles were
+    // four identical pictures and you were choosing on the label alone. Each
+    // now shows what that deck is actually shaped like.
     case 'pitch-deck':
+      return (
+        <>
+          {/* Numbers doing the arguing: headline over a bar chart */}
+          <rect x="14" y="8" width="72" height="44" rx="2" fill={COL.paper} />
+          <rect x="20" y="14" width="30" height="3.5" rx="1" fill={COL.ink} />
+          <rect x="20" y="21" width="20" height="2" rx="1" fill={COL.muted} />
+          <rect x="20" y="40" width="7" height="6" rx="0.8" fill={COL.muted} />
+          <rect x="30" y="35" width="7" height="11" rx="0.8" fill={COL.muted} />
+          <rect x="40" y="30" width="7" height="16" rx="0.8" fill="currentColor" />
+          <rect x="56" y="14" width="24" height="14" rx="1.5" fill="currentColor" opacity="0.3" />
+          <rect x="56" y="32" width="24" height="2" rx="1" fill={COL.muted} />
+          <rect x="56" y="37" width="18" height="2" rx="1" fill={COL.muted} />
+        </>
+      )
     case 'sales-deck':
+      return (
+        <>
+          {/* Three offers with the one you are meant to take picked out */}
+          <rect x="14" y="8" width="72" height="44" rx="2" fill={COL.paper} />
+          <rect x="20" y="13" width="26" height="3" rx="1" fill={COL.ink} />
+          <rect x="20" y="22" width="18" height="24" rx="1.5" fill={COL.muted} opacity="0.6" />
+          <rect x="41" y="19" width="18" height="27" rx="1.5" fill="currentColor" />
+          <rect x="62" y="22" width="18" height="24" rx="1.5" fill={COL.muted} opacity="0.6" />
+          <rect x="45" y="24" width="10" height="2" rx="1" fill={COL.paper} opacity="0.9" />
+          <rect x="45" y="29" width="7" height="2" rx="1" fill={COL.paper} opacity="0.7" />
+        </>
+      )
     case 'talk-slides':
+      return (
+        <>
+          {/* One sentence, very large, and nothing competing with it */}
+          <rect x="14" y="8" width="72" height="44" rx="2" fill={COL.paper} />
+          <rect x="24" y="20" width="52" height="7" rx="1.5" fill={COL.ink} />
+          <rect x="24" y="31" width="34" height="7" rx="1.5" fill="currentColor" />
+          <rect x="24" y="44" width="12" height="2" rx="1" fill={COL.muted} />
+        </>
+      )
     case 'workshop-deck':
       return (
         <>
-          {/* 16:9 slide stack with current slide highlighted */}
-          <rect x="14" y="10" width="72" height="40" rx="2" fill={COL.paper} />
-          <rect x="20" y="18" width="36" height="4" rx="1" fill={COL.ink} />
-          <rect x="20" y="26" width="48" height="2" rx="1" fill={COL.muted} />
-          <rect x="20" y="36" width="14" height="6" rx="1" fill="currentColor" />
-          {/* Pager dots */}
-          {[0, 1, 2, 3, 4].map((i) => (
-            <rect key={i} x={36 + i * 6} y="56" width={i === 1 ? 8 : 4} height="2" rx="1"
-              fill={i === 1 ? 'currentColor' : COL.muted} />
+          {/* A run of order: numbered steps down the slide */}
+          <rect x="14" y="8" width="72" height="44" rx="2" fill={COL.paper} />
+          <rect x="20" y="13" width="24" height="3" rx="1" fill={COL.ink} />
+          {[0, 1, 2].map((i) => (
+            <g key={i}>
+              <rect x="20" y={23 + i * 9} width="5" height="5" rx="2.5"
+                fill={i === 0 ? 'currentColor' : COL.muted} />
+              <rect x="29" y={24.5 + i * 9} width={44 - i * 8} height="2" rx="1" fill={COL.muted} />
+            </g>
           ))}
         </>
       )
@@ -775,7 +813,7 @@ export function DesignWizard({ onCancel, onComplete, initialIdea, target = 'html
               {creating
                 ? (starterTemplate ? 'Setting up template…' : 'Creating…')
                 : (isLast || state.kind === 'blank'
-                    ? (state.target === 'figma' ? 'Build in Figma' : 'Create design')
+                    ? (state.target === 'figma' ? 'Build in Figma' : 'Create project')
                     : 'Next →')}
             </button>
           </div>
