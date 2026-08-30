@@ -15,11 +15,110 @@ function cap(s: string): string { return s ? s.charAt(0).toUpperCase() + s.slice
 function labelOf<T extends string>(opts: { id: T; label: string }[], id: T): string { return opts.find((o) => o.id === id)?.label ?? id }
 
 const FEELS: Vibe[] = ['minimal', 'professional', 'bold', 'playful', 'soft', 'elegant', 'brutalist', 'technical', 'luxe']
-const FEEL_OPTIONS: { id: string; label: string }[] = [
-  ...FEELS.map((id) => ({ id, label: FEEL_PRESETS[id].label })),
-  { id: 'custom', label: 'Describe your own' },
-  { id: 'ref', label: 'Match a screenshot' }
-]
+
+const CORNER_PX: Record<CornerStyle, number> = {
+  angular: 0, slight: 3, rounded: 6, squircle: 8, curved: 10, full: 999
+}
+
+// The feel used to be a dropdown, so choosing between nine visual identities
+// meant reading nine words. Each tile now renders the preset it stands for --
+// its own corners, borders, brand colours, button treatment and heading face --
+// so you are looking at the thing you are picking.
+function FeelSwatch({ vibe }: { vibe: Vibe }): JSX.Element {
+  const f = FEEL_PRESETS[vibe]
+  const r = CORNER_PX[f.cornerStyle]
+  const border = f.borderStyle === 'none'
+    ? 'none'
+    : `${f.borderStyle === 'outlined' ? 1.5 : 1}px solid ${f.borderStyle === 'outlined' ? '#1c1917' : '#d6d3d1'}`
+  const btn = f.fill === 'outline'
+    ? { background: 'transparent', border: `1.5px solid ${f.primary}`, color: f.primary }
+    : f.fill === 'tint'
+      ? { background: `${f.primary}26`, border: 'none', color: f.primary }
+      : { background: f.primary, border: 'none', color: '#fff' }
+  return (
+    <div
+      className="flex h-[92px] w-full flex-col justify-between overflow-hidden p-3"
+      style={{ background: '#fafaf9', borderRadius: Math.min(r, 12), border }}
+    >
+      <div
+        style={{
+          fontFamily: fontStack(f.headingFont),
+          fontWeight: f.headingWeight,
+          fontSize: f.scale === 'expressive' ? 20 : f.scale === 'compact' ? 14 : 17,
+          color: '#1c1917',
+          lineHeight: 1
+        }}
+      >
+        Aa
+      </div>
+      <div className="flex items-end justify-between gap-2">
+        <div
+          style={{
+            ...btn,
+            borderRadius: Math.min(r, 999),
+            fontFamily: fontStack(f.bodyFont),
+            fontWeight: f.btnWeight,
+            fontSize: 9,
+            padding: f.density === 'compact' ? '3px 8px' : f.density === 'spacious' ? '6px 14px' : '4px 11px'
+          }}
+        >
+          Button
+        </div>
+        <div className="flex gap-1">
+          {[f.primary, f.secondary, f.tertiary].map((c) => (
+            <span key={c} className="h-3 w-3" style={{ background: c, borderRadius: Math.min(r, 999) }} />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function FeelTile(
+  { label, blurb, selected, onClick, children }:
+  { label: string; blurb: string; selected: boolean; onClick: () => void; children: ReactNode }
+): JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      className={`rounded-xl p-2 text-left transition-colors ${selected ? 'bg-accent/15' : 'hover:bg-elevated/40'}`}
+    >
+      {children}
+      <div className="mt-2 px-1">
+        <div className={`text-[12.5px] ${selected ? 'text-text-primary' : 'text-text-secondary'}`}>{label}</div>
+        <div className="text-[11px] leading-snug text-text-muted">{blurb}</div>
+      </div>
+    </button>
+  )
+}
+
+// The two escape hatches keep their own drawings rather than borrowing a
+// preset's, because neither of them has a look yet.
+function WriteItSwatch(): JSX.Element {
+  return (
+    <div className="flex h-[92px] w-full items-center justify-center rounded-xl bg-elevated/30">
+      <svg viewBox="0 0 40 24" width="52" height="32" fill="none" stroke="currentColor"
+        strokeWidth="1.4" strokeLinecap="round" className="text-text-muted" aria-hidden="true">
+        <path d="M4 7h22M4 13h16M4 19h10" />
+        <path d="M28 16l8-8 3 3-8 8-4 1z" />
+      </svg>
+    </div>
+  )
+}
+function ScreenshotSwatch(): JSX.Element {
+  return (
+    <div className="flex h-[92px] w-full items-center justify-center rounded-xl bg-elevated/30">
+      <svg viewBox="0 0 40 28" width="52" height="36" fill="none" stroke="currentColor"
+        strokeWidth="1.4" strokeLinejoin="round" className="text-text-muted" aria-hidden="true">
+        <rect x="3" y="4" width="34" height="20" rx="2" />
+        <path d="M3 18l8-6 6 4 5-4 15 8" />
+        <circle cx="13" cy="10" r="2" />
+      </svg>
+    </div>
+  )
+}
 const BASES: { id: BaseTheme; label: string }[] = [{ id: 'light', label: 'Light' }, { id: 'dark', label: 'Dark' }]
 const CORNERS: { id: CornerStyle; label: string }[] = [
   { id: 'angular', label: 'Angular' }, { id: 'slight', label: 'Slightly curved' }, { id: 'rounded', label: 'Rounded' },
@@ -215,19 +314,6 @@ function PictoGroup<T extends string>({ label, value, options, onChange }: { lab
     </div>
   )
 }
-function SelectField<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: { id: T; label: string }[]; onChange: (v: T) => void }): JSX.Element {
-  return (
-    <div>
-      <FieldLabel>{label}</FieldLabel>
-      <div className="relative">
-        <select value={value} onChange={(e) => onChange(e.target.value as T)} className="w-full appearance-none rounded-lg bg-elevated/40 px-3.5 py-2.5 pr-9 text-[13.5px] text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/40">
-          {options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
-        </select>
-        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-text-muted"><path d="M4 6l4 4 4-4" /></svg>
-      </div>
-    </div>
-  )
-}
 
 const GEN_PHASES = ['Reading your brief', 'Composing the tokens', 'Refining the palette', 'Pairing the type', 'Writing the documentation', 'Assembling components']
 
@@ -398,8 +484,37 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
                 <FieldLabel>Name</FieldLabel>
                 <input autoFocus value={a.name} onChange={(e) => set('name', e.target.value)} placeholder="My design system" className="w-full max-w-sm rounded-lg bg-elevated/40 px-3.5 py-2.5 text-[14px] text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/40" />
               </div>
-              <div className="max-w-sm">
-                <SelectField label="Feel" value={refMode ? 'ref' : customFeel ? 'custom' : a.vibe} options={FEEL_OPTIONS} onChange={(v) => { if (v === 'custom') { setCustomFeel(true); setRefMode(false) } else if (v === 'ref') { setRefMode(true); setCustomFeel(false) } else { setA((p) => applyFeel(p, v as Vibe)); setCustomFeel(false); setRefMode(false) } }} />
+              <div>
+                <FieldLabel>Feel</FieldLabel>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                  {FEELS.map((id) => (
+                    <FeelTile
+                      key={id}
+                      label={FEEL_PRESETS[id].label}
+                      blurb={FEEL_PRESETS[id].blurb}
+                      selected={!refMode && !customFeel && a.vibe === id}
+                      onClick={() => { setA((p) => applyFeel(p, id)); setCustomFeel(false); setRefMode(false) }}
+                    >
+                      <FeelSwatch vibe={id} />
+                    </FeelTile>
+                  ))}
+                  <FeelTile
+                    label="Describe your own"
+                    blurb="Write the tone in your words"
+                    selected={customFeel}
+                    onClick={() => { setCustomFeel(true); setRefMode(false) }}
+                  >
+                    <WriteItSwatch />
+                  </FeelTile>
+                  <FeelTile
+                    label="Match a screenshot"
+                    blurb="Pull the look from an image"
+                    selected={refMode}
+                    onClick={() => { setRefMode(true); setCustomFeel(false) }}
+                  >
+                    <ScreenshotSwatch />
+                  </FeelTile>
+                </div>
               </div>
               {customFeel && (
                 <div>

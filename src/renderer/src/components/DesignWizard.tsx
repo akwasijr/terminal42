@@ -2672,7 +2672,7 @@ function PageIdea({ state, set }: PageProps): JSX.Element {
   return (
     <div className="space-y-3">
       <p className="text-[12.5px] text-text-muted">
-        What is this design about? Anything specific you want included.
+        What is this project about? Anything specific you want included.
       </p>
       <textarea
         ref={ref}
