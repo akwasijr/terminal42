@@ -635,6 +635,10 @@ const api = {
   },
   templates: {
     list: (): Promise<TemplateInfo[] | { error: string }> => ipcRenderer.invoke('templates:list'),
+    copyToDesign: (
+      args: { templateId: string; title: string }
+    ): Promise<{ ok: boolean; error?: string; design?: Design }> =>
+      ipcRenderer.invoke('templates:copyToDesign', args),
     materialize: (
       args: { templateId: string; destDir: string }
     ): Promise<{ ok: boolean; error?: string }> =>

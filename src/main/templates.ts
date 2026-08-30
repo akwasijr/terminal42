@@ -12,6 +12,8 @@ import { promises as fs } from 'fs'
 import { existsSync } from 'fs'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
+import { tmpdir } from 'os'
+import { importDesignFromFolder } from './designStore'
 
 const REPO = 'akwasijr/Studio42Starkit'
 const REPO_GIT = `https://github.com/${REPO}.git`
@@ -81,15 +83,26 @@ function run(cmd: string, args: string[], opts: { cwd?: string } = {}): Promise<
 }
 
 let cloneInFlight: Promise<void> | null = null
+// How long a checked-out cache is trusted before we go back to the network.
+// Matches the template list's own cache: refreshing the files more often than
+// the list that describes them buys nothing.
+const REPO_FRESH_MS = 60 * 60 * 1000
+let repoRefreshedAt = 0
+
 async function ensureRepoCache(): Promise<void> {
   if (cloneInFlight) return cloneInFlight
   cloneInFlight = (async () => {
     const dir = repoCachePath()
     await fs.mkdir(templateCacheRoot(), { recursive: true })
     if (existsSync(join(dir, '.git'))) {
+      // A fetch and reset against this repo takes minutes, and it used to run
+      // on every single call — including once per template copy, where it sat
+      // behind a click with nothing on screen to explain the wait.
+      if (Date.now() - repoRefreshedAt < REPO_FRESH_MS) return
       // Best-effort fast pull. Failure is non-fatal: we keep the existing cache.
       await run('git', ['-C', dir, 'fetch', '--depth=1', 'origin', 'main'])
       await run('git', ['-C', dir, 'reset', '--hard', 'origin/main'])
+      repoRefreshedAt = Date.now()
       return
     }
     await fs.rm(dir, { recursive: true, force: true })
@@ -99,6 +112,7 @@ async function ensureRepoCache(): Promise<void> {
       const gitResult = await run('git', ['clone', '--depth=1', REPO_GIT, dir])
       if (gitResult.code !== 0) throw new Error(`Clone failed: ${gitResult.stderr || ghResult.stderr}`)
     }
+    repoRefreshedAt = Date.now()
   })()
   try {
     await cloneInFlight
@@ -178,6 +192,26 @@ export function registerTemplatesIpc(_getWindow: () => BrowserWindow | null): vo
       return await listTemplates()
     } catch (e) {
       return { error: String((e as Error).message || e) }
+    }
+  })
+
+  // Take a copy of a template as a design of your own.
+  //
+  // "Use this template" opens a wizard and asks what you are building.
+  // Duplicating is the other thing people want: the same starter, in their own
+  // list, unchanged and ready to open. The files go through a scratch folder
+  // and then the normal import path, so the copy gets its first version and
+  // entry page detected exactly like any other imported project.
+  ipcMain.handle('templates:copyToDesign', async (_e, args: { templateId: string; title: string }) => {
+    const scratch = join(tmpdir(), `t42-template-${randomUUID().slice(0, 8)}`)
+    try {
+      await copyTemplateInto(args.templateId, scratch)
+      const design = await importDesignFromFolder(scratch, args.title)
+      return { ok: true as const, design }
+    } catch (e) {
+      return { ok: false as const, error: String((e as Error).message || e) }
+    } finally {
+      await fs.rm(scratch, { recursive: true, force: true }).catch(() => {})
     }
   })
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { CardMenu } from './CardMenu'
 import type { TemplateInfo } from '../../../preload/index'
 import { IconClose } from './icons'
 import { Modal, ModalHeader, ModalFooter } from './Modal'
@@ -16,7 +17,25 @@ type PreviewState = {
   error?: string
 }
 
-export function TemplatesGallery({ onUse }: { onUse: (t: TemplateInfo) => void }): JSX.Element {
+export function TemplatesGallery({ onUse, onDuplicate }: {
+  onUse: (t: TemplateInfo) => void
+  /** Take a plain copy into your own list, without the wizard's questions. */
+  onDuplicate: (t: TemplateInfo) => Promise<string | null>
+}): JSX.Element {
+  // Copying pulls the template's files, which on the first go of a session
+  // means waiting on the network. Without this the card sat there looking
+  // like the click had missed.
+  const [copying, setCopying] = useState<string | null>(null)
+  const [copyFailed, setCopyFailed] = useState<{ id: string; reason: string } | null>(null)
+
+  const duplicate = async (t: TemplateInfo): Promise<void> => {
+    if (copying) return
+    setCopying(t.id)
+    setCopyFailed(null)
+    const error = await onDuplicate(t)
+    setCopying(null)
+    if (error) setCopyFailed({ id: t.id, reason: error })
+  }
   const [items, setItems] = useState<TemplateInfo[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [previews, setPreviews] = useState<Record<string, PreviewState>>({})
@@ -116,6 +135,12 @@ export function TemplatesGallery({ onUse }: { onUse: (t: TemplateInfo) => void }
                   ) : (
                     <PlaceholderArt seed={t.id} />
                   )}
+                  {copying === t.id && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-bg/70 px-3 text-center backdrop-blur-sm">
+                      <Spinner />
+                      <span className="text-[10.5px] text-text-secondary">Copying…</span>
+                    </div>
+                  )}
                   {ps.status === 'generating' && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-bg/70 px-3 text-center backdrop-blur-sm">
                       <Spinner />
@@ -128,20 +153,29 @@ export function TemplatesGallery({ onUse }: { onUse: (t: TemplateInfo) => void }
                     {t.displayName}
                   </div>
                   <div className="mt-0.5 line-clamp-1 text-[11.5px] text-text-muted">
-                    {t.description}
+                    {copyFailed?.id === t.id ? (
+                      <span className="text-error">Could not copy: {copyFailed.reason}</span>
+                    ) : (
+                      t.description
+                    )}
                   </div>
                 </div>
               </button>
-              {(ps.status === 'missing' || ps.status === 'error') && (
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); void generate(t.id) }}
-                  title={ps.status === 'error' ? 'Retry preview' : 'Generate preview'}
-                  className="absolute right-2 top-2 rounded-md bg-bg/85 px-2 py-1 text-[10.5px] font-medium text-text-primary opacity-0 shadow-sm -default transition-opacity hover:bg-elevated group-hover:opacity-100"
-                >
-                  {ps.status === 'error' ? 'Retry' : 'Generate'}
-                </button>
-              )}
+              {/* A template is not yours to throw away, so the menu offers no
+                  Delete. Duplicating gives you a copy that is. */}
+              <CardMenu
+                label={t.displayName}
+                actions={[
+                  { label: 'Use as a starting point', onSelect: () => onUse(t) },
+                  { label: 'Duplicate to my designs', onSelect: () => void duplicate(t) },
+                  ...(ps.status === 'missing' || ps.status === 'error'
+                    ? [{
+                        label: ps.status === 'error' ? 'Retry preview' : 'Generate preview',
+                        onSelect: () => void generate(t.id)
+                      }]
+                    : [])
+                ]}
+              />
             </div>
           )
         })}

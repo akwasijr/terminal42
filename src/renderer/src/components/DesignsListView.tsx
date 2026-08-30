@@ -210,6 +210,17 @@ export function DesignsListView({
     }
   }
 
+  /** Returns null on success, or the reason it failed so the card can say so. */
+  const duplicateTemplate = async (t: TemplateInfo): Promise<string | null> => {
+    const r = await window.terminal42.templates.copyToDesign({
+      templateId: t.id,
+      title: t.displayName
+    })
+    if (!r.ok) return r.error ?? 'something went wrong'
+    await refresh()
+    return null
+  }
+
   const duplicate = async (d: Design): Promise<void> => {
     await window.terminal42.designs.duplicate(d.id)
     await refresh()
@@ -539,7 +550,7 @@ export function DesignsListView({
         ) : typeFilter === 'tokens' ? (
           <TokensView onFullPage={setTokensFull} />
         ) : typeFilter === 'templates' ? (
-          <TemplatesGallery onUse={createFromTemplate} />
+          <TemplatesGallery onUse={createFromTemplate} onDuplicate={duplicateTemplate} />
         ) : typeFilter === 'presentation' ? (
           /* Decks lead with the templates. A deck is the one thing here nobody
              wants to start from an empty page, and the saved decks follow
