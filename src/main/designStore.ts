@@ -110,6 +110,41 @@ export async function createDesign(opts?: { title?: string; brief?: DesignBrief 
   return getDesign(id)!
 }
 
+/**
+ * Copy a design, its brief and every saved version.
+ *
+ * Versions are read back off disk rather than from a table, so copying the
+ * working folder is enough to carry the whole history across. The chat
+ * transcript is deliberately left behind: the copy is a fresh start on the
+ * same artwork, not a re-run of the conversation that produced it.
+ */
+export async function duplicateDesign(id: string): Promise<Design | null> {
+  const source = getDesign(id)
+  if (!source) return null
+  const copyId = randomUUID()
+  const now = Date.now()
+  const cwd = designCwd(copyId)
+  await fs.mkdir(cwd, { recursive: true })
+  try {
+    await copyDir(source.cwd, cwd)
+  } catch {
+    // An unreadable source folder still yields a usable, empty copy.
+  }
+  getDb()
+    .prepare(`INSERT INTO designs (id, title, cwd, copilot_session_id, current_version, brief, created_at, last_active_at)
+              VALUES (?, ?, ?, NULL, ?, ?, ?, ?)`)
+    .run(
+      copyId,
+      `${source.title} copy`,
+      cwd,
+      source.currentVersion ?? null,
+      source.brief ? JSON.stringify(source.brief) : null,
+      now,
+      now
+    )
+  return getDesign(copyId)
+}
+
 // ─── Import existing project as a design ──────────────────────────────────
 
 export async function importDesignFromFolder(folderPath: string, title?: string): Promise<Design> {

@@ -7,6 +7,7 @@
 // preview you cannot read is worse than no preview at all.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { ConfirmDelete } from '../CardMenu'
 import type { ComponentId, MotionDoc } from '../../../../shared/motion/types'
 import { MOTION_COMPONENTS, SOON_COMPONENTS, componentFor } from '../../../../shared/motion/registry'
 import { PRESETS_PER_COMPONENT, presetLabel, presetParams } from '../../../../shared/motion/presets'
@@ -34,6 +35,7 @@ export function ComponentsDrawer({
   onDeleteLayout: (id: string) => void
   onSaveLayout: () => void
 }): React.JSX.Element {
+  const [confirmLayout, setConfirmLayout] = useState<{ id: string; name: string } | null>(null)
   const [tab, setTab] = useState<'components' | 'layouts'>('components')
   // Which component's presets are open. Null is the list of components.
   const [drilled, setDrilled] = useState<ComponentId | null>(null)
@@ -158,7 +160,7 @@ export function ComponentsDrawer({
                   </button>
                   <button
                     type="button"
-                    onClick={() => onDeleteLayout(l.id)}
+                    onClick={() => setConfirmLayout(l)}
                     aria-label={`Delete layout ${l.name}`}
                     className="rounded-sm px-1.5 py-1 text-[10.5px] text-text-muted opacity-0 transition-opacity hover:text-error focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 group-hover:opacity-100"
                   >
@@ -169,6 +171,17 @@ export function ComponentsDrawer({
             </ul>
           )}
         </div>
+      )}
+      {confirmLayout && (
+        <ConfirmDelete
+          name={confirmLayout.name}
+          kind="layout"
+          onCancel={() => setConfirmLayout(null)}
+          onConfirm={() => {
+            onDeleteLayout(confirmLayout.id)
+            setConfirmLayout(null)
+          }}
+        />
       )}
     </aside>
   )

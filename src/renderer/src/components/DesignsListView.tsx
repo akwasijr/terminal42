@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { CardMenu, ConfirmDelete } from './CardMenu'
 import { requestNewTokens, takeTokensRequest } from '../lib/tokens/openLatch'
 import { formatAge } from '../lib/formatAge'
 import type { Design, DesignBrief, DesignGroup, TemplateInfo } from '../../../preload/index'
@@ -10,8 +11,7 @@ import type { DeckTemplate } from '../../../shared/decks/templates'
 import { DesignSystemView } from './DesignSystemView'
 import { DesignSystemWizard } from './DesignSystemWizard'
 import { type DesignSystem, upsertSystem } from '../lib/designSystem'
-import { IconClose, IconEdit, IconPlus, IconSearch, IconTrash } from './icons'
-import { Modal, ModalHeader, ModalBody, ModalFooter } from './Modal'
+import { IconClose, IconEdit, IconPlus, IconSearch } from './icons'
 
 // Pretty labels for the kind-group filter chips at the top of the page.
 const GROUP_LABEL: Record<DesignGroup, string> = {
@@ -208,6 +208,11 @@ export function DesignsListView({
     } finally {
       setCreating(false)
     }
+  }
+
+  const duplicate = async (d: Design): Promise<void> => {
+    await window.terminal42.designs.duplicate(d.id)
+    await refresh()
   }
 
   const remove = async (d: Design): Promise<void> => {
@@ -550,7 +555,7 @@ export function DesignsListView({
                       key={d.id}
                       design={d}
                       onOpen={() => onOpen(d)}
-                      onDelete={() => setConfirmDelete(d)}
+                      onDelete={() => setConfirmDelete(d)} onDuplicate={() => void duplicate(d)}
                       folders={folders}
                       folder={designFolders[d.id] ?? null}
                       onAssign={assignFolder}
@@ -575,7 +580,7 @@ export function DesignsListView({
                   <span>Name</span><span>Edited</span><span>Created</span><span>Created by</span>
                 </div>
                 {buckets.flatMap((b) => b.items).map((d) => (
-                  <DesignRow key={d.id} design={d} onOpen={() => onOpen(d)} onDelete={() => setConfirmDelete(d)} folders={folders} folder={designFolders[d.id] ?? null} onAssign={assignFolder} />
+                  <DesignRow key={d.id} design={d} onOpen={() => onOpen(d)} onDelete={() => setConfirmDelete(d)} onDuplicate={() => void duplicate(d)} folders={folders} folder={designFolders[d.id] ?? null} onAssign={assignFolder} />
                 ))}
               </div>
             ) : (
@@ -591,7 +596,7 @@ export function DesignsListView({
                           key={d.id}
                           design={d}
                           onOpen={() => onOpen(d)}
-                          onDelete={() => setConfirmDelete(d)}
+                          onDelete={() => setConfirmDelete(d)} onDuplicate={() => void duplicate(d)}
                           folders={folders}
                           folder={designFolders[d.id] ?? null}
                           onAssign={assignFolder}
@@ -607,7 +612,9 @@ export function DesignsListView({
 
         {confirmDelete && (
           <ConfirmDelete
-            design={confirmDelete}
+            name={confirmDelete.title}
+            kind="design"
+            note="Every saved version goes with it."
             onCancel={() => setConfirmDelete(null)}
             onConfirm={() => void remove(confirmDelete)}
           />
@@ -720,10 +727,11 @@ function ViewPill({ active, onClick, children }: { active: boolean; onClick: () 
   )
 }
 
-function DesignCard({ design, onOpen, onDelete, folders, folder, onAssign }: {
+function DesignCard({ design, onOpen, onDelete, onDuplicate, folders, folder, onAssign }: {
   design: Design
   onOpen: () => void
   onDelete: () => void
+  onDuplicate: () => void
   folders: string[]
   folder: string | null
   onAssign: (id: string, folder: string | null) => void
@@ -806,21 +814,21 @@ function DesignCard({ design, onOpen, onDelete, folders, folder, onAssign }: {
       <TokensFlag designId={design.id} />
       <div className="absolute right-2 top-2 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
         <FolderAssign id={design.id} current={folder} folders={folders} onAssign={onAssign} />
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onDelete() }}
-          title="Delete design"
-          className="grid h-7 w-7 place-items-center rounded-md text-text-muted hover:bg-elevated hover:text-error"
-        >
-          <IconTrash size={11} />
-        </button>
+        <CardMenu
+          label={design.title}
+          inline
+          actions={[
+            { label: 'Duplicate', onSelect: onDuplicate },
+            { label: 'Delete', danger: true, onSelect: onDelete }
+          ]}
+        />
       </div>
     </div>
   )
 }
 
 /** A single design as a table row (list view): thumbnail + name, edited, created, author. */
-function DesignRow({ design, onOpen, onDelete, folders, folder, onAssign }: { design: Design; onOpen: () => void; onDelete: () => void; folders: string[]; folder: string | null; onAssign: (id: string, folder: string | null) => void }): JSX.Element {
+function DesignRow({ design, onOpen, onDelete, onDuplicate, folders, folder, onAssign }: { design: Design; onOpen: () => void; onDelete: () => void; onDuplicate: () => void; folders: string[]; folder: string | null; onAssign: (id: string, folder: string | null) => void }): JSX.Element {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   useEffect(() => {
     let cancelled = false
@@ -853,9 +861,14 @@ function DesignRow({ design, onOpen, onDelete, folders, folder, onAssign }: { de
         </span>
         <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
           <FolderAssign id={design.id} current={folder} folders={folders} onAssign={onAssign} />
-          <button type="button" onClick={(e) => { e.stopPropagation(); onDelete() }} title="Delete design" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-text-muted hover:bg-bg hover:text-error">
-            <IconTrash size={11} />
-          </button>
+          <CardMenu
+            label={design.title}
+            inline
+            actions={[
+              { label: 'Duplicate', onSelect: onDuplicate },
+              { label: 'Delete', danger: true, onSelect: onDelete }
+            ]}
+          />
         </div>
       </div>
     </div>
@@ -943,36 +956,4 @@ function TokensFlag({ designId }: { designId: string }): JSX.Element | null {
   )
 }
 
-function ConfirmDelete({ design, onCancel, onConfirm }: {
-  design: Design
-  onCancel: () => void
-  onConfirm: () => void
-}): JSX.Element {
-  return (
-    <Modal title="Delete this design?" onClose={onCancel} size="small" closeOnBackdrop={false}>
-      <ModalHeader title="Delete this design?" />
-      <ModalBody>
-        <p className="text-[13px] text-text-muted">
-          “{design.title}” and all its versions will be removed permanently.
-        </p>
-      </ModalBody>
-      <ModalFooter>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-md px-3 py-1.5 text-[13px] text-text-secondary hover:bg-elevated hover:text-text-primary"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={onConfirm}
-          className="rounded-md bg-error px-3 py-1.5 text-[13px] font-medium text-white hover:opacity-90"
-        >
-          Delete
-        </button>
-      </ModalFooter>
-    </Modal>
-  )
-}
 

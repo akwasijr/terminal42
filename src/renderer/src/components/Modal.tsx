@@ -192,16 +192,18 @@ export function ModalButton({
 }: {
   onClick?: () => void
   children: React.ReactNode
-  tone?: 'primary' | 'quiet' | 'plain'
+  tone?: 'primary' | 'quiet' | 'plain' | 'danger'
   disabled?: boolean
   type?: 'button' | 'submit'
 }): React.JSX.Element {
   const look =
     tone === 'primary'
       ? 'bg-action text-action-text hover:opacity-90'
-      : tone === 'quiet'
-        ? 'bg-raised text-text-primary hover:opacity-90'
-        : 'text-text-secondary hover:text-text-primary'
+      : tone === 'danger'
+        ? 'bg-error text-white hover:opacity-90'
+        : tone === 'quiet'
+          ? 'bg-raised text-text-primary hover:opacity-90'
+          : 'text-text-secondary hover:text-text-primary'
   return (
     <button
       type={type}

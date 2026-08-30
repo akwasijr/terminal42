@@ -38,6 +38,7 @@ import {
 } from './designExport'
 import {
   createDesign,
+  duplicateDesign,
   getDesign,
   importDesignFromFolder,
   importDesignFromGit,
@@ -1641,6 +1642,7 @@ export function registerDesignIpc(getWin: () => BrowserWindow | null): void {
       return { ok: false, error: String((e as Error).message || e), latest: null, versions: [] }
     }
   })
+  ipcMain.handle('designs:duplicate', async (_e, id: string) => duplicateDesign(id))
   ipcMain.handle('designs:delete', async (_e, id: string) => deleteDesign(id))
 
   ipcMain.handle('designs:writeHtml', async (_e, args: { designId: string; html: string }) => {

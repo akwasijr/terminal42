@@ -7,6 +7,7 @@
 // motion.
 
 import { useEffect, useRef, useState } from 'react'
+import { ConfirmDelete } from '../CardMenu'
 import type { ImageRef, MotionDoc } from '../../../../shared/motion/types'
 import { IMAGE_BANK, bankImageBase64, drawBankImage } from '../../lib/motion/bank'
 import { Section, SegmentedRow } from './controls'
@@ -26,6 +27,7 @@ export function ImagesPanel({
   onImportImages: () => void
   busy: boolean
 }): React.JSX.Element {
+  const [confirmBento, setConfirmBento] = useState<{ id: string; name: string } | null>(null)
   const [tab, setTab] = useState<'library' | 'bentos'>('library')
   const [bentos, setBentos] = useState<Bento[]>([])
   const [naming, setNaming] = useState(false)
@@ -208,7 +210,7 @@ export function ImagesPanel({
                     </button>
                     <button
                       type="button"
-                      onClick={() => void deleteBento(b.id)}
+                      onClick={() => setConfirmBento(b)}
                       aria-label={`Delete bento ${b.name}`}
                       className="rounded-sm px-1.5 py-1 text-[10.5px] text-text-muted opacity-0 transition-opacity hover:text-error focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 group-hover:opacity-100"
                     >
@@ -221,6 +223,17 @@ export function ImagesPanel({
           </>
         )}
       </Section>
+      {confirmBento && (
+        <ConfirmDelete
+          name={confirmBento.name}
+          kind="set"
+          onCancel={() => setConfirmBento(null)}
+          onConfirm={() => {
+            void deleteBento(confirmBento.id)
+            setConfirmBento(null)
+          }}
+        />
+      )}
     </>
   )
 }

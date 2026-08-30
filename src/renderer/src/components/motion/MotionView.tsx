@@ -6,6 +6,7 @@
 // the list never has to spin up the GPU to draw itself.
 
 import { useCallback, useEffect, useState } from 'react'
+import { CardMenu, ConfirmDelete } from '../CardMenu'
 import type { MotionDoc } from '../../../../shared/motion/types'
 import { emptyDoc, hydrateDoc } from '../../../../shared/motion/defaults'
 import { MOTION_COMPONENTS } from '../../../../shared/motion/registry'
@@ -14,7 +15,7 @@ import { MotionTemplates } from './MotionTemplates'
 import { MotionSetup, type MotionSetupChoice } from './MotionSetup'
 import { buildTemplateDoc } from '../../lib/motion/templateDoc'
 import type { MotionTemplate } from '../../../../shared/motion/templates'
-import { IconPlus, IconTrash } from '../icons'
+import { IconPlus } from '../icons'
 import { formatAge } from '../../lib/formatAge'
 
 type Row = { id: string; title: string; doc: unknown; thumbnail: string | null; updatedAt: number }
@@ -25,6 +26,7 @@ export function MotionView(): React.JSX.Element {
   const [loading, setLoading] = useState(true)
   const [setupOpen, setSetupOpen] = useState(false)
   const [templatesOpen, setTemplatesOpen] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState<Row | null>(null)
 
   const refresh = useCallback(async (): Promise<void> => {
     const list = await window.terminal42.motion.list()
@@ -65,6 +67,14 @@ export function MotionView(): React.JSX.Element {
 
   const remove = async (id: string): Promise<void> => {
     await window.terminal42.motion.delete(id)
+    await refresh()
+  }
+
+  // A copy is stored but not opened. Duplicating is usually the first step of
+  // trying something without risking the original, and being thrown into the
+  // copy loses your place in the list.
+  const duplicate = async (row: Row): Promise<void> => {
+    await window.terminal42.motion.create(`${row.title} copy`, hydrateDoc(row.doc))
     await refresh()
   }
 
@@ -140,14 +150,13 @@ export function MotionView(): React.JSX.Element {
                     <span className="mt-0.5 block text-[11.5px] text-text-muted">{formatAge(row.updatedAt)}</span>
                   </span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => void remove(row.id)}
-                  aria-label={`Delete ${row.title}`}
-                  className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-md text-text-muted opacity-0 transition-opacity hover:bg-elevated hover:text-error focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 group-hover:opacity-100"
-                >
-                  <IconTrash size={11} />
-                </button>
+                <CardMenu
+                  label={row.title}
+                  actions={[
+                    { label: 'Duplicate', onSelect: () => void duplicate(row) },
+                    { label: 'Delete', danger: true, onSelect: () => setConfirmDelete(row) }
+                  ]}
+                />
               </div>
             ))}
           </div>
@@ -158,6 +167,17 @@ export function MotionView(): React.JSX.Element {
       )}
       {templatesOpen && (
         <MotionTemplates onPick={(t) => void createFromTemplate(t)} onClose={() => setTemplatesOpen(false)} />
+      )}
+      {confirmDelete && (
+        <ConfirmDelete
+          name={confirmDelete.title}
+          kind="piece"
+          onCancel={() => setConfirmDelete(null)}
+          onConfirm={() => {
+            void remove(confirmDelete.id)
+            setConfirmDelete(null)
+          }}
+        />
       )}
     </div>
   )

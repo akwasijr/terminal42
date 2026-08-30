@@ -807,6 +807,7 @@ const api = {
       ipcRenderer.invoke('designs:applyEdit', { designId, blockId, css, tag }) as Promise<{ ok: boolean; latest: DesignVersion | null; versions: DesignVersion[]; error?: string }>,
     writeHtml: (designId: string, html: string) =>
       ipcRenderer.invoke('designs:writeHtml', { designId, html }) as Promise<{ ok: boolean; latest: DesignVersion | null; versions: DesignVersion[]; error?: string }>,
+    duplicate: (id: string) => ipcRenderer.invoke('designs:duplicate', id) as Promise<Design | null>,
     delete: (id: string) => ipcRenderer.invoke('designs:delete', id) as Promise<{ ok: boolean }>,
     importFolder: () =>
       ipcRenderer.invoke('designs:importFolder') as Promise<{ ok: boolean; design?: Design; error?: string }>,

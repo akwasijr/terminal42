@@ -19,6 +19,7 @@
 // faster than any amount of writing on the subject.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { CardMenu, ConfirmDelete } from '../CardMenu'
 import { TokensSetup } from './TokensSetup'
 import { takeNewTokensRequest } from '../../lib/tokens/openLatch'
 import {
@@ -33,7 +34,6 @@ import {
   type TokenStudio,
   type TokenValue,
   enforcementOf,
-  type Enforcement,
   type SetState,
   cssOptionsOf,
   countTokens as countStudioTokens,
@@ -79,6 +79,7 @@ export function TokensView({ onFullPage }: { onFullPage?: (full: boolean) => voi
   const [studio, setStudio] = useState<TokenStudio | null>(null)
   const [loading, setLoading] = useState(true)
   const [setupOpen, setSetupOpen] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState<StudioRow | null>(null)
   const [importNote, setImportNote] = useState<string | null>(null)
 
   const refresh = async (): Promise<void> => {
@@ -182,10 +183,7 @@ export function TokensView({ onFullPage }: { onFullPage?: (full: boolean) => voi
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-3 pb-3">
-        <p className="text-[12.5px] text-text-muted">
-          One place your colours, sizes and type are decided, and everything else agrees with.
-        </p>
+      <div className="flex items-center justify-end gap-3 pb-3">
         <label className="shrink-0 cursor-pointer rounded-md px-3 py-1.5 text-[13px] text-text-secondary hover:bg-raised hover:text-text-primary focus-within:ring-2 focus-within:ring-accent/60">
           Import
           <input
@@ -226,22 +224,13 @@ export function TokensView({ onFullPage }: { onFullPage?: (full: boolean) => voi
                 <span className="mt-2 block truncate text-[12.5px] text-text-primary">{r.name}</span>
                 <span className="block text-[11px] text-text-muted">{countTokens(r.studio)} tokens</span>
               </button>
-              <button
-                type="button"
-                onClick={() => void duplicate(r)}
-                aria-label={`Duplicate ${r.name}`}
-                className="absolute right-16 top-2 rounded-sm px-1.5 py-1 text-[10.5px] text-text-muted opacity-0 hover:text-text-primary focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 group-hover:opacity-100"
-              >
-                Duplicate
-              </button>
-              <button
-                type="button"
-                onClick={() => void remove(r.id)}
-                aria-label={`Delete ${r.name}`}
-                className="absolute right-2 top-2 rounded-sm px-1.5 py-1 text-[10.5px] text-text-muted opacity-0 hover:text-error focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 group-hover:opacity-100"
-              >
-                Delete
-              </button>
+              <CardMenu
+                label={r.name}
+                actions={[
+                  { label: 'Duplicate', onSelect: () => void duplicate(r) },
+                  { label: 'Delete', danger: true, onSelect: () => setConfirmDelete(r) }
+                ]}
+              />
             </li>
           ))}
         </ul>
@@ -249,6 +238,19 @@ export function TokensView({ onFullPage }: { onFullPage?: (full: boolean) => voi
 
       {setupOpen ? (
         <TokensSetup onCancel={() => setSetupOpen(false)} onCreate={(s) => void create(s)} />
+      ) : null}
+
+      {confirmDelete ? (
+        <ConfirmDelete
+          name={confirmDelete.name}
+          kind="library"
+          note="Anything bound to it will fall back to its own values."
+          onCancel={() => setConfirmDelete(null)}
+          onConfirm={() => {
+            void remove(confirmDelete.id)
+            setConfirmDelete(null)
+          }}
+        />
       ) : null}
     </div>
   )
