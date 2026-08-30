@@ -92,7 +92,7 @@ export function FrameToolbar({
   // The tools sit in the piece's top bar, in the same place Form keeps its
   // own, rather than floating over the frame where they covered the work.
   return (
-    <div className="flex min-w-0 items-center gap-0.5">
+    <div className="flex shrink-0 items-center gap-0.5">
       {/* Undo first, where every other tool bar puts it. The shortcut works
           whether or not these are pressed; they are here because a shortcut
           with nothing on screen is a feature only the person who wrote it

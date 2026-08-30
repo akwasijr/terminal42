@@ -21,6 +21,8 @@ import { MotionStage, type StageHandle } from './MotionStage'
 import { ExportPanel } from './ExportPanel'
 import { ParamsPanel, VisualPanel } from './MotionPanels'
 import { MotionTimeline } from './MotionTimeline'
+import { MotionTools } from './MotionTools'
+import type { MotionTool } from '../../lib/motion/tools'
 import { MotionPickerProvider, type OpenColorPicker } from './pickerContext'
 import type { Pick } from '../../lib/motion/overlayPick'
 import { ColorPicker, type PickerRequest } from '../ColorPicker'
@@ -84,6 +86,7 @@ export function MotionStudio({
   const [naming, setNaming] = useState(false)
   const [layoutName, setLayoutName] = useState('')
   const [poseMode, setPoseMode] = useState(false)
+  const [tool, setTool] = useState<MotionTool>('select')
   const [fit, setFit] = useState<FrameFit>('contain')
   const [leftWidth, setLeftWidth] = useStoredWidth('motion.leftPane', 240, 180, 420)
   const [rightWidth, setRightWidth] = useStoredWidth('motion.rightPane', 256, 200, 460)
@@ -156,9 +159,13 @@ export function MotionStudio({
     })
   }, [])
 
-  const patch = useCallback((p: Partial<MotionDoc>) => {
+  // A function is accepted as well as a plain patch because anything that
+  // waits -- a file dialog, say -- comes back holding a document that has
+  // moved on, and merging that stale copy back in would undo whatever
+  // happened while it was open.
+  const patch = useCallback((p: Partial<MotionDoc> | ((d: MotionDoc) => Partial<MotionDoc>)) => {
     setHist((h) => {
-      const next = { ...h.present, ...p }
+      const next = { ...h.present, ...(typeof p === 'function' ? p(h.present) : p) }
       // A layer's tracks go when the layer does, wherever it was deleted
       // from -- the timeline's bin or any of the four panels' ×. Doing it
       // here rather than in each of those is what stops one of them being
@@ -308,14 +315,39 @@ export function MotionStudio({
       const res = await window.terminal42.motion.addImages(paths)
       if (!res.ok) return
       const added = res.images.map((i) => ({ id: i.id, src: i.path, name: i.name }))
-      const overrides = { ...doc.overrides }
-      if (cardIndex !== null && added[0]) {
-        // Dropping onto a card means that card, not "somewhere in the deck".
-        const key = String(cardIndex)
-        overrides[key] = { ...(overrides[key] ?? emptyOverride()), imageId: added[0].id }
-        setSelected({ kind: 'card', index: cardIndex })
-      }
-      patch({ overrides, visual: { ...doc.visual, images: [...doc.visual.images, ...added] } })
+      if (cardIndex !== null && added[0]) setSelected({ kind: 'card', index: cardIndex })
+      patch((d) => {
+        const overrides = { ...d.overrides }
+        if (cardIndex !== null && added[0]) {
+          // Dropping onto a card means that card, not "somewhere in the deck".
+          const key = String(cardIndex)
+          overrides[key] = { ...(overrides[key] ?? emptyOverride()), imageId: added[0].id }
+        }
+        return { overrides, visual: { ...d.visual, images: [...d.visual.images, ...added] } }
+      })
+    } finally {
+      setBusyImages(false)
+    }
+  }
+
+  /**
+   * The picture tool draws an empty frame and then asks what goes in it. The
+   * image has to find its way back to *that* layer, so this cannot go through
+   * the drop path -- a drop has no layer waiting for it.
+   */
+  const pickImageFor = async (pictureId: string): Promise<void> => {
+    setBusyImages(true)
+    try {
+      const res = await window.terminal42.motion.importImages()
+      if (!res.ok || res.images.length === 0) return
+      const added = res.images.map((i) => ({ id: i.id, src: i.path, name: i.name }))
+      patch((d) => ({
+        visual: {
+          ...d.visual,
+          images: [...d.visual.images, ...added],
+          pictures: (d.visual.pictures ?? []).map((l) => (l.id === pictureId ? { ...l, imageId: added[0].id } : l))
+        }
+      }))
     } finally {
       setBusyImages(false)
     }
@@ -452,8 +484,10 @@ export function MotionStudio({
             value={title}
             onChange={(e) => onRename(e.target.value)}
             aria-label="Piece name"
-            className="w-40 min-w-0 shrink rounded-sm bg-transparent px-1 py-0.5 text-[12.5px] text-text-primary hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            className="w-40 min-w-[72px] shrink rounded-sm bg-transparent px-1 py-0.5 text-[12.5px] text-text-primary hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           />
+          <span className="mx-1 h-4 w-px shrink-0 bg-border" />
+          <MotionTools tool={tool} onTool={setTool} />
           <span className="mx-1 h-4 w-px shrink-0 bg-border" />
           <FrameToolbar
             doc={doc}
@@ -481,12 +515,12 @@ export function MotionStudio({
             undoable={canUndo(hist)}
             redoable={canRedo(hist)}
           />
-          <span className="ml-auto font-mono text-[10.5px] text-text-muted">{count} cards</span>
+          <span className="ml-auto shrink-0 whitespace-nowrap font-mono text-[10.5px] text-text-muted">{count} cards</span>
           {handEdits > 0 ? (
             <button
               type="button"
               onClick={() => { setSelected(null); patch({ overrides: {} }) }}
-              className="rounded-sm px-2 py-1 text-[11px] text-text-muted hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+              className="shrink-0 whitespace-nowrap rounded-sm px-2 py-1 text-[11px] text-text-muted hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
             >
               Reset {handEdits} hand {handEdits === 1 ? 'edit' : 'edits'}
             </button>
@@ -506,7 +540,10 @@ export function MotionStudio({
             onSelect={setSelected}
             onPatch={patch}
             onDropFiles={(f, card) => void dropFiles(f, card)}
+            onPickImage={(pictureId) => void pickImageFor(pictureId)}
             poseMode={poseMode}
+            tool={tool}
+            onTool={setTool}
             fit={fit}
             replayToken={replayToken}
             replayLooping={replayLooping}

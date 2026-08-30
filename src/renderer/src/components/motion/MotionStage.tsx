@@ -23,6 +23,7 @@ import { composeFrame, releaseComposeScratch } from '../../lib/motion/compose'
 import { needsPixelPass, releaseFxScratches } from '../../lib/motion/frameFx'
 import { ensureTextFonts } from '../../lib/motion/fonts'
 import { boxFor, drawPickOutline, pickOverlay, samePick, type Box, type Pick } from '../../lib/motion/overlayPick'
+import { isShapeTool, type MotionTool } from '../../lib/motion/tools'
 
 export type StageHandle = {
   engine: () => MotionEngine | null
@@ -44,7 +45,10 @@ export function MotionStage({
   onSelect,
   onPatch,
   onDropFiles,
+  onPickImage,
   poseMode = false,
+  tool = 'select',
+  onTool,
   fit = 'contain',
   replayToken = 0,
   replayLooping = false
@@ -63,8 +67,14 @@ export function MotionStage({
   onPatch: (patch: Partial<MotionDoc>) => void
   /** Pictures dragged in from the desktop, with the card they landed on. */
   onDropFiles: (files: File[], cardIndex: number | null) => void
+  /** Asks for a picture for the picture layer the tool has just drawn. */
+  onPickImage?: (pictureId: string) => void
   /** While true a drag poses the whole piece instead of picking up a card. */
   poseMode?: boolean
+  /** What a drag on the frame makes. 'select' means it moves what is there. */
+  tool?: MotionTool
+  /** Called to hand the tool back after one use, so drawing is not a mode. */
+  onTool?: (t: MotionTool) => void
   /** 'edge' lets the frame fill the panel instead of sitting inside it. */
   fit?: FrameFit
   /** Bumped to replay the entrance; the value itself means nothing. */
@@ -322,6 +332,21 @@ export function MotionStage({
     return { x: ((e.clientX - r.left) / r.width) * over.width, y: ((e.clientY - r.top) / r.height) * over.height, ctx }
   }
 
+  // Where a draw started, in frame percentages, and where it is now. Kept in
+  // state rather than a ref because the preview has to be drawn as it moves.
+  const [draw, setDraw] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null)
+  const toolRef = useRef<MotionTool>(tool)
+  toolRef.current = tool
+
+  /** A pointer position as a percentage of the frame, which is how layers are placed. */
+  const framePercent = (
+    e: { clientX: number; clientY: number }, el: HTMLElement
+  ): { x: number; y: number } | null => {
+    const r = el.getBoundingClientRect()
+    if (r.width === 0 || r.height === 0) return null
+    return { x: ((e.clientX - r.left) / r.width) * 100, y: ((e.clientY - r.top) / r.height) * 100 }
+  }
+
   /** The overlay canvas draws in device pixels; the frame is laid out in CSS ones. */
   const toCssBox = (box: Box, over: HTMLCanvasElement): Box => ({
     x: (box.x / over.width) * (size.width || 1),
@@ -358,7 +383,56 @@ export function MotionStage({
     })
   }
 
+  /** Puts down whatever the active tool makes, over the box just dragged out. */
+  const placeTool = (box: { x: number; y: number; w: number; h: number }): void => {
+    const t = toolRef.current
+    const d = docRef.current
+    const id = `${typeof t === 'object' ? 'shape' : t}-${Date.now().toString(36)}`
+    if (t === 'text') {
+      const layer = {
+        id, text: 'Title',
+        // Dragged out a box? Set the type to its height. Just clicked? Use a
+        // size that reads at a glance rather than one nobody chose.
+        size: box.h > 2 ? box.h : 8,
+        colour: '#f4f4f2', x: box.x, y: box.y
+      }
+      onPatch({ visual: { ...d.visual, text: [...d.visual.text, layer] } })
+      onSelect({ kind: 'text', id })
+    } else if (t === 'picture') {
+      const layer = {
+        id, mask: 'rect' as const,
+        width: box.w > 2 ? box.w : 30, height: box.h > 2 ? box.h : 30,
+        x: box.x, y: box.y, rotation: 0, opacity: 100, fit: 'cover' as const
+      }
+      onPatch({ visual: { ...d.visual, pictures: [...(d.visual.pictures ?? []), layer] } })
+      onSelect({ kind: 'picture', id })
+      onPickImage?.(id)
+    } else if (typeof t === 'object') {
+      const layer = {
+        id, kind: t.shape,
+        width: box.w > 2 ? box.w : 30, height: box.h > 2 ? box.h : 22,
+        x: box.x, y: box.y, rotation: 0, colour: '#d8d3c8', opacity: 100, corner: 0
+      }
+      onPatch({ visual: { ...d.visual, shapes: [...(d.visual.shapes ?? []), layer] } })
+      onSelect({ kind: 'shape', id })
+    }
+    // One use per press of the button. Staying in the tool would mean every
+    // later click on the frame put down another one by accident.
+    onTool?.('select')
+  }
+
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>): void => {
+    // A tool is asked first: while one is held, a press on the frame draws
+    // rather than picking up whatever happens to be under the pointer.
+    if (tool !== 'select') {
+      const at = framePercent(e, e.currentTarget)
+      if (at) {
+        setDraw({ x0: at.x, y0: at.y, x1: at.x, y1: at.y })
+        try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* still drawable */ }
+        setHint(isShapeTool(tool) ? 'Drag out the shape, or click to drop one' : 'Click where it goes')
+        return
+      }
+    }
     const engine = engineRef.current
     if (!engine) return
     const at = ndc(e, e.currentTarget)
@@ -439,6 +513,11 @@ export function MotionStage({
   }
 
   const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>): void => {
+    if (draw) {
+      const at = framePercent(e, e.currentTarget)
+      if (at) setDraw({ ...draw, x1: at.x, y1: at.y })
+      return
+    }
     const drag = dragRef.current
     const engine = engineRef.current
     if (!drag || !engine) return
@@ -533,6 +612,18 @@ export function MotionStage({
   }
 
   const endDrag = (e: React.PointerEvent<HTMLCanvasElement>): void => {
+    if (draw) {
+      setDraw(null)
+      setHint(null)
+      try {
+        if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
+      } catch { /* nothing to release */ }
+      placeTool({
+        x: (draw.x0 + draw.x1) / 2, y: (draw.y0 + draw.y1) / 2,
+        w: Math.abs(draw.x1 - draw.x0), h: Math.abs(draw.y1 - draw.y0)
+      })
+      return
+    }
     const drag = dragRef.current
     dragRef.current = null
     setHint(null)
@@ -670,7 +761,7 @@ export function MotionStage({
         <canvas ref={backRef} className="absolute inset-0 h-full w-full" aria-hidden="true" />
         <canvas
           ref={glRef}
-          className="absolute inset-0 h-full w-full cursor-grab active:cursor-grabbing"
+          className={`absolute inset-0 h-full w-full ${tool === 'select' ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'}`}
           style={{ filter: beforeCardsFilter(doc.visual.effects, size.height || 1080) }}
           role="img"
           aria-label={
@@ -692,6 +783,21 @@ export function MotionStage({
           aria-hidden="true"
         />
         <canvas ref={overRef} className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true" />
+        {/* What the tool is about to put down, so a drag is not a guess. In the
+            DOM rather than on the overlay canvas: the overlay is redrawn from
+            the document, and this belongs to the gesture, not the piece. */}
+        {draw ? (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute border border-accent bg-accent/10"
+            style={{
+              left: `${Math.min(draw.x0, draw.x1)}%`,
+              top: `${Math.min(draw.y0, draw.y1)}%`,
+              width: `${Math.abs(draw.x1 - draw.x0)}%`,
+              height: `${Math.abs(draw.y1 - draw.y0)}%`
+            }}
+          />
+        ) : null}
         {editing ? (() => {
           const layer = doc.visual.text.find((t) => t.id === editing.id)
           const px = ((layer?.size ?? 6) / 100) * (size.height || 1)
