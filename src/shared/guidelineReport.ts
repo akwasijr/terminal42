@@ -79,7 +79,11 @@ export function reportSummary(sections: ReportSection[], projectName: string): s
 export function applyPrompt(
   sections: ReportSection[],
   accepted: Set<string>,
-  source: { shell?: boolean; files?: string[] } = {}
+  source: {
+    shell?: boolean
+    files?: string[]
+    tokens?: { name: string; block: string } | null
+  } = {}
 ): string {
   const lines: string[] = []
   for (const section of sections) {
@@ -97,20 +101,49 @@ export function applyPrompt(
   const head = source.shell
     ? [
         'v001.html is only the mount point of this project, so there is nothing on it',
-        'to correct. Rebuild it as one self-contained page that shows the project\'s',
-        'real design: read the components and stylesheets in ./source/, reproduce the',
-        'layout, the copy and the styling they describe, inline the CSS in a <style>',
-        'tag, and use no build step, no framework and no external requests. Then make',
-        'sure the page you have written follows the points below.'
+        'to correct. Rebuild it as a page that shows the project\'s real design: read',
+        'the components and stylesheets in ./source/ and reproduce what they actually',
+        'render — their layout, their copy, their styling. Do not invent a product,',
+        'sections or content the source does not have. If the source is a small page,',
+        'the result is a small page.'
       ]
     : [
         'Apply these design guideline fixes to v001.html. Change only what they ask for,',
         'keep the content and the layout as they are, and do not add anything new.'
       ]
 
+  // Said every time, because it is the failure that spoils the result in
+  // silence: a page whose custom properties are aliases of names that were
+  // never declared renders with no styling at all, and reads as a broken
+  // build rather than as a bad instruction.
+  const standalone = [
+    '',
+    'v001.html has to stand on its own: one file, the CSS inline in a <style> tag, no',
+    'build step, no framework, no external requests. Every custom property the page',
+    'uses must be declared in that same file with a real value. Never refer to a',
+    'variable that is not declared there.'
+  ]
+
   const where = files.length > 0
     ? ['', `The project's source is in ./source/ (${files.length} ${files.length === 1 ? 'file' : 'files'}), for reference.`]
     : []
 
-  return [...head, ...where, '', ...lines].join('\n')
+  // A library is an override, not a reference: the point of attaching one is
+  // that the page comes back on the same colours and sizes as the rest of the
+  // work, so it is said before the list, in the imperative.
+  const tokens = source.tokens
+    ? [
+        '',
+        source.tokens.block,
+        '',
+        `Use the ${source.tokens.name} library above in place of the values the project`,
+        'currently uses: replace its colours, sizes, typefaces and radii with the',
+        'nearest of these. Copy the ones you use into the page as custom properties',
+        'with their literal values — an alias to a name that is only in the list above',
+        'resolves to nothing and leaves the page unstyled. Do not invent a value that',
+        'is not in the library.'
+      ]
+    : []
+
+  return [...head, ...standalone, ...where, ...tokens, '', ...lines].join('\n')
 }

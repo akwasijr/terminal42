@@ -2,6 +2,10 @@ import React, { useMemo, useState } from 'react'
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '../Modal'
 import { GroupPictogram } from './GroupPictogram'
 import { buildReport, reportSummary, applyPrompt, type ReportSection } from '../../../../shared/guidelineReport'
+import { formatTokensForPrompt } from '../../../../shared/tokens/export'
+import { useTokenLibraries } from '../../lib/tokens/useTokenLibraries'
+import { TokenLibraryModal, TokenGlyph } from '../tokens/TokenLibraryModal'
+import type { ChatTokens } from '../../lib/tokens/chatTokens'
 import type { GuidelineFinding } from '../../../../preload/index'
 import { IconCheck, IconClose, IconFolder } from '../icons'
 
@@ -38,6 +42,19 @@ export function GuidelineCheckModal({
   // ordinary case and unticking is the decision worth making.
   const [declined, setDeclined] = useState<Set<string>>(new Set())
   const [open, setOpen] = useState<string | null>(null)
+  // A library chosen here overrides the project's own values, so the second
+  // run does not merely tidy what is there but moves it onto the scale the
+  // rest of the work already uses.
+  const [tokens, setTokens] = useState<ChatTokens | null>(null)
+  const [libraryOpen, setLibraryOpen] = useState(false)
+  const { libraries } = useTokenLibraries()
+
+  const library = tokens ? libraries.find((l) => l.id === tokens.id) ?? null : null
+  const tokenBlock = useMemo(() => {
+    if (!library || !tokens) return null
+    const block = formatTokensForPrompt(library.studio, tokens.themeId ?? library.studio.activeTheme)
+    return block ? { name: library.name, block } : null
+  }, [library, tokens])
 
   const sections: ReportSection[] = useMemo(
     () => (stage.at === 'report' ? buildReport(stage.findings) : []),
@@ -95,13 +112,26 @@ export function GuidelineCheckModal({
     onApply({
       checkId: stage.id,
       name: stage.name,
-      prompt: (source) => applyPrompt(sections, accepted, source)
+      prompt: (source) => applyPrompt(sections, accepted, { ...source, tokens: tokenBlock })
     })
   }
 
   const close = (): void => {
     if (stage.at === 'report') void window.terminal42.guidelines.forget(stage.id)
     onClose()
+  }
+
+  // The library sits beside this dialog rather than inside it: Modal is a
+  // plain overlay, not a portal, so nesting one puts a second backdrop and a
+  // second scroll box inside the first and neither can be read.
+  if (libraryOpen) {
+    return (
+      <TokenLibraryModal
+        chosen={tokens}
+        onChoose={(next) => { setTokens(next); setLibraryOpen(false) }}
+        onClose={() => setLibraryOpen(false)}
+      />
+    )
   }
 
   return (
@@ -150,6 +180,31 @@ export function GuidelineCheckModal({
               </button>
             </div>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setLibraryOpen(true)}
+            className="flex items-center gap-3 rounded-lg bg-elevated px-4 py-3 text-left transition-colors hover:bg-raised"
+          >
+            <TokenGlyph className="shrink-0 text-text-secondary" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] text-text-primary">
+                {library ? library.name : 'Follow a token library'}
+              </span>
+              <span className="block text-[11.5px] text-text-muted">
+                {library
+                  ? 'Its colours and sizes replace the ones found'
+                  : 'Optional — put the project onto your own colours and sizes'}
+              </span>
+            </span>
+            {library && (
+              <span className="flex h-5 shrink-0 overflow-hidden rounded">
+                {library.swatches.slice(0, 5).map((c, i) => (
+                  <span key={i} className="w-3" style={{ background: c }} />
+                ))}
+              </span>
+            )}
+          </button>
         </ModalBody>
       )}
 
@@ -264,8 +319,18 @@ export function GuidelineCheckModal({
       <ModalFooter
         left={
           stage.at === 'report' && sections.length > 0 ? (
-            <span className="text-[11.5px] text-text-muted">
-              {accepted.size} of {sections.reduce((n, s) => n + s.rows.length, 0)} selected
+            <span className="flex items-center gap-3">
+              <span className="text-[11.5px] text-text-muted">
+                {accepted.size} of {sections.reduce((n, s) => n + s.rows.length, 0)} selected
+              </span>
+              <button
+                type="button"
+                onClick={() => setLibraryOpen(true)}
+                className="flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[11.5px] text-text-muted hover:bg-elevated hover:text-text-primary"
+              >
+                <TokenGlyph />
+                <span>{library ? library.name : 'Follow a token library'}</span>
+              </button>
             </span>
           ) : undefined
         }

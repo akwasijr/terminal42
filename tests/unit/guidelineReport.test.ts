@@ -113,6 +113,9 @@ describe('applyPrompt', () => {
   })
 })
 
+/** The prompt is wrapped for reading, so a phrase may span two lines. */
+const flat = (s: string): string => s.replace(/\s+/g, ' ')
+
 describe('applyPrompt on a mount point', () => {
   const sections = buildReport([
     { id: 'no-lazy', count: 1, file: 'index.html', line: 3, sample: '<img>' }
@@ -127,7 +130,7 @@ describe('applyPrompt on a mount point', () => {
 
   it('asks for a rebuild when the page is only a mount point', () => {
     const p = applyPrompt(sections, accepted, { shell: true, files: ['source/App.jsx'] })
-    expect(p).toContain('Rebuild it as one self-contained page')
+    expect(flat(p)).toContain('Rebuild it as a page that shows the project')
     expect(p).toContain('./source/')
     expect(p).not.toContain('Apply these design guideline fixes to v001.html')
   })
@@ -143,5 +146,62 @@ describe('applyPrompt on a mount point', () => {
 
   it('is still empty when nothing is accepted', () => {
     expect(applyPrompt(sections, new Set(), { shell: true })).toBe('')
+  })
+})
+
+describe('applyPrompt with a token library', () => {
+  const sections = buildReport([
+    { id: 'no-tokens', count: 1, file: 'a.css', line: 1, sample: 'color: #fff' }
+  ])
+  const accepted = new Set(['no-tokens'])
+  const tokens = { name: 'Ember', block: ':root { --color-primary: #b34700 }' }
+
+  it('puts the library in and says to use it instead', () => {
+    const p = applyPrompt(sections, accepted, { tokens })
+    expect(p).toContain('--color-primary: #b34700')
+    expect(p).toContain('Use the Ember library above in place of the values')
+  })
+
+  it('says nothing about a library when none is attached', () => {
+    expect(applyPrompt(sections, accepted)).not.toContain('in place of the values')
+    expect(applyPrompt(sections, accepted, { tokens: null })).not.toContain('in place of the values')
+  })
+
+  it('still asks for a rebuild when the page is a shell', () => {
+    const p = applyPrompt(sections, accepted, { shell: true, tokens })
+    expect(flat(p)).toContain('Rebuild it as a page that shows the project')
+    expect(p).toContain('Use the Ember library above')
+  })
+
+  it('keeps the library out when nothing is accepted', () => {
+    expect(applyPrompt(sections, new Set(), { tokens })).toBe('')
+  })
+})
+
+describe('applyPrompt keeps the page standing on its own', () => {
+  const sections = buildReport([
+    { id: 'no-tokens', count: 1, file: 'a.css', line: 1, sample: 'color: #fff' }
+  ])
+  const accepted = new Set(['no-tokens'])
+
+  it('says every custom property must be declared, whatever the source', () => {
+    for (const source of [{}, { shell: true }, { shell: false }]) {
+      const p = flat(applyPrompt(sections, accepted, source))
+      expect(p).toContain('must be declared in that same file with a real value')
+      expect(p).toContain('Never refer to a variable that is not declared there')
+    }
+  })
+
+  it('warns that an alias to a library name resolves to nothing', () => {
+    const p = applyPrompt(sections, accepted, {
+      tokens: { name: 'Minimal', block: ':root { --colour-brand-rest: #3730a3 }' }
+    })
+    expect(flat(p)).toContain('with their literal values')
+    expect(flat(p)).toContain('leaves the page unstyled')
+  })
+
+  it('tells a rebuild not to invent content the source does not have', () => {
+    const p = flat(applyPrompt(sections, accepted, { shell: true }))
+    expect(p).toContain('Do not invent a product, sections or content the source does not have')
   })
 })
