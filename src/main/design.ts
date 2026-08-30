@@ -2,7 +2,7 @@ import { ipcMain, BrowserWindow, shell, dialog, app } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { promises as fs, watch as fsWatch, type FSWatcher, existsSync } from 'node:fs'
 import { join, relative } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { pathToFileURL, fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
 import { getDb } from './db'
 import { extractPptxFacts, pptxFactsToPrompt, type PptxFacts } from './pptx'
@@ -20,6 +20,7 @@ import { buildEngineBaseBlock, ENGINE_USAGE, ENGINE_BASE_ID, ENGINE_MOTION_ID } 
 import { pickVariety } from './designVariety'
 import { pickDeckStyle } from './deckStyles'
 import { pickWebsiteStyle } from './websiteStyles'
+import { applyBaseHref, effectiveBase, inlineLocalAssets } from './versionBase'
 import { buildDeckBaseBlock, DECK_USAGE, DECK_BASE_ID, DECK_RUNTIME_ID } from './deckChassis'
 import {
   EXPORT_PREP_JS,
@@ -2037,19 +2038,20 @@ export function registerDesignIpc(getWin: () => BrowserWindow | null): void {
     if (!v) return { ok: false as const, error: 'Not found' }
     try {
       const content = await fs.readFile(v.filePath, 'utf8')
-      // Inject a <base> tag so relative <img src="…"> / <link href="…">
-      // references resolve against the design's directory (file://) when
-      // we render the document via srcDoc. Without this, browsers resolve
-      // relative URLs against about:srcdoc and every local image breaks.
+      // See versionBase.ts: rendered through srcDoc, relative URLs resolve
+      // against about:srcdoc unless the design's directory is set as the
+      // base — and a document that already declares its own base has to be
+      // resolved against that directory rather than overruled by it.
       const d = getDesign(designId)
       const baseHref = d ? pathToFileURL(d.cwd + '/').toString() : ''
-      const baseTag = baseHref ? `<base href="${baseHref}">` : ''
-      const withBase = baseTag
-        ? (/<head[^>]*>/i.test(content)
-            ? content.replace(/<head([^>]*)>/i, (_m, attrs) => `<head${attrs}>${baseTag}`)
-            : baseTag + content)
-        : content
-      return { ok: true as const, content: withBase }
+      const based = applyBaseHref(content, baseHref)
+      // And pull in its own scripts and stylesheets: srcDoc sits inside a page
+      // served over http, so a file:// script is refused as cross-origin and
+      // the page renders as an empty root with nothing to say why.
+      const inlined = await inlineLocalAssets(based, effectiveBase(based, baseHref), async (fileUrl) => {
+        try { return await fs.readFile(fileURLToPath(fileUrl), 'utf8') } catch { return null }
+      })
+      return { ok: true as const, content: inlined }
     } catch (err) {
       return { ok: false as const, error: String(err) }
     }

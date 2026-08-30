@@ -343,6 +343,11 @@ export function DesignsListView({
     })
     if (!r.ok) return r.error ?? 'something went wrong'
     await refresh()
+    // Starting from a template is starting something, so it opens, the same
+    // as the website gallery already did. This one used to drop the design it
+    // had just made and leave you looking at the shelf, with no sign that
+    // anything had happened beyond a card appearing somewhere behind you.
+    if (r.design) onOpen(r.design)
     return null
   }
 
