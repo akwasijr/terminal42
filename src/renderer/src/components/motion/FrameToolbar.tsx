@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useColorPicker } from './pickerContext'
 import { useBrandColours } from '../../lib/motion/brand'
+import { isGradient, linearGradient } from '../../lib/motion/paint'
 import type { FrameAspect, MotionDoc } from '../../../../shared/motion/types'
 
 export type FrameFit = 'contain' | 'edge'
@@ -471,13 +472,13 @@ function ResetGlyph(): React.JSX.Element {
  * repeats it, and when it is not, it is the only place that colour is shown.
  */
 /**
- * The background colour, as one dot that opens into the palette.
+ * The background, as one dot that opens a palette under it.
  *
- * A row of five squares sat next to the play button and the grid toggle and
- * looked like part of the same set of controls, which they are not: they are
- * one choice with five common answers. Collapsed, the toolbar reads as a
- * short line of tools; opened, it is a palette, and the colours in it are
- * the brand's rather than a fixed list nobody chose.
+ * The swatches used to unfold along the toolbar itself, so choosing a colour
+ * pushed the play button and the grid toggle sideways and the row read as one
+ * long undifferentiated line of dots. They now open downwards in a panel of
+ * their own: a grid of flat colours, a row of runs between two colours, and
+ * the picker for anything else.
  */
 function BackgroundSwatches({
   value, onChange
@@ -487,25 +488,31 @@ function BackgroundSwatches({
   const custom = useRef<HTMLButtonElement>(null)
   const box = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
-  const safe = /^#[0-9a-fA-F]{6}$/.test(value) ? value : '#000000'
+  const gradient = isGradient(value)
+  const safe = gradient || /^#[0-9a-fA-F]{6}$/.test(value) ? value : '#000000'
   const current = safe.toLowerCase()
 
   // Closing on an outside click rather than on blur, so that moving from a
-  // swatch to the picker button does not shut the row on the way.
+  // swatch to the picker button does not shut the panel on the way.
   useEffect(() => {
     if (!open) return
     const onDown = (e: MouseEvent): void => {
       if (!box.current?.contains(e.target as Node)) setOpen(false)
     }
+    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') setOpen(false) }
     document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
   }, [open])
 
   const askForColour = (): void => {
     const r = custom.current?.getBoundingClientRect()
     if (!openPicker || !r) return
     openPicker({
-      value: safe,
+      value: gradient ? '#000000' : safe,
       opacity: 1,
       showAlpha: false,
       anchor: { left: r.left, top: r.top, right: r.right, bottom: r.bottom },
@@ -514,59 +521,95 @@ function BackgroundSwatches({
     })
   }
 
-  const swatches = [...new Set([...brand.map((c) => c.toLowerCase()), ...SWATCHES.map((s) => s.value)])]
+  const flats = [...new Set([...brand.map((c) => c.toLowerCase()), ...SWATCHES.map((s) => s.value)])]
+  // Runs are built from the brand's own colours where there are two to run
+  // between, so the list is the piece's rather than a set nobody chose. The
+  // greys are there because a backdrop is often meant to recede.
+  const gradients = [
+    ...(brand.length > 1 ? [linearGradient(160, brand[0], brand[1])] : []),
+    ...(brand.length > 2 ? [linearGradient(120, brand[1], brand[2])] : []),
+    linearGradient(180, '#f2f0ec', '#cfcac2'),
+    linearGradient(180, '#3a3a3f', '#111113'),
+    linearGradient(135, '#111113', '#000000')
+  ]
 
   return (
-    <div ref={box} className="flex items-center gap-1" role="group" aria-label="Background">
+    <div ref={box} className="relative flex items-center" role="group" aria-label="Background">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        aria-label="Background colour"
-        title={`Background · ${safe.toUpperCase()}`}
+        aria-label="Background"
+        title={`Background \u00b7 ${gradient ? 'gradient' : safe.toUpperCase()}`}
         className="h-4 w-4 shrink-0 rounded-full transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         style={{ background: safe, boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / 0.22)' }}
       />
       {open ? (
-        <>
-          {swatches.map((hex) => (
+        <div
+          role="group"
+          aria-label="Choose a background"
+          className="absolute left-1/2 top-full z-30 mt-2 w-[196px] -translate-x-1/2 rounded-panel bg-elevated p-2"
+        >
+          <p className="px-0.5 pb-1 text-[11px] text-text-secondary">Colour</p>
+          <div className="grid grid-cols-6 gap-1.5">
+            {flats.map((hex) => (
+              <button
+                key={hex}
+                type="button"
+                title={hex.toUpperCase()}
+                aria-label={`Background ${hex}`}
+                aria-pressed={current === hex}
+                onClick={() => { onChange(hex); setOpen(false) }}
+                className="h-6 w-6 rounded-full transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                style={{
+                  background: hex,
+                  boxShadow: current === hex
+                    ? '0 0 0 1.5px var(--color-accent), inset 0 0 0 1px rgb(255 255 255 / 0.14)'
+                    : 'inset 0 0 0 1px rgb(255 255 255 / 0.14)'
+                }}
+              />
+            ))}
+          </div>
+          <p className="px-0.5 pb-1 pt-2 text-[11px] text-text-secondary">Gradient</p>
+          <div className="grid grid-cols-6 gap-1.5">
+            {gradients.map((g) => (
+              <button
+                key={g}
+                type="button"
+                title={g}
+                aria-label={`Background ${g}`}
+                aria-pressed={current === g.toLowerCase()}
+                onClick={() => { onChange(g); setOpen(false) }}
+                className="h-6 w-6 rounded-full transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                style={{
+                  background: g,
+                  boxShadow: current === g.toLowerCase()
+                    ? '0 0 0 1.5px var(--color-accent), inset 0 0 0 1px rgb(255 255 255 / 0.14)'
+                    : 'inset 0 0 0 1px rgb(255 255 255 / 0.14)'
+                }}
+              />
+            ))}
             <button
-              key={hex}
+              ref={custom}
               type="button"
-              title={hex.toUpperCase()}
-              aria-label={`Background ${hex}`}
-              aria-pressed={current === hex}
-              onClick={() => onChange(hex)}
-              className="h-4 w-4 shrink-0 rounded-full transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              onClick={askForColour}
+              disabled={!openPicker}
+              title={`Pick a background \u00b7 ${gradient ? 'gradient' : safe.toUpperCase()}`}
+              aria-label="Pick a background"
+              className="relative h-6 w-6 rounded-full transition-transform enabled:hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               style={{
-                background: hex,
-                boxShadow: current === hex
-                  ? '0 0 0 1.5px var(--color-accent), inset 0 0 0 1px rgb(255 255 255 / 0.14)'
-                  : 'inset 0 0 0 1px rgb(255 255 255 / 0.14)'
+                background: 'conic-gradient(from 0deg, #ff4d4d, #ffd24d, #4dff88, #4dd2ff, #8a4dff, #ff4dd2, #ff4d4d)',
+                boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / 0.2)'
               }}
-            />
-          ))}
-          <button
-            ref={custom}
-            type="button"
-            onClick={askForColour}
-            disabled={!openPicker}
-            title={`Pick a background · ${safe.toUpperCase()}`}
-            aria-label="Pick a background"
-            className="relative h-4 w-4 shrink-0 rounded-full transition-transform enabled:hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            style={{
-              background: 'conic-gradient(from 0deg, #ff4d4d, #ffd24d, #4dff88, #4dd2ff, #8a4dff, #ff4dd2, #ff4d4d)',
-              boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / 0.2)'
-            }}
-          >
-            <span
-              className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full"
-              style={{ background: safe, boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / 0.25)' }}
-            />
-          </button>
-        </>
+            >
+              <span
+                className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full"
+                style={{ background: safe, boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / 0.25)' }}
+              />
+            </button>
+          </div>
+        </div>
       ) : null}
     </div>
   )
-
 }

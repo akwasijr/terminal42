@@ -16,6 +16,7 @@ import { applyLayerTransform, layerScaleVisible } from './layerTransform'
 import { layerVisibility } from '../../../../shared/motion/frame'
 
 import { textFont } from './overlayPick'
+import { canvasPaint } from './paint'
 
 export function drawBackdrop(
   ctx: CanvasRenderingContext2D,
@@ -26,7 +27,7 @@ export function drawBackdrop(
 ): void {
   ctx.clearRect(0, 0, width, height)
   if (!opts.transparent) {
-    ctx.fillStyle = frame.background
+    ctx.fillStyle = canvasPaint(ctx, frame.background, width, height)
     ctx.fillRect(0, 0, width, height)
   }
 
