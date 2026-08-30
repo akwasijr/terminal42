@@ -97,6 +97,9 @@ export const IconStop = make(<rect x="4" y="4" width="8" height="8" rx="1" fill=
 export const IconClose = make(<path d="M3.5 3.5 L12.5 12.5 M12.5 3.5 L3.5 12.5" />)
 export const IconBolt = make(<path d="M9 2 L4 9 H8 L7 14 L12 7 H8 L9 2 Z" />)
 export const IconExternal = make(<><path d="M9 2 H14 V7" /><path d="M14 2 L8 8" /><path d="M12 9 V13 c0 .5-.5 1-1 1 H3 c-.5 0-1-.5-1-1 V5 c0-.5.5-1 1-1 H7" /></>)
+// An arrow leaving a tray: this hands the design to something else, whether
+// that is the clipboard or a file on disk.
+export const IconShare = make(<><path d="M8 10 V2" /><path d="M5 5 L8 2 L11 5" /><path d="M3 8 V13 c0 .5.5 1 1 1 H12 c.5 0 1-.5 1-1 V8" /></>)
 export const IconCopy = make(<><rect x="5" y="5" width="9" height="9" rx="1" /><path d="M11 5 V3 c0-.5-.5-1-1-1 H3 c-.5 0-1 .5-1 1 V10 c0 .5.5 1 1 1 H5" /></>)
 export const IconRefresh = make(<><path d="M3 8 a5 5 0 1 1 1.5 3.5" /><path d="M3 13 V11 H5" /></>)
 export const IconBell = make(<><path d="M8 2 c-2.2 0-4 1.8-4 4 v3 l-1.2 1.5 H13.2 L12 9 V6 c0-2.2-1.8-4-4-4 Z" /><path d="M6.8 12.5 c0 .7.5 1.2 1.2 1.2 s1.2-.5 1.2-1.2" /></>)

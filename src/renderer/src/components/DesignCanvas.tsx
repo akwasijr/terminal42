@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import type { Design, DesignVersion } from '../../../preload/index'
-import { IconBrain, IconChat, IconCheck, IconChevronRight, IconClose, IconDesktop, IconDownload, IconEdit, IconExternal, IconFluid, IconFolder, IconMobile, IconRefresh, IconSparkle, IconTablet } from './icons'
+import { IconBrain, IconChat, IconCheck, IconChevronRight, IconClose, IconDesktop, IconEdit, IconExternal, IconFluid, IconFolder, IconMobile, IconRefresh, IconShare, IconSparkle, IconTablet } from './icons'
 import { PencilThinking, pickAnimationForKind } from './PencilThinking'
 import { Modal } from './Modal'
 import { MotionTimeline } from './MotionTimeline'
 import { MOTION_PRESETS, presetSpec, generateMotionCss, type MotionSpec } from '../lib/motionCss'
+import { extractCss, extractTokens, shareReference } from '../../../shared/share'
 import { SHADER_PRESETS, buildShaderScript, type ShaderConfig, type ShaderId } from '../lib/shaderAssets'
 
 // ─── Viewport profiles per design kind ──────────────────────────────────────
@@ -1093,7 +1094,14 @@ export function DesignCanvas({
               <span>{brainCheckProgress}</span>
             </button>
           )}
-          <ExportMenu designId={designId} disabled={empty} />
+          <ShareMenu
+            designId={designId}
+            disabled={empty}
+            title={design?.title ?? ''}
+            fileName={active?.fileName ?? ''}
+            filePath={active?.filePath ?? ''}
+            content={activeContent}
+          />
           {/* Everything that leaves the app or runs over the whole design.
               None of it is reached often enough to earn a permanent slot,
               and together they were what pushed the bar past its width. */}
@@ -1378,7 +1386,7 @@ function CanvasGenerating({ phase, variant }: { phase: string; variant?: 'signat
   )
 }
 
-// ─── Export menu ───────────────────────────────────────────────────────────
+// ─── Share menu ────────────────────────────────────────────────────────────
 
 type Mode = {
   id: string
@@ -1500,8 +1508,19 @@ const FORMAT_LABEL: Record<string, string> = {
   html: 'Export as HTML'
 }
 
-function ExportMenu({ designId, disabled }: { designId: string; disabled: boolean }): JSX.Element {
+type ShareMenuProps = {
+  designId: string
+  disabled: boolean
+  title: string
+  fileName: string
+  filePath: string
+  content: string
+}
+
+function ShareMenu({ designId, disabled, title, fileName, filePath, content }: ShareMenuProps): JSX.Element {
   const [open, setOpen] = useState(false)
+  // What was last put on the clipboard, so the menu can say it took.
+  const [copied, setCopied] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   // Start empty — formatsForKind never returns []; the load below
   // populates the real list. Avoids briefly showing HTML when the kind
@@ -1538,6 +1557,28 @@ function ExportMenu({ designId, disabled }: { designId: string; disabled: boolea
     const t = setTimeout(() => setDone(null), 12000)
     return () => clearTimeout(t)
   }, [done])
+
+  useEffect(() => {
+    if (!copied) return
+    const t = setTimeout(() => setCopied(null), 1600)
+    return () => clearTimeout(t)
+  }, [copied])
+
+  // The stylesheet and the tokens are read from the version on screen rather
+  // than from disk, so what is copied is what is being looked at.
+  const css = useMemo(() => extractCss(content), [content])
+  const tokens = useMemo(() => extractTokens(css), [css])
+  const tokenCount = Object.keys(tokens).length
+
+  const copy = (what: string, text: string): void => {
+    setOpen(false)
+    void navigator.clipboard.writeText(text).then(
+      () => setCopied(what),
+      () => window.dispatchEvent(new CustomEvent('t42:design-system-message', {
+        detail: { designId, text: `Couldn't copy the ${what.toLowerCase()}` }
+      }))
+    )
+  }
 
   const doExport = async (fmt: 'html' | 'pdf' | 'png' | 'pptx'): Promise<void> => {
     setOpen(false)
@@ -1577,31 +1618,52 @@ function ExportMenu({ designId, disabled }: { designId: string; disabled: boolea
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        disabled={disabled || busy || formats.length === 0}
-        title={
-          formats.length === 0
-            ? 'No export formats available for this design'
-            : `Export as ${formats.map((f) => f.toUpperCase()).join(' / ')}`
-        }
+        disabled={disabled || busy}
+        title="Copy this design, or save it as a file"
         className="flex h-7 items-center gap-1.5 rounded-md px-2 text-[11.5px] text-text-secondary hover:bg-elevated hover:text-text-primary disabled:opacity-40"
       >
-        <IconDownload size={12} />
-        <span>{busy ? 'Exporting…' : 'Export'}</span>
-        {formats.length > 1 && <span className="text-[9px] opacity-70">▾</span>}
+        <IconShare size={12} />
+        <span>{busy ? 'Saving…' : copied ? `${copied} copied` : 'Share'}</span>
+        <span className="text-[9px] opacity-70">▾</span>
       </button>
-      {open && formats.length > 0 && (
-        <div className="t42-menu absolute right-0 top-full z-30 mt-1 min-w-[180px] overflow-hidden rounded-md bg-raised shadow-overlay">
-          {formats.map((f) => (
-            <button
-              key={f}
-              type="button"
-              onClick={() => void doExport(f)}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12.5px] text-text-primary hover:bg-elevated"
-            >
-              <span className="w-10 rounded bg-elevated px-1 py-0.5 text-center text-[10px] text-text-muted">{f}</span>
-              <span className="text-text-secondary">{FORMAT_LABEL[f] ?? f.toUpperCase()}</span>
-            </button>
-          ))}
+      {open && (
+        <div className="t42-menu absolute right-0 top-full z-30 mt-1 min-w-[236px] overflow-hidden rounded-md bg-raised py-1 shadow-overlay">
+          {/* Copying comes first because it is the quick answer: a path an
+              agent can open, or the styles themselves. Saving a file is the
+              slower one and waits below. */}
+          <p className="px-3 pb-1 pt-1 text-[10px] text-text-muted">Copy</p>
+          <ShareItem
+            glyph="↗"
+            label="Reference"
+            note={fileName.replace(/\.[^.]+$/, '') || '—'}
+            disabled={!filePath}
+            onPick={() => copy('Reference', shareReference({ title, fileName, filePath }))}
+          />
+          <ShareItem
+            glyph="{ }"
+            label="Stylesheet"
+            note={css ? `${css.split('\n').length} lines` : 'none'}
+            disabled={!css}
+            onPick={() => copy('Stylesheet', css)}
+          />
+          <ShareItem
+            glyph="--"
+            label="Tokens"
+            note={tokenCount ? `${tokenCount}` : 'none'}
+            disabled={tokenCount === 0}
+            onPick={() => copy('Tokens', Object.entries(tokens).map(([k, v]) => `${k}: ${v};`).join('\n'))}
+          />
+          <p className="px-3 pb-1 pt-2 text-[10px] text-text-muted">Save as</p>
+          {formats.length === 0
+            ? <p className="px-3 pb-1 text-[11.5px] text-text-muted">Nothing to save yet</p>
+            : formats.map((f) => (
+              <ShareItem
+                key={f}
+                glyph={f}
+                label={(FORMAT_LABEL[f] ?? f.toUpperCase()).replace(/^Export as /, '')}
+                onPick={() => void doExport(f)}
+              />
+            ))}
         </div>
       )}
       {done && !open && (
@@ -1621,7 +1683,7 @@ function ExportMenu({ designId, disabled }: { designId: string; disabled: boolea
           <button
             type="button"
             onClick={() => setDone(null)}
-            aria-label="Dismiss export confirmation"
+            aria-label="Dismiss save confirmation"
             className="grid h-6 w-6 shrink-0 place-items-center rounded text-text-muted hover:bg-elevated hover:text-text-primary"
           >
             <IconClose size={9} />
@@ -1629,6 +1691,24 @@ function ExportMenu({ designId, disabled }: { designId: string; disabled: boolea
         </div>
       )}
     </div>
+  )
+}
+
+function ShareItem(
+  { glyph, label, note, disabled, onPick }:
+  { glyph: string; label: string; note?: string; disabled?: boolean; onPick: () => void }
+): JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={onPick}
+      disabled={disabled}
+      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12.5px] text-text-primary hover:bg-elevated disabled:opacity-35 disabled:hover:bg-transparent"
+    >
+      <span className="w-9 shrink-0 rounded bg-elevated px-1 py-0.5 text-center text-[10px] text-text-muted">{glyph}</span>
+      <span className="min-w-0 flex-1 truncate text-text-secondary">{label}</span>
+      {note && <span className="shrink-0 text-[10px] text-text-muted">{note}</span>}
+    </button>
   )
 }
 
