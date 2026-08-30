@@ -17,6 +17,8 @@ const ROOT = join(__dirname, '..', '..', 'src', 'renderer', 'src', 'components')
 const GALLERIES = [
   'TemplatesGallery.tsx',
   'DeckTemplateGallery.tsx',
+  'WebsiteTemplates.tsx',
+  join('tokens', 'TokenTemplates.tsx'),
   'TemplatesModal.tsx',
   join('motion', 'MotionTemplates.tsx')
 ]

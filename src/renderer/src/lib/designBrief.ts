@@ -764,6 +764,8 @@ export type DesignBrief = {
   tokensThemeId?: string | null
   /** The deck house style chosen from the gallery, when one was. */
   deckStyleId?: string | null
+  /** The website template chosen from the gallery, when one was. Web only. */
+  webStyleId?: string | null
   audience?: string | null
   paletteId?: string | null
   paletteLabel?: string | null

@@ -11,6 +11,8 @@ import { DesignWizard } from './DesignWizard'
 import { TokensView } from './tokens/TokensView'
 import { TemplatesGallery } from './TemplatesGallery'
 import { DeckTemplateGallery } from './DeckTemplateGallery'
+import { WebsiteTemplates } from './WebsiteTemplates'
+import type { WebsiteTemplate } from '../../../shared/websites/templates'
 import type { DeckTemplate } from '../../../shared/decks/templates'
 import { DesignSystemView } from './DesignSystemView'
 import { DesignSystemWizard } from './DesignSystemWizard'
@@ -66,6 +68,7 @@ export function DesignsListView({
   // wizard finishes. Held here rather than asked for inside the wizard: it is
   // already answered by the time the wizard opens.
   const [deckHouse, setDeckHouse] = useState<DeckTemplate | null>(null)
+  const [webHouse, setWebHouse] = useState<WebsiteTemplate | null>(null)
   const [creating, setCreating] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<Design | null>(null)
   const [search, setSearch] = useState('')
@@ -175,7 +178,13 @@ export function DesignsListView({
     if (creating) return
     setCreating(true)
     try {
-      const brief = deckHouse ? { ...rawBrief, deckStyleId: deckHouse.id } : rawBrief
+      // Whichever gallery opened this wizard pins its template onto the brief.
+      // Only one can be set: they belong to different kinds of thing.
+      const brief = deckHouse
+        ? { ...rawBrief, deckStyleId: deckHouse.id }
+        : webHouse
+          ? { ...rawBrief, webStyleId: webHouse.id }
+          : rawBrief
       const starter = wizardStarter
       const createOpts = starter
         ? { brief, title: `${starter.displayName} starter` }
@@ -278,6 +287,47 @@ export function DesignsListView({
     }
   }
 
+  /** Start a website already committed to one template. */
+  const createWebFromTemplate = (style: WebsiteTemplate): void => {
+    if (creating) return
+    setDeckHouse(null)
+    setWebHouse(style)
+    setWizardStarter(null)
+    setWizardTarget('html')
+    setWizardInitialIdea('')
+    setWizardOpen(true)
+  }
+
+  /**
+   * Build the page from the template alone, without the wizard's questions.
+   *
+   * A website template is direction rather than a folder of files, so there is
+   * nothing to copy — "duplicate" here means generate one with the template's
+   * own answers, which is what taking a starting point as-is amounts to.
+   */
+  const duplicateWebTemplate = async (t: WebsiteTemplate): Promise<string | null> => {
+    try {
+      const brief = {
+        v: 1 as const,
+        kind: 'landing' as DesignBrief['kind'],
+        kindLabel: 'Website',
+        group: 'web' as const,
+        fidelity: 'highfidelity' as const,
+        createdAt: Date.now(),
+        webStyleId: t.id,
+        idea: `A ${t.name.toLowerCase()} website. ${t.suits}.`
+      } as DesignBrief
+      const d = await window.terminal42.designs.create({ title: `${t.name} website`, brief })
+      await refresh()
+      const settings = await window.terminal42.settings.get().catch(() => null)
+      void window.terminal42.designs.send(d.id, brief.idea ?? t.name, settings?.defaultModel ?? null)
+      onOpen(d)
+      return null
+    } catch (e) {
+      return String((e as Error).message || e)
+    }
+  }
+
   /** Returns null on success, or the reason it failed so the card can say so. */
   const duplicateTemplate = async (t: TemplateInfo): Promise<string | null> => {
     const r = await window.terminal42.templates.copyToDesign({
@@ -302,6 +352,7 @@ export function DesignsListView({
 
   const openHtmlWizard = (): void => {
     setDeckHouse(null)
+    setWebHouse(null)
     setWizardTarget('html')
     setWizardInitialIdea('')
     setWizardOpen(true)
@@ -331,6 +382,7 @@ export function DesignsListView({
   const createDeckFromTemplate = (style: DeckTemplate): void => {
     if (creating) return
     setDeckHouse(style)
+    setWebHouse(null)
     setWizardStarter(null)
     setWizardTarget('html')
     setWizardInitialIdea('')
@@ -340,6 +392,7 @@ export function DesignsListView({
   const createFromTemplate = (t: TemplateInfo): void => {
     if (creating) return
     setDeckHouse(null)
+    setWebHouse(null)
     setWizardStarter(t)
     setWizardTarget('html')
     setWizardInitialIdea('')
@@ -631,6 +684,8 @@ export function DesignsListView({
             <TokenTemplates onUse={useTokenTemplate} onDuplicate={duplicateTokenTemplate} />
           ) : typeFilter === 'system' ? (
             <TokenTemplates onUse={useSystemTemplate} onDuplicate={duplicateTokenTemplate} />
+          ) : typeFilter === 'web' ? (
+            <WebsiteTemplates onUse={createWebFromTemplate} onDuplicate={duplicateWebTemplate} />
           ) : (
             <TemplatesGallery onUse={createFromTemplate} onDuplicate={duplicateTemplate} />
           )
@@ -722,7 +777,7 @@ export function DesignsListView({
             initialIdea={wizardInitialIdea}
             target={wizardTarget}
             starterTemplate={wizardStarter ?? undefined}
-              presetCategory={deckHouse ? 'presentation' : undefined}
+              presetCategory={deckHouse ? 'presentation' : webHouse ? 'web' : undefined}
             creating={creating}
             onCancel={() => { if (!creating) { setWizardOpen(false); setWizardInitialIdea(''); setWizardStarter(null); setDeckHouse(null) } }}
             onComplete={(brief, kickoff) => void handleWizardComplete(brief, kickoff)}

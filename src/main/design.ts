@@ -19,6 +19,7 @@ import { upsertManagedBlock } from './htmlBlocks'
 import { buildEngineBaseBlock, ENGINE_USAGE, ENGINE_BASE_ID, ENGINE_MOTION_ID } from './designAssets'
 import { pickVariety } from './designVariety'
 import { pickDeckStyle } from './deckStyles'
+import { pickWebsiteStyle } from './websiteStyles'
 import { buildDeckBaseBlock, DECK_USAGE, DECK_BASE_ID, DECK_RUNTIME_ID } from './deckChassis'
 import {
   EXPORT_PREP_JS,
@@ -409,6 +410,10 @@ export function buildPrefix(
         `The page must include this engine base: put the <style id="${ENGINE_BASE_ID}"> in <head> and the <script id="${ENGINE_MOTION_ID}"> just before </body>. If a previous version already contains them, keep them byte-for-byte. Build the page using their tokens, classes and data-attributes.\n\n` +
         `${buildEngineBaseBlock()}\n\n${ENGINE_USAGE}`,
     )
+    // Only when a template was actually chosen. Left to itself the variety
+    // engine already keeps two sites from looking alike, and a second art
+    // director arguing with the first produces a page that follows neither.
+    if (brief?.webStyleId) blocks.push(pickWebsiteStyle(brief).text)
   }
 
   // Decks get the same medicine, and more of it. A deck is not a page: it

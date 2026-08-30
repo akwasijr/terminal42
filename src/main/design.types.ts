@@ -34,7 +34,10 @@ export type DesignKind =
   | 'freeform'
   | 'blank'
 
-export type DesignGroup = 'web' | 'presentation' | 'content' | 'print' | 'data' | 'social' | 'figma' | 'other'
+// Kept in step with the copies in lib/designBrief.ts and preload/index.ts.
+// This one had drifted: it was missing 'app', so a brief that crossed the
+// process boundary as an app arrived here as a type error waiting to happen.
+export type DesignGroup = 'web' | 'app' | 'presentation' | 'content' | 'print' | 'data' | 'social' | 'figma' | 'other'
 export type DesignFidelity = 'wireframe' | 'highfidelity'
 
 export type DesignBrief = {
@@ -67,6 +70,8 @@ export type DesignBrief = {
    * a question everybody has to answer.
    */
   deckStyleId?: string | null
+  /** The website template chosen from the gallery, when one was. Web only. */
+  webStyleId?: string | null
   /** How long the deck runs: 'short' | 'medium' | 'long'. Decks only. */
   deckLength?: string | null
   /** The shape of the argument the deck carries. Decks only. */
