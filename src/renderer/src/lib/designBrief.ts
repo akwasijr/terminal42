@@ -105,10 +105,13 @@ export const DESIGN_KINDS: DesignKindDef[] = [
   // their own scheme). No density. Look + palette + fonts + audience all
   // matter (deck for investors vs deck for a workshop is very different).
   // Icons are optional on slides, leave on.
-  { id: 'pitch-deck',     label: 'Pitch deck',     group: 'presentation' },
-  { id: 'talk-slides',    label: 'Talk slides',    group: 'presentation' },
-  { id: 'sales-deck',     label: 'Sales deck',     group: 'presentation' },
-  { id: 'workshop-deck',  label: 'Workshop deck',  group: 'presentation' },
+  // No shape: radius, shadows and border treatment describe buttons, cards
+  // and inputs. A slide has none of those, so the question was inherited
+  // from the default rather than chosen, and answering it changed nothing.
+  { id: 'pitch-deck',     label: 'Pitch deck',     group: 'presentation', hasShape: false },
+  { id: 'talk-slides',    label: 'Talk slides',    group: 'presentation', hasShape: false },
+  { id: 'sales-deck',     label: 'Sales deck',     group: 'presentation', hasShape: false },
+  { id: 'workshop-deck',  label: 'Workshop deck',  group: 'presentation', hasShape: false },
 
   // ─── Content: long-form documents ──────────────────────────────────────
   { id: 'blog-post',  label: 'Blog post',  group: 'content',
