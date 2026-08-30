@@ -91,7 +91,29 @@ export function MotionStudio({
   // more of the window than one with two, and which of those you are working
   // on changes hour to hour. The stage takes whatever is left, so growing the
   // timeline shrinks the picture rather than pushing it off the bottom.
-  const [timelineHeight, setTimelineHeight] = useStoredWidth('motion.timelinePane', 240, 120, 620)
+  const TIMELINE_CARD_MARGIN = 8
+  const [timelineHeight, setTimelineHeight, timelineHeightChosen] =
+    useStoredWidth('motion.timelinePane', 240, 120, 620)
+  // Every row of the timeline should be on screen without scrolling for it, so
+  // unless you have dragged the pane to a height of your own it grows to hold
+  // whatever is in it. Opening the layers list makes room instead of hiding it.
+  const timelineFitRef = useRef<HTMLDivElement | null>(null)
+  const [timelineFit, setTimelineFit] = useState(240)
+  useEffect(() => {
+    const el = timelineFitRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => {
+      // The timeline sits in a card with a bottom margin, which scrollHeight
+      // does not count, so add it back or the last row stays half hidden.
+      const h = el.scrollHeight
+      if (h > 0) setTimelineFit(h + TIMELINE_CARD_MARGIN)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const timelinePaneHeight = timelineHeightChosen
+    ? timelineHeight
+    : Math.min(620, Math.max(120, timelineFit))
   const [panelOpen, setPanelOpen] = useState(true)
   // A replay is an event, not a state, so it travels as a counter the stage
   // watches: the same button pressed twice must fire twice.
@@ -524,7 +546,7 @@ export function MotionStudio({
 
         <ResizeHandle
           label="Timeline height"
-          width={timelineHeight}
+          width={timelinePaneHeight}
           onWidth={setTimelineHeight}
           side="bottom"
           min={120}
@@ -533,8 +555,9 @@ export function MotionStudio({
         />
         <div
           className="t42-stable-gutter shrink-0 overflow-y-auto"
-          style={{ height: timelineHeight }}
+          style={{ height: timelinePaneHeight }}
         >
+          <div ref={timelineFitRef}>
           <MotionTimeline
             doc={doc}
             phase={phase}
@@ -546,6 +569,7 @@ export function MotionStudio({
             playing={playing}
             onTogglePlaying={() => setPlaying((p) => !p)}
           />
+          </div>
         </div>
         {selected !== null ? (
           <div className="flex shrink-0 items-center gap-2 px-3 pb-2 text-[11px] text-text-secondary">

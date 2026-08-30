@@ -33,6 +33,11 @@ import { samePick, type Pick } from '../../lib/motion/overlayPick'
 /** The three columns every row shares. Changing one here moves all of them. */
 const LABEL_W = 'w-[132px]'
 const TAIL_W = 'w-[68px]'
+// Zoomed in, the lane is wider than the panel and slides under the row. The
+// name of the row and its buttons have to stay where they are or you lose
+// track of which lane you are looking at, so both columns pin to their edge.
+const LABEL_STICK = 'sticky left-0 z-20 bg-surface'
+const TAIL_STICK = 'sticky right-0 z-20 bg-surface'
 
 export function MotionTimeline({
   doc, phase, onPhase, onChange, selected = null, onSelect, onRemove, playing = false, onTogglePlaying
@@ -55,7 +60,15 @@ export function MotionTimeline({
   // between two of them renders on one of them regardless, so this is what
   // every lane snaps and nudges by.
   const frames = Math.max(1, Math.round(doc.export.durationSec * doc.export.fps))
-  const [open, setOpen] = useState(false)
+  // Everything on the canvas gets a lane, and a lane you cannot see is no use,
+  // so the layer list starts open. The pane grows to hold it.
+  const [open, setOpen] = useState(true)
+  // How much of the loop the lanes show. At 1 the whole loop spans the panel;
+  // above that the lanes grow wider than the panel and scroll, which is the
+  // only way to separate keys that sit a couple of frames apart. Every
+  // position in here is a percentage of the lane, so widening the lane keeps
+  // the playhead, the ticks and the key hit targets correct by construction.
+  const [zoom, setZoom] = useState(1)
   // Selecting a caption on the frame and finding the layer list still closed
   // would leave the app quietly disagreeing with itself about what is in hand.
   useEffect(() => {
@@ -105,9 +118,14 @@ export function MotionTimeline({
         open={open}
         onOpen={() => setOpen((v) => !v)}
         layerCount={layerCount}
+        zoom={zoom}
+        onZoom={setZoom}
       />
 
-      <div className="relative flex flex-col gap-1">
+      {/* At rest the whole loop fits, so there is nothing to scroll and no bar to
+          show. A sideways bar only appears once you have zoomed in yourself. */}
+      <div className={`relative ${zoom > 1 ? 'overflow-x-auto' : 'overflow-x-clip'}`}>
+      <div className="relative flex flex-col gap-1" style={{ width: `${zoom * 100}%`, minWidth: '100%' }}>
         {/* One playhead down every lane, so a key either is or is not under
             the moment on screen. Inset by the label and tail columns so it
             tracks the same span the lanes use. */}
@@ -116,7 +134,7 @@ export function MotionTimeline({
           style={{ left: `calc(140px + (100% - 216px) * ${phase})` }}
           className="pointer-events-none absolute bottom-0 top-0 z-10 w-px bg-accent/40"
         />
-        <Ruler doc={doc} phase={phase} onPhase={onPhase} />
+        <Ruler doc={doc} phase={phase} onPhase={onPhase} zoom={zoom} />
 
         {open ? (
         <>
@@ -290,21 +308,16 @@ export function MotionTimeline({
 
       {targets.length > 0 ? (
         <div className="flex items-center gap-2">
-          <span className={`${LABEL_W} shrink-0 px-1 text-[10px] text-text-muted`}>
+          <span className={`${LABEL_W} ${LABEL_STICK} shrink-0 px-1 text-[10px] text-text-muted`}>
             {targets.length === 1 ? '1 animated value' : `${targets.length} animated values`}
           </span>
           <span className="flex flex-1 items-center">
             <Hint label="Double-click a lane to add a key. Click a key to set its time, value and easing; drag to move it, arrows to nudge it a frame at a time, Delete to remove it. Keys land on frames — hold Alt to place one between two. \u2318Z undoes." />
           </span>
-          <button
-            type="button"
-            onClick={() => onChange({ keys: {} })}
-            className={`${TAIL_W} shrink-0 rounded-sm py-0.5 text-[10px] text-text-muted hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60`}
-          >
-            Clear
-          </button>
+          <span className={`${TAIL_W} ${TAIL_STICK} shrink-0`} />
         </div>
       ) : null}
+      </div>
       </div>
     </div>
   )
@@ -336,7 +349,7 @@ function Chevron(): React.JSX.Element {
  * change while you are watching.
  */
 function Transport({
-  doc, phase, onPhase, onChange, playing, onTogglePlaying, open, onOpen, layerCount
+  doc, phase, onPhase, onChange, playing, onTogglePlaying, open, onOpen, layerCount, zoom, onZoom
 }: {
   doc: MotionDoc
   phase: number
@@ -347,6 +360,8 @@ function Transport({
   open: boolean
   onOpen: () => void
   layerCount: number
+  zoom: number
+  onZoom: (z: number) => void
 }): React.JSX.Element {
   const { durationSec, fps } = doc.export
   const frames = Math.max(1, Math.round(durationSec * fps))
@@ -395,7 +410,8 @@ function Transport({
       </span>
 
       <div className="ml-auto flex items-center gap-1">
-        <label className="text-[10px] text-text-muted" htmlFor="motion-loop-length">Length</label>
+        <TimeZoom value={zoom} onChange={onZoom} />
+        <label className="ml-1 text-[10px] text-text-muted" htmlFor="motion-loop-length">Length</label>
         <input
           id="motion-loop-length"
           type="number"
@@ -454,11 +470,13 @@ function Transport({
  * the key beneath it line up by construction rather than by coincidence.
  */
 function Ruler({
-  doc, phase, onPhase
+  doc, phase, onPhase, zoom = 1
 }: {
   doc: MotionDoc
   phase: number
   onPhase: (p: number) => void
+  /** How wide the lane is relative to the panel, so ticks re-space rather than crowd. */
+  zoom?: number
 }): React.JSX.Element {
   const durationSec = doc.export.durationSec
   const track = useRef<HTMLDivElement | null>(null)
@@ -489,13 +507,13 @@ function Ruler({
 
   // Enough ticks to read, few enough to stay legible at this width. The step
   // is chosen from a round set so the labels are numbers a person would say.
-  const step = tickStep(durationSec)
+  const step = tickStep(durationSec / Math.max(1, zoom))
   const ticks: number[] = []
   for (let t = 0; t <= durationSec + 1e-6; t += step) ticks.push(Number(t.toFixed(4)))
 
   return (
     <div className="flex items-stretch gap-2">
-      <span className={`${LABEL_W} shrink-0`} />
+      <span className={`${LABEL_W} ${LABEL_STICK} shrink-0`} />
       <div
         ref={track}
         role="slider"
@@ -530,8 +548,39 @@ function Ruler({
           <span className="absolute -left-[3px] top-0 h-1.5 w-[7px] rounded-[1px] bg-accent" />
         </span>
       </div>
-      <span className={`${TAIL_W} shrink-0`} />
+      <span className={`${TAIL_W} ${TAIL_STICK} shrink-0`} />
     </div>
+  )
+}
+
+/**
+ * How much of the loop the lanes show.
+ *
+ * Two keys a couple of frames apart land on the same pixel when the whole
+ * loop has to fit the panel, so they cannot be told apart, let alone dragged
+ * separately. Zooming widens the lanes and lets them scroll.
+ */
+function TimeZoom({ value, onChange }: { value: number; onChange: (z: number) => void }): React.JSX.Element {
+  return (
+    <span className="flex items-center gap-1.5">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"
+        strokeLinecap="round" className="shrink-0 text-text-muted" aria-hidden="true">
+        <circle cx="7" cy="7" r="4.5" />
+        <path d="M10.5 10.5L14 14" />
+      </svg>
+      <input
+        type="range"
+        min={1}
+        max={8}
+        step={0.25}
+        value={value}
+        aria-label="Zoom the timeline"
+        title={`Timeline zoom ${value.toFixed(2)}x — double-click to fit the whole loop`}
+        onDoubleClick={() => onChange(1)}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="t42-time-zoom h-1 w-16 cursor-pointer appearance-none rounded-full bg-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+      />
+    </span>
   )
 }
 
@@ -558,7 +607,7 @@ function ComponentRow({ doc, phase }: { doc: MotionDoc; phase: number }): React.
   const enabled = doc.componentEnabled
   return (
     <div className="flex items-center gap-2">
-      <span className={`${LABEL_W} shrink-0 truncate px-1 text-[10.5px] ${enabled ? 'text-text-secondary' : 'text-text-muted line-through'}`}>
+      <span className={`${LABEL_W} ${LABEL_STICK} shrink-0 truncate px-1 text-[10.5px] ${enabled ? 'text-text-secondary' : 'text-text-muted line-through'}`}>
         {componentFor(doc.componentId).label}
       </span>
       <div className="relative h-5 flex-1 overflow-hidden rounded-sm bg-sunken">
@@ -572,7 +621,7 @@ function ComponentRow({ doc, phase }: { doc: MotionDoc; phase: number }): React.
           style={{ left: `${phase * 100}%` }}
         />
       </div>
-      <span className={`${TAIL_W} shrink-0`} />
+      <span className={`${TAIL_W} ${TAIL_STICK} shrink-0`} />
     </div>
   )
 }
@@ -690,7 +739,7 @@ function TrackRow({
         type="button"
         onClick={() => onKeys(setMuted(keys, target, !track?.muted))}
         title={track?.muted ? `Let ${label} animate again` : `Stop ${label} animating, keeping its keys`}
-        className={`${LABEL_W} shrink-0 truncate rounded-sm py-0.5 text-left text-[10px] hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+        className={`${LABEL_W} ${LABEL_STICK} shrink-0 truncate rounded-sm py-0.5 text-left text-[10px] hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
           nested ? 'pl-4 pr-1' : 'px-1'
         } ${track?.muted ? 'text-text-muted line-through' : 'text-text-muted'}`}
       >
@@ -750,7 +799,7 @@ function TrackRow({
         onClick={() => onKeys(removeTrack(keys, target))}
         aria-label={`Stop animating ${label}`}
         title={`Stop animating ${label}`}
-        className={`${TAIL_W} shrink-0 rounded-sm text-[12px] leading-none text-text-muted hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60`}
+        className={`${TAIL_W} ${TAIL_STICK} shrink-0 rounded-sm text-[12px] leading-none text-text-muted hover:bg-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60`}
       >
         ×
       </button>
@@ -1101,7 +1150,7 @@ function LayerRow({
     <div className="flex items-center gap-2">
       {/* The eye and the name share the label column, so the lanes below a
           layer still start where the layer's own lane starts. */}
-      <div className={`${LABEL_W} flex shrink-0 items-center gap-1`}>
+      <div className={`${LABEL_W} ${LABEL_STICK} flex shrink-0 items-center gap-1`}>
         <button
           type="button"
           onClick={() => onSpan({ hidden: !span.hidden })}
@@ -1152,7 +1201,7 @@ function LayerRow({
           style={{ left: `${phase * 100}%` }}
         />
       </div>
-      <div className={`${TAIL_W} flex shrink-0 items-center justify-end gap-0.5`}>
+      <div className={`${TAIL_W} ${TAIL_STICK} flex shrink-0 items-center justify-end gap-0.5`}>
         {/* A window's controls appear only once it has a window. Three greyed
             glyphs on every row taught nothing except that most of the tail is
             unavailable, and left the one live glyph looking like an error. */}

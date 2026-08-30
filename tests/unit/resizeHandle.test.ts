@@ -61,7 +61,7 @@ describe('the Motion timeline is a pane', () => {
   })
 
   it('scrolls rather than growing past the height it was given', () => {
-    expect(studio).toMatch(/overflow-y-auto"[\s\S]{0,80}style=\{\{ height: timelineHeight \}\}/)
+    expect(studio).toMatch(/overflow-y-auto"[\s\S]{0,80}style=\{\{ height: timelinePaneHeight \}\}/)
   })
 
   it('leaves the stage on flex-1, so the two share the column', () => {

@@ -598,3 +598,24 @@ html[data-translucent="true"] nav.t42-sidebar {
    one — filter tabs slide out from under the pointer. Holding the gutter open
    costs nothing on overlay scrollbars and keeps the page still everywhere. */
 .t42-stable-gutter { scrollbar-gutter: stable; }
+
+/* The timeline zoom slider. A native range renders in OS chrome, which is a
+   blue capsule that looks nothing like the rest of the panel, so the handle is
+   drawn here: a round accent dot on a thin track. */
+.t42-time-zoom::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: var(--accent, #4ade80);
+  cursor: pointer;
+}
+.t42-time-zoom::-moz-range-thumb {
+  width: 11px;
+  height: 11px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent, #4ade80);
+  cursor: pointer;
+}
