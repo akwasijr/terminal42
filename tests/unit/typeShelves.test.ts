@@ -77,3 +77,24 @@ describe('an empty shelf', () => {
     expect(LIST).toMatch(/Start from a template/)
   })
 })
+
+describe('getting back to everything', () => {
+  /*
+   * There was no "All" pill. Widening back meant pressing the pill you were
+   * already on — a gesture nothing on screen mentioned — and Design systems
+   * and Tokens did not honour it at all, so looking at tokens was a one-way
+   * door. Checked in the app: Tokens → All now heads "All projects".
+   */
+  it('offers an explicit All pill', () => {
+    expect(LIST).toMatch(/active=\{typeFilter === 'all'\}[\s\S]{0,160}>\s*All\s*</)
+  })
+
+  it('lets Design systems and Tokens be pressed off again', () => {
+    expect(LIST).toContain("setTypeFilter(typeFilter === 'system' ? 'all' : 'system')")
+    expect(LIST).toContain("setTypeFilter(typeFilter === 'tokens' ? 'all' : 'tokens')")
+  })
+
+  it('no longer claims there is no all pill', () => {
+    expect(LIST).not.toContain('No "all" pill')
+  })
+})

@@ -153,7 +153,7 @@ export function DesignSystemView({ openSystemId, onConsumeOpen }: { openSystemId
               <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="5" height="5" rx="1" /><rect x="9" y="2" width="5" height="5" rx="1" /><rect x="2" y="9" width="5" height="5" rx="1" /><rect x="9" y="9" width="5" height="5" rx="1" /></svg>
             </div>
             <h2 className="text-[15px] font-medium text-text-primary">No design systems yet</h2>
-            <p className="max-w-xs text-[12.5px] text-text-muted">Start one from New design, then choose Design system.</p>
+            <p className="max-w-xs text-[12.5px] text-text-muted">Start one from New project, then choose Design system.</p>
           </div>
           {wizardEl}
         </div>

@@ -135,7 +135,7 @@ export function DesignsListView({
   const folders = folderStore.folders
   const designFolders = folderStore.assignments
   const [newFolderOpen, setNewFolderOpen] = useState(false)
-  // Single "New design" menu: form sizes, other design types, and new folder.
+  // Single "New project" menu: form sizes, other design types, and new folder.
   const [newMenuOpen, setNewMenuOpen] = useState(false)
   const newMenuRef = useRef<HTMLDivElement>(null)
   const [dsWizardOpen, setDsWizardOpen] = useState(false)
@@ -478,7 +478,7 @@ export function DesignsListView({
     return { groups: GROUP_ORDER.filter((g) => s.has(g)) }
   }, [scoped, scope])
 
-  const allLabel = scope === 'form' ? 'All forms' : 'All designs'
+  const allLabel = scope === 'form' ? 'All forms' : 'All projects'
   // The heading is the answer to "what am I looking at", so it has to name the
   // tab you are on. It used to say "All designs" while the App tab was lit,
   // which reads as the filter having failed to apply.
@@ -548,7 +548,7 @@ export function DesignsListView({
                 className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md bg-action px-3 py-1.5 text-[13px] font-medium text-action-text transition-opacity hover:opacity-90 disabled:opacity-50"
               >
                 <IconPlus size={13} />
-                <span>{creating ? 'Creating\u2026' : scope === 'form' ? 'New form' : 'New design'}</span>
+                <span>{creating ? 'Creating\u2026' : scope === 'form' ? 'New form' : 'New project'}</span>
                 <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="-mr-0.5 ml-0.5 opacity-80"><path d="M4 6l4 4 4-4" /></svg>
               </button>
               {newMenuOpen && (
@@ -581,9 +581,17 @@ export function DesignsListView({
         <div className="mb-3 flex flex-wrap items-center gap-2">
           {(scope === 'design' || presentTypes.groups.length > 0) && (
           <div className="inline-flex shrink-0 flex-wrap items-center gap-1 rounded-lg bg-sunken p-1">
-            {/* No "all" pill and no "other" pill: everything is showing until
-                you narrow it, and pressing the pill you are on widens it back,
-                so the row carries only the kinds you actually have. */}
+            {/* An explicit "All" pill. There used to be none: widening back
+                meant pressing the pill you were already on, which nothing on
+                screen said, and Design systems and Tokens did not do it at
+                all — so once you looked at tokens there was no way back to
+                everything. A hidden gesture is not an affordance. */}
+            <ViewPill
+              active={typeFilter === 'all'}
+              onClick={() => { setTypeFilter('all'); setShelf('mine') }}
+            >
+              All
+            </ViewPill>
             {presentTypes.groups.filter((g) => g !== 'other').map((g) => (
               <ViewPill
                 key={g}
@@ -595,8 +603,8 @@ export function DesignsListView({
             ))}
             {scope === 'design' && (
               <div className="ml-3 inline-flex items-center gap-1">
-                <ViewPill active={typeFilter === 'system'} onClick={() => { setTypeFilter('system'); setShelf('mine') }}>Design systems</ViewPill>
-                <ViewPill active={typeFilter === 'tokens'} onClick={() => { setTypeFilter('tokens'); setShelf('mine') }}>Tokens</ViewPill>
+                <ViewPill active={typeFilter === 'system'} onClick={() => { setTypeFilter(typeFilter === 'system' ? 'all' : 'system'); setShelf('mine') }}>Design systems</ViewPill>
+                <ViewPill active={typeFilter === 'tokens'} onClick={() => { setTypeFilter(typeFilter === 'tokens' ? 'all' : 'tokens'); setShelf('mine') }}>Tokens</ViewPill>
               </div>
             )}
           </div>
@@ -639,8 +647,8 @@ export function DesignsListView({
                     if (searchOpen && !search) setSearchOpen(false)
                     else setSearchOpen(true)
                   }}
-                  aria-label={searchOpen ? 'Close search' : 'Search designs'}
-                  title={searchOpen ? 'Close search' : 'Search designs'}
+                  aria-label={searchOpen ? 'Close search' : 'Search projects'}
+                  title={searchOpen ? 'Close search' : 'Search projects'}
                   className="grid h-8 w-8 shrink-0 place-items-center text-text-muted transition-colors hover:text-text-primary"
                 >
                   <IconSearch size={13} />
@@ -721,7 +729,7 @@ export function DesignsListView({
                  website reads as though the list were broken. */
               <div className="rounded-xl bg-surface/40 px-6 py-10 text-center text-[13px] text-text-muted">
                 {search || folderFilter !== 'all' ? (
-                  <>No {scope === 'form' ? 'forms' : 'designs'} match.</>
+                  <>No {scope === 'form' ? 'forms' : 'projects'} match.</>
                 ) : (
                   <>
                     Nothing here yet.
@@ -1089,7 +1097,7 @@ function TokensFlag({ designId }: { designId: string }): JSX.Element | null {
     // library it wants no longer exists. Saying so is the whole job.
     return (
       <span
-        title="This design is bound to a library that has been deleted, so nothing from it is being put in the prompt or checked. Bind it to another one."
+        title="This project is bound to a library that has been deleted, so nothing from it is being put in the prompt or checked. Bind it to another one."
         className="shrink-0 self-start rounded-full bg-elevated px-2 py-0.5 text-[10.5px] text-text-secondary"
       >
         Library missing

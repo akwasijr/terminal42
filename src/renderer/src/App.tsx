@@ -96,7 +96,9 @@ const PRIMARY_NAV: { id: NavId; label: string; Icon: typeof IconTerminal }[] = [
   { id: 'rawterm',  label: 'Terminal', Icon: IconTerminal },
   { id: 'forms',    label: 'Form',     Icon: IconLayout },
   { id: 'motion',   label: 'Motion',   Icon: IconMotion },
-  { id: 'designs',  label: 'Design',   Icon: IconSparkle },
+  // "Project" rather than "Design": this is where work is started, browsed
+  // and picked from templates. Editing it happens in Chat.
+  { id: 'designs',  label: 'Project',  Icon: IconSparkle },
 ]
 const SECONDARY_NAV: { id: NavId; label: string; Icon: typeof IconTerminal }[] = [
   { id: 'workbench', label: 'Automations', Icon: IconCode },

@@ -577,7 +577,7 @@ function shortModel(m: string): string {
 function cleanProjectName(name: string, cwd: string): string {
   // Suppress raw UUIDs (the Terminal42 design workdirs are named that way).
   if (/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(name)) {
-    if (cwd && /\/terminal42\/designs\//i.test(cwd)) return 'Design'
+    if (cwd && /\/terminal42\/designs\//i.test(cwd)) return 'Project'
     return name.slice(0, 8) + '…'
   }
   return name

@@ -857,8 +857,8 @@ export function DesignCanvas({
           <button
             type="button"
             onClick={onClose}
-            title="Back to designs"
-            aria-label="Back to designs"
+            title="Back to projects"
+            aria-label="Back to projects"
             className="grid h-7 w-7 place-items-center rounded-md text-text-secondary hover:bg-elevated hover:text-text-primary"
           >
             <IconChevronRight size={13} className="rotate-180" />
@@ -1096,8 +1096,8 @@ export function DesignCanvas({
             <button
               type="button"
               onClick={onClose}
-              title="Close design"
-              aria-label="Close design"
+              title="Close project"
+              aria-label="Close project"
               className="grid h-7 w-7 place-items-center rounded-md text-text-secondary hover:bg-elevated hover:text-text-primary"
             >
               <IconClose size={11} />
