@@ -12,6 +12,8 @@ import { TokensView } from './tokens/TokensView'
 import { TemplatesGallery } from './TemplatesGallery'
 import { DeckTemplateGallery } from './DeckTemplateGallery'
 import { WebsiteTemplates } from './WebsiteTemplates'
+import { FolderBar } from './FolderBar'
+import { useFolders, hasLegacyFolders, migrateLegacyFolders } from '../lib/designFolders'
 import type { WebsiteTemplate } from '../../../shared/websites/templates'
 import type { DeckTemplate } from '../../../shared/decks/templates'
 import { DesignSystemView } from './DesignSystemView'
@@ -124,10 +126,15 @@ export function DesignsListView({
   }, [scope, typeFilter])
   // Project folders: client/project organisation, stored renderer-side.
   const [folderFilter, setFolderFilter] = useState<string>('all')
-  const [folders, setFolders] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('t42-design-folders') || '[]') } catch { return [] } })
-  const [designFolders, setDesignFolders] = useState<Record<string, string>>(() => { try { return JSON.parse(localStorage.getItem('t42-design-folder-map') || '{}') } catch { return {} } })
+
+  // Which section's folders are on show. Folders belong to the section they
+  // were made in, so a folder made over decks no longer hangs over tokens.
+  const folderScope: string = typeFilter
+  const scopeForDesign = (d: Design): string => d.brief?.group ?? 'other'
+  const folderStore = useFolders(folderScope)
+  const folders = folderStore.folders
+  const designFolders = folderStore.assignments
   const [newFolderOpen, setNewFolderOpen] = useState(false)
-  const [newFolderName, setNewFolderName] = useState('')
   // Single "New design" menu: form sizes, other design types, and new folder.
   const [newMenuOpen, setNewMenuOpen] = useState(false)
   const newMenuRef = useRef<HTMLDivElement>(null)
@@ -419,26 +426,37 @@ export function DesignsListView({
     return out
   }
 
-  // Persist folders + the design→folder map.
-  useEffect(() => { try { localStorage.setItem('t42-design-folders', JSON.stringify(folders)) } catch { /* quota */ } }, [folders])
-  useEffect(() => { try { localStorage.setItem('t42-design-folder-map', JSON.stringify(designFolders)) } catch { /* quota */ } }, [designFolders])
-  const createFolder = (name: string): void => {
-    const v = name.trim()
-    setNewFolderName(''); setNewFolderOpen(false)
-    if (!v || folders.includes(v)) return
-    setFolders((f) => [...f, v]); setFolderFilter(v)
+  // Folders are per-section, so a filter set over decks means nothing over
+  // websites. Leaving it set showed an empty list and no reason why.
+  useEffect(() => { setFolderFilter('all') }, [folderScope])
+
+  // Move an old flat list into the sections its designs actually occupy. Runs
+  // once designs are known, because a folder's section can only be read off
+  // the work inside it.
+  useEffect(() => {
+    if (!designs.length || !hasLegacyFolders()) return
+    const groupOf = new Map(designs.map((d) => [d.id, d.brief?.group ?? 'other']))
+    migrateLegacyFolders((id) => groupOf.get(id) ?? null)
+  }, [designs])
+
+  // A design belongs to this section if its own group matches the one on show.
+  // 'all' owns everything, which is what makes its folders a catch-all.
+  const ownedHere = (id: string): boolean => {
+    if (folderScope === 'all') return true
+    const d = designs.find((x) => x.id === id)
+    return !!d && scopeForDesign(d) === folderScope
   }
-  const assignFolder = (id: string, folder: string | null): void => setDesignFolders((m) => {
-    const next = { ...m }
-    if (folder) next[id] = folder; else delete next[id]
-    return next
-  })
+
+  const createFolder = (name: string): void => {
+    setNewFolderOpen(false)
+    if (folderStore.create(name)) setFolderFilter(name.trim())
+  }
+  const assignFolder = folderStore.assign
   const removeFolder = (name: string): void => {
-    setFolders((f) => f.filter((x) => x !== name))
-    setDesignFolders((m) => { const next = { ...m }; for (const k of Object.keys(next)) if (next[k] === name) delete next[k]; return next })
+    folderStore.remove(name, ownedHere)
     if (folderFilter === name) setFolderFilter('all')
   }
-  const folderCount = (name: string): number => Object.values(designFolders).filter((x) => x === name).length
+  const folderCount = (name: string): number => folderStore.count(name, ownedHere)
 
   // Only the files belonging to this scope. Everything downstream (type pills,
   // folder counts, buckets) works from this list, never the raw one.
@@ -656,20 +674,19 @@ export function DesignsListView({
               </div>
           </div>
         </div>
-        {typeFilter !== 'system' && shelf === 'mine' && typeFilter !== 'tokens' && (folders.length > 0 || newFolderOpen) && (
-          <div className="-mt-1 mb-3 flex flex-wrap items-center gap-1.5">
-            <span className="mr-1 text-[11px] font-medium text-text-muted">Folders</span>
-            <FolderChip active={folderFilter === 'all'} onClick={() => setFolderFilter('all')} label="All" />
-            {folders.map((f) => (
-              <FolderChip key={f} active={folderFilter === f} onClick={() => setFolderFilter(f)} label={f} count={folderCount(f)} onRemove={() => removeFolder(f)} />
-            ))}
-            {newFolderOpen && (
-              <input autoFocus value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') createFolder(newFolderName); if (e.key === 'Escape') { setNewFolderOpen(false); setNewFolderName('') } }}
-                onBlur={() => createFolder(newFolderName)} placeholder="Folder name…"
-                className="w-36 rounded-md bg-elevated px-2 py-1 text-[12px] text-text-primary focus:outline-none" />
-            )}
-          </div>
+        {/* Tokens and design systems keep their own folders, shown by their own
+            lists. Everything else is a design and is filtered here. */}
+        {typeFilter !== 'system' && typeFilter !== 'tokens' && shelf === 'mine' && (
+          <FolderBar
+            folders={folders}
+            filter={folderFilter}
+            onFilter={setFolderFilter}
+            count={folderCount}
+            onCreate={createFolder}
+            onRemove={removeFolder}
+            adding={newFolderOpen}
+            onAddingChange={setNewFolderOpen}
+          />
         )}
         </div>
         )}
@@ -792,21 +809,6 @@ export function DesignsListView({
         )}
       </div>
     </div>
-  )
-}
-
-function FolderChip({ active, onClick, label, count, onRemove }: { active: boolean; onClick: () => void; label: string; count?: number; onRemove?: () => void }): JSX.Element {
-  return (
-    <span className={['group inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12px] transition-colors', active ? 'bg-elevated text-text-primary' : 'text-text-secondary hover:bg-elevated/60 hover:text-text-primary'].join(' ')}>
-      <button type="button" onClick={onClick} className="inline-flex items-center gap-1.5">
-        {onRemove
-          ? <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4"><path d="M2 4.5a1 1 0 0 1 1-1h3l1.2 1.2H13a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z" /></svg>
-          : <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4"><path d="M2 4h5l1 1.5h6v7a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z" opacity="0.0" /><rect x="2" y="3.5" width="12" height="9.5" rx="1.2" /></svg>}
-        <span>{label}</span>
-        {count != null && count > 0 && <span className="text-[10px] text-text-muted">{count}</span>}
-      </button>
-      {onRemove && <button type="button" onClick={onRemove} title="Delete folder" className="grid h-3.5 w-3.5 place-items-center rounded text-text-muted opacity-0 hover:text-error group-hover:opacity-100"><IconClose size={8} /></button>}
-    </span>
   )
 }
 

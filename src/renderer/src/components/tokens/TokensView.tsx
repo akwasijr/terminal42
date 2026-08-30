@@ -21,6 +21,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Vibe } from '../../lib/designSystem'
 import { CardMenu, ConfirmDelete } from '../CardMenu'
+import { FolderBar } from '../FolderBar'
+import { useFolders } from '../../lib/designFolders'
 import { TokensSetup } from './TokensSetup'
 import { takeNewTokensRequest, takeNewTokensFeel } from '../../lib/tokens/openLatch'
 import {
@@ -83,6 +85,13 @@ export function TokensView({ onFullPage }: { onFullPage?: (full: boolean) => voi
   const [startFrom, setStartFrom] = useState<Vibe | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<StudioRow | null>(null)
   const [importNote, setImportNote] = useState<string | null>(null)
+  // Token libraries keep their own folders, separate from the ones over
+  // designs: a folder called "Acme" here is not the one over the decks.
+  const folderStore = useFolders('tokens')
+  const [folderFilter, setFolderFilter] = useState('all')
+  const [addingFolder, setAddingFolder] = useState(false)
+  const ownedHere = (id: string): boolean => rows.some((r) => r.id === id)
+  const visible = folderFilter === 'all' ? rows : rows.filter((r) => folderStore.folderOf(r.id) === folderFilter)
 
   const refresh = async (): Promise<void> => {
     const list = (await window.terminal42.tokens.list()) as StudioRow[]
@@ -204,6 +213,13 @@ export function TokensView({ onFullPage }: { onFullPage?: (full: boolean) => voi
   return (
     <div>
       <div className="flex items-center justify-end gap-3 pb-3">
+        <button
+          type="button"
+          onClick={() => setAddingFolder(true)}
+          className="shrink-0 rounded-md px-3 py-1.5 text-[13px] text-text-secondary hover:bg-raised hover:text-text-primary"
+        >
+          New folder
+        </button>
         <label className="shrink-0 cursor-pointer rounded-md px-3 py-1.5 text-[13px] text-text-secondary hover:bg-raised hover:text-text-primary focus-within:ring-2 focus-within:ring-accent/60">
           Import
           <input
@@ -223,14 +239,29 @@ export function TokensView({ onFullPage }: { onFullPage?: (full: boolean) => voi
         <p className="mb-3 rounded-md bg-surface px-3 py-2 text-[11.5px] text-text-secondary">{importNote}</p>
       ) : null}
 
+      <FolderBar
+        folders={folderStore.folders}
+        filter={folderFilter}
+        onFilter={setFolderFilter}
+        count={(f) => folderStore.count(f, ownedHere)}
+        onCreate={(name) => { if (folderStore.create(name)) setFolderFilter(name.trim()) }}
+        onRemove={(name) => { folderStore.remove(name, ownedHere); if (folderFilter === name) setFolderFilter('all') }}
+        adding={addingFolder}
+        onAddingChange={setAddingFolder}
+      />
+
       {loading ? null : rows.length === 0 ? (
         <p className="rounded-panel bg-surface px-4 py-10 text-center text-[12.5px] text-text-muted">
           Nothing yet. A token library is where a look stops being a habit and starts being a decision
           you can point at.
         </p>
+      ) : visible.length === 0 ? (
+        <p className="rounded-panel bg-surface px-4 py-10 text-center text-[12.5px] text-text-muted">
+          No libraries in {folderFilter}.
+        </p>
       ) : (
         <ul className="grid grid-cols-2 gap-3 md:grid-cols-3">
-          {rows.map((r) => (
+          {visible.map((r) => (
             <li key={r.id} className="group relative">
               <button
                 type="button"
@@ -248,6 +279,10 @@ export function TokensView({ onFullPage }: { onFullPage?: (full: boolean) => voi
                 label={r.name}
                 actions={[
                   { label: 'Duplicate', onSelect: () => void duplicate(r) },
+                  ...folderStore.folders.map((f) => ({
+                    label: folderStore.folderOf(r.id) === f ? `Remove from ${f}` : `Move to ${f}`,
+                    onSelect: () => folderStore.assign(r.id, folderStore.folderOf(r.id) === f ? null : f)
+                  })),
                   { label: 'Delete', danger: true, onSelect: () => setConfirmDelete(r) }
                 ]}
               />
