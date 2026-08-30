@@ -40,6 +40,35 @@ describe('template galleries', () => {
     expect(source).toMatch(/Duplicate to my designs/)
   })
 
+  it('lets you take a copy from every shelf, not just some of them', () => {
+    // The deck shelf was the odd one out: it could only be used as the
+    // starting point for a wizard, so there was no way to take a deck
+    // template as-is the way every other shelf allows. The overlay pickers
+    // (TemplatesModal, MotionTemplates) are excluded -- they are a way in to
+    // one document, not a shelf you browse.
+    const SHELVES = [
+      'TemplatesGallery.tsx',
+      'DeckTemplateGallery.tsx',
+      'WebsiteTemplates.tsx',
+      join('tokens', 'TokenTemplates.tsx')
+    ]
+    for (const file of SHELVES) {
+      const source = readFileSync(join(ROOT, file), 'utf8')
+      expect(source, `${file} has no Duplicate`).toMatch(/Duplicate to my/)
+    }
+  })
+
+  it('scales a preview rather than stretching it into a bigger box', () => {
+    // A cover drawn straight into whatever box it is given keeps its fixed
+    // type sizes, so the detail modal showed the same small slide in a larger
+    // frame. Draw once at a fixed size and scale.
+    for (const file of ['DeckTemplateGallery.tsx', 'WebsiteTemplates.tsx']) {
+      const source = readFileSync(join(ROOT, file), 'utf8')
+      expect(source, `${file} does not scale`).toMatch(/ResizeObserver/)
+      expect(source, `${file} does not scale`).toMatch(/transformOrigin: 'top left'/)
+    }
+  })
+
   it('says when a copy is under way rather than looking like a missed click', () => {
     const source = readFileSync(join(ROOT, 'TemplatesGallery.tsx'), 'utf8')
     expect(source).toMatch(/Copying…/)

@@ -340,6 +340,30 @@ export function DesignsListView({
   }
 
   /** Returns null on success, or the reason it failed so the card can say so. */
+  const duplicateDeckTemplate = async (t: DeckTemplate): Promise<string | null> => {
+    try {
+      const brief = {
+        v: 1 as const,
+        kind: 'pitch-deck' as DesignBrief['kind'],
+        kindLabel: 'Deck',
+        group: 'presentation' as const,
+        fidelity: 'highfidelity' as const,
+        createdAt: Date.now(),
+        deckStyleId: t.id,
+        idea: `A deck in the ${t.name} style. ${t.note}`
+      } as DesignBrief
+      const d = await window.terminal42.designs.create({ title: `${t.name} deck`, brief })
+      await refresh()
+      const settings = await window.terminal42.settings.get().catch(() => null)
+      void window.terminal42.designs.send(d.id, brief.idea ?? t.name, settings?.defaultModel ?? null)
+      onOpen(d)
+      return null
+    } catch (e) {
+      return String((e as Error).message || e)
+    }
+  }
+
+  /** Returns null on success, or the reason it failed so the card can say so. */
   const duplicateTemplate = async (t: TemplateInfo): Promise<string | null> => {
     const r = await window.terminal42.templates.copyToDesign({
       templateId: t.id,
@@ -723,7 +747,7 @@ export function DesignsListView({
             nothing else, which is the whole reason the shared gallery went. */}
         {shelf === 'templates' ? (
           typeFilter === 'presentation' ? (
-            <DeckTemplateGallery onUse={createDeckFromTemplate} />
+            <DeckTemplateGallery onUse={createDeckFromTemplate} onDuplicate={duplicateDeckTemplate} />
           ) : typeFilter === 'tokens' ? (
             <TokenTemplates onUse={useTokenTemplate} onDuplicate={duplicateTokenTemplate} />
           ) : typeFilter === 'system' ? (

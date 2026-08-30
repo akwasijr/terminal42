@@ -1,7 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { JSX } from 'react'
 import { DECK_TEMPLATES, type DeckTemplate } from '../../../shared/decks/templates'
 import { Modal } from './Modal'
+import { CardMenu } from './CardMenu'
+
+// The cover is drawn once at slide proportions and then scaled. It used to be
+// rendered straight into whatever box it was given, and because its type sizes
+// are fixed pixels, the modal showed the same small text in a bigger frame --
+// enlarging the box rather than the slide.
+const BASE_W = 480
+const BASE_H = 270
 
 /**
  * The deck templates, shown under Decks.
@@ -156,25 +164,63 @@ function CoverPreview({ t }: { t: DeckTemplate }): JSX.Element {
   )
 }
 
+/** Draw the cover once at slide size, then scale it to whatever box it is in. */
+function ScaledPreview({ t }: { t: DeckTemplate }): JSX.Element {
+  const box = useRef<HTMLDivElement>(null)
+  const [scale, setScale] = useState(1)
+
+  useEffect(() => {
+    const el = box.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setScale(el.clientWidth / BASE_W))
+    ro.observe(el)
+    setScale(el.clientWidth / BASE_W)
+    return () => ro.disconnect()
+  }, [])
+
+  return (
+    <div ref={box} className="absolute inset-0 overflow-hidden">
+      <div
+        className="absolute left-0 top-0"
+        style={{ width: BASE_W, height: BASE_H, transform: `scale(${scale})`, transformOrigin: 'top left' }}
+      >
+        <div className="relative" style={{ width: BASE_W, height: BASE_H }}>
+          <CoverPreview t={t} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function TemplateCard({
   t,
   onUse,
+  onDuplicate,
   onOpen
 }: {
   t: DeckTemplate
   onUse: () => void
+  onDuplicate: () => void
   onOpen: () => void
 }): JSX.Element {
   return (
-    <li className="group overflow-hidden rounded-xl bg-surface/40">
+    <li className="group relative overflow-hidden rounded-xl bg-surface/40">
       <button
         type="button"
         onClick={onOpen}
         className="relative block aspect-[16/9] w-full overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         aria-label={`${t.name} — see the slides`}
       >
-        <CoverPreview t={t} />
+        <ScaledPreview t={t} />
       </button>
+      {/* Deliberately no Delete: a starting point is not yours to throw away. */}
+      <CardMenu
+        label={t.name}
+        actions={[
+          { label: 'Use as a starting point', onSelect: onUse },
+          { label: 'Duplicate to my decks', onSelect: onDuplicate }
+        ]}
+      />
       <div className="flex items-start gap-3 px-4 py-3">
         <div className="min-w-0">
           <p className="truncate text-[13px] font-medium text-text-primary">{t.name}</p>
@@ -205,7 +251,7 @@ function TemplateDetail({
   return (
     <Modal title={t.name} onClose={onClose} size="medium">
       <div className="relative aspect-[16/9] w-full overflow-hidden">
-        <CoverPreview t={t} />
+        <ScaledPreview t={t} />
       </div>
       <div className="px-5 py-4">
         <div className="flex items-baseline gap-2">
@@ -242,9 +288,11 @@ function TemplateDetail({
 }
 
 export function DeckTemplateGallery({
-  onUse
+  onUse,
+  onDuplicate
 }: {
   onUse: (t: DeckTemplate) => void
+  onDuplicate: (t: DeckTemplate) => Promise<string | null>
 }): JSX.Element {
   useTemplateFonts()
   const [open, setOpen] = useState<DeckTemplate | null>(null)
@@ -253,7 +301,7 @@ export function DeckTemplateGallery({
     <div className="pb-6">
       <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {DECK_TEMPLATES.map((t) => (
-          <TemplateCard key={t.id} t={t} onUse={() => onUse(t)} onOpen={() => setOpen(t)} />
+          <TemplateCard key={t.id} t={t} onUse={() => onUse(t)} onDuplicate={() => void onDuplicate(t)} onOpen={() => setOpen(t)} />
         ))}
       </ul>
       {open && (
