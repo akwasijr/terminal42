@@ -22,7 +22,7 @@ import { registerGitIpc } from './git'
 import { registerIdentityIpc } from './identity'
 import { registerMemoryIpc, backfillMemoryIndex } from './memory'
 import { registerFilesIpc } from './files'
-import { registerGuidelineIpc, clearChecks } from './guidelineCheck'
+import { registerGuidelineIpc, clearChecks, sweepOldClones } from './guidelineCheck'
 import { registerVoiceIpc } from './voice'
 import { registerSettingsIpc } from './settings'
 import { registerCopilotCliSettingsIpc } from './copilotCliSettings'
@@ -366,6 +366,7 @@ app.whenReady().then(() => {
   registerMemoryIpc(() => mainWindow)
   registerFilesIpc(() => mainWindow)
   registerGuidelineIpc(() => mainWindow)
+  void sweepOldClones()
   registerVoiceIpc()
   registerSettingsIpc()
   registerCopilotCliSettingsIpc()

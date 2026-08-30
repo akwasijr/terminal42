@@ -1247,8 +1247,11 @@ const api = {
     checkGithub: (url: string): Promise<GuidelineCheckResult> =>
       ipcRenderer.invoke('guidelines:checkGithub', url),
     /** The page a finished check points at, fetched only when it is needed. */
-    entry: (id: string): Promise<{ name: string; path: string; html: string } | null> =>
+    entry: (id: string): Promise<{ name: string; path: string; html: string; shell: boolean } | null> =>
       ipcRenderer.invoke('guidelines:entry', id),
+    /** Copy the project's design source into a design, for the repair run to read. */
+    seedSource: (id: string, designId: string): Promise<string[]> =>
+      ipcRenderer.invoke('guidelines:seedSource', id, designId),
     /** Let go of a check, and of any repository cloned for it. */
     forget: (id: string): Promise<void> => ipcRenderer.invoke('guidelines:forget', id)
   },

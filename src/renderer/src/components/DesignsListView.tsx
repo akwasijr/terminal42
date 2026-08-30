@@ -20,6 +20,7 @@ import { DesignSystemView } from './DesignSystemView'
 import { DesignSystemWizard } from './DesignSystemWizard'
 import { type DesignSystem, upsertSystem } from '../lib/designSystem'
 import { IconClose, IconEdit, IconPlus, IconSearch } from './icons'
+import { GuidelineCheckModal } from './guidelines/GuidelineCheckModal'
 
 // Pretty labels for the kind-group filter chips at the top of the page.
 const GROUP_LABEL: Record<DesignGroup, string> = {
@@ -140,6 +141,7 @@ export function DesignsListView({
   const [newFolderOpen, setNewFolderOpen] = useState(false)
   // Single "New project" menu: form sizes, other design types, and new folder.
   const [newMenuOpen, setNewMenuOpen] = useState(false)
+  const [checkOpen, setCheckOpen] = useState(false)
   const newMenuRef = useRef<HTMLDivElement>(null)
   const [dsWizardOpen, setDsWizardOpen] = useState(false)
   const [dsSeed, setDsSeed] = useState<SystemAnswers | null>(null)
@@ -398,6 +400,29 @@ export function DesignsListView({
     setWizardInitialIdea('')
     setWizardOpen(true)
   }
+  // A finished check becomes a design of its own: the page it read, with the
+  // accepted fixes queued against it. Editing someone's repository in place
+  // would be a different and much larger promise than the one the modal made.
+  const applyCheck = async (a: {
+    checkId: string
+    name: string
+    prompt: (source: { shell?: boolean; files?: string[] }) => string
+  }): Promise<void> => {
+    setCheckOpen(false)
+    const entry = await window.terminal42.guidelines.entry(a.checkId)
+    if (!entry) return
+    const d = await window.terminal42.designs.create({ title: a.name })
+    await window.terminal42.designs.writeHtml(d.id, entry.html)
+    // The source goes in before the run starts, or the run opens ./source/
+    // and finds nothing there.
+    const files = await window.terminal42.guidelines.seedSource(a.checkId, d.id)
+    void window.terminal42.guidelines.forget(a.checkId)
+    onOpen(d)
+    void window.terminal42.designs.send(
+      d.id, a.prompt({ shell: entry.shell, files }), null, 'autopilot', 'Design check'
+    )
+  }
+
   const createFreeform = async (preset?: { w: number; h: number }): Promise<void> => {
     if (creating) return
     const brief = {
@@ -611,6 +636,13 @@ export function DesignsListView({
                     ))
                   )}
                   <div className="my-1" />
+                  {/* Not a way to create something, so it sits apart from the
+                      list above it: this measures a project that already
+                      exists against the guidelines. */}
+                  <button type="button" onClick={() => { setNewMenuOpen(false); setCheckOpen(true) }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12.5px] font-medium text-text-primary hover:bg-elevated">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2.5 3.5h11M2.5 8h7M2.5 12.5h4"/><path d="M11 11.2l1.6 1.6L15 9.8"/></svg>
+                    Design check
+                  </button>
                   <button type="button" onClick={() => { setNewMenuOpen(false); setNewFolderOpen(true) }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12.5px] font-medium text-text-primary hover:bg-elevated">
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"><path d="M2 5.5V12a1 1 0 001 1h10a1 1 0 001-1V6.5a1 1 0 00-1-1H8L6.5 4H3a1 1 0 00-1 1.5z"/></svg>
                     New folder
@@ -850,6 +882,9 @@ export function DesignsListView({
             onCancel={() => { if (!creating) { setWizardOpen(false); setWizardInitialIdea(''); setWizardStarter(null); setDeckHouse(null); setWebHouse(null); setWizardCategory(null) } }}
             onComplete={(brief, kickoff) => void handleWizardComplete(brief, kickoff)}
           />
+        )}
+        {checkOpen && (
+          <GuidelineCheckModal onClose={() => setCheckOpen(false)} onApply={(a) => void applyCheck(a)} />
         )}
         {dsWizardOpen && (
           <DesignSystemWizard

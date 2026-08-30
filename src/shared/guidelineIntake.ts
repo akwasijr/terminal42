@@ -28,6 +28,19 @@ export function isCheckable(relPath: string): boolean {
 }
 
 /**
+ * Files worth carrying, which is a wider net than the ones worth checking.
+ *
+ * Plain .js and .ts hold the components of a great many React projects. The
+ * scanner has no rules for them, but the repair run needs to read them to
+ * rebuild a page, so they are collected and simply not scanned.
+ */
+export function isDesignSource(relPath: string): boolean {
+  if (shouldSkip(relPath)) return false
+  if (/\.min\.(css|js)$/i.test(relPath)) return false
+  return fileKind(relPath) !== null || /\.[jt]s$/i.test(relPath)
+}
+
+/**
  * The page a report should point at. A project usually has one obvious front
  * door, and index.html at the shallowest depth is it; without one, the first
  * page found will do rather than nothing.
@@ -104,4 +117,80 @@ export function cloneUrl(repo: GithubRepo): string {
 export function projectName(source: { kind: 'folder'; path: string } | { kind: 'github'; repo: GithubRepo }): string {
   if (source.kind === 'github') return `${source.repo.owner}/${source.repo.repo}`
   return source.path.replace(/\/+$/, '').split('/').pop() || 'Project'
+}
+
+// ─── What the second run is given to work on ──────────────────────────────
+
+/**
+ * Whether a page is only a mount point rather than a design.
+ *
+ * A React or Vue project's index.html is a head, a `<div id="root">` and a
+ * script tag. Handing that to the repair run wastes it: there is nothing on
+ * the page to correct, and the preview that comes back is a white rectangle.
+ * The design lives in the components and the stylesheets, so a shell entry
+ * has to be answered differently — rebuild the page, do not edit it.
+ */
+export function isShell(html: string): boolean {
+  const body = /<body[^>]*>([\s\S]*?)<\/body>/i.exec(html)?.[1] ?? html
+  const clean = body
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<(script|noscript|template|style)\b[^>]*>[\s\S]*?<\/\1>/gi, '')
+  // Text is the first test, but a page can be all pictures and still be a
+  // design, so anything that carries meaning on its own counts too.
+  const meaty = /<(img|svg|picture|video|canvas|button|input|form|table|h[1-6]|p|a|ul|ol|section|article|header|footer|nav|aside|figure)\b/i.test(clean)
+  const text = clean.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+  return text.length < 40 && !meaty
+}
+
+/**
+ * Whether a plain .js or .ts file is really a piece of the design.
+ *
+ * The scanner only reads html, css and jsx, but a great many React projects
+ * put their components in .js — react-gh-pages is one. Those files are
+ * invisible to the check and would be invisible to the repair too, which is
+ * how a rebuild ends up with nothing to rebuild from. A file counts if it
+ * returns markup.
+ */
+function rendersMarkup(file: { path: string; text: string }): boolean {
+  if (!/\.[jt]s$/i.test(file.path)) return false
+  return /<[A-Za-z][\w.-]*[\s/>]/.test(file.text) && /\breturn\b/.test(file.text)
+}
+
+/**
+ * The files the repair run is allowed to read, smallest useful set first.
+ *
+ * A project is megabytes and a run has a budget, so this is a shortlist, not
+ * a copy: the stylesheets and the components nearest the top, which is where
+ * a design that can be seen actually comes from.
+ */
+export function designSources(
+  files: { path: string; text: string }[],
+  entry: string | null,
+  limits: { files?: number; bytes?: number } = {}
+): { path: string; text: string }[] {
+  const maxFiles = limits.files ?? 20
+  const maxBytes = limits.bytes ?? 240_000
+  const depth = (p: string): number => p.split('/').length
+  const rank = (p: string): number => {
+    const kind = fileKind(p)
+    if (kind === 'css') return 0
+    if (kind === 'jsx') return /(^|\/)(app|index|main|home|layout|page)\.[jt]sx?$/i.test(p) ? 1 : 2
+    if (kind === 'html') return 4
+    return 3
+  }
+
+  const pool = files
+    .filter((f) => f.path !== entry && (fileKind(f.path) !== null || rendersMarkup(f)))
+    .sort((a, b) => rank(a.path) - rank(b.path) || depth(a.path) - depth(b.path)
+      || a.path.localeCompare(b.path))
+
+  const taken: { path: string; text: string }[] = []
+  let bytes = 0
+  for (const f of pool) {
+    if (taken.length >= maxFiles) break
+    if (bytes + f.text.length > maxBytes) continue
+    taken.push(f)
+    bytes += f.text.length
+  }
+  return taken
 }

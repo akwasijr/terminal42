@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
-  shouldSkip, isCheckable, entryFile, parseGithubUrl, cloneUrl, projectName
+  shouldSkip, isCheckable, isDesignSource, isShell, designSources, entryFile,
+  parseGithubUrl, cloneUrl, projectName
 } from '../../src/shared/guidelineIntake'
 
 describe('shouldSkip', () => {
@@ -163,5 +164,86 @@ describe('projectName', () => {
 
   it('ignores a trailing slash', () => {
     expect(projectName({ kind: 'folder', path: '/Users/me/my-site/' })).toBe('my-site')
+  })
+})
+
+describe('isShell', () => {
+  it('calls a React mount point a shell', () => {
+    expect(isShell(`<!DOCTYPE html><html><head><title>React App</title></head>
+      <body><noscript>You need to enable JavaScript to run this app.</noscript>
+      <div id="root"></div></body></html>`)).toBe(true)
+  })
+
+  it('calls a Vite mount point a shell', () => {
+    expect(isShell('<html><body><div id="app"></div><script type="module" src="/src/main.ts"></script></body></html>'))
+      .toBe(true)
+  })
+
+  it('does not call a real page a shell', () => {
+    expect(isShell('<html><body><h1>Trainers for men</h1><p>Every pair, every size.</p></body></html>'))
+      .toBe(false)
+  })
+
+  it('does not call a page of pictures a shell', () => {
+    expect(isShell('<html><body><img src="a.png"><img src="b.png"></body></html>')).toBe(false)
+  })
+
+  it('ignores what is inside a comment or a script', () => {
+    expect(isShell('<body><!-- a long comment about the design of this page --><script>const a = "hello there everyone"</script><div id="root"></div></body>'))
+      .toBe(true)
+  })
+})
+
+describe('isDesignSource', () => {
+  it('carries plain js and ts that the scanner has no rules for', () => {
+    expect(isDesignSource('src/App.js')).toBe(true)
+    expect(isDesignSource('src/theme.ts')).toBe(true)
+  })
+
+  it('still refuses what should be skipped', () => {
+    expect(isDesignSource('node_modules/react/index.js')).toBe(false)
+    expect(isDesignSource('dist/bundle.min.js')).toBe(false)
+  })
+
+  it('refuses what is not source at all', () => {
+    expect(isDesignSource('README.md')).toBe(false)
+  })
+})
+
+describe('designSources', () => {
+  const f = (path: string, text = 'body { color: red }'): { path: string; text: string } => ({ path, text })
+
+  it('puts stylesheets first, then the components nearest the top', () => {
+    const picked = designSources(
+      [f('src/components/deep/Widget.jsx'), f('src/App.jsx'), f('src/index.css')],
+      null
+    )
+    expect(picked.map((p) => p.path)).toEqual(['src/index.css', 'src/App.jsx', 'src/components/deep/Widget.jsx'])
+  })
+
+  it('leaves the entry out, since it is already the page', () => {
+    const picked = designSources([f('index.html'), f('a.css')], 'index.html')
+    expect(picked.map((p) => p.path)).toEqual(['a.css'])
+  })
+
+  it('takes a plain js file that returns markup', () => {
+    const picked = designSources([f('src/App.js', 'function App() { return <h1>Hi</h1> }')], null)
+    expect(picked.map((p) => p.path)).toEqual(['src/App.js'])
+  })
+
+  it('leaves a plain js file that renders nothing', () => {
+    expect(designSources([f('src/config.js', 'export const API = "/x"')], null)).toEqual([])
+  })
+
+  it('stops at the file limit', () => {
+    const many = Array.from({ length: 30 }, (_, i) => f(`s${i}.css`))
+    expect(designSources(many, null, { files: 4 })).toHaveLength(4)
+  })
+
+  it('stops at the byte limit', () => {
+    const big = [f('a.css', 'x'.repeat(900)), f('b.css', 'y'.repeat(50))]
+    const picked = designSources(big, null, { bytes: 1000 })
+    expect(picked.map((p) => p.path)).toEqual(['a.css', 'b.css'])
+    expect(designSources(big, null, { bytes: 500 }).map((p) => p.path)).toEqual(['b.css'])
   })
 })
