@@ -47,3 +47,28 @@ describe('a deck is only asked about decks', () => {
     expect(app).toContain('shape')
   })
 })
+
+describe('an app is not asked what the renderer already handles', () => {
+  const app = (): string[] => pagesForState({ category: 'app', kind: 'app', target: 'html' })
+
+  it('skips the steps the website flow already stopped asking about', () => {
+    // The same renderer builds both, so responsive layout and the motion
+    // engine are handled for you in an app too.
+    expect(app()).not.toContain('surface')
+    expect(app()).not.toContain('motion')
+  })
+
+  it('keeps what genuinely shapes an app', () => {
+    for (const p of ['stack', 'look', 'shape', 'palette', 'fonts', 'theme', 'spacing', 'grid']) {
+      expect(app(), `app dropped ${p}`).toContain(p)
+    }
+  })
+
+  it('still asks about surface when the output is not ours to render', () => {
+    // Figma frames are static, so that path has its own rules and must not
+    // be swept up by the app shortcut.
+    const figma = pagesForState({ category: 'app', kind: 'app', target: 'figma' })
+    expect(figma).not.toContain('surface')
+    expect(figma).toContain('figma')
+  })
+})

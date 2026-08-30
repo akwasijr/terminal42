@@ -999,8 +999,13 @@ export function pagesForState(s: {
   const pages: WizardPage[] = ['category', 'kind']
   if (def.subtypes && def.subtypes.length) pages.push('subtype')
   // Surface (responsive breakpoints) doesn't apply when the output is
-  // static Figma frames: drop it.
-  if (def.hasSurfaces && s.target !== 'figma') pages.push('surface')
+  // static Figma frames: drop it. Apps get the same responsive layout and
+  // motion engine the website flow already stopped asking about, so an app
+  // brief does not need to answer for them either -- that took starting an
+  // app from seventeen questions down to fourteen without losing a decision
+  // that changes the result.
+  const handledForYou = s.category === 'app' && s.target !== 'figma'
+  if (def.hasSurfaces && s.target !== 'figma' && !handledForYou) pages.push('surface')
   if (flag(def, 'hasFidelity')) pages.push('fidelity')
 
   // (useTpl is computed above.) When the template owns the design we drop every
@@ -1022,7 +1027,7 @@ export function pagesForState(s: {
   if (!useTpl && def.hasDensity && s.target !== 'figma') pages.push('density')
   // Spacing + grid replace density on precision kinds (apps + figma).
   if (!useTpl && def.hasSpacing) pages.push('spacing', 'grid')
-  if (!useTpl && def.hasMotion && s.target !== 'figma') pages.push('motion')
+  if (!useTpl && def.hasMotion && s.target !== 'figma' && !handledForYou) pages.push('motion')
   pages.push('inspiration', 'idea', 'defaults')
   if (s.target === 'figma') pages.push('figma')
   pages.push('summary')
