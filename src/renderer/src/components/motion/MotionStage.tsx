@@ -22,7 +22,7 @@ import { beforeCardsFilter, drawEffects } from '../../lib/motion/effects'
 import { composeFrame, releaseComposeScratch } from '../../lib/motion/compose'
 import { needsPixelPass, releaseFxScratches } from '../../lib/motion/frameFx'
 import { ensureTextFonts } from '../../lib/motion/fonts'
-import { boxFor, drawPickOutline, pickOverlay, samePick, type Pick } from '../../lib/motion/overlayPick'
+import { boxFor, drawPickOutline, pickOverlay, samePick, type Box, type Pick } from '../../lib/motion/overlayPick'
 
 export type StageHandle = {
   engine: () => MotionEngine | null
@@ -120,6 +120,9 @@ export function MotionStage({
   }, [])
   const visRef = useRef('')
   const [hint, setHint] = useState<string | null>(null)
+  // Wording is changed where it is read. Double-clicking a caption puts a box
+  // over the drawn text rather than sending you to the timeline to rename it.
+  const [editing, setEditing] = useState<{ id: string; box: Box; draft: string } | null>(null)
   const dragRef = useRef<DragState | null>(null)
   const sizeRef = useRef(size)
   sizeRef.current = size
@@ -243,7 +246,14 @@ export function MotionStage({
         const p = phaseRef.current
         drawEffects(ctx, resolvedEffects(doc, p), over.width, over.height)
         drawLogos(ctx, resolvedLogoLayers(doc, p), images, over.width, over.height, p)
-        drawOverlay(ctx, resolvedTextLayers(doc, p), over.width, over.height, p)
+        // The layer being edited is hidden here, because the editing box draws
+        // it instead; two copies of the same words at the same place read as a
+        // rendering fault rather than as an editor.
+        drawOverlay(
+          ctx,
+          resolvedTextLayers(doc, p).filter((t) => t.id !== editing?.id),
+          over.width, over.height, p
+        )
         // The marquee is painted here rather than in the DOM because the layer
         // it surrounds is canvas: an HTML box over the top would need the same
         // measurements anyway, and would lag the frame by a render.
@@ -251,7 +261,7 @@ export function MotionStage({
         if (box) drawPickOutline(ctx, box, accentRef.current)
       }
     }
-  }, [size, ready, fontTick, visTick, selected, doc.frame, doc.visual.text, doc.visual.logos,
+  }, [size, ready, fontTick, visTick, selected, editing?.id, doc.frame, doc.visual.text, doc.visual.logos,
       doc.visual.shapes, doc.visual.pictures, doc.visual.effects, images])
 
   // A webfont arrives after the frame it was first asked for has been painted,
@@ -310,6 +320,42 @@ export function MotionStage({
     const r = el.getBoundingClientRect()
     if (r.width === 0 || r.height === 0) return null
     return { x: ((e.clientX - r.left) / r.width) * over.width, y: ((e.clientY - r.top) / r.height) * over.height, ctx }
+  }
+
+  /** The overlay canvas draws in device pixels; the frame is laid out in CSS ones. */
+  const toCssBox = (box: Box, over: HTMLCanvasElement): Box => ({
+    x: (box.x / over.width) * (size.width || 1),
+    y: (box.y / over.height) * (size.height || 1),
+    w: (box.w / over.width) * (size.width || 1),
+    h: (box.h / over.height) * (size.height || 1)
+  })
+
+  const onDoubleClick = (e: React.MouseEvent<HTMLCanvasElement>): void => {
+    const over = overlayPoint(e, e.currentTarget)
+    if (!over) return
+    const pick = pickOverlay(
+      over.ctx, docRef.current, images,
+      over.ctx.canvas.width, over.ctx.canvas.height, phaseRef.current, over.x, over.y
+    )
+    if (pick?.kind !== 'text') return
+    const layer = docRef.current.visual.text.find((t) => t.id === pick.id)
+    const box = boxFor(over.ctx, docRef.current, images, over.ctx.canvas.width, over.ctx.canvas.height, phaseRef.current, pick)
+    if (!layer || !box) return
+    onSelect(pick)
+    setHint(null)
+    setEditing({ id: pick.id, box: toCssBox(box, over.ctx.canvas), draft: layer.text })
+  }
+
+  const commitEdit = (): void => {
+    setEditing((cur) => {
+      if (!cur) return null
+      const d = docRef.current
+      const text = d.visual.text.map((t) => (t.id === cur.id ? { ...t, text: cur.draft } : t))
+      // An empty caption is invisible and unpickable, so there would be no way
+      // back to it. Blanking the box leaves the wording alone.
+      if (cur.draft.trim() !== '') onPatch({ visual: { ...d.visual, text } })
+      return null
+    })
   }
 
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>): void => {
@@ -633,6 +679,7 @@ export function MotionStage({
               : `${doc.componentId} motion piece. Drag to turn it, drag a card to move it, scroll to zoom.`
           }
           onPointerDown={onPointerDown}
+          onDoubleClick={onDoubleClick}
           onPointerMove={onPointerMove}
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
@@ -645,6 +692,46 @@ export function MotionStage({
           aria-hidden="true"
         />
         <canvas ref={overRef} className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true" />
+        {editing ? (() => {
+          const layer = doc.visual.text.find((t) => t.id === editing.id)
+          const px = ((layer?.size ?? 6) / 100) * (size.height || 1)
+          const align = layer?.align ?? 'center'
+          const w = Math.max(editing.box.w + px * 4, px * 6)
+          return (
+            <textarea
+              autoFocus
+              aria-label="Edit this text"
+              value={editing.draft}
+              onChange={(e) => setEditing({ ...editing, draft: e.target.value })}
+              onBlur={commitEdit}
+              onKeyDown={(e) => {
+                e.stopPropagation()
+                if (e.key === 'Escape') { e.preventDefault(); setEditing(null) }
+                // Enter commits, because a caption is usually one line. Shift
+                // holds it open for the times it is not.
+                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commitEdit() }
+              }}
+              onFocus={(e) => e.currentTarget.select()}
+              className="absolute z-20 resize-none overflow-hidden rounded-sm bg-transparent p-0 outline outline-1 outline-accent"
+              style={{
+                // Room to type past the current wording, grown from whichever
+                // edge the layer is anchored to so the words do not jump.
+                left: align === 'right' ? editing.box.x + editing.box.w - w
+                  : align === 'center' ? editing.box.x + editing.box.w / 2 - w / 2
+                  : editing.box.x,
+                top: editing.box.y,
+                width: w, height: editing.box.h,
+                fontSize: px,
+                lineHeight: `${(layer?.lineHeight ?? 1.15)}em`,
+                fontFamily: layer?.font ?? 'inherit',
+                fontWeight: layer?.weight ?? 400,
+                fontStyle: layer?.italic ? 'italic' : 'normal',
+                textAlign: align,
+                color: layer?.colour ?? '#fff'
+              }}
+            />
+          )
+        })() : null}
         {hint ? (
           <p className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-sm bg-bg/80 px-2 py-1 text-[11px] text-text-secondary" role="status">
             {hint}
