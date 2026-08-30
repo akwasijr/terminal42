@@ -22,6 +22,7 @@ import { registerGitIpc } from './git'
 import { registerIdentityIpc } from './identity'
 import { registerMemoryIpc, backfillMemoryIndex } from './memory'
 import { registerFilesIpc } from './files'
+import { registerGuidelineIpc, clearChecks } from './guidelineCheck'
 import { registerVoiceIpc } from './voice'
 import { registerSettingsIpc } from './settings'
 import { registerCopilotCliSettingsIpc } from './copilotCliSettings'
@@ -364,6 +365,7 @@ app.whenReady().then(() => {
   registerIdentityIpc()
   registerMemoryIpc(() => mainWindow)
   registerFilesIpc(() => mainWindow)
+  registerGuidelineIpc(() => mainWindow)
   registerVoiceIpc()
   registerSettingsIpc()
   registerCopilotCliSettingsIpc()
@@ -454,6 +456,7 @@ app.on('before-quit', (event) => {
   killAllDesignRuns()
   stopAllDesignWatchers()
   stopDesignOrigins()
+  clearChecks()
   stopTasksWatcher()
   stopAutoPoke()
   stopInsightsScheduler()

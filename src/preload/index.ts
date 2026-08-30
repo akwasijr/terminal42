@@ -182,6 +182,12 @@ export type DesignBrief = {
   createdAt: number
 }
 
+export type GuidelineFinding = { id: string; count: number; example?: string; file?: string }
+
+export type GuidelineCheckResult =
+  | { ok: true; id: string; name: string; fileCount: number; entry: string | null; findings: GuidelineFinding[] }
+  | { ok: false; error: string }
+
 export type Design = {
   id: string
   title: string
@@ -1233,6 +1239,18 @@ const api = {
   files: {
     pick: (opts?: { multi?: boolean; images?: boolean }): Promise<string[]> =>
       ipcRenderer.invoke('files:pick', opts ?? {})
+  },
+  guidelines: {
+    /** Check a folder the user points at. */
+    checkFolder: (): Promise<GuidelineCheckResult> => ipcRenderer.invoke('guidelines:checkFolder'),
+    /** Check a public GitHub repository. */
+    checkGithub: (url: string): Promise<GuidelineCheckResult> =>
+      ipcRenderer.invoke('guidelines:checkGithub', url),
+    /** The page a finished check points at, fetched only when it is needed. */
+    entry: (id: string): Promise<{ name: string; path: string; html: string } | null> =>
+      ipcRenderer.invoke('guidelines:entry', id),
+    /** Let go of a check, and of any repository cloned for it. */
+    forget: (id: string): Promise<void> => ipcRenderer.invoke('guidelines:forget', id)
   },
   voice: {
     transcribe: (bytes: ArrayBuffer | Uint8Array, mimeType: string): Promise<{ ok: true; text: string } | { ok: false; error: string }> =>
