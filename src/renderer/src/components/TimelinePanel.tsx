@@ -447,8 +447,9 @@ export function TimelinePanel({ objects, selIds, onSelect, setMotion, getDoc, on
           <div className="absolute inset-x-0 top-1/2 mx-auto h-0.5 w-10 -translate-y-1/2 rounded-full bg-text-muted/30 group-hover:bg-accent" />
         </div>
       )}
-      {/* Top bar */}
-      <div className="flex items-center gap-1.5 px-3 py-1.5 text-[11.5px] text-text-secondary">
+      {/* Top bar. Positioned so the menus it opens sit above the ruler and the
+          rows rather than sliding behind them. */}
+      <div className="relative z-40 flex items-center gap-1.5 px-3 py-1.5 text-[11.5px] text-text-secondary">
         <button type="button" onClick={play} title={playing ? 'Pause (Space)' : 'Play (Space)'} className="grid h-7 w-7 place-items-center rounded-md bg-action text-action-text transition-opacity hover:opacity-90">
           {playing
             ? <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><rect x="2" y="1.5" width="3" height="9" rx="1" /><rect x="7" y="1.5" width="3" height="9" rx="1" /></svg>
@@ -468,24 +469,21 @@ export function TimelinePanel({ objects, selIds, onSelect, setMotion, getDoc, on
           <span className="text-text-muted">ms</span>
         </label>
         <button type="button" onClick={() => setPlayback((p) => PB_MODES[p].next)} className="grid h-7 w-7 place-items-center rounded-md text-text-secondary transition-colors hover:bg-bg/60 hover:text-text-primary" title={PB_MODES[playback].desc}>{PB_MODES[playback].icon}</button>
-        <select
-          value=""
+        <div className="w-[104px] shrink-0">
+        <TimelineMenu
+          label="Preset"
           title={selIds.length ? 'Apply an animation preset to the selected layer' : 'Select a layer first'}
           disabled={!selIds.length}
-          onChange={(e) => {
-            const preset = ANIMATION_PRESETS.find((p) => p.id === e.target.value)
+          groups={PRESET_GROUPS.map((g) => ({
+            label: g,
+            items: ANIMATION_PRESETS.filter((pr) => pr.group === g).map((pr) => ({ id: pr.id, label: pr.label }))
+          }))}
+          onPick={(id) => {
+            const preset = ANIMATION_PRESETS.find((pr) => pr.id === id)
             if (preset) for (const obid of selIds) setMotion(obid, preset.build(duration))
-            e.target.value = ''
           }}
-          className="rounded bg-bg/60 px-1.5 py-1 text-[11px] text-text-primary focus:outline-none disabled:opacity-40"
-        >
-          <option value="">+ Preset…</option>
-          {PRESET_GROUPS.map((g) => (
-            <optgroup key={g} label={g}>
-              {ANIMATION_PRESETS.filter((p) => p.group === g).map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
-            </optgroup>
-          ))}
-        </select>
+        />
+        </div>
         <div className="ml-auto" />
         <label className="flex items-center gap-1.5 text-[10.5px] text-text-muted" title="Zoom the time axis">
           <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="7" cy="7" r="4.5" /><path d="M11 11l3 3" /></svg>
@@ -571,10 +569,10 @@ export function TimelinePanel({ objects, selIds, onSelect, setMotion, getDoc, on
                           {ap.length === 0 && <div className="sticky left-0 z-[6] w-[220px] bg-elevated px-7 py-1.5 text-[10px] text-text-muted">No animated properties yet.</div>}
                           {addable.length > 0 && (
                             <div className="sticky left-0 z-[6] flex w-[220px] items-center bg-elevated px-5 pb-1 pt-1">
-                              <select value="" onChange={(e) => { if (e.target.value) { addKeyAt(o, e.target.value as PropName); e.currentTarget.value = '' } }} className="w-full rounded bg-bg/60 px-1.5 py-1 text-[10.5px] text-text-secondary focus:outline-none">
-                                <option value="">+ Add property…</option>
-                                {addable.map((p) => <option key={p} value={p}>{PROP_META[p].label}</option>)}
-                              </select>
+                              <AddPropertyMenu
+                                options={addable}
+                                onPick={(prop) => addKeyAt(o, prop)}
+                              />
                             </div>
                           )}
                         </div>
@@ -629,5 +627,104 @@ export function TimelinePanel({ objects, selIds, onSelect, setMotion, getDoc, on
       </div>
       )}
     </div>
+  )
+}
+
+/**
+ * A menu in the timeline's own clothes.
+ *
+ * These were bare <select>s, which a browser draws in the operating system's
+ * chrome: a blue highlight and system corners in the middle of a panel that
+ * has neither, and on a dark theme a popup that is a different dark from
+ * everything around it. Both lists are grouped, so the two of them share this.
+ */
+function TimelineMenu({
+  label, title, disabled = false, groups, onPick
+}: {
+  label: string
+  title?: string
+  disabled?: boolean
+  groups: Array<{ label: string; items: Array<{ id: string; label: string; short?: string }> }>
+  onPick: (id: string) => void
+}): React.JSX.Element {
+  const [open, setOpen] = useState(false)
+  const box = useRef<HTMLDivElement | null>(null)
+  const shown = groups.filter((g) => g.items.length > 0)
+
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent): void => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  return (
+    <div ref={box} className="relative w-full">
+      <button
+        type="button"
+        title={title}
+        disabled={disabled}
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="flex w-full items-center justify-between gap-2 rounded bg-bg/60 px-1.5 py-1 text-[10.5px] text-text-secondary hover:text-text-primary disabled:opacity-40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+      >
+        <span>{label}</span>
+        <span aria-hidden="true" className="text-text-muted">+</span>
+      </button>
+      {open && !disabled ? (
+        <div
+          role="menu"
+          aria-label={label}
+          className="t42-menu absolute left-0 top-full z-50 mt-1 max-h-[280px] w-[168px] overflow-y-auto rounded-lg bg-raised p-1"
+        >
+          {shown.map((g) => (
+            <div key={g.label}>
+              <p className="px-2 pb-0.5 pt-1 text-[9.5px] text-text-muted">{g.label}</p>
+              {g.items.map((it) => (
+                <button
+                  key={it.id}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => { onPick(it.id); setOpen(false) }}
+                  className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[11px] text-text-secondary hover:bg-bg/60 hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+                >
+                  {it.short ? (
+                    <span aria-hidden="true" className="w-4 shrink-0 text-center text-[9.5px] text-text-muted">{it.short}</span>
+                  ) : null}
+                  {it.label}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+/** The list of things this layer could be animated on. */
+function AddPropertyMenu({
+  options, onPick
+}: { options: PropName[]; onPick: (p: PropName) => void }): React.JSX.Element {
+  const group = (g: 'transform' | 'effect'): Array<{ id: string; label: string; short: string }> =>
+    options.filter((p) => PROP_META[p].group === g)
+      .map((p) => ({ id: p, label: PROP_META[p].label, short: PROP_META[p].short }))
+  return (
+    <TimelineMenu
+      label="Add property"
+      groups={[
+        { label: 'Transform', items: group('transform') },
+        { label: 'Effects', items: group('effect') }
+      ]}
+      onPick={(id) => onPick(id as PropName)}
+    />
   )
 }
