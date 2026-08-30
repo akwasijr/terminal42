@@ -22,6 +22,7 @@ import { createReadStream } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { join, resolve, sep } from 'node:path'
 import { contentType, isRoute, requestPath } from './spa'
+import { withAgent } from '../shared/frameAgent'
 
 type Origin = { server: Server; url: string; root: string; html: string }
 
@@ -69,7 +70,10 @@ export async function serveDesign(root: string, html: string): Promise<string> {
         // The document changes on every edit and is only ever a few
         // kilobytes; a cached copy would show yesterday's design.
         'Cache-Control': 'no-store'
-      }).end(state.html)
+      // The page is on its own origin, so the canvas cannot reach into it.
+      // The agent goes in here, on the way out, because this is the last
+      // point at which anything of ours touches the document.
+      }).end(withAgent(state.html))
       return
     }
     const file = join(state.root, path)
