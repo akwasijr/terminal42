@@ -5,6 +5,8 @@ import { DesignSystemWizard } from './DesignSystemWizard'
 import { DS_CATEGORIES, DS_COMPONENTS } from './dsComponents'
 import { DsIcon, ICON_SAMPLE, iconSnippet } from './dsIcons'
 import { ensureTokenLibrary, refreshFromLibrary } from '../lib/tokens/systemLibrary'
+import { GuidelinesPage, LayoutsPage, PatternsPage } from './designSystem/SystemPages'
+import { ComponentRules } from './designSystem/ComponentRules'
 import { Modal, ModalHeader, ModalBody, ModalFooter } from './Modal'
 
 function fontStack(name: string): string {
@@ -225,6 +227,12 @@ export function DesignSystemView({ openSystemId, onConsumeOpen }: { openSystemId
   const typeRows: { key: keyof DesignSystem['type']; label: string }[] = [
     { key: 'xxxl', label: 'Display' }, { key: 'xxl', label: 'H1' }, { key: 'xl', label: 'H2' }, { key: 'lg', label: 'H3' }, { key: 'md', label: 'Lead' }, { key: 'base', label: 'Body' }, { key: 'sm', label: 'Small' }, { key: 'xs', label: 'Caption' }
   ]
+  const guidelineCount = (() => {
+    const g = s.guidelines
+    if (!g) return 0
+    const written = [g.componentUsage, g.accessibility, g.content, g.interaction, g.responsive].filter((v) => (v ?? '').trim().length > 0).length
+    return written + (g.dos?.length ? 1 : 0) + (g.donts?.length ? 1 : 0)
+  })()
   const compName = nav.startsWith('component:') ? nav.slice('component:'.length) : null
   const openComp = compName ? (DS_COMPONENTS.find((c) => c.name === compName) ?? null) : null
   const themed = applyBase(s, compBase)
@@ -284,9 +292,13 @@ export function DesignSystemView({ openSystemId, onConsumeOpen }: { openSystemId
             </div>
           )}
           <p className="mt-3 text-[11.5px] text-text-muted">This preview reflects your design tokens.</p>
+          <ComponentRules system={s} update={update} name={openComp.name} category={openComp.category} />
         </section>
       )
     }
+    if (nav === 'patterns') return <PatternsPage system={s} update={update} />
+    if (nav === 'layouts') return <LayoutsPage system={s} update={update} />
+    if (nav === 'guidelines') return <GuidelinesPage system={s} update={update} />
     if (nav.startsWith('foundations:')) {
       const f = nav.slice('foundations:'.length)
       if (f === 'colors') {
@@ -592,6 +604,24 @@ export function DesignSystemView({ openSystemId, onConsumeOpen }: { openSystemId
               })}
             </div>
           )}
+
+          {/* The parts that are not values and not a gallery. A count says
+              whether anybody has decided any of it yet, because an untouched
+              section and a deliberately empty one look identical. */}
+          <div className="mt-3">
+            {([
+              ['patterns', 'Patterns', (s.patterns ?? []).length],
+              ['layouts', 'Layouts', (s.layouts ?? []).length],
+              ['guidelines', 'Guidelines', guidelineCount]
+            ] as const).map(([id, label, n]) => (
+              <button key={id} type="button" onClick={() => setNav(id)} className={navCls(id)}>
+                <span className="flex items-center justify-between gap-2">
+                  <span>{label}</span>
+                  {n > 0 && <span className="text-[10.5px] text-text-muted">{n}</span>}
+                </span>
+              </button>
+            ))}
+          </div>
         </nav>
 
         <div className="min-w-0 flex-1 overflow-y-auto pb-6 pr-1">{renderContent()}</div>
