@@ -36,13 +36,11 @@ import {
   type Token,
   type TokenStudio,
   type TokenValue,
-  enforcementOf,
   type SetState,
   cssOptionsOf,
   countTokens as countStudioTokens,
   type CssOptions
 } from '../../../../shared/tokens/types'
-import { ENFORCEMENT_OPTIONS } from '../../../../shared/tokens/enforcementCopy'
 import { toCSS } from '../../../../shared/tokens/export'
 import { flatten, problems, resolve, type Problem } from '../../../../shared/tokens/resolve'
 import { familiesOf, leafOf, SECTIONS, sectionOf, type Family, type SectionId } from '../../../../shared/tokens/groups'
@@ -57,7 +55,7 @@ import {
   type BulkResult
 } from '../../../../shared/tokens/bulk'
 import { bridgeSummary, brandItems } from '../../../../shared/tokens/bridges'
-import { coverageAcross, coverageScore, gapsBySection } from '../../../../shared/tokens/coverage'
+import { coverageAcross, gapsBySection } from '../../../../shared/tokens/coverage'
 import { fillGaps, fillNote } from '../../../../shared/tokens/harden'
 import { cloneStudio } from '../../../../shared/tokens/scaffold'
 import {
@@ -531,6 +529,36 @@ function StudioEditor({
 
   const filled = SECTIONS.filter((s) => (sections.get(s.id) ?? []).length > 0)
 
+  // What the library has not decided yet.
+  //
+  // This used to be a chip in the header reading "Complete", which told you
+  // nothing about where the gaps were and sat next to two other chips nobody
+  // could read either. The count now hangs off the section it belongs to, so
+  // the answer to "not decided where?" is on screen without opening anything.
+  //
+  // Every theme, not the one showing: a library with layers in Light and none
+  // in Dark is not complete, and saying so only when somebody happens to
+  // switch theme is how the gap survives.
+  const gaps = useMemo(() => {
+    const by = new Map<SectionId, { label: string; why: string }[]>()
+    for (const g of gapsBySection(coverageAcross(studio))) {
+      by.set(g.section, g.missing.map((m) => ({ label: m.check.label, why: m.check.why })))
+    }
+    return by
+  }, [studio])
+  const gapCount = useMemo(
+    () => [...gaps.values()].reduce((a, b) => a + b.length, 0),
+    [gaps]
+  )
+
+  const fillTheGaps = (): void => {
+    const result = fillGaps(studio, themeId)
+    if (result.added.length === 0) return
+    onChange(result.studio)
+    setNote(fillNote(result))
+    window.setTimeout(() => setNote(null), 5000)
+  }
+
   // Gathering tokens up for a sweep. A gathered token is not the selection:
   // the inspector is for one token at a time and showing it alongside a
   // sweep would be two answers to the question of what "this" means.
@@ -620,26 +648,12 @@ function StudioEditor({
             aria-label="Find a token"
             className="w-40 rounded-md bg-elevated px-2.5 py-1.5 text-[12px] text-text-primary placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           />
-          <GapsMenu
-            studio={studio}
-            themeId={themeId}
-            onFill={(next, msg) => {
-              onChange(next)
-              setNote(msg)
-              window.setTimeout(() => setNote(null), 5000)
-            }}
-          />
-          <EnforcementPicker studio={studio} onChange={onChange} />
-          <SendTo studio={studio} themeId={themeId} onDone={(msg) => {
-            setNote(msg)
-            window.setTimeout(() => setNote(null), 4000)
-          }} />
           <ExportMenu
             studio={studio}
             themeId={themeId}
             onChange={(css) => onChange({ ...studio, css })}
             onWrite={() => void exportFiles()}
-            onCopied={(msg) => {
+            onDone={(msg) => {
               setNote(msg)
               window.setTimeout(() => setNote(null), 4000)
             }}
@@ -658,13 +672,21 @@ function StudioEditor({
               type="button"
               onClick={() => jump(s.id)}
               aria-current={here === s.id ? 'true' : undefined}
-              className={`rounded-md px-2.5 py-1.5 text-left text-[12.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+              className={`flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-[12.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
                 here === s.id
                   ? 'bg-elevated font-medium text-text-primary'
                   : 'text-text-muted hover:bg-elevated/60 hover:text-text-primary'
               }`}
             >
-              {s.label}
+              <span className="truncate">{s.label}</span>
+              {(gaps.get(s.id)?.length ?? 0) > 0 && (
+                <span
+                  title={`${gaps.get(s.id)?.length} not decided yet`}
+                  className="shrink-0 text-[10.5px] tabular-nums text-warning"
+                >
+                  {gaps.get(s.id)?.length}
+                </span>
+              )}
             </button>
           ))}
 
@@ -718,6 +740,20 @@ function StudioEditor({
           ref={scroller}
           className="min-w-0 flex-1 overflow-y-auto rounded-panel bg-surface pb-2"
         >
+          {gapCount > 0 && (
+            <div className="flex items-baseline gap-3 px-4 pt-3 text-[11.5px]">
+              <span className="text-text-muted">
+                {gapCount} {gapCount === 1 ? 'thing' : 'things'} not decided yet
+              </span>
+              <button
+                type="button"
+                onClick={fillTheGaps}
+                className="rounded-sm text-text-secondary underline decoration-border underline-offset-2 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+              >
+                Decide them from what is here
+              </button>
+            </div>
+          )}
           {filled.length === 0 ? (
             <p className="px-2 py-16 text-center text-[12px] text-text-muted">
               {onlyProblems ? 'Nothing wrong here.' : search ? 'No token by that name.' : 'Nothing in this theme yet.'}
@@ -765,6 +801,22 @@ function StudioEditor({
                       }}
                     />
                   ))}
+                  {(gaps.get(s.id) ?? []).length > 0 && (
+                    <div>
+                      <p className="mb-1 text-[11px] text-text-muted">Not decided yet</p>
+                      <ul className="flex flex-wrap gap-x-3 gap-y-1">
+                        {(gaps.get(s.id) ?? []).map((g) => (
+                          <li
+                            key={g.label}
+                            title={g.why}
+                            className="text-[11.5px] text-text-secondary"
+                          >
+                            {g.label}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               </section>
             ))
@@ -1946,85 +1998,6 @@ function TypeMenu({
  * the failure this whole feature exists to stop.
  */
 /**
- * How hard this library leans on the designs bound to it.
- *
- * Three rungs rather than a switch, because the middle one is the point: a
- * two-state "enforce on/off" would force a team to choose between being told
- * nothing and having a turn spent on their behalf, and most teams want to see
- * the drift first and decide.
- *
- * It reads as a named choice rather than three bare words, because "Check" on
- * its own is not a sentence anybody can act on, and the whole feature turns on
- * knowing what it does. The button says what the setting is about and the menu
- * spells out, on every rung, what will actually happen.
- */
-function EnforcementPicker({ studio, onChange }: { studio: TokenStudio; onChange: (s: TokenStudio) => void }): JSX.Element {
-  const current = enforcementOf(studio)
-  const [open, setOpen] = useState(false)
-  const box = useRef<HTMLDivElement | null>(null)
-  const options = ENFORCEMENT_OPTIONS
-  const now = options.find((o) => o.id === current) ?? options[0]
-
-  useEffect(() => {
-    if (!open) return
-    const away = (e: MouseEvent): void => {
-      if (!box.current?.contains(e.target as Node)) setOpen(false)
-    }
-    const esc = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('mousedown', away)
-    document.addEventListener('keydown', esc)
-    return () => {
-      document.removeEventListener('mousedown', away)
-      document.removeEventListener('keydown', esc)
-    }
-  }, [open])
-
-  return (
-    <div ref={box} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        className="rounded-md bg-surface px-2.5 py-1 text-[11.5px] text-text-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-      >
-        Off-library: <span className="text-text-primary">{now.label}</span>
-      </button>
-      {open && (
-        <div
-          role="menu"
-          className="t42-menu absolute right-0 top-full z-30 mt-1 w-72 rounded-panel bg-elevated p-1 shadow-lg ring-1 ring-border"
-        >
-          <p className="px-2 py-1.5 text-[10.5px] text-text-muted">
-            When a design goes off-library
-          </p>
-          {options.map((o) => (
-            <button
-              key={o.id}
-              type="button"
-              role="menuitemradio"
-              aria-checked={o.id === current}
-              onClick={() => {
-                setOpen(false)
-                onChange({ ...studio, enforcement: o.id })
-              }}
-              className={`w-full rounded-sm px-2 py-1.5 text-left hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
-                o.id === current ? 'bg-raised' : ''
-              }`}
-            >
-              <span className="block text-[11.5px] text-text-primary">{o.label}</span>
-              <span className="block text-[10.5px] text-text-muted">{o.hint}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-/**
  * How the stylesheet gets written.
  *
  * A library is exported into a codebase that has already decided what its
@@ -2035,162 +2008,32 @@ function EnforcementPicker({ studio, onChange }: { studio: TokenStudio; onChange
  * a prefix" in their head and be sure.
  */
 /**
- * What the library has not decided yet.
+ * The one way out of a library.
  *
- * A library screen shows what is in it, which means the one thing it can
- * never show is the gap: thirty swatches look finished whether or not any of
- * them is a focus ring. This is the only part of the screen that reads the
- * absence.
- *
- * Each gap has a reason worth reading, and printing all of them at once made
- * a wall of prose nobody read any of. One line per gap, and the reason for
- * whichever line is under the pointer, in a slot kept clear for it — one
- * sentence at a time rather than fifteen.
- */
-function GapsMenu({
-  studio,
-  themeId,
-  onFill
-}: {
-  studio: TokenStudio
-  themeId: string | null
-  onFill: (studio: TokenStudio, note: string) => void
-}): React.JSX.Element {
-  const [open, setOpen] = useState(false)
-  // The gap whose reason is currently showing. One at a time, in a slot that
-  // is always there, so the panel does not change height as you move down it.
-  const [why, setWhy] = useState<string | null>(null)
-  const box = useRef<HTMLDivElement | null>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const away = (e: MouseEvent): void => {
-      if (!box.current?.contains(e.target as Node)) setOpen(false)
-    }
-    const esc = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('mousedown', away)
-    document.addEventListener('keydown', esc)
-    return () => {
-      document.removeEventListener('mousedown', away)
-      document.removeEventListener('keydown', esc)
-    }
-  }, [open])
-
-  // Every theme, not the one on screen: a library with layers in Light and
-  // none in Dark is not complete, and saying so only when somebody happens to
-  // switch theme is how the gap survives.
-  const rows = useMemo(() => coverageAcross(studio), [studio])
-  const score = coverageScore(rows)
-  const groups = useMemo(() => gapsBySection(rows), [rows])
-  const label = useMemo(() => new Map(SECTIONS.map((s) => [s.id, s.label])), [])
-
-  const fill = (): void => {
-    const result = fillGaps(studio, themeId)
-    if (result.added.length === 0) return
-    onFill(result.studio, fillNote(result))
-    setOpen(false)
-  }
-
-  const whole = score.met === score.total
-
-  return (
-    <div ref={box} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        title="What this library has not decided yet"
-        className="flex items-center gap-1.5 rounded-md bg-surface px-2.5 py-1 text-[11.5px] text-text-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-      >
-        <span
-          aria-hidden="true"
-          className={`h-1.5 w-1.5 rounded-full ${whole ? 'bg-success' : 'bg-warning'}`}
-        />
-        {whole ? 'Complete' : `${score.total - score.met} to decide`}
-      </button>
-      {open && (
-        <div className="t42-menu absolute right-0 top-full z-30 mt-1 w-[22rem] rounded-panel bg-elevated p-3 shadow-overlay ring-1 ring-border">
-          <p className="text-[12.5px] font-medium text-text-primary">
-            {whole ? 'Nothing left to decide' : `${score.met} of ${score.total} decided`}
-          </p>
-
-          {!whole && (
-            <div className="mt-2.5 max-h-72 overflow-y-auto pr-1" onMouseLeave={() => setWhy(null)}>
-              {groups.map((g) => (
-                <div key={g.section} className="mb-2.5 last:mb-0">
-                  <p className="mb-1 text-[10.5px] uppercase tracking-wide text-text-muted">
-                    {label.get(g.section) ?? g.section}
-                  </p>
-                  <ul className="flex flex-col gap-0.5">
-                    {g.missing.map((m) => (
-                      <li key={m.check.id}>
-                        <button
-                          type="button"
-                          onMouseEnter={() => setWhy(m.check.why)}
-                          onFocus={() => setWhy(m.check.why)}
-                          className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-[12px] text-text-primary hover:bg-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-                        >
-                          <span aria-hidden="true" className="h-1 w-1 shrink-0 rounded-full bg-warning" />
-                          <span className="truncate">{m.check.label}</span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Always rendered, so nothing below it moves as the pointer travels. */}
-          <p className="mt-2 min-h-[2.5rem] border-t border-border pt-2 text-[11px] leading-relaxed text-text-secondary">
-            {why ??
-              (whole
-                ? 'Every part a product reaches for is named here.'
-                : 'Point at a gap to see what it costs.')}
-          </p>
-
-          {!whole && (
-            <button
-              type="button"
-              onClick={fill}
-              className="mt-2.5 w-full rounded-md bg-action px-3 py-1.5 text-[12px] font-medium text-action-text hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-            >
-              Fill the gaps
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-/**
- * Export used to be two controls sitting next to each other: a "CSS" button
- * that held the options and a dark "Export" button that wrote the files. They
- * were one job split in half, and the options were easy to miss until after
- * you had already written the wrong thing. One menu now: how the stylesheet is
- * written, a live sample of a name, and then the two ways of taking it away —
- * to disk, or to the clipboard for pasting at a coding agent.
+ * Export used to be two controls split in half, then one menu, and next to it
+ * a separate "Send to" that also took the library somewhere -- so the answer
+ * to "how do I use these?" was spread across two buttons and neither said
+ * what it would produce. It is one menu now, and every destination names both
+ * where it goes and what arrives there. "Export" with no object is not a
+ * sentence anybody can act on.
  */
 function ExportMenu({
   studio,
   themeId,
   onChange,
   onWrite,
-  onCopied
+  onDone
 }: {
   studio: TokenStudio
   themeId: string | null
   onChange: (o: CssOptions) => void
   onWrite: () => void
-  onCopied: (message: string) => void
+  onDone: (message: string) => void
 }): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const box = useRef<HTMLDivElement | null>(null)
   const options = cssOptionsOf(studio.css)
+  const counts = useMemo(() => bridgeSummary(studio, themeId), [studio, themeId])
 
   useEffect(() => {
     if (!open) return
@@ -2217,7 +2060,31 @@ function ExportMenu({
     await navigator.clipboard.writeText(css)
     const names = css.split('\n').filter((l) => l.includes(': ')).length
     setOpen(false)
-    onCopied(`${names} names copied. Paste them at a coding agent and ask it to use these.`)
+    onDone(`${names} names copied. Paste them at a coding agent and ask it to use these.`)
+  }
+
+  // Both destinations replace rather than merge. Two half-updated palettes is
+  // the failure this whole bridge exists to stop.
+  const toForm = (): void => {
+    setOpen(false)
+    if (counts.variables === 0) { onDone('Nothing to send yet.'); return }
+    publishToForm(studio)
+    onDone(`Published to Form as ${studio.name}. Enable it from a file's Libraries panel.`)
+  }
+
+  const toMotion = async (): Promise<void> => {
+    setOpen(false)
+    const { colours, fonts } = brandItems(studio, themeId)
+    if (colours.length === 0 && fonts.length === 0) { onDone('Nothing to send yet.'); return }
+    const existing = await window.terminal42.motion.brandSets()
+    const put = async (kind: 'colours' | 'fonts', items: string[]): Promise<void> => {
+      if (!items.length) return
+      const was = existing.find((s) => s.kind === kind && s.name === studio.name)
+      await window.terminal42.motion.saveBrandSet({ id: was?.id, kind, name: studio.name, items })
+    }
+    await put('colours', colours)
+    await put('fonts', fonts)
+    onDone(`Sent ${counts.colours} colours and ${counts.fonts} typefaces to Motion.`)
   }
 
   return (
@@ -2235,7 +2102,7 @@ function ExportMenu({
         <div className="t42-menu absolute right-0 top-full z-30 mt-1 w-72 rounded-panel bg-elevated p-3 shadow-lg ring-1 ring-border">
           <div className="flex flex-col gap-2.5">
             <p className="text-[10.5px] text-text-muted">
-              Written as CSS custom properties.
+              As a stylesheet &mdash; CSS custom properties.
             </p>
             <div className="flex gap-2">
               <label className="min-w-0 flex-1">
@@ -2320,14 +2187,30 @@ function ExportMenu({
                 }}
                 className="flex-1 rounded-md bg-action px-3 py-1.5 text-[11.5px] font-medium text-action-text hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
               >
-                Save to a file
+                Save a .css file
               </button>
               <button
                 type="button"
                 onClick={() => void copy()}
                 className="flex-1 rounded-md bg-surface px-3 py-1.5 text-[11.5px] text-text-primary hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
               >
-                Copy
+                Copy it
+              </button>
+            </div>
+
+            <div className="border-t border-border pt-2.5">
+              <p className="text-[10.5px] text-text-muted">Or into the rest of Terminal 42</p>
+              <button type="button" onClick={toForm} className={DESTINATION}>
+                <span>Form</span>
+                <span className="text-[10.5px] text-text-muted">
+                  {counts.variables} variables, to style a file
+                </span>
+              </button>
+              <button type="button" onClick={() => void toMotion()} className={DESTINATION}>
+                <span>Motion</span>
+                <span className="text-[10.5px] text-text-muted">
+                  {counts.colours} colours and {counts.fonts} typefaces, as a brand set
+                </span>
               </button>
             </div>
           </div>
@@ -2338,6 +2221,9 @@ function ExportMenu({
 }
 
 const CASE_LABEL: Record<string, string> = { kebab: 'a-b', camel: 'aB', snake: 'a_b' }
+
+const DESTINATION =
+  'mt-1 flex w-full flex-col gap-0.5 rounded-sm px-2 py-1.5 text-left text-[11.5px] text-text-primary hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60'
 
 /** One real name, spelled the way the options say, so the choice is legible. */
 function sampleCss(options: CssOptions): string {
@@ -2363,86 +2249,5 @@ function sampleCss(options: CssOptions): string {
       .split('\n')
       .find((l) => l.includes('--'))
       ?.trim() ?? ''
-  )
-}
-
-function SendTo({
-  studio, themeId, onDone
-}: {
-  studio: TokenStudio
-  themeId: string | null
-  onDone: (message: string) => void
-}): React.JSX.Element {
-  const [open, setOpen] = useState(false)
-  const box = useRef<HTMLDivElement | null>(null)
-  const counts = useMemo(() => bridgeSummary(studio, themeId), [studio, themeId])
-
-  useEffect(() => {
-    if (!open) return
-    const away = (e: MouseEvent): void => {
-      if (!box.current?.contains(e.target as Node)) setOpen(false)
-    }
-    const esc = (e: KeyboardEvent): void => { if (e.key === 'Escape') setOpen(false) }
-    document.addEventListener('mousedown', away)
-    document.addEventListener('keydown', esc)
-    return () => {
-      document.removeEventListener('mousedown', away)
-      document.removeEventListener('keydown', esc)
-    }
-  }, [open])
-
-  const toForm = (): void => {
-    setOpen(false)
-    if (counts.variables === 0) { onDone('Nothing to send yet.'); return }
-    publishToForm(studio)
-    onDone(`Published to Form as ${studio.name}. Enable it from a file's Libraries panel.`)
-  }
-
-  const toMotion = async (): Promise<void> => {
-    setOpen(false)
-    const { colours, fonts } = brandItems(studio, themeId)
-    if (colours.length === 0 && fonts.length === 0) { onDone('Nothing to send yet.'); return }
-    const existing = await window.terminal42.motion.brandSets()
-    const put = async (kind: 'colours' | 'fonts', items: string[]): Promise<void> => {
-      if (!items.length) return
-      const was = existing.find((s) => s.kind === kind && s.name === studio.name)
-      await window.terminal42.motion.saveBrandSet({ id: was?.id, kind, name: studio.name, items })
-    }
-    await put('colours', colours)
-    await put('fonts', fonts)
-    onDone(`Sent ${counts.colours} colours and ${counts.fonts} typefaces to Motion.`)
-  }
-
-  const row = 'flex w-full items-baseline justify-between gap-3 rounded-sm px-2 py-1.5 text-left text-[11.5px] text-text-primary hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60'
-
-  return (
-    <div ref={box} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        className="rounded-md bg-surface px-2.5 py-1 text-[11.5px] text-text-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-      >
-        Send to
-      </button>
-      {open && (
-        <div
-          role="menu"
-          className="t42-menu absolute right-0 top-full z-30 mt-1 w-64 rounded-panel bg-elevated p-1 shadow-lg ring-1 ring-border"
-        >
-          <button type="button" role="menuitem" className={row} onClick={toForm}>
-            <span>Form</span>
-            <span className="text-[10.5px] text-text-muted">{counts.variables} variables</span>
-          </button>
-          <button type="button" role="menuitem" className={row} onClick={() => void toMotion()}>
-            <span>Motion</span>
-            <span className="text-[10.5px] text-text-muted">
-              {counts.colours} colours, {counts.fonts} typefaces
-            </span>
-          </button>
-        </div>
-      )}
-    </div>
   )
 }

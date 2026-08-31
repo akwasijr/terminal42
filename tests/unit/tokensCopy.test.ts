@@ -60,17 +60,23 @@ describe('the gaps panel', () => {
     }
   })
 
-  it('shows one reason at a time rather than one per row', () => {
-    // The reason for every gap at once is fifteen paragraphs in a dropdown.
-    // It is read from a single piece of state, so it can only be one.
-    expect(view).toContain('setWhy(m.check.why)')
-    const inlinePerRow = /<p[^>]*>\{m\.check\.why\}<\/p>/
-    expect(view).not.toMatch(inlinePerRow)
+  it('says what is missing in the section it is missing from', () => {
+    // The gaps used to live behind a header chip reading "Complete", which
+    // named neither where they were nor what they were. The list now sits at
+    // the foot of the section it belongs to.
+    expect(view).toContain('Not decided yet')
+    expect(view).toContain('gaps.get(s.id)')
   })
 
-  it('keeps the reason slot from moving the panel about', () => {
-    // Rendered whether or not there is anything in it.
-    expect(view).toContain('min-h-[2.5rem]')
+  it('carries the reason without spending a line on it', () => {
+    // Fifteen reasons rendered at once is fifteen paragraphs nobody reads;
+    // none at all leaves a label with no way to find out what it means.
+    expect(view).toContain('title={g.why}')
+  })
+
+  it('offers one way to settle them all', () => {
+    expect(view).toContain('Decide them from what is here')
+    expect(view).toContain('fillGaps(studio, themeId)')
   })
 })
 
