@@ -37,6 +37,15 @@ type Seed = {
   type: Token['type']
   tier: Token['tier']
   value: TokenValue
+  /**
+   * Where to put it when the first name is already taken by something else.
+   *
+   * A scaffolded library often holds `type.display` as a font size. The whole
+   * style wants the same name, and without a second one to fall back on the
+   * seed is dropped every time, which leaves a gap the button offers to close
+   * and never can.
+   */
+  alt?: string
 }
 
 let counter = 0
@@ -86,9 +95,15 @@ function seedsFor(rows: Coverage[], tokens: Token[]): { seeds: Seed[]; skipped: 
   // Whether the path already exists is decided per set when the seed lands,
   // not here. A colour that exists in Light and not in Dark has to be seeded
   // so it can reach the theme that is missing it.
-  const add = (path: string, type: Token['type'], tier: Token['tier'], value: TokenValue): void => {
+  const add = (
+    path: string,
+    type: Token['type'],
+    tier: Token['tier'],
+    value: TokenValue,
+    alt?: string
+  ): void => {
     if (seeds.some((s) => s.path === path)) return
-    seeds.push({ path, type, tier, value })
+    seeds.push({ path, type, tier, value, alt })
   }
 
   if (gap('layers')) {
@@ -170,10 +185,16 @@ function seedsFor(rows: Coverage[], tokens: Token[]): { seeds: Seed[]; skipped: 
     const body = tokens.find((t) => t.type === 'typography' && /body/i.test(t.path))
     const tight = findPath(tokens, 'lineHeight', [/snug/i, /tight/i, /normal/i])
     if (body && typeof body.value === 'object') {
-      add('type.bodyCompact', 'typography', 'semantic', {
-        ...(body.value as Record<string, string | number>),
-        ...(tight ? { lineHeight: ref(tight) } : { lineHeight: 1.35 })
-      })
+      add(
+        'type.bodyCompact',
+        'typography',
+        'semantic',
+        {
+          ...(body.value as Record<string, string | number>),
+          ...(tight ? { lineHeight: ref(tight) } : { lineHeight: 1.35 })
+        },
+        'text.bodyCompact'
+      )
     } else if (gap('typeStyles')) {
       // The whole type section is missing rather than just this style, so it
       // is built below and the compact one comes with it.
@@ -211,7 +232,7 @@ function seedsFor(rows: Coverage[], tokens: Token[]): { seeds: Seed[]; skipped: 
           lineHeight: leading
         }
         if (weight) value.fontWeight = ref(weight.path)
-        add(path, 'typography', 'semantic', value)
+        add(path, 'typography', 'semantic', value, path.replace(/^type\./, 'text.'))
       }
       style('type.display', display, at(1), heavy, 1.2)
       style('type.title', display, at(0.85), heavy, 1.2)
@@ -365,19 +386,36 @@ export function fillGaps(studio: TokenStudio, themeId: string | null): Filled {
   const themes = studio.themes.length > 0 ? studio.themes.map((t) => t.id) : [themeId]
   const resolved = new Map(themes.map((t) => [t, resolveAll(studio, t)]))
 
+  // A name held by a different kind of token is not the same token under
+  // another name: `type.display` as a font size and `type.display` as a whole
+  // style are two things, and the second cannot quietly take the first's seat.
+  const heldByOther = (path: string, type: Token['type']): boolean =>
+    sets.some((s) => s.tokens.some((t) => t.path === path && t.type !== type))
+
   for (const seed of seeds) {
+    let path = seed.path
+    if (heldByOther(path, seed.type)) {
+      if (!seed.alt || heldByOther(seed.alt, seed.type)) {
+        skipped.push({
+          id: seed.path,
+          reason: `${seed.path} is already a different kind of token here, so it was left alone.`
+        })
+        continue
+      }
+      path = seed.alt
+    }
     let landed = false
     for (const theme of themes) {
       const target = byId.get(setFor(studio, seed, theme))
       if (!target) continue
-      if (target.tokens.some((t) => t.path === seed.path)) continue
+      if (target.tokens.some((t) => t.path === path)) continue
       const wants = aliasesIn(seed.value)
       const here = resolved.get(theme)
-      if (here && wants.some((path) => !here.has(path))) continue
-      target.tokens.push({ id: id(), path: seed.path, type: seed.type, tier: seed.tier, value: seed.value })
+      if (here && wants.some((w) => !here.has(w))) continue
+      target.tokens.push({ id: id(), path, type: seed.type, tier: seed.tier, value: seed.value })
       landed = true
     }
-    if (landed) added.push(seed.path)
+    if (landed) added.push(path)
   }
 
   return { studio: { ...studio, sets }, added, skipped }
@@ -400,7 +438,13 @@ function aliasesIn(value: TokenValue): string[] {
 
 /** What the button should say it will do, before anybody presses it. */
 export function fillNote(result: Filled): string {
-  if (result.added.length === 0) return 'Nothing to add: the library already covers everything checked.'
+  if (result.added.length === 0) {
+    // A gap the sweep cannot close is the one case where staying quiet is
+    // worst: the bar says something is undecided, the button offers to
+    // decide it, and nothing happens. Say which gap and why instead.
+    const first = result.skipped[0]
+    return first ? `Nothing added. ${first.reason}` : 'Nothing to add: the library already covers everything checked.'
+  }
   const one = result.added.length === 1
   const head = `${one ? 'Adds 1 token' : `Adds ${result.added.length} tokens`}.`
   if (result.skipped.length === 0) return head

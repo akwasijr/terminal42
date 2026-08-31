@@ -180,6 +180,32 @@ describe('filling the gaps', () => {
     expect(twice.added).toEqual([])
   })
 
+  it('does not let a style take the name of a size that already has it', () => {
+    // A scaffolded library holds type.display as a font size. The whole style
+    // wants the same name; before, the seed was dropped every time, so the
+    // gap the button offered to close could never close.
+    const { studio, theme } = dated()
+    const filled = fillGaps(studio, theme)
+    const all = filled.studio.sets.flatMap((s) => s.tokens)
+    for (const t of all.filter((t) => t.type === 'typography')) {
+      const clash = all.filter((o) => o.path === t.path && o.type !== t.type)
+      expect(clash).toEqual([])
+    }
+  })
+
+  it('says why when a sweep can close nothing', () => {
+    // The bar says a thing is undecided and the button offers to decide it.
+    // When the sweep cannot, silence reads as a broken button, so the reason
+    // the gap survived is what comes back instead.
+    const note = fillNote({
+      studio: emptyStudio('Nothing'),
+      added: [],
+      skipped: [{ id: 'focus', reason: 'The library has no brand colour to make a ring out of.' }]
+    })
+    expect(note).toContain('no brand colour')
+    expect(note).not.toMatch(/already covers/)
+  })
+
   it('says what it could not do rather than guessing', () => {
     const studio = emptyStudio('Nothing')
     const filled = fillGaps(studio, studio.themes[0]?.id ?? null)

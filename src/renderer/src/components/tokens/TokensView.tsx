@@ -579,8 +579,7 @@ function StudioEditor({
 
   const fillTheGaps = (): void => {
     const result = fillGaps(studio, themeId)
-    if (result.added.length === 0) return
-    onChange(result.studio)
+    if (result.added.length > 0) onChange(result.studio)
     setNote(fillNote(result))
     window.setTimeout(() => setNote(null), 5000)
   }
