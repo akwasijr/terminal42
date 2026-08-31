@@ -5,3 +5,6 @@ dist
 *.log
 .vite
 *.tsbuildinfo
+
+# Local CDP driver, not part of the app
+*.local.mjs

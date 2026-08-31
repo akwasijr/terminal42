@@ -44,9 +44,38 @@ function px(map: Map<string, { value: TokenValue }>, path: string, fallback: num
   return fallback
 }
 
-function text(map: Map<string, { value: TokenValue }>, path: string, fallback: string): string {
-  const v = pick(map, path)
-  return typeof v === 'string' && v.length > 0 ? v : fallback
+// Two vocabularies, one reader.
+//
+// Libraries have been written by more than one hand. The scaffold names a
+// brand colour `colour.brand.rest`, because it also has a hover and an active
+// and wanted them to sit together; libraries written the other way name it
+// plainly `colour.brand` and hang `colour.brand.hover` off the same stem.
+// Neither is wrong and both are saved, so a reader that knows only one name
+// silently keeps the system's own colour and the link to the library looks
+// broken. These take a list of names and answer with the first that resolves.
+
+function hexAny(
+  map: Map<string, { value: TokenValue }>,
+  paths: readonly string[],
+  fallback: string
+): string {
+  for (const path of paths) {
+    const v = pick(map, path)
+    if (typeof v === 'string' && v.startsWith('#')) return v
+  }
+  return fallback
+}
+
+function textAny(
+  map: Map<string, { value: TokenValue }>,
+  paths: readonly string[],
+  fallback: string
+): string {
+  for (const path of paths) {
+    const v = pick(map, path)
+    if (typeof v === 'string' && v.length > 0) return v
+  }
+  return fallback
 }
 
 /** `cubic-bezier(...)` from the four numbers a token stores, or a keyword. */
@@ -99,22 +128,26 @@ export function applyStudioToSystem(
     ...ds,
     base,
     colors: {
-      primary: hex(map, 'colour.brand.rest', ds.colors.primary),
-      secondary: hex(map, 'colour.accent.rest', ds.colors.secondary),
-      tertiary: hex(map, 'palette.info.600', ds.colors.tertiary),
-      bg: hex(map, 'colour.bg.canvas', ds.colors.bg),
-      surface: hex(map, 'colour.bg.surface', ds.colors.surface),
+      primary: hexAny(map, ['colour.brand.rest', 'colour.brand'], ds.colors.primary),
+      secondary: hexAny(map, ['colour.accent.rest', 'colour.accent'], ds.colors.secondary),
+      tertiary: hexAny(
+        map,
+        ['colour.support', 'palette.support.600', 'palette.info.600'],
+        ds.colors.tertiary
+      ),
+      bg: hexAny(map, ['colour.bg.canvas', 'colour.background'], ds.colors.bg),
+      surface: hexAny(map, ['colour.bg.surface', 'colour.surface'], ds.colors.surface),
       text: hex(map, 'colour.text.primary', ds.colors.text),
       textMuted: hex(map, 'colour.text.muted', ds.colors.textMuted),
-      border: hex(map, 'colour.border.default', ds.colors.border),
-      success: hex(map, 'colour.success.fill', ds.colors.success),
-      warning: hex(map, 'colour.warning.fill', ds.colors.warning),
-      error: hex(map, 'colour.danger.fill', ds.colors.error),
-      info: hex(map, 'colour.info.fill', ds.colors.info)
+      border: hexAny(map, ['colour.border.default', 'colour.border'], ds.colors.border),
+      success: hexAny(map, ['colour.success.fill', 'colour.positive'], ds.colors.success),
+      warning: hexAny(map, ['colour.warning.fill', 'colour.caution'], ds.colors.warning),
+      error: hexAny(map, ['colour.danger.fill', 'colour.critical'], ds.colors.error),
+      info: hexAny(map, ['colour.info.fill', 'colour.info'], ds.colors.info)
     },
     font: {
-      family: text(map, 'family.sans', ds.font.family),
-      heading: text(map, 'family.display', ds.font.heading)
+      family: textAny(map, ['family.sans', 'family.body'], ds.font.family),
+      heading: textAny(map, ['family.display', 'family.heading'], ds.font.heading)
     },
     type: {
       xs: px(map, 'size.xs', ds.type.xs),

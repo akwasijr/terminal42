@@ -94,3 +94,78 @@ describe('a system standing on a library', () => {
     expect(dark.colors.bg).not.toBe(light.colors.bg)
   })
 })
+
+// The scaffold names a brand colour `colour.brand.rest`; libraries written by
+// the other hand name it plainly `colour.brand`. Both are saved on real
+// machines, so the reader has to answer to both names or a system standing on
+// half the libraries in the app quietly keeps its own generated colours and
+// looks linked when it is not.
+const plainVocabulary = (): TokenStudio => ({
+  id: 'ts2',
+  name: 'Calm',
+  activeTheme: 'light',
+  themes: [
+    { id: 'light', name: 'Light', sets: { p: 'source', l: 'enabled' } },
+    { id: 'dark', name: 'Dark', sets: { p: 'source', l: 'off' } }
+  ],
+  sets: [
+    {
+      id: 'p',
+      name: 'Palette',
+      order: 0,
+      tokens: [
+        { path: 'palette.brand.600', type: 'color', tier: 'primitive', value: '#3f7d5b' },
+        { path: 'palette.accent.600', type: 'color', tier: 'primitive', value: '#b4642a' },
+        { path: 'palette.support.600', type: 'color', tier: 'primitive', value: '#2c5aa0' },
+        { path: 'palette.white', type: 'color', tier: 'primitive', value: '#ffffff' },
+        { path: 'palette.neutral.200', type: 'color', tier: 'primitive', value: '#e5e5e5' },
+        { path: 'palette.neutral.50', type: 'color', tier: 'primitive', value: '#fafafa' },
+        { path: 'family.body', type: 'fontFamily', tier: 'primitive', value: 'Lato' },
+        { path: 'family.heading', type: 'fontFamily', tier: 'primitive', value: 'Merriweather' }
+      ]
+    },
+    {
+      id: 'l',
+      name: 'Light',
+      order: 1,
+      tokens: [
+        { path: 'colour.brand', type: 'color', tier: 'semantic', value: '{palette.brand.600}' },
+        { path: 'colour.accent', type: 'color', tier: 'semantic', value: '{palette.accent.600}' },
+        { path: 'colour.support', type: 'color', tier: 'semantic', value: '{palette.support.600}' },
+        { path: 'colour.background', type: 'color', tier: 'semantic', value: '{palette.neutral.50}' },
+        { path: 'colour.surface', type: 'color', tier: 'semantic', value: '{palette.white}' },
+        { path: 'colour.border', type: 'color', tier: 'semantic', value: '{palette.neutral.200}' },
+        { path: 'colour.positive', type: 'color', tier: 'semantic', value: '#16a34a' },
+        { path: 'colour.caution', type: 'color', tier: 'semantic', value: '#d97706' },
+        { path: 'colour.critical', type: 'color', tier: 'semantic', value: '#dc2626' }
+      ]
+    }
+  ]
+})
+
+describe('a library that names its semantics plainly', () => {
+  it('is read as readily as the scaffold vocabulary', () => {
+    const out = applyStudioToSystem(system(), plainVocabulary(), 'light')
+    expect(out.colors.primary).toBe('#3f7d5b')
+    expect(out.colors.secondary).toBe('#b4642a')
+    expect(out.colors.tertiary).toBe('#2c5aa0')
+    expect(out.colors.bg).toBe('#fafafa')
+    expect(out.colors.surface).toBe('#ffffff')
+    expect(out.colors.border).toBe('#e5e5e5')
+    expect(out.colors.success).toBe('#16a34a')
+    expect(out.colors.warning).toBe('#d97706')
+    expect(out.colors.error).toBe('#dc2626')
+    expect(out.font.family).toBe('Lato')
+    expect(out.font.heading).toBe('Merriweather')
+  })
+
+  it('does not cost the scaffold vocabulary its own answers', () => {
+    const out = applyStudioToSystem(system(), library(), 'light')
+    expect(out.font.family).toBe('DM Sans')
+    expect(out.font.heading).toBe('Fraunces')
+    expect(out.colors.primary).toMatch(/^#[0-9a-f]{6}$/i)
+    expect(out.colors.primary).not.toBe('#000001')
+    expect(out.colors.surface).not.toBe('#000005')
+    expect(out.colors.border).not.toBe('#000008')
+  })
+})
