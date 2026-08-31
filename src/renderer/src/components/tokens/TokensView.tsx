@@ -39,7 +39,9 @@ import {
   type SetState,
   cssOptionsOf,
   countTokens as countStudioTokens,
-  type CssOptions
+  enforcementOf,
+  type CssOptions,
+  type Enforcement
 } from '../../../../shared/tokens/types'
 import { toCSS } from '../../../../shared/tokens/export'
 import { flatten, problems, resolve, type Problem } from '../../../../shared/tokens/resolve'
@@ -641,6 +643,10 @@ function StudioEditor({
         </div>
 
         <div className="ml-auto flex items-center gap-1.5">
+          <EnforcementPicker
+            level={enforcementOf(studio)}
+            onPick={(enforcement) => onChange({ ...studio, enforcement })}
+          />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -2017,6 +2023,46 @@ function TypeMenu({
  * where it goes and what arrives there. "Export" with no object is not a
  * sentence anybody can act on.
  */
+/**
+ * What this library asks of the designs bound to it.
+ *
+ * The three rungs were built and wired through the auto-lint pass, and then
+ * nothing anywhere could set them: every library made in the app started on
+ * the bottom rung and stayed there, so a team that wanted its values enforced
+ * had no way to say so.
+ */
+const LEVELS: { id: Enforcement; label: string; hint: string }[] = [
+  { id: 'advise', label: 'Advise', hint: 'Ask for these values, accept what comes back' },
+  { id: 'check', label: 'Check', hint: 'Report values that are off this library' },
+  { id: 'block', label: 'Block', hint: 'Fix values that are off this library' }
+]
+
+function EnforcementPicker({
+  level,
+  onPick
+}: {
+  level: Enforcement
+  onPick: (level: Enforcement) => void
+}): React.JSX.Element {
+  return (
+    <div className="t42-seg" role="group" aria-label="What this library asks of designs">
+      {LEVELS.map((l) => (
+        <button
+          key={l.id}
+          type="button"
+          onClick={() => onPick(l.id)}
+          data-active={l.id === level}
+          aria-pressed={l.id === level}
+          title={l.hint}
+          className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+        >
+          {l.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function ExportMenu({
   studio,
   themeId,
