@@ -4,8 +4,7 @@ import { FONT_OPTIONS } from '../lib/brief'
 import { DesignSystemWizard } from './DesignSystemWizard'
 import { DS_CATEGORIES, DS_COMPONENTS } from './dsComponents'
 import { DsIcon, ICON_SAMPLE, iconSnippet } from './dsIcons'
-import { studioFromDesignSystem } from '../lib/tokens/fromDesignSystem'
-import { tokenLibrariesChanged } from '../lib/tokens/useTokenLibraries'
+import { ensureTokenLibrary, refreshFromLibrary } from '../lib/tokens/systemLibrary'
 import { Modal, ModalHeader, ModalBody, ModalFooter } from './Modal'
 
 function fontStack(name: string): string {
@@ -131,6 +130,21 @@ export function DesignSystemView({ openSystemId, onConsumeOpen }: { openSystemId
     if (openSystemId) { setSystems(loadSystems()); setOpenId(openSystemId); setNav('overview'); onConsumeOpen?.() }
   }, [openSystemId, onConsumeOpen])
 
+  // Opening a system re-reads its values from its library. Without this a
+  // colour changed in the library stays changed there and stale here, and
+  // both copies look deliberate, so there is no way to tell which is wrong.
+  useEffect(() => {
+    if (!openId) return
+    const current = loadSystems().find((x) => x.id === openId)
+    if (!current?.tokensId) return
+    let live = true
+    void refreshFromLibrary(current).then((next) => {
+      if (!live || JSON.stringify(next) === JSON.stringify(current)) return
+      setSystems(upsertSystem(next))
+    })
+    return () => { live = false }
+  }, [openId])
+
   const system = systems.find((x) => x.id === openId) ?? null
   const update = (patch: Partial<DesignSystem>): void => { if (system) setSystems(upsertSystem({ ...system, ...patch })) }
   const updateColors = (patch: Partial<DesignSystem['colors']>): void => { if (system) setSystems(upsertSystem({ ...system, colors: { ...system.colors, ...patch } })) }
@@ -191,13 +205,13 @@ export function DesignSystemView({ openSystemId, onConsumeOpen }: { openSystemId
     setMakingTokens(true)
     setTokensNote(null)
     try {
-      const studio = studioFromDesignSystem(s)
-      const row = await window.terminal42.tokens.create(s.name, studio)
-      await window.terminal42.tokens.save(row.id, { ...studio, id: row.id })
-      tokenLibrariesChanged()
-      setTokensNote(`\u201c${s.name}\u201d is now a token library. Find it under Design \u203a Tokens.`)
-    } catch {
-      setTokensNote('That library could not be made. Try again.')
+      const linked = await ensureTokenLibrary(s)
+      if (!linked.tokensId) {
+        setTokensNote('That library could not be made. Try again.')
+        return
+      }
+      setSystems(upsertSystem(linked))
+      setTokensNote(`\u201c${s.name}\u201d now stands on its own token library. Find it under Tokens.`)
     } finally {
       setMakingTokens(false)
     }

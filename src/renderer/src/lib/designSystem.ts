@@ -84,6 +84,68 @@ export interface RefProfile {
   palette: string[]
 }
 
+/**
+ * One component the system has decided it has.
+ *
+ * A design system that lists `Button` and stops has documented a word. What
+ * makes it usable is the variants — the four buttons a person must choose
+ * between — and the states, because every argument about a component is
+ * really an argument about what it looks like when it is disabled.
+ */
+export interface DSComponent {
+  /** The key into the component catalogue, e.g. `Button`. */
+  id: string
+  /** Which of it exist here: Primary, Secondary, Destructive. */
+  variants: string[]
+  /** Default, Hover, Focus, Active, Disabled, Loading. */
+  states: string[]
+  /** When to reach for it, and when not to. */
+  usage?: string
+  /** What it must do for a keyboard and a screen reader. */
+  accessibility?: string
+  /** A snippet showing it in use. */
+  code?: string
+}
+
+/**
+ * A pattern is several components arranged to do one job.
+ *
+ * Sign-up is not a component and never will be: it is a form, some feedback
+ * and a link, agreed once so that the second sign-up screen matches the first.
+ */
+export interface DSPattern {
+  id: string
+  name: string
+  /** The components it is built from, by their catalogue ids. */
+  uses: string[]
+  notes?: string
+}
+
+/** How the page itself is arranged, above and around any component. */
+export interface DSLayout {
+  id: string
+  name: string
+  notes?: string
+}
+
+/**
+ * The written rules, kept apart from the AI rules.
+ *
+ * `AiRules` are toggles a generator obeys. These are sentences a person
+ * reads, and the two are not interchangeable: "never use emoji as icons" can
+ * be enforced, "prefer the active voice" can only be explained.
+ */
+export interface DSGuidelines {
+  componentUsage?: string
+  accessibility?: string
+  content?: string
+  interaction?: string
+  responsive?: string
+  /** Paired sentences: what to do, and the thing people keep doing instead. */
+  dos?: string[]
+  donts?: string[]
+}
+
 /** Short documentation notes per foundation, written by the AI (or left empty). */
 export interface DSDocs {
   overview?: string
@@ -93,6 +155,10 @@ export interface DSDocs {
   radius?: string
   elevation?: string
   motion?: string
+  grid?: string
+  sizing?: string
+  icons?: string
+  images?: string
 }
 
 export interface DesignSystem {
@@ -108,6 +174,26 @@ export interface DesignSystem {
   docs?: DSDocs
   /** anti-AI-default rules enforced when generating with this system */
   rules?: AiRules
+  /**
+   * The token library this system stands on.
+   *
+   * A system without one is a system whose colours came from nowhere and
+   * agree with nothing. Every system made from now on gets a library, and the
+   * values below are read back out of it rather than kept as a second
+   * original — see `applyStudioToSystem`. Optional only because systems saved
+   * before this existed are still on disk.
+   */
+  tokensId?: string
+  /** Which theme of that library the system is drawn in. */
+  tokensThemeId?: string
+  /** The components this system says it has, with their variants and states. */
+  components?: DSComponent[]
+  /** Jobs made of several components, agreed once. */
+  patterns?: DSPattern[]
+  /** How the page is arranged around all of it. */
+  layouts?: DSLayout[]
+  /** The rules a person reads, as opposed to the ones a generator obeys. */
+  guidelines?: DSGuidelines
   base: BaseTheme
   colors: {
     primary: string

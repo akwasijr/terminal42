@@ -21,6 +21,7 @@ import { DesignSystemWizard } from './DesignSystemWizard'
 import { type DesignSystem, upsertSystem } from '../lib/designSystem'
 import { IconClose, IconEdit, IconPlus, IconSearch } from './icons'
 import { GuidelineCheckModal } from './guidelines/GuidelineCheckModal'
+import { ensureTokenLibrary } from '../lib/tokens/systemLibrary'
 
 // Pretty labels for the kind-group filter chips at the top of the page.
 const GROUP_LABEL: Record<DesignGroup, string> = {
@@ -898,7 +899,19 @@ export function DesignsListView({
           <DesignSystemWizard
             initial={dsSeed ?? undefined}
             onCancel={() => { setDsWizardOpen(false); setDsSeed(null) }}
-            onComplete={(gen: DesignSystem) => { upsertSystem(gen); setDsWizardOpen(false); setDsSeed(null); setTypeFilter('system'); setPendingDsId(gen.id) }}
+            onComplete={(gen: DesignSystem) => {
+              // Saved first, linked second. Making the library is a round
+              // trip to the main process, and a system that vanishes for a
+              // second while that happens looks like the save failed.
+              upsertSystem(gen)
+              setDsWizardOpen(false)
+              setDsSeed(null)
+              setTypeFilter('system')
+              setPendingDsId(gen.id)
+              void ensureTokenLibrary(gen).then((linked) => {
+                if (linked.tokensId) upsertSystem(linked)
+              })
+            }}
           />
         )}
       </div>
