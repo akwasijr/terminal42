@@ -173,3 +173,56 @@ describe('a scaffolded library through the grouping', () => {
     expect(fam.length).toBeLessThan(10)
   })
 })
+
+describe('the parts of the taxonomy that were missing', () => {
+  const studio = studioFromFeel('X', {
+    name: 'X',
+    primary: '#33bb66',
+    secondary: '#aa6633',
+    tertiary: '#3366aa',
+    headingFont: 'DM Sans',
+    bodyFont: 'DM Sans',
+    corner: 'rounded',
+    density: 'cozy',
+    scale: 'balanced',
+    elevation: 'subtle'
+  })
+  const all = studio.sets.flatMap((s) => s.tokens)
+  const paths = all.map((t) => t.path)
+
+  it('says how big a thing is, not only how far it sits from the next one', () => {
+    // Space and size are both pixels, which is why they were one shelf. They
+    // are not one question: nobody writes `gap: 40px` meaning a button.
+    for (const p of ['icon.md', 'control.md', 'width.md', 'measure.normal']) {
+      expect(paths).toContain(p)
+    }
+    const section = (p: string) => sectionOf(all.find((t) => t.path === p)!)
+    expect(section('icon.md')).toBe('size')
+    expect(section('control.md')).toBe('size')
+  })
+
+  it('keeps a padding in Space even when it is named after a control', () => {
+    // `pad.control` ends in a word the size list also uses. It is still a
+    // padding, and filing it under Size put the gaps and the heights together
+    // again by the back door.
+    expect(sectionOf({ path: 'pad.control', type: 'dimension' })).toBe('space')
+  })
+
+  it('says what kind of edge a border is, not only how heavy', () => {
+    expect(paths).toContain('border.style')
+    expect(sectionOf({ path: 'border.style', type: 'text' })).toBe('shape')
+  })
+
+  it('names the three screens anyone actually says out loud', () => {
+    for (const p of ['screen.mobile', 'screen.tablet', 'screen.desktop']) {
+      expect(paths).toContain(p)
+      expect(sectionOf({ path: p, type: 'dimension' })).toBe('grid')
+    }
+  })
+
+  it('has a gap smaller than one step of the scale', () => {
+    // The sliver between a label and its field, where a whole step reads as
+    // a paragraph break.
+    expect(paths).toContain('space.hair')
+  })
+})

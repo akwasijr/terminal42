@@ -191,6 +191,10 @@ function palette(feel: Feel): Token[] {
   // The gaps in the sequence are the scale working: there is no 7 because
   // nothing should ever be seven steps of anything.
   const step = DENSITY_STEP[feel.density]
+  // Half a step, for the one gap the scale cannot express: the sliver between
+  // a label and the field under it, where a whole step reads as a paragraph
+  // break. Named rather than numbered, because it is not a rung on the ladder.
+  out.push(tok('space.hair', 'dimension', 'primitive', Math.round(step / 2)))
   for (const n of [0, 1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24]) {
     out.push(tok(`space.${n}`, 'dimension', 'primitive', n * step))
   }
@@ -206,6 +210,30 @@ function palette(feel: Feel): Token[] {
   out.push(tok('stroke.none', 'dimension', 'primitive', 0))
   out.push(tok('stroke.hairline', 'dimension', 'primitive', 1))
   out.push(tok('stroke.thick', 'dimension', 'primitive', 2))
+  // A width says how heavy an edge is; this says what kind of edge it is.
+  // One decision, not a menu: a library that offers dashed and dotted has
+  // decided nothing, and the third border on the page will be dotted.
+  out.push(tok('border.style', 'text', 'primitive', 'solid'))
+
+  // How big a thing is, as opposed to how far it sits from its neighbour.
+  // Space and size are both distances and both in pixels, which is why they
+  // get confused, but you never write `gap: 40px` meaning the height of a
+  // button.
+  for (const [name, px] of [['xs', 12], ['sm', 16], ['md', 20], ['lg', 24], ['xl', 32]] as const) {
+    out.push(tok(`icon.${name}`, 'dimension', 'primitive', px))
+  }
+  for (const [name, px] of [['sm', 32], ['md', 40], ['lg', 48]] as const) {
+    out.push(tok(`control.${name}`, 'dimension', 'primitive', px))
+  }
+  for (const [name, px] of [['xs', 240], ['sm', 360], ['md', 480], ['lg', 640], ['xl', 800]] as const) {
+    out.push(tok(`width.${name}`, 'dimension', 'primitive', px))
+  }
+  // A maximum for text specifically, in characters rather than pixels,
+  // because the thing being limited is the eye travelling back to the next
+  // line and that does not change when the font does.
+  for (const [name, ch] of [['narrow', 45], ['normal', 65], ['wide', 80]] as const) {
+    out.push(tok(`measure.${name}`, 'dimension', 'primitive', `${ch}ch`))
+  }
 
   const ratio = SCALE_RATIO[feel.scale]
   const sizes = ['xs', 'sm', 'md', 'lg', 'xl', '2xl', '3xl', '4xl']
@@ -466,6 +494,11 @@ function shape(): Token[] {
   ] as const) {
     out.push(tok(`breakpoint.${name}`, 'dimension', 'primitive', px))
   }
+  // The three anyone actually names. The lettered scale above is the full
+  // set; these say which of them a person means when they say "on mobile".
+  out.push(tok('screen.mobile', 'dimension', 'semantic', '{breakpoint.sm}'))
+  out.push(tok('screen.tablet', 'dimension', 'semantic', '{breakpoint.md}'))
+  out.push(tok('screen.desktop', 'dimension', 'semantic', '{breakpoint.lg}'))
   for (const [name, cols] of [['sm', 4], ['md', 8], ['lg', 16], ['xl', 16], ['2xl', 16]] as const) {
     out.push(tok(`column.${name}`, 'number', 'primitive', cols))
   }

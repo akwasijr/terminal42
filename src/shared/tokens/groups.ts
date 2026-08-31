@@ -20,6 +20,7 @@ export const SECTIONS = [
   { id: 'colour', label: 'Colour' },
   { id: 'type', label: 'Type' },
   { id: 'space', label: 'Space' },
+  { id: 'size', label: 'Size' },
   { id: 'shape', label: 'Shape' },
   { id: 'elevation', label: 'Elevation' },
   { id: 'motion', label: 'Motion' },
@@ -59,7 +60,27 @@ const SHAPE_STEMS = ['radius', 'corner', 'stroke', 'border']
  * for. They are not: nothing is ever `padding: 672px`. They belong to the
  * grid, and the grid is a topic of its own.
  */
-const GRID_STEMS = ['breakpoint', 'grid', 'column', 'gutter']
+const GRID_STEMS = ['breakpoint', 'screen', 'grid', 'column', 'gutter']
+
+/**
+ * Dimensions that say how big a thing is rather than how far it sits from
+ * the next one.
+ *
+ * Both are pixels and both were filed under Space, which put the height of a
+ * button in among the paddings. Nobody writes `gap: 40px` meaning a control
+ * height, and nobody looking for an icon size expects to find it beside the
+ * section gaps.
+ */
+const SIZE_STEMS = ['icon', 'control', 'width', 'height', 'measure', 'avatar']
+
+/**
+ * The same idea said at the end of a path rather than the start.
+ *
+ * Only words that can mean nothing else: `control` is a role, so `pad.control`
+ * is a padding and belongs in Space, while `button.height` can only ever be a
+ * size.
+ */
+const SIZE_LEAVES = ['height', 'width', 'minWidth', 'maxWidth', 'iconSize', 'measure']
 
 /**
  * Which section a token belongs in.
@@ -70,6 +91,10 @@ const GRID_STEMS = ['breakpoint', 'grid', 'column', 'gutter']
  * the author said what the number was for.
  */
 export function sectionOf(token: Pick<Token, 'path' | 'type'>): SectionId {
+  // `border.style` is a word rather than a number, but it is still a
+  // decision about an edge, and by type alone it would land in Other, which
+  // is where tokens go to be lost.
+  if (token.type === 'text' && SHAPE_STEMS.includes(token.path.split('.')[0])) return 'shape'
   const byType = BY_TYPE[token.type]
   if (byType) return byType
   if (token.type === 'dimension') {
@@ -80,7 +105,9 @@ export function sectionOf(token: Pick<Token, 'path' | 'type'>): SectionId {
     const parts = token.path.split('.')
     const said = [parts[0], parts[parts.length - 1]]
     if (said.some((w) => GRID_STEMS.includes(w))) return 'grid'
-    return said.some((w) => SHAPE_STEMS.includes(w)) ? 'shape' : 'space'
+    if (said.some((w) => SHAPE_STEMS.includes(w))) return 'shape'
+    if (SIZE_STEMS.includes(parts[0]) || SIZE_LEAVES.includes(parts[parts.length - 1])) return 'size'
+    return 'space'
   }
   if (token.type === 'number') {
     // A column count is a number rather than a dimension, and it belongs
@@ -203,6 +230,10 @@ const ORDER = [
   'gap',
   'pad',
   'space',
+  'icon',
+  'control',
+  'width',
+  'measure',
   'corner',
   'radius',
   'stroke',
