@@ -51,6 +51,17 @@ export const TIERS = ['primitive', 'semantic', 'component'] as const
 export type Tier = (typeof TIERS)[number]
 
 /**
+ * What to call a tier on screen.
+ *
+ * The list filter has always said "Raw" for the tier the code calls
+ * primitive, so anywhere else that said "primitive" was a second name for
+ * the same thing. One word each, everywhere a person reads it.
+ */
+export function tierWord(t: Tier): string {
+  return t === 'primitive' ? 'raw' : t === 'semantic' ? 'named' : 'component'
+}
+
+/**
  * A token's value.
  *
  * A string beginning `{` and ending `}` names another token, e.g.

@@ -30,6 +30,7 @@ import {
   isAlias,
   aliasTarget,
   TIERS,
+  tierWord,
   TOKEN_TYPES,
   type TokenType,
   type Tier,
@@ -1993,7 +1994,7 @@ function TypeMenu({
               tier === t ? 'bg-raised text-text-primary' : 'text-text-muted hover:bg-raised hover:text-text-secondary'
             }`}
           >
-            {t}
+            {tierWord(t)}
           </button>
         ))}
       </div>

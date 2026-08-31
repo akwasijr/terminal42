@@ -15,6 +15,7 @@ import {
   type Token,
   type TokenStudio,
   type TokenValue,
+  tierWord,
   type Tier
 } from './types'
 
@@ -139,7 +140,7 @@ export function problems(studio: TokenStudio, themeId: string | null): Problem[]
         out.push({
           path,
           kind: 'type-mismatch',
-          note: `A ${token.tier} token pointing at a ${to.token.tier} one.`
+          note: `A ${tierWord(token.tier)} token pointing at a ${tierWord(to.token.tier)} one.`
         })
       }
       continue
@@ -171,7 +172,7 @@ export function problems(studio: TokenStudio, themeId: string | null): Problem[]
       out.push({
         path,
         kind: 'literal-semantic',
-        note: `Holds a value of its own. A ${token.tier} token should point at another one.`
+        note: `Holds a value of its own. A ${tierWord(token.tier)} token should point at another one.`
       })
     }
   }
