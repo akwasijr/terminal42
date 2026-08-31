@@ -857,6 +857,7 @@ function StudioEditor({
             studio={studio}
             token={selectedToken.token}
             setName={studio.sets.find((x) => x.id === selectedToken.setId)?.name ?? ''}
+            problem={found.find((p) => p.path === selectedToken.token.path)?.note ?? null}
             resolved={selectedResolved}
             onClose={() => setSelected(null)}
             onPickColour={(hex, rect, cb) =>

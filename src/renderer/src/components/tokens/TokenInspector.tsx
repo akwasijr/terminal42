@@ -30,6 +30,7 @@ export function TokenInspector({
   studio,
   token,
   setName,
+  problem,
   resolved,
   edit,
   onPickColour,
@@ -38,6 +39,8 @@ export function TokenInspector({
   studio: TokenStudio
   token: Token
   setName: string
+  /** What is wrong with this one, if anything, in the words the bar uses. */
+  problem: string | null
   resolved: TokenValue | null
   edit: TokenEdit
   onPickColour: (hex: string, rect: DOMRect, onChange: (hex: string) => void) => void
@@ -102,6 +105,14 @@ export function TokenInspector({
       <p className="mt-1 text-[10.5px] text-text-muted">
         {token.type} in {setName}
       </p>
+      {problem ? (
+        // The count at the foot of the library names one problem at a time,
+        // so the other four were invisible at the only place they can be
+        // fixed. Whatever is wrong with this token belongs on this token.
+        <p className="mt-2 rounded-sm bg-sunken px-2 py-1.5 text-[10.5px] text-text-secondary" role="status">
+          {problem}
+        </p>
+      ) : null}
 
       <div className="mt-2.5 flex items-center gap-1">
         <Choice on={target === null} onClick={() => edit.setTarget(null)}>
