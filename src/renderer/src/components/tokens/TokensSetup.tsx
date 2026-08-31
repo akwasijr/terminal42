@@ -12,33 +12,40 @@
 // looking rather than by reading, and every answer lands on a real field of
 // the library being built. Nothing here is asked for the sake of having a
 // step: if a question had nowhere to go, it is not in the list.
+//
+// The reverse holds too, and cost us: for a while the wizard opened on nine
+// palette cards -- a whole style, chosen before anything else, that silently
+// decided the typefaces. Anyone who had a style in mind was being asked to
+// find the nearest card to it, and everyone ended up with fonts they were
+// never shown. The cards are gone. What the library holds is now exactly
+// what was asked for, typefaces included.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Modal, ModalAside, ModalHeader, ModalBody, ModalFooter, ModalSteps, ModalButton } from '../Modal'
 import { FEEL_PRESETS, type Vibe } from '../../lib/designSystem'
-import { buildFeelPrompt, parseFeelReply } from '../../lib/tokenBrief'
 import { emptyStudio, ramp, studioFromFeel, SEMANTIC_DEFAULTS, type Feel, type SemanticRole } from '../../../../shared/tokens/scaffold'
 import { feelFromVibe } from '../../lib/tokens/feelFromVibe'
 import { DEFAULT_CSS, type TokenStudio } from '../../../../shared/tokens/types'
 
-const VIBES: Vibe[] = [
-  'minimal', 'professional', 'bold', 'playful', 'soft',
-  'elegant', 'brutalist', 'technical', 'luxe'
-]
+type StepId = 'name' | 'colour' | 'support' | 'meaning' | 'corner' | 'space' | 'type' | 'lift' | 'naming' | 'review'
 
-type StepId = 'feel' | 'colour' | 'support' | 'meaning' | 'corner' | 'air' | 'scale' | 'lift' | 'naming' | 'review'
-
+// Space and type used to read as the same question twice -- "How much air is
+// there?" then "How far apart are the type sizes?", both answered by picking
+// one of a row of grey bars. They are not the same question: one sets the gap
+// between things on a page, the other sets the jump from one text size to the
+// next. They now say so, and the pictograms show a layout and some lettering
+// rather than two sets of bars.
 const STEPS: { id: StepId; question: string }[] = [
-  { id: 'feel',   question: 'Where should it start?' },
-  { id: 'colour', question: 'What is the brand colour?' },
+  { id: 'name',    question: 'What is this set called?' },
+  { id: 'colour',  question: 'What is the brand colour?' },
   { id: 'support', question: 'What sits beside it?' },
   { id: 'meaning', question: 'What do good and bad look like?' },
-  { id: 'corner', question: 'How round are things?' },
-  { id: 'air',    question: 'How much air is there?' },
-  { id: 'scale',  question: 'How far apart are the type sizes?' },
-  { id: 'lift',   question: 'Does anything lift off the page?' },
-  { id: 'naming', question: 'What are the variables called?' },
-  { id: 'review', question: 'Ready to build' }
+  { id: 'corner',  question: 'How round are things?' },
+  { id: 'space',   question: 'How much space between things?' },
+  { id: 'type',    question: 'What does text look like?' },
+  { id: 'lift',    question: 'Does anything lift off the page?' },
+  { id: 'naming',  question: 'What are the variables called?' },
+  { id: 'review',  question: 'Ready to build' }
 ]
 
 /* ── pictograms ───────────────────────────────────────────────────────────
@@ -46,29 +53,56 @@ const STEPS: { id: StepId; question: string }[] = [
    choices are corners, the air choices are gaps, the type choices are type
    sizes. A picture of the answer beats a sentence describing it.          */
 
-function CornerPicto({ r }: { r: number }): React.JSX.Element {
+function CornerPicto({ r, pill = false }: { r: number; pill?: boolean }): React.JSX.Element {
+  // A pill drawn on a square comes out a circle, which is a different shape
+  // and a different answer. So the pill is drawn on an oblong, where fully
+  // round ends read as ends rather than as a ring.
+  const w = pill ? 30 : 28
+  const h = pill ? 17 : 28
   return (
     <svg viewBox="0 0 40 40" className="h-10 w-10" aria-hidden="true">
-      <rect x="6" y="6" width="28" height="28" rx={r} fill="none" stroke="currentColor" strokeWidth="2" />
+      <rect
+        x={(40 - w) / 2} y={(40 - h) / 2} width={w} height={h}
+        rx={pill ? h / 2 : r}
+        fill="none" stroke="currentColor" strokeWidth="2"
+      />
     </svg>
   )
 }
 
-function AirPicto({ gap }: { gap: number }): React.JSX.Element {
+/**
+ * Space, drawn as a card with things inside it.
+ *
+ * The gap is the answer, so the gap is what moves: the frame stays the same
+ * size and the blocks inside it crowd together or spread out. Bars floating
+ * on their own could as easily have been about type, which is exactly the
+ * confusion this step used to cause.
+ */
+function SpacePicto({ gap }: { gap: number }): React.JSX.Element {
+  const top = 20 - (gap + 3)
   return (
     <svg viewBox="0 0 40 40" className="h-10 w-10" aria-hidden="true">
+      <rect x="4" y="4" width="32" height="32" rx="4" fill="none" stroke="currentColor" strokeWidth="1.5" opacity="0.35" />
       {[0, 1, 2].map((i) => (
-        <rect key={i} x="8" y={20 - gap - 3 + i * (gap + 3)} width="24" height="3" rx="1.5" fill="currentColor" />
+        <rect key={i} x="10" y={top + i * (gap + 3)} width="20" height="3" rx="1.5" fill="currentColor" />
       ))}
     </svg>
   )
 }
 
-function ScalePicto({ steps }: { steps: number[] }): React.JSX.Element {
+/** Type, drawn as type. Three letters at the three sizes being chosen. */
+function TypePicto({ steps }: { steps: number[] }): React.JSX.Element {
   return (
     <svg viewBox="0 0 40 40" className="h-10 w-10" aria-hidden="true">
-      {steps.map((h, i) => (
-        <rect key={i} x={8 + i * 10} y={30 - h} width="7" height={h} rx="1" fill="currentColor" />
+      {steps.map((size, i) => (
+        <text
+          key={i}
+          x={7 + i * 11} y="27"
+          fontSize={size} fontWeight="600"
+          fill="currentColor" textAnchor="middle" dominantBaseline="alphabetic"
+        >
+          A
+        </text>
       ))}
     </svg>
   )
@@ -88,25 +122,70 @@ function LiftPicto({ level }: { level: 0 | 1 | 2 }): React.JSX.Element {
   )
 }
 
-const CORNERS: { id: Feel['corner']; label: string; r: number }[] = [
+const CORNERS: { id: Feel['corner']; label: string; r: number; pill?: boolean }[] = [
   { id: 'angular', label: 'Square',  r: 0 },
   { id: 'slight',  label: 'Slight',  r: 3 },
   { id: 'rounded', label: 'Rounded', r: 7 },
   { id: 'curved',  label: 'Curved',  r: 11 },
-  { id: 'full',    label: 'Pill',    r: 14 }
+  { id: 'full',    label: 'Pill',    r: 14, pill: true }
 ]
 
-const AIRS: { id: Feel['density']; label: string; gap: number }[] = [
-  { id: 'compact',     label: 'Tight', gap: 2 },
-  { id: 'cozy',        label: 'Close', gap: 4 },
-  { id: 'comfortable', label: 'Even',  gap: 6 },
-  { id: 'spacious',    label: 'Open',  gap: 9 }
+const SPACES: { id: Feel['density']; label: string; gap: number }[] = [
+  { id: 'compact',     label: 'Tight',   gap: 2 },
+  { id: 'cozy',        label: 'Snug',    gap: 4 },
+  { id: 'comfortable', label: 'Roomy',   gap: 6 },
+  { id: 'spacious',    label: 'Airy',    gap: 9 }
 ]
 
+// No label here repeats one from the space step: two rows of options sharing
+// the word "Even" is most of why the two read as the same question.
 const SCALES: { id: Feel['scale']; label: string; steps: number[] }[] = [
-  { id: 'compact',    label: 'Close together', steps: [9, 12, 15] },
-  { id: 'balanced',   label: 'Even',           steps: [6, 13, 20] },
-  { id: 'expressive', label: 'Far apart',      steps: [4, 13, 25] }
+  { id: 'compact',    label: 'Gentle jump', steps: [11, 13, 15] },
+  { id: 'balanced',   label: 'Clear jump',  steps: [9, 14, 20] },
+  { id: 'expressive', label: 'Big jump',    steps: [7, 14, 26] }
+]
+
+/**
+ * Showing a font's name in some other font is a worse answer than showing no
+ * sample at all, and none of these ship with the app. The families are
+ * fetched once, on demand, when the wizard opens -- not at boot, since most
+ * sessions never open it.
+ */
+function useTypefaces(): void {
+  useEffect(() => {
+    const id = 't42-token-typefaces'
+    if (document.getElementById(id)) return
+    const families = TYPEFACES
+      .flatMap((t) => [t.heading, t.body])
+      .filter((f) => f !== 'inherit' && !f.startsWith('ui-'))
+    const link = document.createElement('link')
+    link.id = id
+    link.rel = 'stylesheet'
+    link.href =
+      'https://fonts.googleapis.com/css2?' +
+      [...new Set(families)].map((f) => `family=${encodeURIComponent(f)}:wght@400;600`).join('&') +
+      '&display=swap'
+    document.head.appendChild(link)
+  }, [])
+}
+
+/**
+ * The typefaces on offer.
+ *
+ * These used to arrive with the style card, so the library came out holding
+ * a heading font and a body font nobody had been shown. Asking is two clicks
+ * and removes the surprise.
+ */
+const TYPEFACES: { id: string; label: string; heading: string; body: string }[] = [
+  { id: 'geist',     label: 'Geist',        heading: 'Geist', body: 'Geist' },
+  { id: 'jakarta',   label: 'Jakarta Sans', heading: 'Plus Jakarta Sans', body: 'Plus Jakarta Sans' },
+  { id: 'dm',        label: 'DM Sans',      heading: 'DM Sans', body: 'DM Sans' },
+  { id: 'plex',      label: 'IBM Plex',     heading: 'IBM Plex Sans', body: 'IBM Plex Sans' },
+  { id: 'grotesk',   label: 'Space Grotesk', heading: 'Space Grotesk', body: 'Plus Jakarta Sans' },
+  { id: 'fraunces',  label: 'Fraunces',     heading: 'Fraunces', body: 'Source Serif Pro' },
+  { id: 'playfair',  label: 'Playfair',     heading: 'Playfair Display', body: 'Plus Jakarta Sans' },
+  { id: 'mono',      label: 'Geist Mono',   heading: 'Geist', body: 'Geist Mono' },
+  { id: 'system',    label: 'System font',  heading: 'inherit', body: 'inherit' }
 ]
 
 const LIFTS: { id: Feel['elevation']; label: string; level: 0 | 1 | 2 }[] = [
@@ -208,7 +287,7 @@ export function TokensSetup({
   startFrom?: Vibe
 }): React.JSX.Element {
   const [stepIdx, setStepIdx] = useState(0)
-  const [vibe, setVibe] = useState<Vibe>(startFrom ?? 'minimal')
+  const vibe: Vibe = startFrom ?? 'minimal'
   const [name, setName] = useState('')
   const [primary, setPrimary] = useState<string | null>(null)
   const [secondary, setSecondary] = useState<string | null>(null)
@@ -218,11 +297,9 @@ export function TokensSetup({
   const [density, setDensity] = useState<Feel['density'] | null>(null)
   const [scale, setScale] = useState<Feel['scale'] | null>(null)
   const [elevation, setElevation] = useState<Feel['elevation'] | null>(null)
+  const [typeface, setTypeface] = useState<string>('geist')
   const [prefix, setPrefix] = useState('')
   const [casing, setCasing] = useState<'kebab' | 'camel' | 'snake'>('kebab')
-  const [brief, setBrief] = useState('')
-  const [thinking, setThinking] = useState(false)
-  const [note, setNote] = useState<string | null>(null)
 
   const step = STEPS[stepIdx]
 
@@ -230,6 +307,8 @@ export function TokensSetup({
   // it. Answering nothing still produces a coherent library, which is why the
   // steps can be walked past rather than gated behind a required answer.
   const base = feelFromVibe(vibe)
+  const face = TYPEFACES.find((t) => t.id === typeface)
+  useTypefaces()
   const feel: Feel = {
     ...base,
     name: name.trim() || FEEL_PRESETS[vibe].label,
@@ -240,7 +319,8 @@ export function TokensSetup({
     corner: corner ?? base.corner,
     density: density ?? base.density,
     scale: scale ?? base.scale,
-    elevation: elevation ?? base.elevation
+    elevation: elevation ?? base.elevation,
+    ...(face ? { headingFont: face.heading, bodyFont: face.body } : {})
   }
 
   const cornerPx = CORNERS.find((c) => c.id === feel.corner)!.r
@@ -248,31 +328,6 @@ export function TokensSetup({
   const build = (): void => {
     const studio = studioFromFeel(feel.name, feel)
     onCreate({ ...studio, css: { ...DEFAULT_CSS, prefix: prefix.trim(), casing } })
-  }
-
-  const fromBrief = async (): Promise<void> => {
-    if (thinking) return
-    setThinking(true)
-    setNote(null)
-    const res = await window.terminal42.canvas.assist(buildFeelPrompt(brief))
-    setThinking(false)
-    if (!res.ok) {
-      setNote('That did not come back. Carry on and pick instead.')
-      return
-    }
-    // A described product answers every question at once, so it lands on the
-    // review step rather than walking the user back through choices that have
-    // already been made for them.
-    const got = parseFeelReply(res.text, base)
-    setPrimary(got.primary)
-    setSecondary(got.secondary)
-    setTertiary(got.tertiary)
-    setCorner(got.corner)
-    setDensity(got.density)
-    setScale(got.scale)
-    setElevation(got.elevation)
-    if (!name.trim()) setName(got.name)
-    setStepIdx(STEPS.length - 1)
   }
 
   const r = ramp(feel.primary)
@@ -321,51 +376,19 @@ export function TokensSetup({
           <ModalHeader title={step.question} />
 
           <ModalBody height={300}>
-            {step.id === 'feel' && (
-              <>
-                <ul className="grid grid-cols-3 gap-2">
-                  {VIBES.map((v) => {
-                    const f = feelFromVibe(v)
-                    const rr = ramp(f.primary)
-                    return (
-                      <li key={v}>
-                        <button type="button" onClick={() => setVibe(v)} aria-pressed={vibe === v} className={tile(vibe === v)}>
-                          <span className="flex h-6 overflow-hidden rounded-sm">
-                            {[100, 400, 700].map((s) => <span key={s} style={{ background: rr[s] }} className="flex-1" />)}
-                            <span style={{ background: f.secondary }} className="flex-1" />
-                          </span>
-                          <span className="mt-1.5 block truncate text-[12px]" style={{ fontFamily: f.headingFont }}>
-                            {FEEL_PRESETS[v].label}
-                          </span>
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ul>
-                <div className="mt-4">
-                  <label htmlFor="token-brief" className="text-[11px] text-text-secondary">
-                    Or describe the product and skip the rest
-                  </label>
-                  <div className="mt-1.5 flex gap-2">
-                    <input
-                      id="token-brief"
-                      value={brief}
-                      onChange={(e) => setBrief(e.target.value)}
-                      placeholder="A calm booking tool for independent clinics."
-                      className="min-w-0 flex-1 rounded-md bg-sunken px-2.5 py-2 text-[12.5px] text-text-primary placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => void fromBrief()}
-                      disabled={brief.trim().length === 0 || thinking}
-                      className="flex-none rounded-md px-3 py-2 text-[12.5px] text-text-secondary hover:bg-raised hover:text-text-primary disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-                    >
-                      {thinking ? 'Choosing' : 'Use this'}
-                    </button>
-                  </div>
-                  {note ? <p className="mt-2 text-[11px] text-text-muted">{note}</p> : null}
-                </div>
-              </>
+            {step.id === 'name' && (
+              <div>
+                <input
+                  id="token-name"
+                  aria-label="Name this set"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) setStepIdx(1) }}
+                  placeholder="Product tokens"
+                  autoFocus
+                  className="w-full rounded-md bg-sunken px-3 py-2.5 text-[14px] text-text-primary placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                />
+              </div>
             )}
 
             {step.id === 'colour' && (
@@ -404,12 +427,7 @@ export function TokensSetup({
 
             {step.id === 'support' && (
               <div>
-                <p className="max-w-prose text-[12px] text-text-secondary">
-                  The accent carries the second-most important thing on a page, and the
-                  third colour is what is left for charts and categories. Both start
-                  from the feel, so leaving them alone is a real answer.
-                </p>
-                <div className="mt-4 space-y-3">
+                <div className="space-y-3">
                   <Swatch
                     label="Accent"
                     hint="Highlights, selected states, links"
@@ -430,12 +448,7 @@ export function TokensSetup({
 
             {step.id === 'meaning' && (
               <div>
-                <p className="max-w-prose text-[12px] text-text-secondary">
-                  These four mean something rather than look like something, so
-                  convention matters more than taste. The defaults are the
-                  convention; change them only where the brand demands it.
-                </p>
-                <div className="mt-4 space-y-2.5">
+                <div className="space-y-2.5">
                   {(Object.keys(SEMANTIC_DEFAULTS) as SemanticRole[]).map((role) => (
                     <Swatch
                       key={role}
@@ -459,7 +472,7 @@ export function TokensSetup({
                 {CORNERS.map((c) => (
                   <li key={c.id}>
                     <button type="button" onClick={() => setCorner(c.id)} aria-pressed={feel.corner === c.id} className={tile(feel.corner === c.id)}>
-                      <CornerPicto r={c.r} />
+                      <CornerPicto r={c.r} pill={c.pill} />
                       <span className="mt-1.5 block text-[12px]">{c.label}</span>
                     </button>
                   </li>
@@ -467,12 +480,12 @@ export function TokensSetup({
               </ul>
             )}
 
-            {step.id === 'air' && (
+            {step.id === 'space' && (
               <ul className="grid grid-cols-4 gap-2">
-                {AIRS.map((a) => (
+                {SPACES.map((a) => (
                   <li key={a.id}>
                     <button type="button" onClick={() => setDensity(a.id)} aria-pressed={feel.density === a.id} className={tile(feel.density === a.id)}>
-                      <AirPicto gap={a.gap} />
+                      <SpacePicto gap={a.gap} />
                       <span className="mt-1.5 block text-[12px]">{a.label}</span>
                     </button>
                   </li>
@@ -480,17 +493,35 @@ export function TokensSetup({
               </ul>
             )}
 
-            {step.id === 'scale' && (
-              <ul className="grid grid-cols-3 gap-2">
-                {SCALES.map((s) => (
-                  <li key={s.id}>
-                    <button type="button" onClick={() => setScale(s.id)} aria-pressed={feel.scale === s.id} className={tile(feel.scale === s.id)}>
-                      <ScalePicto steps={s.steps} />
-                      <span className="mt-1.5 block text-[12px]">{s.label}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+            {step.id === 'type' && (
+              <div>
+                <ul className="grid grid-cols-3 gap-2">
+                  {TYPEFACES.map((t) => (
+                    <li key={t.id}>
+                      <button
+                        type="button"
+                        onClick={() => setTypeface(t.id)}
+                        aria-pressed={typeface === t.id}
+                        className={`${tile(typeface === t.id)} flex items-baseline gap-2 !py-2`}
+                      >
+                        <span className="text-[16px] leading-none" style={{ fontFamily: t.heading }}>Ag</span>
+                        <span className="truncate text-[11.5px] text-text-muted">{t.label}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <span className="mt-4 block text-[11px] text-text-secondary">Size steps</span>
+                <ul className="mt-1.5 grid grid-cols-3 gap-2">
+                  {SCALES.map((sc) => (
+                    <li key={sc.id}>
+                      <button type="button" onClick={() => setScale(sc.id)} aria-pressed={feel.scale === sc.id} className={tile(feel.scale === sc.id)}>
+                        <TypePicto steps={sc.steps} />
+                        <span className="mt-1.5 block text-[12px]">{sc.label}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
 
             {step.id === 'lift' && (
@@ -532,21 +563,15 @@ export function TokensSetup({
 
             {step.id === 'review' && (
               <div>
-                <label htmlFor="token-name" className="text-[11px] text-text-secondary">Name this library</label>
-                <input
-                  id="token-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder={FEEL_PRESETS[vibe].label}
-                  className="mt-1.5 w-full rounded-md bg-sunken px-2.5 py-2 text-[12.5px] text-text-primary placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-                />
-                <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-[12px]">
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-[12px]">
                   {([
+                    ['Name', feel.name],
                     ['Brand', feel.primary],
                     ['Accent', feel.secondary],
                     ['Corners', CORNERS.find((c) => c.id === feel.corner)!.label],
-                    ['Air', AIRS.find((a) => a.id === feel.density)!.label],
-                    ['Type sizes', SCALES.find((s) => s.id === feel.scale)!.label],
+                    ['Space', SPACES.find((a) => a.id === feel.density)!.label],
+                    ['Typeface', face?.label ?? 'System font'],
+                    ['Size steps', SCALES.find((s) => s.id === feel.scale)!.label],
                     ['Lift', LIFTS.find((l) => l.id === feel.elevation)!.label],
                     ['Names', varName(casing, prefix)]
                   ] as [string, string][]).map(([k, v]) => (
@@ -562,9 +587,11 @@ export function TokensSetup({
 
           <ModalFooter
             left={
-              <ModalButton tone="plain" onClick={() => onCreate(emptyStudio('Untitled'))}>
-                Start empty
-              </ModalButton>
+              stepIdx === 0 ? (
+                <ModalButton tone="plain" onClick={() => onCreate(emptyStudio('Untitled'))}>
+                  Start empty
+                </ModalButton>
+              ) : undefined
             }
           >
             <ModalButton tone="plain" onClick={() => (stepIdx === 0 ? onCancel() : setStepIdx(stepIdx - 1))}>

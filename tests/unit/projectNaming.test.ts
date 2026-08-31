@@ -42,8 +42,11 @@ describe('the list', () => {
     expect(LIST).not.toContain("'All designs'")
   })
 
-  it('labels the create button "New project"', () => {
-    expect(LIST).toContain("'New project'")
+  it('labels the create button just "New"', () => {
+    // The button sits under a heading that already names the kind, so
+    // "New project" on the Tokens tab was both longer and wrong.
+    expect(LIST).toContain("'New'")
+    expect(LIST).not.toContain("'New project'")
   })
 
   it('says no projects match, not no designs match', () => {

@@ -23,7 +23,10 @@ const back = () => act(() => { fireEvent.click(screen.getByRole('button', { name
 describe('the new token library wizard', () => {
   it('opens on a question rather than a wall of cards', () => {
     open()
-    expect(screen.getByText('Where should it start?')).toBeTruthy()
+    // It used to open on nine style cards, which decided the typefaces on
+    // your behalf and made anyone who already knew their style hunt for the
+    // nearest match. It opens on the one thing only you can supply.
+    expect(screen.getByText('What is this set called?')).toBeTruthy()
     expect(screen.getByText('Step 1 of 10')).toBeTruthy()
   })
 
@@ -36,13 +39,13 @@ describe('the new token library wizard', () => {
     }
     asked.push(screen.getByRole('heading', { level: 2 }).textContent ?? '')
     expect(asked).toEqual([
-      'Where should it start?',
+      'What is this set called?',
       'What is the brand colour?',
       'What sits beside it?',
       'What do good and bad look like?',
       'How round are things?',
-      'How much air is there?',
-      'How far apart are the type sizes?',
+      'How much space between things?',
+      'What does text look like?',
       'Does anything lift off the page?',
       'What are the variables called?',
       'Ready to build'
@@ -54,12 +57,13 @@ describe('the new token library wizard', () => {
     next()
     expect(screen.getByText('What is the brand colour?')).toBeTruthy()
     back()
-    expect(screen.getByText('Where should it start?')).toBeTruthy()
+    expect(screen.getByText('What is this set called?')).toBeTruthy()
   })
 
   it('carries the answers into the library it builds', () => {
     const made = vi.fn()
     open(made)
+    act(() => { fireEvent.change(screen.getByLabelText('Name this set'), { target: { value: 'Acme' } }) })
     // brand colour
     next()
     act(() => { fireEvent.change(screen.getByLabelText('Brand colour hex'), { target: { value: '#1166ee' } }) })
@@ -68,7 +72,7 @@ describe('the new token library wizard', () => {
     // corners
     next()
     act(() => { fireEvent.click(screen.getByRole('button', { name: /Pill/ })) })
-    // air, type sizes, lift
+    // space, type, lift
     next(); next(); next()
     // naming
     next()
@@ -76,7 +80,6 @@ describe('the new token library wizard', () => {
     act(() => { fireEvent.click(screen.getByRole('button', { name: '--acme-colorTextPrimary' })) })
     // review
     next()
-    act(() => { fireEvent.change(screen.getByLabelText('Name this library'), { target: { value: 'Acme' } }) })
     act(() => { fireEvent.click(screen.getByRole('button', { name: 'Build' })) })
 
     expect(made).toHaveBeenCalledTimes(1)
@@ -88,10 +91,9 @@ describe('the new token library wizard', () => {
 
   it('shows the choice taking effect while it is being made', () => {
     open()
-    // The running preview names the library, so changing the name on the last
+    // The running preview names the library, so typing the name on the first
     // step has to show up there rather than only on Build.
-    for (let i = 0; i < 9; i++) next()
-    act(() => { fireEvent.change(screen.getByLabelText('Name this library'), { target: { value: 'Harbour' } }) })
+    act(() => { fireEvent.change(screen.getByLabelText('Name this set'), { target: { value: 'Harbour' } }) })
     expect(screen.getAllByText('Harbour').length).toBeGreaterThan(0)
   })
 
@@ -100,6 +102,27 @@ describe('the new token library wizard', () => {
     open(made)
     act(() => { fireEvent.click(screen.getByRole('button', { name: 'Start empty' })) })
     expect(made).toHaveBeenCalledTimes(1)
+  })
+
+  it('takes the offer to skip away once there are answers to lose', () => {
+    open()
+    next()
+    expect(screen.queryByRole('button', { name: 'Start empty' })).toBeNull()
+  })
+
+  it('builds with the typeface that was chosen, not one supplied behind your back', () => {
+    const made = vi.fn()
+    open(made)
+    for (let i = 0; i < 6; i++) next()
+    act(() => { fireEvent.click(screen.getByRole('button', { name: /Fraunces/ })) })
+    for (let i = 0; i < 3; i++) next()
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Build' })) })
+
+    const studio = made.mock.calls[0][0] as TokenStudio
+    const value = (name: string): unknown =>
+      studio.sets.flatMap((s) => s.tokens).find((t) => t.path === name)?.value
+    expect(value('family.display')).toBe('Fraunces')
+    expect(value('family.sans')).toBe('Source Serif Pro')
   })
 })
 

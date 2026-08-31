@@ -24,14 +24,31 @@ import { GuidelineCheckModal } from './guidelines/GuidelineCheckModal'
 
 // Pretty labels for the kind-group filter chips at the top of the page.
 const GROUP_LABEL: Record<DesignGroup, string> = {
-  web: 'Website', app: 'App', presentation: 'Decks', content: 'Content',
+  web: 'Website', app: 'App', presentation: 'Presentation', content: 'Content',
   print: 'Print', data: 'Data', social: 'Social', figma: 'Figma', other: 'Other'
 }
-// Display order for the chip row. Keeps the most common kinds on the left.
-const GROUP_ORDER: DesignGroup[] = ['web', 'app', 'presentation', 'content', 'print', 'data', 'social', 'figma', 'other']
-
-/** Kinds you can start from nothing, so their tabs are always on the row. */
+/**
+ * The tabs, and the whole of them.
+ *
+ * There is no "All": a row where one of the pills means "no filter" invites
+ * the list to be read as a heap with a few views onto it, and the heap is
+ * what nobody could find anything in. Every project belongs to one of these,
+ * and a project whose kind was never recorded belongs to Website -- see
+ * `groupOf`.
+ */
 const ALWAYS_OFFERED: DesignGroup[] = ['web', 'app', 'presentation']
+
+/**
+ * Which tab a design sits under.
+ *
+ * Anything whose brief says nothing, or says a kind that has no tab of its
+ * own, comes out as a website: a page is what those things nearly always
+ * are, and a project with no tab at all cannot be opened again.
+ */
+function groupOf(d: { brief?: { group?: string } | null }): DesignGroup {
+  const g = (d.brief?.group ?? 'web') as DesignGroup
+  return ALWAYS_OFFERED.includes(g) ? g : 'web'
+}
 type TypeFilter = 'all' | 'form' | DesignGroup | 'system' | 'tokens'
 
 /**
@@ -80,7 +97,7 @@ export function DesignsListView({
   const [search, setSearch] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => (localStorage.getItem('t42-designs-view') === 'list' ? 'list' : 'grid'))
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('web')
   const [shelf, setShelf] = useState<Shelf>('mine')
 
   // Which types have starting points to offer. "All" does not: a gallery
@@ -127,6 +144,8 @@ export function DesignsListView({
     ) {
       setTypeFilter('all')
     }
+    // Coming back the other way, off a scope that has no pills at all.
+    if (scope === 'design' && typeFilter === 'all') setTypeFilter('web')
   }, [scope, typeFilter])
   // Project folders: client/project organisation, stored renderer-side.
   const [folderFilter, setFolderFilter] = useState<string>('all')
@@ -528,16 +547,13 @@ export function DesignsListView({
   )
 
   // Which file types are present, so the type pills only show real options.
-  const presentTypes = useMemo(() => {
-    const s = new Set<DesignGroup>()
-    for (const d of scoped) s.add((d.brief?.group ?? 'other') as DesignGroup)
-    // The kinds you can start something as are always offered, whether or not
-    // you already own one. Each carries its own templates, and a tab that only
-    // appears once you own the thing hides the very shelf you would use to
-    // make your first.
-    if (scope === 'design') for (const g of ALWAYS_OFFERED) s.add(g)
-    return { groups: GROUP_ORDER.filter((g) => s.has(g)) }
-  }, [scoped, scope])
+  // The three tabs, whether or not you own one of each: each carries its own
+  // templates, and a tab that only appears once you own the thing hides the
+  // very shelf you would use to make your first.
+  const presentTypes = useMemo(
+    () => ({ groups: scope === 'design' ? ALWAYS_OFFERED : [] as DesignGroup[] }),
+    [scope]
+  )
 
   const allLabel = scope === 'form' ? 'All forms' : 'All projects'
   // The heading is the answer to "what am I looking at", so it has to name the
@@ -557,7 +573,7 @@ export function DesignsListView({
       typeFilter !== 'all' && typeFilter !== 'form' && typeFilter !== 'system' &&
       typeFilter !== 'tokens'
     const visible = scoped.filter((d) => {
-      if (isGroup && (d.brief?.group ?? 'other') !== typeFilter) return false
+      if (isGroup && groupOf(d) !== typeFilter) return false
       if (folderFilter !== 'all' && designFolders[d.id] !== folderFilter) return false
       if (!q) return true
       const hay = [d.title, d.brief?.kindLabel ?? '', d.brief?.subtype ?? '', d.brief?.idea ?? '', d.brief?.audience ?? '', d.brief?.lookLabel ?? ''].join(' ').toLowerCase()
@@ -609,7 +625,7 @@ export function DesignsListView({
                 className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md bg-action px-3 py-1.5 text-[13px] font-medium text-action-text transition-opacity hover:opacity-90 disabled:opacity-50"
               >
                 <IconPlus size={13} />
-                <span>{creating ? 'Creating\u2026' : scope === 'form' ? 'New form' : 'New project'}</span>
+                <span>{creating ? 'Creating\u2026' : 'New'}</span>
                 <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="-mr-0.5 ml-0.5 opacity-80"><path d="M4 6l4 4 4-4" /></svg>
               </button>
               {newMenuOpen && (
@@ -656,30 +672,22 @@ export function DesignsListView({
         <div className="mb-3 flex flex-wrap items-center gap-2">
           {(scope === 'design' || presentTypes.groups.length > 0) && (
           <div className="inline-flex shrink-0 flex-wrap items-center gap-1 rounded-lg bg-sunken p-1">
-            {/* An explicit "All" pill. There used to be none: widening back
-                meant pressing the pill you were already on, which nothing on
-                screen said, and Design systems and Tokens did not do it at
-                all — so once you looked at tokens there was no way back to
-                everything. A hidden gesture is not an affordance. */}
-            <ViewPill
-              active={typeFilter === 'all'}
-              onClick={() => { setTypeFilter('all'); setShelf('mine') }}
-            >
-              All
-            </ViewPill>
-            {presentTypes.groups.filter((g) => g !== 'other').map((g) => (
+            {/* One of these is always on. Pressing the one you are already
+                on does nothing rather than widening to everything, because
+                there is no everything to widen to. */}
+            {presentTypes.groups.map((g) => (
               <ViewPill
                 key={g}
                 active={typeFilter === g}
-                onClick={() => { setTypeFilter(typeFilter === g ? 'all' : g); setShelf('mine') }}
+                onClick={() => { setTypeFilter(g); setShelf('mine') }}
               >
                 {GROUP_LABEL[g]}
               </ViewPill>
             ))}
             {scope === 'design' && (
               <div className="ml-3 inline-flex items-center gap-1">
-                <ViewPill active={typeFilter === 'system'} onClick={() => { setTypeFilter(typeFilter === 'system' ? 'all' : 'system'); setShelf('mine') }}>Design systems</ViewPill>
-                <ViewPill active={typeFilter === 'tokens'} onClick={() => { setTypeFilter(typeFilter === 'tokens' ? 'all' : 'tokens'); setShelf('mine') }}>Tokens</ViewPill>
+                <ViewPill active={typeFilter === 'system'} onClick={() => { setTypeFilter('system'); setShelf('mine') }}>Design systems</ViewPill>
+                <ViewPill active={typeFilter === 'tokens'} onClick={() => { setTypeFilter('tokens'); setShelf('mine') }}>Tokens</ViewPill>
               </div>
             )}
           </div>

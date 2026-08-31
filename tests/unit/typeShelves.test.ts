@@ -78,23 +78,29 @@ describe('an empty shelf', () => {
   })
 })
 
-describe('getting back to everything', () => {
+describe('there is no everything to get back to', () => {
   /*
-   * There was no "All" pill. Widening back meant pressing the pill you were
-   * already on — a gesture nothing on screen mentioned — and Design systems
-   * and Tokens did not honour it at all, so looking at tokens was a one-way
-   * door. Checked in the app: Tokens → All now heads "All projects".
+   * An All pill was added once, to fix a real problem: Design systems and
+   * Tokens were a one-way door. It turned out to be the wrong fix. "All"
+   * showed five kinds of thing in one grid and was the tab the list opened
+   * on, so the first thing anyone saw was a pile. The pills are now the only
+   * view, one kind each, and Website is where the list starts.
    */
-  it('offers an explicit All pill', () => {
-    expect(LIST).toMatch(/active=\{typeFilter === 'all'\}[\s\S]{0,160}>\s*All\s*</)
+  it('offers no All pill', () => {
+    expect(LIST).not.toMatch(/>\s*All\s*</)
+    // 'all' survives only as something to be pushed out of: the form scope
+    // has no pills and legitimately uses it, so entering the design scope
+    // has to correct for it.
+    expect(LIST).toContain("if (scope === 'design' && typeFilter === 'all') setTypeFilter('web')")
   })
 
-  it('lets Design systems and Tokens be pressed off again', () => {
-    expect(LIST).toContain("setTypeFilter(typeFilter === 'system' ? 'all' : 'system')")
-    expect(LIST).toContain("setTypeFilter(typeFilter === 'tokens' ? 'all' : 'tokens')")
+  it('leaves you on a pill you press twice', () => {
+    // Pressing the one you are on used to widen to everything, which is now
+    // nowhere. It does nothing instead.
+    expect(LIST).not.toContain("? 'all' :")
   })
 
-  it('no longer claims there is no all pill', () => {
-    expect(LIST).not.toContain('No "all" pill')
+  it('opens on Website rather than on a pile', () => {
+    expect(LIST).toMatch(/useState<TypeFilter>\('web'\)/)
   })
 })
