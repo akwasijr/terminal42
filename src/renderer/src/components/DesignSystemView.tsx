@@ -237,7 +237,20 @@ export function DesignSystemView({ openSystemId, onConsumeOpen }: { openSystemId
   const openComp = compName ? (DS_COMPONENTS.find((c) => c.name === compName) ?? null) : null
   const themed = applyBase(s, compBase)
   const variant = openComp?.variants ? openComp.variants[Math.min(compVariant, openComp.variants.length - 1)] : null
-  const navCls = (id: string): string => ['mb-0.5 block w-full truncate rounded-md px-2 py-1.5 text-left text-[12.5px] transition-colors', nav === id ? 'bg-elevated font-medium text-text-primary' : 'text-text-secondary hover:bg-elevated/50 hover:text-text-primary'].join(' ')
+  // Three levels, told apart by size, weight, colour and indent rather than by
+  // a line: a destination that stands on its own reads at the same strength as
+  // the group headings beside it, and a page inside a group sits under it.
+  const navCls = (id: string, level: 'top' | 'child' = 'child'): string => [
+    'mb-0.5 block w-full truncate rounded-md py-1.5 text-left transition-colors',
+    level === 'top' ? 'px-2 text-[12.5px] font-medium' : 'pl-4 pr-2 text-[12px]',
+    nav === id
+      ? 'bg-elevated font-medium text-text-primary'
+      : level === 'top'
+        ? 'text-text-primary hover:bg-elevated/50'
+        : 'text-text-secondary hover:bg-elevated/50 hover:text-text-primary'
+  ].join(' ')
+  /** A group heading: the strongest thing in the rail, and never a destination. */
+  const groupCls = 'mt-4 flex w-full items-center justify-between rounded-md px-2 py-1.5 text-[12.5px] font-semibold tracking-[0.01em] text-text-primary hover:bg-elevated/40'
   const goComp = (name: string): void => { setNav('component:' + name); setCompVariant(0); setCompBase(s.base ?? 'light') }
   const goFoundation = (id: string): void => setNav('foundations:' + id)
 
@@ -578,17 +591,17 @@ export function DesignSystemView({ openSystemId, onConsumeOpen }: { openSystemId
 
       <div ref={bodyRef} className="flex min-h-0 gap-6 overflow-hidden" style={{ height: bodyH || undefined }}>
         <nav className="w-52 shrink-0 overflow-y-auto pr-1 text-[12.5px]">
-          <button type="button" onClick={() => setNav('overview')} className={navCls('overview')}>Overview</button>
+          <button type="button" onClick={() => setNav('overview')} className={navCls('overview', 'top')}>Overview</button>
 
-          <button type="button" onClick={() => setFoundOpen((o) => !o)} className="mt-3 flex w-full items-center justify-between rounded-md px-2 py-1.5 text-[11px] font-medium text-text-muted hover:text-text-secondary">
+          <button type="button" onClick={() => setFoundOpen((o) => !o)} className={groupCls}>
             <span>Foundations</span>
-            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${foundOpen ? '' : '-rotate-90'}`}><path d="M4 6l4 4 4-4" /></svg>
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={`text-text-muted transition-transform ${foundOpen ? '' : '-rotate-90'}`}><path d="M4 6l4 4 4-4" /></svg>
           </button>
           {foundOpen && <div className="mb-1">{FOUNDATIONS.map((f) => <button key={f.id} type="button" onClick={() => setNav('foundations:' + f.id)} className={navCls('foundations:' + f.id)}>{f.label}</button>)}</div>}
 
-          <button type="button" onClick={() => setCompOpen((o) => !o)} className="mt-3 flex w-full items-center justify-between rounded-md px-2 py-1.5 text-[11px] font-medium text-text-muted hover:text-text-secondary">
+          <button type="button" onClick={() => setCompOpen((o) => !o)} className={groupCls}>
             <span>Components</span>
-            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${compOpen ? '' : '-rotate-90'}`}><path d="M4 6l4 4 4-4" /></svg>
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={`text-text-muted transition-transform ${compOpen ? '' : '-rotate-90'}`}><path d="M4 6l4 4 4-4" /></svg>
           </button>
           {compOpen && (
             <div className="mb-1">
@@ -597,7 +610,7 @@ export function DesignSystemView({ openSystemId, onConsumeOpen }: { openSystemId
                 if (!items.length) return null
                 return (
                   <div key={cat} className="mb-1.5">
-                    <div className="px-2 pb-0.5 pt-1 text-[10.5px] text-text-muted">{cat}</div>
+                    <div className="pb-1 pl-2.5 pr-2 pt-2 text-[11px] font-medium text-text-muted">{cat}</div>
                     {items.map((c) => <button key={c.name} type="button" onClick={() => { setNav('component:' + c.name); setCompVariant(0); setCompBase(s.base ?? 'light') }} className={navCls('component:' + c.name)}>{c.name}</button>)}
                   </div>
                 )
@@ -608,13 +621,13 @@ export function DesignSystemView({ openSystemId, onConsumeOpen }: { openSystemId
           {/* The parts that are not values and not a gallery. A count says
               whether anybody has decided any of it yet, because an untouched
               section and a deliberately empty one look identical. */}
-          <div className="mt-3">
+          <div className="mt-4">
             {([
               ['patterns', 'Patterns', (s.patterns ?? []).length],
               ['layouts', 'Layouts', (s.layouts ?? []).length],
               ['guidelines', 'Guidelines', guidelineCount]
             ] as const).map(([id, label, n]) => (
-              <button key={id} type="button" onClick={() => setNav(id)} className={navCls(id)}>
+              <button key={id} type="button" onClick={() => setNav(id)} className={navCls(id, 'top')}>
                 <span className="flex items-center justify-between gap-2">
                   <span>{label}</span>
                   {n > 0 && <span className="text-[10.5px] text-text-muted">{n}</span>}
