@@ -1,26 +1,56 @@
 import React, { useMemo, useState } from 'react'
-import { Modal, ModalHeader, ModalBody, ModalFooter } from '../Modal'
+import { Modal, ModalHeader, ModalBody, ModalFooter, ModalSteps } from '../Modal'
 import { GroupPictogram } from './GroupPictogram'
 import { buildReport, reportSummary, applyPrompt, type ReportSection } from '../../../../shared/guidelineReport'
 import { formatTokensForPrompt } from '../../../../shared/tokens/export'
-import { useTokenLibraries } from '../../lib/tokens/useTokenLibraries'
-import { TokenLibraryModal, TokenGlyph } from '../tokens/TokenLibraryModal'
-import type { ChatTokens } from '../../lib/tokens/chatTokens'
+import { useTokenLibraries, type TokenLibrary } from '../../lib/tokens/useTokenLibraries'
+import { TokenGlyph } from '../tokens/TokenLibraryModal'
+import { DesignSystemWizard } from '../DesignSystemWizard'
+import { loadSystems, type DesignSystem } from '../../lib/designSystem'
+import { studioFromDesignSystem } from '../../lib/tokens/fromDesignSystem'
 import type { GuidelineFinding } from '../../../../preload/index'
 import { IconCheck, IconClose, IconFolder } from '../icons'
 
-// Checking a project against the design guidelines.
+// Checking a project against the design guidelines, and holding it to yours.
 //
-// Two steps and no more: say what to check, then read what came back. The
-// report is the point, so it is a list of shapes and counts rather than
-// paragraphs — every row is a rule, a number, and a tick that decides
-// whether the second run touches it.
+// The point of this is generated work that came out off-brand: it looks
+// plausible, it uses colours nobody chose and sizes off no scale, and there
+// is no way to say "put it back onto ours". So it runs in three moves.
+//
+//   1. The project. A folder, or a public repository.
+//   2. What to hold it to. A token library, a design system, both, or values
+//      set here and now. Optional, and the guidelines apply either way.
+//   3. The report, which is the list of what to change.
+//
+// The standard used to sit on the first screen, beside the folder picker,
+// which asked you to choose the ruler before you had shown it the thing
+// being measured -- and made a two-thing screen out of a one-thing question.
+// It comes second now, and only once there is something to hold.
+
+type Step = 'project' | 'standard' | 'report'
+const STEP_ORDER: Step[] = ['project', 'standard', 'report']
 
 type Stage =
   | { at: 'intake' }
   | { at: 'running'; what: string }
-  | { at: 'report'; id: string; name: string; fileCount: number; entry: string | null; findings: GuidelineFinding[] }
+  | { at: 'read'; id: string; name: string; fileCount: number; entry: string | null; findings: GuidelineFinding[] }
   | { at: 'failed'; error: string }
+
+/**
+ * What the project is being held to.
+ *
+ * Every part optional and none exclusive: a library can carry the colours
+ * while a system carries the shapes, and asking for both themes at once is
+ * the only way to catch a page that is right in Light and unreadable in Dark.
+ */
+type Standard = {
+  libraryId: string | null
+  /** One or both. Empty means the library's own active theme. */
+  themeIds: string[]
+  systemId: string | null
+}
+
+const NO_STANDARD: Standard = { libraryId: null, themeIds: [], systemId: null }
 
 export function GuidelineCheckModal({
   onClose,
@@ -35,6 +65,7 @@ export function GuidelineCheckModal({
     prompt: (source: { shell?: boolean; files?: string[] }) => string
   }) => void
 }): React.JSX.Element {
+  const [step, setStep] = useState<Step>('project')
   const [stage, setStage] = useState<Stage>({ at: 'intake' })
   const [link, setLink] = useState('')
   // Everything is accepted until it is turned off: the report is a list of
@@ -42,22 +73,61 @@ export function GuidelineCheckModal({
   // ordinary case and unticking is the decision worth making.
   const [declined, setDeclined] = useState<Set<string>>(new Set())
   const [open, setOpen] = useState<string | null>(null)
-  // A library chosen here overrides the project's own values, so the second
+  // A standard chosen here overrides the project's own values, so the second
   // run does not merely tidy what is there but moves it onto the scale the
   // rest of the work already uses.
-  const [tokens, setTokens] = useState<ChatTokens | null>(null)
-  const [libraryOpen, setLibraryOpen] = useState(false)
+  const [standard, setStandard] = useState<Standard>(NO_STANDARD)
+  const [wizardOpen, setWizardOpen] = useState(false)
   const { libraries } = useTokenLibraries()
+  // Read once. The list cannot change while this dialog is open, and re-reading
+  // it on every keystroke would rebuild every row underneath the pointer.
+  const [systems, setSystems] = useState<DesignSystem[]>(() => loadSystems())
 
-  const library = tokens ? libraries.find((l) => l.id === tokens.id) ?? null : null
+  const library = standard.libraryId
+    ? libraries.find((l) => l.id === standard.libraryId) ?? null
+    : null
+  const system = standard.systemId ? systems.find((s) => s.id === standard.systemId) ?? null : null
+
+  /**
+   * The standard, written out for the model.
+   *
+   * A design system is turned into a library rather than described in prose,
+   * because the run needs names it can write into a stylesheet and "the
+   * primary is a deep indigo" is not one.
+   */
   const tokenBlock = useMemo(() => {
-    if (!library || !tokens) return null
-    const block = formatTokensForPrompt(library.studio, tokens.themeId ?? library.studio.activeTheme)
-    return block ? { name: library.name, block } : null
-  }, [library, tokens])
+    const parts: string[] = []
+    const names: string[] = []
+    if (library) {
+      const themes = standard.themeIds.length
+        ? standard.themeIds
+        : [library.studio.activeTheme]
+      // Two themes carry the same variable names with different values, so
+      // each block says which theme it is or the second silently wins.
+      for (const themeId of themes) {
+        const block = formatTokensForPrompt(library.studio, themeId)
+        if (!block) continue
+        const theme = library.themes.find((t) => t.id === themeId)
+        parts.push(theme ? `${theme.name}:\n${block}` : block)
+      }
+      if (parts.length) {
+        const picked = themes
+          .map((id) => library.themes.find((t) => t.id === id)?.name)
+          .filter(Boolean)
+        names.push(picked.length > 1 ? `${library.name} (${picked.join(' and ')})` : library.name)
+      }
+    }
+    if (system) {
+      const studio = studioFromDesignSystem(system)
+      const block = formatTokensForPrompt(studio, studio.activeTheme)
+      if (block) { parts.push(block); names.push(system.name) }
+    }
+    if (parts.length === 0) return null
+    return { name: names.join(' and '), block: parts.join('\n\n') }
+  }, [library, system, standard.themeIds])
 
   const sections: ReportSection[] = useMemo(
-    () => (stage.at === 'report' ? buildReport(stage.findings) : []),
+    () => (stage.at === 'read' ? buildReport(stage.findings) : []),
     [stage]
   )
   const accepted = useMemo(() => {
@@ -74,7 +144,8 @@ export function GuidelineCheckModal({
       return
     }
     setDeclined(new Set())
-    setStage({ at: 'report', ...res })
+    setStage({ at: 'read', ...res })
+    setStep('standard')
   }
 
   const checkLink = async (): Promise<void> => {
@@ -84,7 +155,8 @@ export function GuidelineCheckModal({
     const res = await window.terminal42.guidelines.checkGithub(url)
     if (!res.ok) { setStage({ at: 'failed', error: res.error }); return }
     setDeclined(new Set())
-    setStage({ at: 'report', ...res })
+    setStage({ at: 'read', ...res })
+    setStep('standard')
   }
 
   const toggle = (id: string): void => {
@@ -107,7 +179,7 @@ export function GuidelineCheckModal({
   }
 
   const apply = (): void => {
-    if (stage.at !== 'report') return
+    if (stage.at !== 'read') return
     if (applyPrompt(sections, accepted).length === 0) return
     onApply({
       checkId: stage.id,
@@ -117,36 +189,62 @@ export function GuidelineCheckModal({
   }
 
   const close = (): void => {
-    if (stage.at === 'report') void window.terminal42.guidelines.forget(stage.id)
+    if (stage.at === 'read') void window.terminal42.guidelines.forget(stage.id)
     onClose()
   }
 
-  // The library sits beside this dialog rather than inside it: Modal is a
-  // plain overlay, not a portal, so nesting one puts a second backdrop and a
-  // second scroll box inside the first and neither can be read.
-  if (libraryOpen) {
+  // Setting the values by hand is the same questions as making a design
+  // system, so it is the same wizard rather than a second, thinner copy of
+  // it that would drift. It sits beside this dialog rather than inside it:
+  // Modal is a plain overlay, not a portal, so nesting one puts a second
+  // backdrop and a second scroll box inside the first and neither can be read.
+  if (wizardOpen) {
     return (
-      <TokenLibraryModal
-        chosen={tokens}
-        onChoose={(next) => { setTokens(next); setLibraryOpen(false) }}
-        onClose={() => setLibraryOpen(false)}
+      <DesignSystemWizard
+        onCancel={() => setWizardOpen(false)}
+        onComplete={(made) => {
+          setSystems((prev) => [...prev.filter((s) => s.id !== made.id), made])
+          setStandard((prev) => ({ ...prev, systemId: made.id }))
+          setWizardOpen(false)
+        }}
       />
     )
   }
 
-  return (
-    <Modal title="Design check" onClose={close} size={stage.at === 'report' ? 'large' : 'medium'}>
-      <ModalHeader
-        title="Design check"
-        note={
-          stage.at === 'report'
-            ? `${reportSummary(sections, stage.name)} ${stage.fileCount} files read.`
-            : 'Measure a project against the design guidelines.'
-        }
-      />
+  const toggleTheme = (lib: TokenLibrary, themeId: string): void => {
+    setStandard((prev) => {
+      // Choosing a theme of another library is choosing that library: two
+      // libraries at once is two answers to the same question.
+      const themeIds = prev.libraryId === lib.id
+        ? prev.themeIds.includes(themeId)
+          ? prev.themeIds.filter((t) => t !== themeId)
+          : [...prev.themeIds, themeId]
+        : [themeId]
+      if (themeIds.length === 0) return { ...prev, libraryId: null, themeIds: [] }
+      return { ...prev, libraryId: lib.id, themeIds }
+    })
+  }
 
-      {stage.at === 'intake' && (
-        <ModalBody className="flex flex-col gap-4">
+  const stepNote: Record<Step, string> = {
+    project: 'The page, stylesheet or app to measure.',
+    standard: 'What to hold it to. The guidelines apply either way.',
+    report:
+      stage.at === 'read'
+        ? `${reportSummary(sections, stage.name)} ${stage.fileCount} files read.`
+        : ''
+  }
+
+  return (
+    // One size throughout. A dialog that grows between one step and the next
+    // moves the button you were reaching for.
+    <Modal title="Design check" onClose={close} size="large">
+      <ModalHeader title="Design check" note={stepNote[step]} />
+      <div className="px-5 pt-3">
+        <ModalSteps count={STEP_ORDER.length} at={STEP_ORDER.indexOf(step)} />
+      </div>
+
+      {step === 'project' && stage.at === 'intake' && (
+        <ModalBody height={420} className="flex flex-col gap-4">
           <button
             type="button"
             onClick={() => void checkFolder()}
@@ -176,40 +274,15 @@ export function GuidelineCheckModal({
                 disabled={!link.trim()}
                 className="h-9 shrink-0 rounded-md bg-accent px-4 text-[12.5px] font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-35"
               >
-                Check
+                Read it
               </button>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={() => setLibraryOpen(true)}
-            className="flex items-center gap-3 rounded-lg bg-elevated px-4 py-3 text-left transition-colors hover:bg-raised"
-          >
-            <TokenGlyph className="shrink-0 text-text-secondary" />
-            <span className="min-w-0 flex-1">
-              <span className="block text-[13px] text-text-primary">
-                {library ? library.name : 'Follow a token library'}
-              </span>
-              <span className="block text-[11.5px] text-text-muted">
-                {library
-                  ? 'Its colours and sizes replace the ones found'
-                  : 'Optional — put the project onto your own colours and sizes'}
-              </span>
-            </span>
-            {library && (
-              <span className="flex h-5 shrink-0 overflow-hidden rounded">
-                {library.swatches.slice(0, 5).map((c, i) => (
-                  <span key={i} className="w-3" style={{ background: c }} />
-                ))}
-              </span>
-            )}
-          </button>
         </ModalBody>
       )}
 
-      {stage.at === 'running' && (
-        <ModalBody className="flex min-h-[160px] flex-col items-center justify-center gap-3">
+      {step === 'project' && stage.at === 'running' && (
+        <ModalBody height={420} className="flex flex-col items-center justify-center gap-3">
           <span className="flex h-6 w-6">
             <span className="absolute inline-flex h-6 w-6 animate-ping rounded-full bg-accent/30" />
             <span className="relative inline-flex h-6 w-6 rounded-full bg-accent/60" />
@@ -218,8 +291,8 @@ export function GuidelineCheckModal({
         </ModalBody>
       )}
 
-      {stage.at === 'failed' && (
-        <ModalBody className="flex min-h-[160px] flex-col items-center justify-center gap-3">
+      {step === 'project' && stage.at === 'failed' && (
+        <ModalBody height={420} className="flex flex-col items-center justify-center gap-3">
           <p className="max-w-sm text-center text-[12.5px] text-text-secondary">{stage.error}</p>
           <button
             type="button"
@@ -231,7 +304,114 @@ export function GuidelineCheckModal({
         </ModalBody>
       )}
 
-      {stage.at === 'report' && (
+      {step === 'standard' && (
+        <ModalBody height={420} className="flex flex-col gap-5 overflow-y-auto">
+          {libraries.length > 0 && (
+            <section className="flex flex-col gap-1.5">
+              <h3 className="text-[11.5px] text-text-muted">Your token libraries</h3>
+              <ul className="flex flex-col gap-1">
+                {libraries.map((lib) => {
+                  const picked = standard.libraryId === lib.id
+                  return (
+                    <li key={lib.id} className="flex items-center gap-3 rounded-lg bg-elevated px-3 py-2">
+                      <TokenGlyph className="shrink-0 text-text-secondary" />
+                      <span className={`min-w-0 flex-1 truncate text-[12.5px] ${picked ? 'text-text-primary' : 'text-text-secondary'}`}>
+                        {lib.name}
+                      </span>
+                      <span className="flex h-4 shrink-0 overflow-hidden rounded">
+                        {lib.swatches.slice(0, 5).map((c, i) => (
+                          <span key={i} className="w-2.5" style={{ background: c }} />
+                        ))}
+                      </span>
+                      {/* Both themes at once is a real answer: a page can be
+                          right in Light and unreadable in Dark. */}
+                      <span className="flex shrink-0 items-center gap-1">
+                        {lib.themes.map((t) => {
+                          const on = picked && standard.themeIds.includes(t.id)
+                          return (
+                            <button
+                              key={t.id}
+                              type="button"
+                              aria-pressed={on}
+                              onClick={() => toggleTheme(lib, t.id)}
+                              className={`rounded-md px-2 py-1 text-[11px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                                on ? 'bg-accent text-black' : 'bg-surface text-text-muted hover:text-text-primary'
+                              }`}
+                            >
+                              {t.name}
+                            </button>
+                          )
+                        })}
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
+            </section>
+          )}
+
+          <section className="flex flex-col gap-1.5">
+            <h3 className="text-[11.5px] text-text-muted">Your design systems</h3>
+            <ul className="flex flex-col gap-1">
+              {systems.map((sys) => {
+                const picked = standard.systemId === sys.id
+                return (
+                  <li key={sys.id}>
+                    <button
+                      type="button"
+                      aria-pressed={picked}
+                      onClick={() =>
+                        setStandard((prev) => ({ ...prev, systemId: picked ? null : sys.id }))
+                      }
+                      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                        picked ? 'bg-raised' : 'bg-elevated hover:bg-raised'
+                      }`}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`grid h-[15px] w-[15px] shrink-0 place-items-center rounded ${
+                          picked ? 'bg-accent text-black' : 'bg-surface text-transparent'
+                        }`}
+                      >
+                        <IconCheck size={9} />
+                      </span>
+                      <span className={`min-w-0 flex-1 truncate text-[12.5px] ${picked ? 'text-text-primary' : 'text-text-secondary'}`}>
+                        {sys.name}
+                      </span>
+                      <span className="flex h-4 shrink-0 overflow-hidden rounded">
+                        {[sys.colors.primary, sys.colors.secondary, sys.colors.tertiary, sys.colors.surface, sys.colors.border].map((c, i) => (
+                          <span key={i} className="w-2.5" style={{ background: c }} />
+                        ))}
+                      </span>
+                    </button>
+                  </li>
+                )
+              })}
+              <li>
+                <button
+                  type="button"
+                  onClick={() => setWizardOpen(true)}
+                  className="flex w-full items-center gap-3 rounded-lg bg-elevated px-3 py-2 text-left transition-colors hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                >
+                  <span aria-hidden="true" className="grid h-[15px] w-[15px] shrink-0 place-items-center text-[13px] leading-none text-text-muted">+</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[12.5px] text-text-primary">Set the values here</span>
+                    <span className="block text-[11.5px] text-text-muted">The same questions as making a design system</span>
+                  </span>
+                </button>
+              </li>
+            </ul>
+          </section>
+
+          <p className="text-[11.5px] text-text-muted">
+            {tokenBlock
+              ? `Held to ${tokenBlock.name}, on top of the design guidelines.`
+              : 'Nothing chosen — held to the design guidelines alone.'}
+          </p>
+        </ModalBody>
+      )}
+
+      {step === 'report' && (
         <ModalBody height={420} className="flex flex-col gap-4 overflow-y-auto">
           {sections.length === 0 && (
             <p className="py-10 text-center text-[13px] text-text-secondary">
@@ -318,19 +498,10 @@ export function GuidelineCheckModal({
 
       <ModalFooter
         left={
-          stage.at === 'report' && sections.length > 0 ? (
-            <span className="flex items-center gap-3">
-              <span className="text-[11.5px] text-text-muted">
-                {accepted.size} of {sections.reduce((n, s) => n + s.rows.length, 0)} selected
-              </span>
-              <button
-                type="button"
-                onClick={() => setLibraryOpen(true)}
-                className="flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[11.5px] text-text-muted hover:bg-elevated hover:text-text-primary"
-              >
-                <TokenGlyph />
-                <span>{library ? library.name : 'Follow a token library'}</span>
-              </button>
+          step === 'report' && sections.length > 0 ? (
+            <span className="text-[11.5px] text-text-muted">
+              {accepted.size} of {sections.reduce((n, s) => n + s.rows.length, 0)} selected
+              {tokenBlock ? `, held to ${tokenBlock.name}` : ''}
             </span>
           ) : undefined
         }
@@ -343,7 +514,38 @@ export function GuidelineCheckModal({
           <IconClose size={10} />
           <span>Close</span>
         </button>
-        {stage.at === 'report' && stage.entry && sections.length > 0 && (
+
+        {/* Back only where there is something to go back to. Step one has
+            nothing behind it, and going back from the report would leave the
+            findings on screen for a project that is no longer chosen. */}
+        {step === 'standard' && (
+          <button
+            type="button"
+            onClick={() => { setStage({ at: 'intake' }); setStep('project') }}
+            className="h-8 rounded-md px-3 text-[12.5px] text-text-secondary hover:bg-elevated hover:text-text-primary"
+          >
+            Back
+          </button>
+        )}
+        {step === 'standard' && (
+          <button
+            type="button"
+            onClick={() => setStep('report')}
+            className="h-8 rounded-md bg-accent px-4 text-[12.5px] font-medium text-black transition-opacity hover:opacity-90"
+          >
+            {tokenBlock ? 'Check against it' : 'Check'}
+          </button>
+        )}
+        {step === 'report' && stage.at === 'read' && (
+          <button
+            type="button"
+            onClick={() => setStep('standard')}
+            className="h-8 rounded-md px-3 text-[12.5px] text-text-secondary hover:bg-elevated hover:text-text-primary"
+          >
+            Back
+          </button>
+        )}
+        {step === 'report' && stage.at === 'read' && stage.entry && sections.length > 0 && (
           <button
             type="button"
             onClick={apply}
