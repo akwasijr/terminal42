@@ -8,23 +8,23 @@ import {
   allStarterPrompts
 } from '../../src/renderer/src/components/starterPrompts'
 import { readAndAdvanceRotation } from '../../src/renderer/src/components/starterRotation'
-import { analyzeGoalQuality, shouldShowGoalQualityHint } from '../../src/shared/goalQuality'
+import { analyzeGoalQuality } from '../../src/shared/goalQuality'
 
 const ALL = STARTER_IDS.flatMap((id) => STARTER_POOL[id])
 
-// The starters are the first thing a new user ever sends. If one of them trips
-// the harness's own "this goal may be hard to measure" hint, the very first
-// thing the product does is scold the user for a prompt the product wrote —
-// which teaches them the hint is noise. This test is the guard against that.
+// The starters are the first thing a new user ever sends, and the same
+// scoring still feeds the goal reframe in chat. A starter the product wrote
+// that scores as a poor goal would have the product arguing with itself, so
+// each one has to stand up to its own measure.
 
 describe('starter prompts', () => {
   for (const p of ALL) {
-    it(`"${p.title}" does not trip the goal-quality hint`, () => {
+    it(`"${p.title}" scores as a goal worth sending`, () => {
       const analysis = analyzeGoalQuality(p.prompt)
       expect(
-        shouldShowGoalQualityHint(p.prompt, analysis),
-        `scored ${analysis.score}/100 — rewrite it with a stated target and a named way to verify it`
-      ).toBe(false)
+        analysis.score,
+        `scored ${analysis.score}/100. Rewrite it with a stated target and a named way to verify it`
+      ).toBeGreaterThanOrEqual(50)
     })
   }
 

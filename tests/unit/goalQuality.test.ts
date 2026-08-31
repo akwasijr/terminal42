@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { analyzeGoalQuality, goalQualityGateScore, shouldShowGoalQualityHint } from '../../src/shared/goalQuality'
+import { analyzeGoalQuality, goalQualityGateScore } from '../../src/shared/goalQuality'
 
 describe('analyzeGoalQuality', () => {
   it('scores climbable goals high when they include a target and verification', () => {
@@ -18,7 +18,6 @@ describe('analyzeGoalQuality', () => {
     expect(analysis.suggestions.length).toBeGreaterThan(0)
     expect(analysis.reasons.some((reason) => reason.text.includes('“faster”'))).toBe(true)
     expect(analysis.reasons.some((reason) => reason.kind === 'missing-measure')).toBe(true)
-    expect(shouldShowGoalQualityHint('Please improve the composer and make the terminal faster and cleaner so the whole app feels nicer to use.', analysis)).toBe(true)
   })
 
   it('keeps anchored vague words from dominating a measurable goal', () => {
@@ -32,7 +31,6 @@ describe('analyzeGoalQuality', () => {
     for (const text of ['hi', 'thanks', 'ok', 'run the tests']) {
       const analysis = analyzeGoalQuality(text)
       expect(analysis.isLikelyGoal).toBe(false)
-      expect(shouldShowGoalQualityHint(text, analysis)).toBe(false)
     }
   })
 
@@ -41,7 +39,6 @@ describe('analyzeGoalQuality', () => {
     const analysis = analyzeGoalQuality(text)
 
     expect(analysis.isLikelyGoal).toBe(false)
-    expect(shouldShowGoalQualityHint(text, analysis)).toBe(false)
   })
 
   it('does not flag pasted stack traces', () => {
@@ -51,7 +48,6 @@ describe('analyzeGoalQuality', () => {
     const analysis = analyzeGoalQuality(text)
 
     expect(analysis.isLikelyGoal).toBe(false)
-    expect(shouldShowGoalQualityHint(text, analysis)).toBe(false)
   })
 
   it('is deterministic across repeated calls', () => {
@@ -67,10 +63,9 @@ describe('analyzeGoalQuality', () => {
     expect(analysis.suggestions.some((suggestion) => suggestion.includes('cleaner'))).toBe(true)
   })
 
-  it('does not surface the UI hint for concise operational commands', () => {
-    const text = 'run npm test for the renderer package'
-    const analysis = analyzeGoalQuality(text)
+  it('does not treat a concise operational command as a goal to score', () => {
+    const analysis = analyzeGoalQuality('run npm test for the renderer package')
 
-    expect(shouldShowGoalQualityHint(text, analysis)).toBe(false)
+    expect(analysis.isLikelyGoal).toBe(false)
   })
 })

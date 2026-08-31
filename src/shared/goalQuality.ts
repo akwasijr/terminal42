@@ -23,9 +23,6 @@ export type GoalQualityAnalysis = {
 }
 
 const CLIMBABLE_SCORE = 90
-const LOW_GOAL_SCORE = 72
-const MIN_HINT_CHARS = 48
-const MIN_HINT_WORDS = 8
 const MAX_REASON_SUGGESTIONS = 4
 
 const VAGUE_TERMS = [
@@ -175,15 +172,6 @@ export function analyzeGoalQuality(goalText: string): GoalQualityAnalysis {
     suggestions: reasons.flatMap((reason) => reason.suggestion ? [reason.suggestion] : []).slice(0, MAX_REASON_SUGGESTIONS),
     isLikelyGoal: true
   }
-}
-
-export function shouldShowGoalQualityHint(goalText: string, analysis: GoalQualityAnalysis = analyzeGoalQuality(goalText)): boolean {
-  const text = goalText.trim()
-  if (!analysis.isLikelyGoal) return false
-  if (analysis.score >= LOW_GOAL_SCORE) return false
-  if (text.length < MIN_HINT_CHARS || wordsOf(text).length < MIN_HINT_WORDS) return false
-  if (analysis.reasons.every((reason) => reason.impact !== 'negative')) return false
-  return true
 }
 
 export function goalQualityGateScore(): number {
