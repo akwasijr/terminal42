@@ -365,6 +365,80 @@ function GeneratingArt(): JSX.Element {
   )
 }
 
+type BasisLib = { id: string; name: string; swatches: string[]; themes: number }
+
+/**
+ * Which values this system stands on.
+ *
+ * This was a stack of three-line rows that outgrew the step the moment a team
+ * had more than a handful of libraries, and pushed the buttons out of sight.
+ * One line, opened only when someone wants to change it.
+ */
+function BasisPicker({ basis, libs, onPick }: {
+  basis: string
+  libs: BasisLib[]
+  onPick: (id: string) => void
+}): JSX.Element {
+  const [open, setOpen] = useState(false)
+  const box = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!open) return
+    const away = (e: MouseEvent): void => { if (!box.current?.contains(e.target as Node)) setOpen(false) }
+    const esc = (e: KeyboardEvent): void => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', away)
+    document.addEventListener('keydown', esc)
+    return () => { document.removeEventListener('mousedown', away); document.removeEventListener('keydown', esc) }
+  }, [open])
+
+  const chosen = libs.find((l) => l.id === basis) ?? null
+  const row = (label: string, swatches: string[]): JSX.Element => (
+    <span className="flex min-w-0 items-center gap-2">
+      <span className="truncate text-[13px] text-text-primary">{label}</span>
+      {swatches.slice(0, 3).map((c, i) => <span key={i} className="t42-swatch h-3.5 w-3.5 shrink-0 rounded" style={{ background: c }} />)}
+    </span>
+  )
+
+  return (
+    <div ref={box}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-3 rounded-lg bg-elevated/60 px-3 py-2.5 text-left transition-colors hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+      >
+        {chosen ? row(chosen.name, chosen.swatches) : row('New library', [])}
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-text-muted" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
+      </button>
+      {open && (
+        <div role="listbox" className="mt-1.5 max-h-56 overflow-y-auto rounded-lg bg-raised py-1">
+          <button
+            type="button"
+            role="option"
+            aria-selected={basis === ''}
+            onClick={() => { onPick(''); setOpen(false) }}
+            className="flex w-full items-center px-3 py-2 text-left hover:bg-elevated"
+          >
+            {row('New library', [])}
+          </button>
+          {libs.map((l) => (
+            <button
+              key={l.id}
+              type="button"
+              role="option"
+              aria-selected={basis === l.id}
+              onClick={() => { onPick(l.id); setOpen(false) }}
+              className="flex w-full items-center px-3 py-2 text-left hover:bg-elevated"
+            >
+              {row(l.name, l.swatches)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function DesignSystemWizard({ initial, onCancel, onComplete }: {
   initial?: SystemAnswers
   onCancel: () => void
@@ -537,7 +611,6 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
       <div className="relative flex min-h-0 flex-1 flex-col">
         <div className="px-5 pt-5">
           <ModalSteps count={pages.length} at={idx} />
-          <p className="mt-3 text-[11px] text-text-muted">Step {idx + 1} of {pages.length}</p>
         </div>
         <ModalHeader
           title={TITLES[page]}
@@ -557,7 +630,7 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
           </div>
         )}
 
-        <ModalBody>
+        <ModalBody height={440}>
           {page === 'style' && (
             <div className="space-y-5">
               <div>
@@ -631,7 +704,7 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
                           {!visionApplied && !analyzing && <button type="button" onClick={() => { setAnalysisSkipped(true); setAnalysisNote('Skipped. Your screenshots will still be stored as references.'); }} className="rounded-md px-2.5 py-1 text-[11.5px] text-text-muted hover:bg-elevated hover:text-text-primary">Skip</button>}
                         </div>
                       </div>
-                      {analyzing && <p className="text-[11.5px] leading-relaxed text-text-muted">Reading the colours, corners, type, density and feel from the actual UI.</p>}
+                      {analyzing && <p className="text-[11.5px] text-text-muted">Reading the screenshots…</p>}
                       {!analyzing && visionApplied && (
                         <>
                           <div className="grid grid-cols-2 gap-x-5 gap-y-1.5 sm:grid-cols-3">
@@ -644,10 +717,9 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
                             <div className="flex gap-1">{[a.primary, a.secondary, a.tertiary].map((c, i) => <span key={i} className="t42-swatch h-4 w-4 rounded" style={{ background: c }} title={c} />)}</div>
                           </div>
                           {analysisNote && <p className="text-[11.5px] leading-relaxed text-text-muted">{analysisNote}</p>}
-                          <p className="text-[11px] leading-relaxed text-text-muted">These become your starting tokens. You can change any of them in the next steps.</p>
                         </>
                       )}
-                      {!analyzing && analysisSkipped && <p className="text-[11.5px] leading-relaxed text-text-muted">Analysis skipped. Generate is allowed, but the result may not match the screenshots as closely.</p>}
+                      {!analyzing && analysisSkipped && <p className="text-[11.5px] text-text-muted">Not read, so the result may not match.</p>}
                       {!analyzing && !visionApplied && analysisNote && <p className="text-[11.5px] leading-relaxed text-text-secondary">{analysisNote}</p>}
                     </div>
                   )}
@@ -661,51 +733,13 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
           )}
 
           {page === 'basis' && (
-            <div className="space-y-4">
-              <p className="max-w-xl text-[12.5px] leading-relaxed text-text-muted">
-                A design system is built on a set of values. Point at the library that already holds yours and the colour, type and shape questions go away — there is one answer to them, and it lives there.
-              </p>
-              <div className="space-y-1.5">
-                <button
-                  type="button"
-                  onClick={() => setBasis('')}
-                  aria-pressed={basis === ''}
-                  className={`flex w-full items-center justify-between gap-3 rounded-lg px-3.5 py-3 text-left transition-colors ${basis === '' ? 'bg-surface' : 'bg-elevated/40 hover:bg-elevated/70'}`}
-                >
-                  <span>
-                    <span className="block text-[13px] text-text-primary">Build one from my answers</span>
-                    <span className="mt-0.5 block text-[11.5px] text-text-muted">The next four steps ask for the values, and a library is made from them.</span>
-                  </span>
-                  {basis === '' && <DsIcon name="check" style="outlined" size={15} />}
-                </button>
-                {libs.map((l) => (
-                  <button
-                    key={l.id}
-                    type="button"
-                    onClick={() => { setBasis(l.id); setIdx((i) => i) }}
-                    aria-pressed={basis === l.id}
-                    className={`flex w-full items-center justify-between gap-3 rounded-lg px-3.5 py-3 text-left transition-colors ${basis === l.id ? 'bg-surface' : 'bg-elevated/40 hover:bg-elevated/70'}`}
-                  >
-                    <span>
-                      <span className="block text-[13px] text-text-primary">{l.name}</span>
-                      <span className="mt-1 flex items-center gap-2">
-                        {l.swatches.map((c, i) => <span key={i} className="t42-swatch h-4 w-4 rounded" style={{ background: c }} />)}
-                        <span className="text-[11.5px] text-text-muted">{l.themes === 1 ? 'One theme' : `${l.themes} themes`}</span>
-                      </span>
-                    </span>
-                    {basis === l.id && <DsIcon name="check" style="outlined" size={15} />}
-                  </button>
-                ))}
-              </div>
-              {libs.length === 0 && <p className="text-[11.5px] text-text-muted">You have no token libraries yet, so one will be made for this system.</p>}
+            <div className="max-w-sm">
+              <BasisPicker basis={basis} libs={libs} onPick={setBasis} />
             </div>
           )}
 
           {page === 'parts' && (
             <div className="space-y-6">
-              <p className="max-w-xl text-[12.5px] leading-relaxed text-text-muted">
-                What this system covers beyond the components. Leave a row off if nobody has designed it yet — an empty one is more honest than a claimed one.
-              </p>
               <div className="space-y-2">
                 <FieldLabel>Patterns</FieldLabel>
                 <div className="flex flex-wrap gap-1.5">
@@ -796,7 +830,6 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
 
           {page === 'rules' && (
             <div className="space-y-4">
-              <p className="text-[12.5px] leading-relaxed text-text-muted">Rules that keep the system away from AI defaults. Turn one off only if you want to allow it.</p>
               {AI_RULE_GROUPS.map((g) => {
                 const rules = DS_RULES.filter((r) => r.group === g.id)
                 if (!rules.length) return null

@@ -368,7 +368,7 @@ export function DesignSystemView({ openSystemId, onConsumeOpen }: { openSystemId
         return (
           <section className="space-y-3">
             <PageTitle>Layout grid</PageTitle>
-            <DocNote text="A 12-column grid keeps every layout aligned. Columns flex, gutters stay fixed." />
+            <DocNote text={s.docs?.grid ?? 'A 12-column grid keeps every layout aligned.'} />
             <div className="rounded-xl bg-surface p-5">
               <div className="mb-2 text-[11px] text-text-muted">12 columns</div>
               <div className="flex gap-1.5">
@@ -416,7 +416,7 @@ export function DesignSystemView({ openSystemId, onConsumeOpen }: { openSystemId
         return (
           <section className="space-y-3">
             <PageTitle>Icons</PageTitle>
-            <DocNote text="One icon set, drawn in your chosen style." />
+            <DocNote text={s.docs?.icons ?? 'One icon set, drawn in your chosen style.'} />
             <div className="max-w-[220px]"><SelectorBox label="Icon style" value={cur} options={iconOpts} onChange={(v) => update({ iconStyle: v as DesignSystem['iconStyle'] })} /></div>
             <div className="rounded-xl bg-surface p-5">
               <div className="flex flex-wrap gap-6" style={{ color: s.colors.text }}>

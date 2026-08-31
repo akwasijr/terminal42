@@ -756,7 +756,7 @@ function StudioEditor({
                 onClick={fillTheGaps}
                 className="rounded-sm text-text-secondary underline decoration-border underline-offset-2 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
               >
-                Decide them from what is here
+                {gapCount === 1 ? 'Decide it from what is here' : 'Decide them from what is here'}
               </button>
             </div>
           )}

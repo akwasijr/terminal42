@@ -156,9 +156,7 @@ export interface DSDocs {
   elevation?: string
   motion?: string
   grid?: string
-  sizing?: string
   icons?: string
-  images?: string
 }
 
 export interface DesignSystem {
@@ -599,7 +597,9 @@ export function buildSystemPrompt(a: SystemAnswers, palette: string[], basis?: S
     '    "spacing": "One short sentence on spacing rhythm.",',
     '    "radius": "One short sentence on corner usage.",',
     '    "elevation": "One short sentence on elevation usage.",',
-    '    "motion": "One short sentence on motion intent."',
+    '    "motion": "One short sentence on motion intent.",',
+    '    "grid": "One short sentence on how layouts are aligned.",',
+    '    "icons": "One short sentence on the icon style."',
     '  }',
     '}',
     basis
@@ -656,7 +656,8 @@ export function applyAiSystem(base: DesignSystem, parsed: unknown, opts?: { colo
     const dd = d as Record<string, unknown>
     const docs: DSDocs = {
       overview: cleanDocStr(dd.overview), colors: cleanDocStr(dd.colors), typography: cleanDocStr(dd.typography),
-      spacing: cleanDocStr(dd.spacing), radius: cleanDocStr(dd.radius), elevation: cleanDocStr(dd.elevation), motion: cleanDocStr(dd.motion)
+      spacing: cleanDocStr(dd.spacing), radius: cleanDocStr(dd.radius), elevation: cleanDocStr(dd.elevation),
+      motion: cleanDocStr(dd.motion), grid: cleanDocStr(dd.grid), icons: cleanDocStr(dd.icons)
     }
     if (Object.values(docs).some(Boolean)) out.docs = docs
   }
