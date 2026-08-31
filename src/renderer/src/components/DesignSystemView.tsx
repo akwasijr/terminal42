@@ -5,6 +5,7 @@ import { DesignSystemWizard } from './DesignSystemWizard'
 import { DS_CATEGORIES, DS_COMPONENTS } from './dsComponents'
 import { DsIcon, ICON_SAMPLE, iconSnippet } from './dsIcons'
 import { ensureTokenLibrary, refreshFromLibrary } from '../lib/tokens/systemLibrary'
+import { requestLibrary } from '../lib/tokens/openLatch'
 import { GuidelinesPage, LayoutsPage, PatternsPage } from './designSystem/SystemPages'
 import { ComponentRules } from './designSystem/ComponentRules'
 import { Modal, ModalHeader, ModalBody, ModalFooter } from './Modal'
@@ -213,7 +214,7 @@ export function DesignSystemView({ openSystemId, onConsumeOpen }: { openSystemId
         return
       }
       setSystems(upsertSystem(linked))
-      setTokensNote(`\u201c${s.name}\u201d now stands on its own token library. Find it under Tokens.`)
+      setTokensNote('Library made. It is under Tokens.')
     } finally {
       setMakingTokens(false)
     }
@@ -475,7 +476,16 @@ export function DesignSystemView({ openSystemId, onConsumeOpen }: { openSystemId
       { id: 'spacing', label: 'Dimensions', desc: 'Spacing on a 4px grid.', preview: <div className="flex h-full w-full flex-col justify-center gap-1.5 px-5" style={{ background: ov.colors.surface }}>{[40, 64, 88].map((w) => <span key={w} className="h-2 rounded-full" style={{ width: w, background: s.colors.primary }} />)}</div> },
       { id: 'grid', label: 'Layout grid', desc: '12-column responsive grid.', preview: <div className="flex h-full w-full items-stretch gap-1 px-4 py-4" style={{ background: ov.colors.surface }}>{Array.from({ length: 8 }).map((_, i) => <span key={i} className="flex-1 rounded-sm" style={{ background: `${s.colors.primary}33` }} />)}</div> },
       { id: 'radius', label: 'Corner radius', desc: 'Corner shape and outlines.', preview: <div className="grid h-full w-full place-items-center" style={{ background: ov.colors.surface }}><span style={{ width: 48, height: 48, borderRadius: Math.min(22, s.radii.lg), background: `${s.colors.primary}26`, border: `1px solid ${s.colors.border}` }} /></div> },
-      { id: 'elevation', label: 'Elevation', desc: 'Shadow levels.', preview: <div className="grid h-full w-full place-items-center" style={{ background: ov.colors.surface }}><span style={{ width: 64, height: 40, borderRadius: Math.min(14, s.radii.md), background: ov.colors.bg, boxShadow: SHADOW_CSS[s.shadow === 'off' ? 'subtle' : s.shadow] }} /></div> }
+      { id: 'elevation', label: 'Elevation', desc: 'Shadow levels.', preview: <div className="grid h-full w-full place-items-center" style={{ background: ov.colors.surface }}><span style={{ width: 64, height: 40, borderRadius: Math.min(14, s.radii.md), background: ov.colors.bg, boxShadow: SHADOW_CSS[s.shadow === 'off' ? 'subtle' : s.shadow] }} /></div> },
+      // The rail has eight foundations and this grid had seven. Motion was the
+      // one nobody could get to from here.
+      { id: 'motion', label: 'Motion', desc: 'Durations and easing.', preview: (
+        <div className="flex h-full w-full items-center gap-1.5 px-4" style={{ background: ov.colors.surface }}>
+          {[0.35, 0.6, 1].map((w, i) => (
+            <span key={i} style={{ height: 6, flex: w, borderRadius: 3, background: ov.colors.primary, opacity: 0.35 + i * 0.3 }} />
+          ))}
+        </div>
+      ) }
     ]
     return (
       <section className="space-y-8">
@@ -570,14 +580,28 @@ export function DesignSystemView({ openSystemId, onConsumeOpen }: { openSystemId
                 <div className="fixed inset-0 z-20" onClick={() => setMenuOpen(false)} role="presentation" />
                 <div className="t42-menu absolute right-0 top-full z-30 mt-1.5 w-44 overflow-hidden rounded-lg bg-raised py-1 shadow-overlay">
                   <button type="button" onClick={() => { setMenuOpen(false); setWizard({ initial: answersFromSystem(s) }) }} className="flex w-full px-3 py-2 text-left text-[12.5px] text-text-primary hover:bg-elevated">Duplicate &amp; tweak</button>
-                  <button
-                    type="button"
-                    disabled={makingTokens}
-                    onClick={() => { setMenuOpen(false); void makeTokens() }}
-                    className="flex w-full px-3 py-2 text-left text-[12.5px] text-text-primary hover:bg-elevated disabled:opacity-50"
-                  >
-                    {makingTokens ? 'Making a library…' : 'Make a token library'}
-                  </button>
+                  {s.tokensId ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuOpen(false)
+                        requestLibrary(s.tokensId!)
+                        window.dispatchEvent(new CustomEvent('t42:tokens-open-library', { detail: { id: s.tokensId } }))
+                      }}
+                      className="flex w-full px-3 py-2 text-left text-[12.5px] text-text-primary hover:bg-elevated"
+                    >
+                      Open its library
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={makingTokens}
+                      onClick={() => { setMenuOpen(false); void makeTokens() }}
+                      className="flex w-full px-3 py-2 text-left text-[12.5px] text-text-primary hover:bg-elevated disabled:opacity-50"
+                    >
+                      {makingTokens ? 'Making a library…' : 'Make a token library'}
+                    </button>
+                  )}
                   <button type="button" onClick={() => { setMenuOpen(false); setConfirmDel(true) }} className="flex w-full px-3 py-2 text-left text-[12.5px] text-error hover:bg-error/10">Delete</button>
                 </div>
               </>

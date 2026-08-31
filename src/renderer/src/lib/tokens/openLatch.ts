@@ -29,8 +29,30 @@ let pendingNew = false
  */
 let pendingFeel: string | null = null
 
+/**
+ * "…and open this one when you get there."
+ *
+ * A design system stands on a library and can now send somebody to it. Same
+ * ordering problem as the request above: the tab switches first, so the id
+ * waits here until the library screen turns up to take it.
+ */
+let pendingOpenId: string | null = null
+
 export function requestTokens(): void {
   pending = true
+}
+
+/** Ask for the library list, already opened on one library. */
+export function requestLibrary(id: string): void {
+  pending = true
+  pendingOpenId = id
+}
+
+/** The library to open on arrival, once per request. */
+export function takeLibraryRequest(): string | null {
+  const was = pendingOpenId
+  pendingOpenId = null
+  return was
 }
 
 /** True once per request. */

@@ -24,7 +24,7 @@ import { CardMenu, ConfirmDelete } from '../CardMenu'
 import { FolderBar } from '../FolderBar'
 import { useFolders } from '../../lib/designFolders'
 import { TokensSetup } from './TokensSetup'
-import { takeNewTokensRequest, takeNewTokensFeel } from '../../lib/tokens/openLatch'
+import { takeNewTokensRequest, takeNewTokensFeel, takeLibraryRequest } from '../../lib/tokens/openLatch'
 import {
   hydrateStudio,
   isAlias,
@@ -125,6 +125,28 @@ export function TokensView({ onFullPage }: { onFullPage?: (full: boolean) => voi
       setOpenId(null)
       setSetupOpen(true)
     }
+    // A design system knows which library it stands on, and had no way to send
+    // anybody there: the menu offered to make a second one instead. Heard live
+    // and taken on mount, because the tab switch happens first and this screen
+    // is not listening yet when the request is made.
+    const openLibrary = (id: string): void => {
+      setSetupOpen(false)
+      void (async () => {
+        try {
+          const row = await window.terminal42.tokens.get(id)
+          if (!row) return
+          setOpenId(row.id)
+          setStudio(hydrateStudio(row.studio))
+        } catch { /* a library that will not open is left closed */ }
+      })()
+    }
+    const onOpenLibrary = (e: Event): void => {
+      const id = (e as CustomEvent<{ id?: string }>).detail?.id ?? takeLibraryRequest()
+      if (id) openLibrary(id)
+    }
+    const waiting = takeLibraryRequest()
+    if (waiting) openLibrary(waiting)
+    window.addEventListener('t42:tokens-open-library', onOpenLibrary as EventListener)
     window.addEventListener('t42:tokens-new-from', onNewFrom as EventListener)
     // Something outside this view can add a library — duplicating a template
     // does. Without this the list only caught up on a remount, which happened
@@ -138,6 +160,7 @@ export function TokensView({ onFullPage }: { onFullPage?: (full: boolean) => voi
     return () => {
       window.removeEventListener('t42:tokens-new', onNew)
       window.removeEventListener('t42:tokens-new-from', onNewFrom as EventListener)
+      window.removeEventListener('t42:tokens-open-library', onOpenLibrary as EventListener)
       window.removeEventListener('t42:tokens-changed', onChanged)
     }
   }, [])

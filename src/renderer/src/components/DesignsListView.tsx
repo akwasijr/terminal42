@@ -133,7 +133,11 @@ export function DesignsListView({
     if (takeTokensRequest()) setTypeFilter('tokens')
     const onOpen = (): void => setTypeFilter('tokens')
     window.addEventListener('t42:tokens-open', onOpen)
-    return () => window.removeEventListener('t42:tokens-open', onOpen)
+    window.addEventListener('t42:tokens-open-library', onOpen)
+    return () => {
+      window.removeEventListener('t42:tokens-open', onOpen)
+      window.removeEventListener('t42:tokens-open-library', onOpen)
+    }
   }, [scope])
 
   // The Form section has no pill for the design-only views, so if it ever
