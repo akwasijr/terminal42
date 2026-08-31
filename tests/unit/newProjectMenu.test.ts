@@ -32,9 +32,9 @@ describe('the New project menu opens the wizard on the type you picked', () => {
 
   it('clears the category on every other way into the wizard', () => {
     // A category left over from a previous open would silently pick the type
-    // for you. Count the resets: three template doors plus the cancel path.
+    // for you. Count the resets: two template doors plus the cancel path.
     const resets = listView.match(/setWizardCategory\(null\)/g) ?? []
-    expect(resets.length).toBeGreaterThanOrEqual(4)
+    expect(resets.length).toBeGreaterThanOrEqual(3)
   })
 
   it('hands the category to the wizard as its preset', () => {

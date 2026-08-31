@@ -66,7 +66,7 @@ describe('making one', () => {
   })
 
   it('routes every "use this template" through the wizard, which opens', () => {
-    for (const fn of ['createDeckFromTemplate', 'createFromTemplate', 'createWebFromTemplate']) {
+    for (const fn of ['createFromTemplate', 'createWebFromTemplate']) {
       const body = LIST.slice(LIST.indexOf(`const ${fn}`), LIST.indexOf(`const ${fn}`) + 420)
       expect(body, fn).toMatch(/setWizardOpen\(true\)/)
     }

@@ -16,9 +16,7 @@ const ROOT = join(__dirname, '..', '..', 'src', 'renderer', 'src', 'components')
 
 const GALLERIES = [
   'TemplatesGallery.tsx',
-  'DeckTemplateGallery.tsx',
   'WebsiteTemplates.tsx',
-  join('tokens', 'TokenTemplates.tsx'),
   'TemplatesModal.tsx',
   join('motion', 'MotionTemplates.tsx')
 ]
@@ -41,17 +39,9 @@ describe('template galleries', () => {
   })
 
   it('lets you take a copy from every shelf, not just some of them', () => {
-    // The deck shelf was the odd one out: it could only be used as the
-    // starting point for a wizard, so there was no way to take a deck
-    // template as-is the way every other shelf allows. The overlay pickers
-    // (TemplatesModal, MotionTemplates) are excluded -- they are a way in to
-    // one document, not a shelf you browse.
-    const SHELVES = [
-      'TemplatesGallery.tsx',
-      'DeckTemplateGallery.tsx',
-      'WebsiteTemplates.tsx',
-      join('tokens', 'TokenTemplates.tsx')
-    ]
+    // The overlay pickers (TemplatesModal, MotionTemplates) are excluded:
+    // they are a way in to one document, not a shelf you browse.
+    const SHELVES = ['TemplatesGallery.tsx', 'WebsiteTemplates.tsx']
     for (const file of SHELVES) {
       const source = readFileSync(join(ROOT, file), 'utf8')
       expect(source, `${file} has no Duplicate`).toMatch(/Duplicate to my/)
@@ -62,7 +52,7 @@ describe('template galleries', () => {
     // A cover drawn straight into whatever box it is given keeps its fixed
     // type sizes, so the detail modal showed the same small slide in a larger
     // frame. Draw once at a fixed size and scale.
-    for (const file of ['DeckTemplateGallery.tsx', 'WebsiteTemplates.tsx']) {
+    for (const file of ['WebsiteTemplates.tsx']) {
       const source = readFileSync(join(ROOT, file), 'utf8')
       expect(source, `${file} does not scale`).toMatch(/ResizeObserver/)
       expect(source, `${file} does not scale`).toMatch(/transformOrigin: 'top left'/)

@@ -1,8 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { applyFeel, DEFAULT_ANSWERS, type SystemAnswers } from '../lib/designSystem'
-import { TokenTemplates } from './tokens/TokenTemplates'
-import { studioFromPreset } from '../lib/tokenPresets'
-import type { Vibe } from '../lib/designSystem'
+import type { SystemAnswers } from '../lib/designSystem'
 import { CardMenu, ConfirmDelete } from './CardMenu'
 import { requestNewTokens, takeTokensRequest } from '../lib/tokens/openLatch'
 import { formatAge } from '../lib/formatAge'
@@ -10,12 +7,10 @@ import type { Design, DesignBrief, DesignGroup, TemplateInfo } from '../../../pr
 import { DesignWizard } from './DesignWizard'
 import { TokensView } from './tokens/TokensView'
 import { TemplatesGallery } from './TemplatesGallery'
-import { DeckTemplateGallery } from './DeckTemplateGallery'
 import { WebsiteTemplates } from './WebsiteTemplates'
 import { FolderBar } from './FolderBar'
 import { useFolders, hasLegacyFolders, migrateLegacyFolders } from '../lib/designFolders'
 import type { WebsiteTemplate } from '../../../shared/websites/templates'
-import type { DeckTemplate } from '../../../shared/decks/templates'
 import { DesignSystemView } from './DesignSystemView'
 import { DesignSystemWizard } from './DesignSystemWizard'
 import { type DesignSystem, upsertSystem } from '../lib/designSystem'
@@ -88,7 +83,6 @@ export function DesignsListView({
   // The house chosen from the deck gallery, stamped onto the brief when the
   // wizard finishes. Held here rather than asked for inside the wizard: it is
   // already answered by the time the wizard opens.
-  const [deckHouse, setDeckHouse] = useState<DeckTemplate | null>(null)
   const [webHouse, setWebHouse] = useState<WebsiteTemplate | null>(null)
   // The type the New project menu already committed to, so the wizard does
   // not open by asking what you just told it.
@@ -101,12 +95,11 @@ export function DesignsListView({
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('web')
   const [shelf, setShelf] = useState<Shelf>('mine')
 
-  // Which types have starting points to offer. "All" does not: a gallery
-  // mixing deck templates with token templates is the thing this replaced.
-  const hasTemplates =
-    scope === 'design' &&
-    (typeFilter === 'app' || typeFilter === 'web' || typeFilter === 'presentation' ||
-     typeFilter === 'tokens' || typeFilter === 'system')
+  // Which types have starting points to offer. Tokens, design systems and
+  // decks do not: a generated starting point there was never as good as the
+  // thing you would have described, and it set the result off on the wrong
+  // foot.
+  const hasTemplates = scope === 'design' && (typeFilter === 'app' || typeFilter === 'web')
 
   // What your own work is called depends on what it is. "Ongoing projects" is
   // right for an app and wrong for a token library, which is not a project.
@@ -214,13 +207,8 @@ export function DesignsListView({
     if (creating) return
     setCreating(true)
     try {
-      // Whichever gallery opened this wizard pins its template onto the brief.
-      // Only one can be set: they belong to different kinds of thing.
-      const brief = deckHouse
-        ? { ...rawBrief, deckStyleId: deckHouse.id }
-        : webHouse
-          ? { ...rawBrief, webStyleId: webHouse.id }
-          : rawBrief
+      // The website gallery pins its template onto the brief.
+      const brief = webHouse ? { ...rawBrief, webStyleId: webHouse.id } : rawBrief
       const starter = wizardStarter
       const createOpts = starter
         ? { brief, title: `${starter.displayName} starter` }
@@ -288,45 +276,9 @@ export function DesignsListView({
     }
   }
 
-  /** Open the token wizard with this template's feel already chosen. */
-  const useTokenTemplate = (vibe: Vibe): void => {
-    // Left in the latch rather than fired as an event: the list that answers
-    // this does not exist until the tab has switched, and an event sent in
-    // between is heard by nobody.
-    requestNewTokens(vibe)
-    setTypeFilter('tokens')
-    setShelf('mine')
-  }
-
-  /** Same feel, but into the design system wizard rather than the token one. */
-  const useSystemTemplate = (vibe: Vibe): void => {
-    setTypeFilter('system')
-    setShelf('mine')
-    setDsSeed(applyFeel(DEFAULT_ANSWERS, vibe))
-    setDsWizardOpen(true)
-  }
-
-  /**
-   * Take the built library as it stands, without the wizard's questions.
-   * Lands on your own shelf, because a copy you cannot find is not a copy.
-   */
-  const duplicateTokenTemplate = async (vibe: Vibe): Promise<string | null> => {
-    try {
-      const built = studioFromPreset(vibe)
-      await window.terminal42.tokens.create(built.name, built)
-      setTypeFilter('tokens')
-      setShelf('mine')
-      window.dispatchEvent(new Event('t42:tokens-changed'))
-      return null
-    } catch (e) {
-      return String((e as Error).message || e)
-    }
-  }
-
   /** Start a website already committed to one template. */
   const createWebFromTemplate = (style: WebsiteTemplate): void => {
     if (creating) return
-    setDeckHouse(null)
     setWebHouse(style)
     setWizardStarter(null)
     setWizardCategory(null)
@@ -366,30 +318,6 @@ export function DesignsListView({
   }
 
   /** Returns null on success, or the reason it failed so the card can say so. */
-  const duplicateDeckTemplate = async (t: DeckTemplate): Promise<string | null> => {
-    try {
-      const brief = {
-        v: 1 as const,
-        kind: 'pitch-deck' as DesignBrief['kind'],
-        kindLabel: 'Deck',
-        group: 'presentation' as const,
-        fidelity: 'highfidelity' as const,
-        createdAt: Date.now(),
-        deckStyleId: t.id,
-        idea: `A deck in the ${t.name} style. ${t.note}`
-      } as DesignBrief
-      const d = await window.terminal42.designs.create({ title: `${t.name} deck`, brief })
-      await refresh()
-      const settings = await window.terminal42.settings.get().catch(() => null)
-      void window.terminal42.designs.send(d.id, brief.idea ?? t.name, settings?.defaultModel ?? null)
-      onOpen(d)
-      return null
-    } catch (e) {
-      return String((e as Error).message || e)
-    }
-  }
-
-  /** Returns null on success, or the reason it failed so the card can say so. */
   const duplicateTemplate = async (t: TemplateInfo): Promise<string | null> => {
     const r = await window.terminal42.templates.copyToDesign({
       templateId: t.id,
@@ -417,7 +345,6 @@ export function DesignsListView({
   }
 
   const openHtmlWizard = (category?: DesignGroup): void => {
-    setDeckHouse(null)
     setWebHouse(null)
     setWizardCategory(category ?? null)
     setWizardTarget('html')
@@ -468,21 +395,8 @@ export function DesignsListView({
     onOpen(d)
   }
 
-  /** Start a deck already committed to one template. */
-  const createDeckFromTemplate = (style: DeckTemplate): void => {
-    if (creating) return
-    setDeckHouse(style)
-    setWebHouse(null)
-    setWizardStarter(null)
-    setWizardCategory(null)
-    setWizardTarget('html')
-    setWizardInitialIdea('')
-    setWizardOpen(true)
-  }
-
   const createFromTemplate = (t: TemplateInfo): void => {
     if (creating) return
-    setDeckHouse(null)
     setWebHouse(null)
     setWizardStarter(t)
     setWizardCategory(null)
@@ -788,16 +702,9 @@ export function DesignsListView({
         )}
 
         <div className={tokensFull ? 'min-h-0 flex-1' : 'pb-10'}>
-        {/* The templates shelf. Each type shows its own starting points and
-            nothing else, which is the whole reason the shared gallery went. */}
+        {/* The templates shelf, for the two types that still have one. */}
         {shelf === 'templates' ? (
-          typeFilter === 'presentation' ? (
-            <DeckTemplateGallery onUse={createDeckFromTemplate} onDuplicate={duplicateDeckTemplate} />
-          ) : typeFilter === 'tokens' ? (
-            <TokenTemplates onUse={useTokenTemplate} onDuplicate={duplicateTokenTemplate} />
-          ) : typeFilter === 'system' ? (
-            <TokenTemplates onUse={useSystemTemplate} onDuplicate={duplicateTokenTemplate} />
-          ) : typeFilter === 'web' ? (
+          typeFilter === 'web' ? (
             <WebsiteTemplates onUse={createWebFromTemplate} onDuplicate={duplicateWebTemplate} />
           ) : (
             <TemplatesGallery onUse={createFromTemplate} onDuplicate={duplicateTemplate} />
@@ -890,9 +797,9 @@ export function DesignsListView({
             initialIdea={wizardInitialIdea}
             target={wizardTarget}
             starterTemplate={wizardStarter ?? undefined}
-            presetCategory={deckHouse ? 'presentation' : webHouse ? 'web' : wizardCategory ?? undefined}
+            presetCategory={webHouse ? 'web' : wizardCategory ?? undefined}
             creating={creating}
-            onCancel={() => { if (!creating) { setWizardOpen(false); setWizardInitialIdea(''); setWizardStarter(null); setDeckHouse(null); setWebHouse(null); setWizardCategory(null) } }}
+            onCancel={() => { if (!creating) { setWizardOpen(false); setWizardInitialIdea(''); setWizardStarter(null); setWebHouse(null); setWizardCategory(null) } }}
             onComplete={(brief, kickoff) => void handleWizardComplete(brief, kickoff)}
           />
         )}

@@ -8,7 +8,6 @@ import {
   type WizardState, type ProjectTypeId, type Branch
 } from '../lib/brief'
 import type { ProjectBrief } from '../../../preload/index'
-import { DECK_TEMPLATES } from '../../../shared/decks/templates'
 import { Modal, ModalHeader, ModalBody, ModalFooter, ModalSteps, ModalButton } from './Modal'
 
 type Props = {
@@ -109,10 +108,9 @@ export function pageList(branch: Branch, type: ProjectTypeId | null, designSyste
       if (isPrint) {
         // Static / print-style pieces: no surfaces, no motion, no UI radius/shadow,
         // no theme toggle. Brand and inspiration matter most.
-        // A deck is not a small app. Its template has already decided the
-        // look, the type, the corner shape and the palette, so re-asking those
-        // is noise, and a tech stack means nothing for a presentation. Ask
-        // what the template cannot know, and stop.
+        // A deck is not a small app: a tech stack means nothing for a
+        // presentation, and how it is set follows from the brief and the
+        // design system it stands on rather than a shelf of looks.
         if (type === 'slide-deck') {
           return [
             'type',
@@ -292,7 +290,6 @@ export function BriefWizard({ folderPath, projectId, initial, onCancel, onComple
     <Modal title={PAGE_TITLES[currentPage] ?? ''} onClose={onCancel} size="large">
       <div className="px-5 pt-5" title={folderPath}>
         <ModalSteps count={total} at={pageIdx} />
-        <p className="mt-3 text-[11px] text-text-muted">Step {pageIdx + 1} of {total}</p>
       </div>
       <ModalHeader
         title={PAGE_TITLES[currentPage] ?? ''}
@@ -550,38 +547,14 @@ const ICO_ARC  = Ico(<><path d="M3 15c3-8 11-8 14 0" /><circle cx="3" cy="15" r=
 /**
  * The one page a slide deck gets that an app does not.
  *
- * Everything a template already decides — palette, type, corner shape, how a
- * slide is laid out — is not asked here, because asking again only invites an
- * answer that fights the template. What is left is the three things a template
- * genuinely cannot know: which template, how long the deck runs, and the shape
- * of the argument it has to carry.
+ * How the deck is set is decided from the brief and the design system it
+ * stands on, not picked off a shelf, so what is asked here is the two things
+ * neither can know: how long the deck runs, and the shape of the argument it
+ * has to carry.
  */
 function PageDeck({ state, set }: { state: WizardState; set: <K extends keyof WizardState>(k: K, v: WizardState[K]) => void }) {
   return (
     <div className="space-y-6">
-      <div>
-        <div className="mb-2.5 text-sm font-medium text-text-primary">Template</div>
-        <div className="grid grid-cols-3 gap-2.5">
-          {DECK_TEMPLATES.map((t) => {
-            const selected = state.deckTemplate === t.id
-            return (
-              <button key={t.id} onClick={() => set('deckTemplate', t.id)} className={tileClass(selected, 'p-2.5')}>
-                <span
-                  className="mb-2 block h-12 w-full rounded-md"
-                  style={{ background: t.tokens['--deck-bg'] }}
-                >
-                  <span
-                    className="ml-2 mt-2 inline-block h-2 w-8 rounded-sm"
-                    style={{ background: t.tokens['--deck-accent-1'] }}
-                  />
-                </span>
-                <span className="block text-sm font-medium text-text-primary">{t.name}</span>
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
       <div>
         <div className="mb-2.5 text-sm font-medium text-text-primary">Length</div>
         <div className="grid grid-cols-3 gap-2.5">
@@ -752,33 +725,9 @@ function ColorPickerRow({
 }
 
 function PageColors({ state, set }: { state: WizardState; set: <K extends keyof WizardState>(k: K, v: WizardState[K]) => void }) {
-  // A deck template arrives with a palette that was taken from a real deck and
-  // balanced there. Overriding it is a choice worth offering, but it is not the
-  // default, so keeping it is the first thing on the page.
-  const template = DECK_TEMPLATES.find((t) => t.id === state.deckTemplate)
-  const overriding = !!(state.brandColor || state.secondaryColor || state.tertiaryColor)
   return (
     <div>
       <PageHeading title="Brand colors" hint="Primary required, secondary and tertiary optional" />
-      {template && (
-        <div className="mb-4 space-y-2.5">
-          <button
-            onClick={() => { set('brandColor', ''); set('secondaryColor', ''); set('tertiaryColor', '') }}
-            className={tileClass(!overriding, 'flex w-full items-center gap-3')}
-          >
-            <span className="flex flex-none gap-1">
-              {['--deck-bg', '--deck-accent-1', '--deck-ink'].map((k) => (
-                <span key={k} className="h-7 w-7 rounded-md" style={{ background: template.tokens[k] }} />
-              ))}
-            </span>
-            <span>
-              <span className="block text-sm font-medium text-text-primary">Keep the {template.name} palette</span>
-              <span className="block text-xs text-text-secondary">{template.note}</span>
-            </span>
-          </button>
-          <div className="text-xs text-text-secondary">Or set your own below, which overrides it.</div>
-        </div>
-      )}
       <div className="space-y-3">
         <ColorPickerRow label="Primary" value={state.brandColor} onChange={(v) => set('brandColor', v)} />
         <ColorPickerRow label="Secondary" value={state.secondaryColor} onChange={(v) => set('secondaryColor', v)} />

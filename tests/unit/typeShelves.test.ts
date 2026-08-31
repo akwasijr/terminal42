@@ -60,10 +60,13 @@ describe('the shelf row', () => {
     expect(LIST).not.toMatch(/typeFilter === 'all' \|\|[\s\S]{0,80}hasTemplates/)
   })
 
-  it('shows each type its own templates and nobody else\u2019s', () => {
+  it('keeps a shelf of looks away from decks, tokens and systems', () => {
+    // A generated starting point there was never as good as the thing you
+    // would have described, and it set the result off on the wrong foot.
+    expect(LIST).toMatch(/hasTemplates = scope === 'design' && \(typeFilter === 'app' \|\| typeFilter === 'web'\)/)
     const shelf = LIST.slice(LIST.indexOf("shelf === 'templates' ? ("))
-    expect(shelf).toMatch(/typeFilter === 'presentation' \?\s*\(\s*<DeckTemplateGallery/)
-    expect(shelf).toMatch(/typeFilter === 'tokens' \?\s*\(\s*<TokenTemplates/)
+    expect(shelf).toMatch(/typeFilter === 'web' \?\s*\(\s*<WebsiteTemplates/)
+    expect(shelf).not.toMatch(/DeckTemplateGallery|TokenTemplates/)
   })
 })
 

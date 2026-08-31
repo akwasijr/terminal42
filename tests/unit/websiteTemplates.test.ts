@@ -138,7 +138,7 @@ describe('the wizard it opens', () => {
   it('does not ask what you are designing when you already said', () => {
     // Choosing a website template answers that question. Asking again let you
     // pick Presentation and pin a website template onto a deck.
-    expect(LIST).toMatch(/presetCategory=\{deckHouse \? 'presentation' : webHouse \? 'web' :/)
+    expect(LIST).toMatch(/presetCategory=\{webHouse \? 'web' :/)
   })
 
   it('pins the chosen template onto the brief', () => {

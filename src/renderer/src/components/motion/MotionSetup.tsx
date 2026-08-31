@@ -77,6 +77,7 @@ export function MotionSetup({
   const size = SIZES.find((s) => s.aspect === aspect)!
   const arrangement = MOTION_COMPONENTS.find((c) => c.id === componentId)!
   const last = stepIdx === STEPS.length - 1
+  const own = !BACKGROUNDS.some((b) => b.value === background)
 
   // The preview frame is drawn at the chosen proportion inside a fixed box, so
   // a Story and a Widescreen occupy the same space rather than shoving the
@@ -112,7 +113,7 @@ export function MotionSetup({
             <div className="flex justify-between gap-2">
               <dt className="text-text-muted">Ground</dt>
               <dd className="text-text-primary">
-                {BACKGROUNDS.find((b) => b.value === background)?.label ?? background}
+                {BACKGROUNDS.find((b) => b.value === background)?.label ?? background.toUpperCase()}
               </dd>
             </div>
           </dl>
@@ -121,7 +122,6 @@ export function MotionSetup({
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="px-5 pt-5">
             <ModalSteps count={STEPS.length} at={stepIdx} />
-            <p className="mt-3 text-[11px] text-text-muted">Step {stepIdx + 1} of {STEPS.length}</p>
           </div>
           <ModalHeader title={step.question} />
 
@@ -165,6 +165,23 @@ export function MotionSetup({
                     </button>
                   </li>
                 ))}
+                <li>
+                  <label className={`${tile(own)} block cursor-pointer`}>
+                    <span
+                      style={{ background: own ? background : 'conic-gradient(#e05252,#e0c452,#52c46a,#5290e0,#e05252)' }}
+                      className="block h-12 w-full rounded-sm"
+                    />
+                    <span className="mt-1.5 block truncate text-[12px]">
+                      {own ? background.toUpperCase() : 'Any colour'}
+                    </span>
+                    <input
+                      type="color"
+                      value={background}
+                      onChange={(e) => setBackground(e.target.value)}
+                      className="sr-only"
+                    />
+                  </label>
+                </li>
               </ul>
             )}
 
