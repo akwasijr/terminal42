@@ -371,7 +371,6 @@ export function TokensSetup({
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="px-5 pt-5">
             <ModalSteps count={STEPS.length} at={stepIdx} />
-            <p className="mt-3 text-[11px] text-text-muted">Step {stepIdx + 1} of {STEPS.length}</p>
           </div>
           <ModalHeader title={step.question} />
 

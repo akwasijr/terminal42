@@ -162,7 +162,14 @@ export function ModalFooter({
 /** Progress across a stepped dialog. Position, not decoration. */
 export function ModalSteps({ count, at }: { count: number; at: number }): React.JSX.Element {
   return (
-    <div className="flex items-center gap-1.5" aria-hidden="true">
+    <div
+      className="flex items-center gap-1.5"
+      role="progressbar"
+      aria-label={`Step ${at + 1} of ${count}`}
+      aria-valuemin={1}
+      aria-valuemax={count}
+      aria-valuenow={at + 1}
+    >
       {Array.from({ length: count }, (_, i) => (
         <span
           key={i}

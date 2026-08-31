@@ -27,7 +27,9 @@ describe('the new token library wizard', () => {
     // your behalf and made anyone who already knew their style hunt for the
     // nearest match. It opens on the one thing only you can supply.
     expect(screen.getByText('What is this set called?')).toBeTruthy()
-    expect(screen.getByText('Step 1 of 10')).toBeTruthy()
+    // The step count lives on the progress bar rather than in a second line
+    // of prose repeating what the bar already shows.
+    expect(screen.getByRole('progressbar').getAttribute('aria-label')).toBe('Step 1 of 10')
   })
 
   it('asks about every decision that changes the library', () => {
