@@ -204,4 +204,26 @@ describe('applyPrompt keeps the page standing on its own', () => {
     const p = flat(applyPrompt(sections, accepted, { shell: true }))
     expect(p).toContain('Do not invent a product, sections or content the source does not have')
   })
+
+  it('carries what a system says about itself, not only its values', () => {
+    // Held to a system's colours and to none of its decisions is being
+    // measured against a palette, not against a system.
+    const p = applyPrompt(sections, accepted, {
+      tokens: {
+        name: 'Calm Care',
+        block: ':root { --colour-brand: #7b8b7c }',
+        covers: 'Patterns it has agreed: Login, Forms.\nDo not: use a dropdown for two options.'
+      }
+    })
+    expect(flat(p)).toContain('Calm Care also says this about itself')
+    expect(p).toContain('Patterns it has agreed: Login, Forms.')
+    expect(p).toContain('Do not: use a dropdown for two options.')
+  })
+
+  it('says nothing about coverage when the system claims none', () => {
+    const p = applyPrompt(sections, accepted, {
+      tokens: { name: 'Calm Care', block: ':root { --colour-brand: #7b8b7c }' }
+    })
+    expect(p).not.toContain('also says this about itself')
+  })
 })

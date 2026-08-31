@@ -105,6 +105,24 @@ function runOnce(prompt: string, model: string | null, cwd: string, attachments:
   })
 }
 
+/** True when the CLI refused the model itself, rather than failing the request. */
+function modelUnavailable(error: string): boolean {
+  return /model .*(is )?not available|unknown model|unsupported model/i.test(error)
+}
+
+/**
+ * Run with the preferred model, and if the CLI does not have that model, run
+ * again with whatever the user's default is. An account without the fast model
+ * would otherwise get silence from every AI feature in the app.
+ */
+async function runWithFallback(
+  prompt: string, model: string | null, cwd: string, attachments: string[] = []
+): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+  const first = await runOnce(prompt, model, cwd, attachments)
+  if (first.ok || !model || !modelUnavailable(first.error)) return first
+  return runOnce(prompt, null, cwd, attachments)
+}
+
 export function registerCanvasAssistIpc(_getWin: () => BrowserWindow | null): void {
   // Reads the OS clipboard's text/html — used to import a Figma copy (the renderer
   // 'paste' event doesn't fire reliably on a non-editable canvas).
@@ -118,7 +136,7 @@ export function registerCanvasAssistIpc(_getWin: () => BrowserWindow | null): vo
     // quick model keeps it snappy regardless of the user's global default.
     const model = args?.model ?? 'claude-haiku-4.5'
     const cwd = sandboxDir()
-    return runOnce(prompt, model, cwd)
+    return runWithFallback(prompt, model, cwd)
   })
 
   // Vision variant: writes the provided images (data URLs) to temp files and
@@ -143,7 +161,7 @@ export function registerCanvasAssistIpc(_getWin: () => BrowserWindow | null): vo
         try { writeFileSync(file, Buffer.from(m[2], 'base64')); files.push(file) } catch { /* skip */ }
       }
       if (!files.length) return { ok: false, error: 'No valid images to analyze.' }
-      return await runOnce(prompt, model, cwd, files)
+      return await runWithFallback(prompt, model, cwd, files)
     } finally {
       for (const f of files) { try { unlinkSync(f) } catch { /* ignore */ } }
     }

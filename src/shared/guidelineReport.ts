@@ -82,7 +82,7 @@ export function applyPrompt(
   source: {
     shell?: boolean
     files?: string[]
-    tokens?: { name: string; block: string } | null
+    tokens?: { name: string; block: string; covers?: string } | null
   } = {}
 ): string {
   const lines: string[] = []
@@ -145,5 +145,12 @@ export function applyPrompt(
       ]
     : []
 
-  return [...head, ...standalone, ...where, ...tokens, '', ...lines].join('\n')
+  // What the system decided beyond its values. A project held to a system's
+  // colours and to none of its decisions has been measured against a palette,
+  // not against a system.
+  const covers = source.tokens?.covers
+    ? ['', `${source.tokens.name} also says this about itself. Follow it where the project touches on it:`, source.tokens.covers]
+    : []
+
+  return [...head, ...standalone, ...where, ...tokens, ...covers, '', ...lines].join('\n')
 }

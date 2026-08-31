@@ -52,6 +52,41 @@ type Standard = {
 
 const NO_STANDARD: Standard = { libraryId: null, themeIds: [], systemId: null }
 
+/**
+ * What a system says it covers, for the prompt.
+ *
+ * A design system is not only values. It says which components it documents,
+ * which patterns it has agreed, and what its own guidelines ask for, and none
+ * of that reached the run: a project was held to the colours of a system and
+ * to none of its decisions. Empty rows are left out, because a system that
+ * claims a pattern nobody designed is worse than one that claims nothing.
+ */
+function coversOf(system: DesignSystem | null): string | undefined {
+  if (!system) return undefined
+  const lines: string[] = []
+  const components = (system.components ?? []).map((c) => c.id)
+  const patterns = (system.patterns ?? []).map((p) => p.name)
+  const layouts = (system.layouts ?? []).map((l) => l.name)
+  if (components.length) lines.push(`Components it documents: ${components.join(', ')}.`)
+  if (patterns.length) lines.push(`Patterns it has agreed: ${patterns.join(', ')}.`)
+  if (layouts.length) lines.push(`Layouts it has agreed: ${layouts.join(', ')}.`)
+  const g = system.guidelines
+  if (g) {
+    for (const [label, value] of [
+      ['Component usage', g.componentUsage],
+      ['Accessibility', g.accessibility],
+      ['Content', g.content],
+      ['Interaction', g.interaction],
+      ['Responsive', g.responsive]
+    ] as const) {
+      if (value && value.trim()) lines.push(`${label}: ${value.trim()}`)
+    }
+    for (const d of g.dos ?? []) lines.push(`Do: ${d}`)
+    for (const d of g.donts ?? []) lines.push(`Do not: ${d}`)
+  }
+  return lines.length ? lines.join('\n') : undefined
+}
+
 export function GuidelineCheckModal({
   onClose,
   onApply
@@ -118,13 +153,22 @@ export function GuidelineCheckModal({
       }
     }
     if (system) {
-      const studio = studioFromDesignSystem(system)
-      const block = formatTokensForPrompt(studio, studio.activeTheme)
+      // A system that stands on a library is a reader of it, not a second
+      // copy. Rebuilding a library out of the system's own values would hold
+      // the project to the copy and lose everything the library holds that
+      // the system never carried: the whole palette, the component parts, the
+      // themes. Only a system with no library falls back to its own values.
+      const linked = system.tokensId
+        ? libraries.find((l) => l.id === system.tokensId) ?? null
+        : null
+      const studio = linked ? linked.studio : studioFromDesignSystem(system)
+      const themeId = linked ? system.tokensThemeId ?? studio.activeTheme : studio.activeTheme
+      const block = formatTokensForPrompt(studio, themeId)
       if (block) { parts.push(block); names.push(system.name) }
     }
     if (parts.length === 0) return null
-    return { name: names.join(' and '), block: parts.join('\n\n') }
-  }, [library, system, standard.themeIds])
+    return { name: names.join(' and '), block: parts.join('\n\n'), covers: coversOf(system) }
+  }, [library, system, libraries, standard.themeIds])
 
   const sections: ReportSection[] = useMemo(
     () => (stage.at === 'read' ? buildReport(stage.findings) : []),

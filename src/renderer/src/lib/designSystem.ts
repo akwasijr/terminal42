@@ -543,8 +543,28 @@ export function applyBase(s: DesignSystem, base: BaseTheme): DesignSystem {
 
 const hex6 = /^#[0-9a-fA-F]{6}$/
 
+/**
+ * What a system already stands on, for the prompt.
+ *
+ * A system built on a library has had its colour, type and shape answered
+ * before the model is asked anything. Without this the model is handed the
+ * wizard's untouched defaults and writes documentation about them: a system
+ * whose primary is a sage green got a colour page reading "teal primary with
+ * slate neutral", which is not a small wording problem, it is the page lying
+ * about the system it documents.
+ */
+export type SystemBasis = {
+  /** The library's name, so the docs can say what this stands on. */
+  name: string
+  /** The library's resolved values, as `formatTokensForPrompt` writes them. */
+  tokens: string
+  patterns?: string[]
+  layouts?: string[]
+  components?: string[]
+}
+
 /** Build the strict-JSON prompt sent to canvas.assist for a design system brief. */
-export function buildSystemPrompt(a: SystemAnswers, palette: string[]): string {
+export function buildSystemPrompt(a: SystemAnswers, palette: string[], basis?: SystemBasis | null): string {
   const pal = palette.filter((c) => hex6.test(c)).slice(0, 6)
   const lines = [
     'You are a senior design-systems lead. Read the brief and produce a refined brand palette and concise documentation for a design system.',
@@ -556,20 +576,22 @@ export function buildSystemPrompt(a: SystemAnswers, palette: string[]): string {
     `- Branding notes: ${a.branding.trim() || '(none)'}`,
     `- Overall vibe: ${a.vibe}`,
     `- Base theme: ${a.base}`,
-    `- Chosen brand colors: primary ${a.primary}, secondary ${a.secondary}, tertiary ${a.tertiary}`,
-    pal.length ? `- Colors sampled from the uploaded logo/screenshots: ${pal.join(', ')}` : '- No image colors provided',
-    `- Heading font: ${a.headingFont}; Body font: ${a.bodyFont}`,
-    `- Corners: ${a.cornerStyle}; Borders: ${a.borderStyle}; Icons: ${a.iconStyle}; Density: ${a.density}; Type scale: ${a.scale}; Elevation: ${a.elevation}; Motion: ${a.motionStyle}`,
+    basis ? '' : `- Chosen brand colors: primary ${a.primary}, secondary ${a.secondary}, tertiary ${a.tertiary}`,
+    basis ? '' : (pal.length ? `- Colors sampled from the uploaded logo/screenshots: ${pal.join(', ')}` : '- No image colors provided'),
+    basis ? '' : `- Heading font: ${a.headingFont}; Body font: ${a.bodyFont}`,
+    basis ? '' : `- Corners: ${a.cornerStyle}; Borders: ${a.borderStyle}; Icons: ${a.iconStyle}; Density: ${a.density}; Type scale: ${a.scale}; Elevation: ${a.elevation}; Motion: ${a.motionStyle}`,
+    basis ? `- Icons: ${a.iconStyle}` : '',
     a.notes.trim() ? `- Extra notes: ${a.notes.trim()}` : '',
     (a.shots && a.shots.length) ? `- Reference UI screenshots were provided (${a.shots.length}). Match their look closely: keep the palette above and the ${a.base} base faithful to the references, and choose tokens that fit that style. Only fall back to sensible defaults where the references give no signal (for example exact fonts or motion).` : '',
     a.refName.trim() ? `- The user says the references resemble: ${a.refName.trim()}. Follow that product's known visual conventions where appropriate.` : '',
+    ...(basis ? basisLines(basis) : []),
     '',
     formatRulesForPrompt(dsActiveRuleIds(a.rules)),
     '',
     'Return ONLY a JSON object (no prose, no markdown fence) with this exact shape:',
     '{',
     '  "name": "short refined name (optional, keep theirs if good)",',
-    '  "colors": { "primary": "#RRGGBB", "secondary": "#RRGGBB", "tertiary": "#RRGGBB", "success": "#RRGGBB", "warning": "#RRGGBB", "error": "#RRGGBB", "info": "#RRGGBB" },',
+    basis ? '' : '  "colors": { "primary": "#RRGGBB", "secondary": "#RRGGBB", "tertiary": "#RRGGBB", "success": "#RRGGBB", "warning": "#RRGGBB", "error": "#RRGGBB", "info": "#RRGGBB" },',
     '  "docs": {',
     '    "overview": "One short sentence: what this system is for.",',
     '    "colors": "One short sentence on palette roles.",',
@@ -580,14 +602,33 @@ export function buildSystemPrompt(a: SystemAnswers, palette: string[]): string {
     '    "motion": "One short sentence on motion intent."',
     '  }',
     '}',
-    'Rules: keep brand colors close to the chosen/sampled ones unless they clash with the brief. All colors must be 6-digit hex. Each doc value must be ONE short, plain sentence (max ~16 words), specific to THIS brief, no marketing fluff, no all-caps, no dashes of any kind (no em or en dashes), use commas or the word "to" instead.'
+    basis
+      ? 'Rules: the values above are already decided and you may not change or propose any. Describe what is there, in words a designer would say out loud: write the real colors, font names and numbers (for example "sage green", "#7b8b7c", "Lato", "8px"), never a token or CSS variable name such as --colour-brand, and never a color the library does not contain. Each doc value must be ONE short, plain sentence (max ~16 words), specific to THIS system, no marketing fluff, no all-caps, no dashes of any kind (no em or en dashes), use commas or the word "to" instead.'
+      : 'Rules: keep brand colors close to the chosen/sampled ones unless they clash with the brief. All colors must be 6-digit hex. Each doc value must be ONE short, plain sentence (max ~16 words), specific to THIS brief, no marketing fluff, no all-caps, no dashes of any kind (no em or en dashes), use commas or the word "to" instead.'
   ]
   return lines.filter(Boolean).join('\n')
+}
+
+/** The library and the coverage, written out under the brief. */
+function basisLines(basis: SystemBasis): string[] {
+  const out: string[] = [
+    '',
+    `This system stands on the token library "${basis.name}". Its values are already decided:`,
+    basis.tokens
+  ]
+  if (basis.components?.length) out.push(`- Components it documents: ${basis.components.join(', ')}`)
+  if (basis.patterns?.length) out.push(`- Patterns it covers: ${basis.patterns.join(', ')}`)
+  if (basis.layouts?.length) out.push(`- Layouts it covers: ${basis.layouts.join(', ')}`)
+  return out
 }
 
 function cleanDocStr(v: unknown): string | undefined {
   if (typeof v !== 'string') return undefined
   const t = v.trim().replace(/\s*[\u2013\u2014]\s*/g, ' - ').replace(/[\u2013\u2014]/g, '-') // no em/en dashes
+  // A sentence that recites variable names ("combines --colour-brand and
+  // --colour-background") documents nothing a reader could not already see in
+  // the token table. No note is better than a note that says the same thing twice.
+  if (/--[a-z0-9]+(-[a-z0-9]+)+/i.test(t)) return undefined
   return t ? t.slice(0, 180) : undefined
 }
 

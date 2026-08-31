@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   type BaseTheme, type BorderStyle, type CornerStyle, type Density, type DesignSystem, type Elevation, type IconStyle, type RefProfile, type ScaleChoice, type SystemAnswers, type Vibe,
-  DEFAULT_ANSWERS, DS_RULES, FEEL_PRESETS, applyFeel, generateSystem, buildSystemPrompt, buildVisionPrompt, applyVisionAnalysis, parseSystemReply, applyAiSystem
+  DEFAULT_ANSWERS, DS_RULES, FEEL_PRESETS, applyFeel, generateSystem, buildSystemPrompt, buildVisionPrompt, applyVisionAnalysis, parseSystemReply, applyAiSystem,
+  type SystemBasis
 } from '../lib/designSystem'
 import { AI_RULE_GROUPS, type AiRuleId } from '../lib/aiRules'
 import { FONT_OPTIONS } from '../lib/brief'
@@ -9,6 +10,8 @@ import { DsIcon } from './dsIcons'
 import { Modal, ModalHeader, ModalBody, ModalFooter, ModalSteps, ModalButton } from './Modal'
 import { LAYOUT_CATALOGUE, PATTERN_CATALOGUE } from '../lib/dsCatalogues'
 import { refreshFromLibrary } from '../lib/tokens/systemLibrary'
+import { formatTokensForPrompt } from '../../../shared/tokens/export'
+import type { TokenStudio } from '../../../shared/tokens/types'
 
 function fontStack(name: string): string {
   return FONT_OPTIONS.find((f) => f.id === name)?.stack ?? `'${name}', system-ui, sans-serif`
@@ -475,17 +478,41 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
       } catch { /* fall through to deterministic */ }
     }
     let sys = generateSystem(ans)
+    // What the system stands on, before the model is asked anything. A system
+    // on a library has already answered colour, type and shape; without this
+    // the model documents the wizard's untouched defaults instead.
+    let basisBlock: SystemBasis | null = null
+    if (basis) {
+      try {
+        const row = await window.terminal42.tokens.get(basis)
+        if (row) {
+          const studio = row.studio as TokenStudio
+          const block = formatTokensForPrompt(studio, studio.activeTheme)
+          if (block) {
+            basisBlock = {
+              name: row.name || studio.name,
+              tokens: block,
+              components: sys.components?.map((c) => c.id),
+              patterns: pickedPatterns.map((id) => PATTERN_CATALOGUE.find((x) => x.id === id)?.name ?? id),
+              layouts: pickedLayouts.map((id) => LAYOUT_CATALOGUE.find((x) => x.id === id)?.name ?? id)
+            }
+          }
+        }
+      } catch { /* a library that will not read is a reason to ask without it */ }
+    }
     try {
       const assist = window.terminal42?.canvas?.assist
       if (assist) {
-        const res = await assist(buildSystemPrompt(ans, palette), null)
+        const res = await assist(buildSystemPrompt(ans, palette, basisBlock), null)
+        if (!res.ok) console.warn('[t42] system brief failed:', res.error)
         if (res.ok) {
           const parsed = parseSystemReply(res.text)
           // When the screenshots already gave accurate colours, keep them; only take the docs.
-          if (parsed) sys = applyAiSystem(sys, parsed, { colors: !usedVision, name: !ans.name.trim() })
+          // A library decides them outright, so there is nothing to take at all.
+          if (parsed) sys = applyAiSystem(sys, parsed, { colors: !usedVision && !basis, name: !ans.name.trim() })
         }
       }
-    } catch { /* fall back to the deterministic system */ }
+    } catch (err) { console.warn('[t42] system brief threw:', err) }
     // What the system covers, and what it stands on. Linking the library
     // before the values are read means the library wins any disagreement,
     // which is the whole point of picking one.

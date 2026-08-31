@@ -79,6 +79,35 @@ describe('design system AI helpers', () => {
     expect(out.name).toBe('Teal')
   })
 
+  it('buildSystemPrompt hands over the library instead of the untouched defaults', () => {
+    // A system on a library has already answered colour, type and shape. Asked
+    // without them, the model documented the wizard's defaults and a sage
+    // green system got a colour page reading "teal primary".
+    const p = buildSystemPrompt(A, ['#ff0000'], {
+      name: 'Calm Care',
+      tokens: ':root { --colour-brand: #7b8b7c }',
+      components: ['Button', 'TextInput'],
+      patterns: ['Login'],
+      layouts: ['Grid']
+    })
+    expect(p).toContain('stands on the token library "Calm Care"')
+    expect(p).toContain('--colour-brand: #7b8b7c')
+    expect(p).toContain('Components it documents: Button, TextInput')
+    expect(p).toContain('Patterns it covers: Login')
+    expect(p).toContain('Layouts it covers: Grid')
+    // The values are decided, so it is not asked to choose any.
+    expect(p).not.toContain('Chosen brand colors')
+    expect(p).not.toContain('"colors": {')
+    expect(p).toContain('already decided and you may not change')
+  })
+
+  it('buildSystemPrompt still asks for colours when there is no library', () => {
+    const p = buildSystemPrompt(A, ['#ff0000'])
+    expect(p).toContain('Chosen brand colors')
+    expect(p).toContain('"colors": {')
+    expect(p).not.toContain('stands on the token library')
+  })
+
   it('applyAiSystem returns base unchanged on garbage', () => {
     const base = generateSystem(A)
     expect(applyAiSystem(base, null)).toEqual(base)
@@ -146,5 +175,19 @@ describe('design system AI helpers', () => {
     expect(withRef).toContain('Stripe dashboard')
     const noRef = buildSystemPrompt({ ...A, shots: undefined, refName: '' }, [])
     expect(noRef).not.toMatch(/Reference UI screenshots were provided/)
+  })
+})
+
+describe('documentation that only recites token names', () => {
+  it('is dropped, while a sentence naming real values is kept', () => {
+    const base = generateSystem(DEFAULT_ANSWERS)
+    const out = applyAiSystem(base, {
+      docs: {
+        colors: 'The palette combines --colour-brand and --colour-background.',
+        motion: 'Gentle 150ms fades on transform and opacity.'
+      }
+    })
+    expect(out.docs?.colors).toBeUndefined()
+    expect(out.docs?.motion).toBe('Gentle 150ms fades on transform and opacity.')
   })
 })
