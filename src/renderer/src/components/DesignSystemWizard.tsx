@@ -7,6 +7,8 @@ import { AI_RULE_GROUPS, type AiRuleId } from '../lib/aiRules'
 import { FONT_OPTIONS } from '../lib/brief'
 import { DsIcon } from './dsIcons'
 import { Modal, ModalHeader, ModalBody, ModalFooter, ModalSteps, ModalButton } from './Modal'
+import { LAYOUT_CATALOGUE, PATTERN_CATALOGUE } from '../lib/dsCatalogues'
+import { refreshFromLibrary } from '../lib/tokens/systemLibrary'
 
 function fontStack(name: string): string {
   return FONT_OPTIONS.find((f) => f.id === name)?.stack ?? `'${name}', system-ui, sans-serif`
@@ -150,9 +152,32 @@ function scalePicto(id: ScaleChoice): ReactNode { return <span style={{ display:
 function elevPicto(id: Elevation): ReactNode { return <span style={{ width: 26, height: 16, borderRadius: 3, background: '#cbd0d6', boxShadow: ELEV_SHADOW[id], border: id === 'flat' ? '1px solid currentColor' : 'none' }} /> }
 function iconPicto(id: IconStyle): ReactNode { return <DsIcon name="star" style={id} size={20} color="currentColor" /> }
 
-const PAGES = ['style', 'brand', 'color', 'type', 'shape', 'feel', 'rules', 'context'] as const
+const PAGES = ['style', 'basis', 'brand', 'color', 'type', 'shape', 'feel', 'parts', 'rules', 'context'] as const
 type Page = typeof PAGES[number]
-const TITLES: Record<Page, string> = { style: 'Style', brand: 'Brand', color: 'Color', type: 'Type', shape: 'Shape', feel: 'Feel', rules: 'Rules', context: 'Context' }
+const TITLES: Record<Page, string> = { style: 'Style', basis: 'Basis', brand: 'Brand', color: 'Color', type: 'Type', shape: 'Shape', feel: 'Feel', parts: 'Parts', rules: 'Rules', context: 'Context' }
+
+// The four pages that ask for values a token library already holds. When the
+// system is standing on an existing library, asking again would only invite
+// two answers to the same question, so they are dropped.
+const VALUE_PAGES: Page[] = ['color', 'type', 'shape', 'feel']
+
+/**
+ * Enough of a library to recognise it by.
+ *
+ * A list of eleven rows all reading "an existing token library" tells nobody
+ * which one is theirs. Its colours do.
+ */
+function summariseLibrary(row: { id: string; name: string; studio?: unknown }): { id: string; name: string; swatches: string[]; themes: number } {
+  const studio = row.studio as { sets?: { tokens?: { path: string; type: string; value: unknown }[] }[]; themes?: unknown[] } | undefined
+  const colors: Record<string, string> = {}
+  for (const set of studio?.sets ?? [])
+    for (const t of set.tokens ?? [])
+      if (t.type === 'color' && typeof t.value === 'string') colors[t.path] = t.value
+  const wanted = ['palette.brand.600', 'palette.accent.600', 'palette.neutral.600']
+  const picked = wanted.map((k) => colors[k]).filter((v): v is string => !!v)
+  const swatches = picked.length ? picked : [...new Set(Object.values(colors))].slice(0, 3)
+  return { id: row.id, name: row.name, swatches, themes: Math.max(1, studio?.themes?.length ?? 1) }
+}
 
 // ── Image helpers (client-side; canvas.assist is text-only) ──────────────────
 function fileToDataUrl(file: File): Promise<string> {
@@ -358,8 +383,24 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
   const [busy, setBusy] = useState(false)
   const [phaseIdx, setPhaseIdx] = useState(0)
   const shotsInput = useRef<HTMLInputElement>(null)
-  const page = PAGES[idx]
-  const isLast = idx === PAGES.length - 1
+
+  // Which token library this system stands on. '' means "build one from these
+  // answers", which is what happens when a team has not made one yet.
+  const [basis, setBasis] = useState('')
+  const [libs, setLibs] = useState<{ id: string; name: string; swatches: string[]; themes: number }[]>([])
+  const [pickedPatterns, setPickedPatterns] = useState<string[]>([])
+  const [pickedLayouts, setPickedLayouts] = useState<string[]>([])
+  useEffect(() => {
+    let live = true
+    void window.terminal42?.tokens?.list?.().then((rows) => {
+      if (live) setLibs(rows.map(summariseLibrary))
+    }).catch(() => undefined)
+    return () => { live = false }
+  }, [])
+
+  const pages = PAGES.filter((p) => (basis ? !VALUE_PAGES.includes(p) : true))
+  const page = pages[Math.min(idx, pages.length - 1)]
+  const isLast = idx >= pages.length - 1
 
   const toggleRule = (id: AiRuleId): void => setA((p) => ({ ...p, rules: { ...p.rules, [id]: !p.rules[id] } }))
 
@@ -445,6 +486,18 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
         }
       }
     } catch { /* fall back to the deterministic system */ }
+    // What the system covers, and what it stands on. Linking the library
+    // before the values are read means the library wins any disagreement,
+    // which is the whole point of picking one.
+    sys = {
+      ...sys,
+      patterns: pickedPatterns.map((id) => {
+        const c = PATTERN_CATALOGUE.find((x) => x.id === id)
+        return { id, name: c?.name ?? id, uses: c?.uses ?? [] }
+      }),
+      layouts: pickedLayouts.map((id) => ({ id, name: LAYOUT_CATALOGUE.find((x) => x.id === id)?.name ?? id }))
+    }
+    if (basis) sys = await refreshFromLibrary({ ...sys, tokensId: basis })
     setBusy(false)
     onComplete(sys)
   }
@@ -456,8 +509,8 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
     <Modal title={TITLES[page]} onClose={() => { if (!busy) onCancel() }} size="large">
       <div className="relative flex min-h-0 flex-1 flex-col">
         <div className="px-5 pt-5">
-          <ModalSteps count={PAGES.length} at={idx} />
-          <p className="mt-3 text-[11px] text-text-muted">Step {idx + 1} of {PAGES.length}</p>
+          <ModalSteps count={pages.length} at={idx} />
+          <p className="mt-3 text-[11px] text-text-muted">Step {idx + 1} of {pages.length}</p>
         </div>
         <ModalHeader
           title={TITLES[page]}
@@ -577,6 +630,81 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {page === 'basis' && (
+            <div className="space-y-4">
+              <p className="max-w-xl text-[12.5px] leading-relaxed text-text-muted">
+                A design system is built on a set of values. Point at the library that already holds yours and the colour, type and shape questions go away — there is one answer to them, and it lives there.
+              </p>
+              <div className="space-y-1.5">
+                <button
+                  type="button"
+                  onClick={() => setBasis('')}
+                  aria-pressed={basis === ''}
+                  className={`flex w-full items-center justify-between gap-3 rounded-lg px-3.5 py-3 text-left transition-colors ${basis === '' ? 'bg-surface' : 'bg-elevated/40 hover:bg-elevated/70'}`}
+                >
+                  <span>
+                    <span className="block text-[13px] text-text-primary">Build one from my answers</span>
+                    <span className="mt-0.5 block text-[11.5px] text-text-muted">The next four steps ask for the values, and a library is made from them.</span>
+                  </span>
+                  {basis === '' && <DsIcon name="check" style="outlined" size={15} />}
+                </button>
+                {libs.map((l) => (
+                  <button
+                    key={l.id}
+                    type="button"
+                    onClick={() => { setBasis(l.id); setIdx((i) => i) }}
+                    aria-pressed={basis === l.id}
+                    className={`flex w-full items-center justify-between gap-3 rounded-lg px-3.5 py-3 text-left transition-colors ${basis === l.id ? 'bg-surface' : 'bg-elevated/40 hover:bg-elevated/70'}`}
+                  >
+                    <span>
+                      <span className="block text-[13px] text-text-primary">{l.name}</span>
+                      <span className="mt-1 flex items-center gap-2">
+                        {l.swatches.map((c, i) => <span key={i} className="t42-swatch h-4 w-4 rounded" style={{ background: c }} />)}
+                        <span className="text-[11.5px] text-text-muted">{l.themes === 1 ? 'One theme' : `${l.themes} themes`}</span>
+                      </span>
+                    </span>
+                    {basis === l.id && <DsIcon name="check" style="outlined" size={15} />}
+                  </button>
+                ))}
+              </div>
+              {libs.length === 0 && <p className="text-[11.5px] text-text-muted">You have no token libraries yet, so one will be made for this system.</p>}
+            </div>
+          )}
+
+          {page === 'parts' && (
+            <div className="space-y-6">
+              <p className="max-w-xl text-[12.5px] leading-relaxed text-text-muted">
+                What this system covers beyond the components. Leave a row off if nobody has designed it yet — an empty one is more honest than a claimed one.
+              </p>
+              <div className="space-y-2">
+                <FieldLabel>Patterns</FieldLabel>
+                <div className="flex flex-wrap gap-1.5">
+                  {PATTERN_CATALOGUE.map((c) => {
+                    const on = pickedPatterns.includes(c.id)
+                    return (
+                      <button key={c.id} type="button" aria-pressed={on} title={c.hint}
+                        onClick={() => setPickedPatterns((prev) => on ? prev.filter((x) => x !== c.id) : [...prev, c.id])}
+                        className={`rounded-md px-2.5 py-1.5 text-[12px] transition-colors ${on ? 'bg-accent text-black' : 'bg-elevated/50 text-text-muted hover:text-text-primary'}`}>{c.name}</button>
+                    )
+                  })}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <FieldLabel>Layouts</FieldLabel>
+                <div className="flex flex-wrap gap-1.5">
+                  {LAYOUT_CATALOGUE.map((c) => {
+                    const on = pickedLayouts.includes(c.id)
+                    return (
+                      <button key={c.id} type="button" aria-pressed={on} title={c.hint}
+                        onClick={() => setPickedLayouts((prev) => on ? prev.filter((x) => x !== c.id) : [...prev, c.id])}
+                        className={`rounded-md px-2.5 py-1.5 text-[12px] transition-colors ${on ? 'bg-accent text-black' : 'bg-elevated/50 text-text-muted hover:text-text-primary'}`}>{c.name}</button>
+                    )
+                  })}
+                </div>
+              </div>
             </div>
           )}
 
