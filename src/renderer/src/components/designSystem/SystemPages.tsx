@@ -8,6 +8,7 @@
 
 import type { JSX, ReactNode } from 'react'
 import { GUIDELINE_FIELDS, LAYOUT_CATALOGUE, PATTERN_CATALOGUE } from '../../lib/dsCatalogues'
+import { AI_RULES, defaultAiRules, type AiRules } from '../../lib/aiRules'
 import type { DesignSystem, DSGuidelines } from '../../lib/designSystem'
 
 function Title({ children }: { children: ReactNode }): JSX.Element {
@@ -177,11 +178,6 @@ export function GuidelinesPage({
   return (
     <section className="space-y-4">
       <Title>Guidelines</Title>
-      <p className="max-w-xl text-[12.5px] leading-relaxed text-text-secondary">
-        The rules a person reads. Separate from the generation rules, because
-        &ldquo;never use emoji as icons&rdquo; can be enforced and &ldquo;prefer the
-        active voice&rdquo; can only be explained.
-      </p>
       <div className="flex flex-col gap-3">
         {GUIDELINE_FIELDS.map((f) => (
           <label key={f.key} className="flex flex-col gap-1.5 rounded-xl bg-surface p-4">
@@ -202,7 +198,56 @@ export function GuidelinesPage({
             <Notes value={lines(g.donts)} onChange={(v) => set({ donts: split(v) })} placeholder="" />
           </label>
         </div>
+        <EnforcedRules rules={system.rules} onChange={(rules) => update({ rules })} />
       </div>
     </section>
+  )
+}
+
+/**
+ * The rules a generator obeys, as opposed to the ones above that a person
+ * reads.
+ *
+ * These were asked for once, in the wizard, and then never shown again: a
+ * system carried eight relaxed rules with nothing on any screen saying so,
+ * and no way to change its mind afterwards short of building a new system.
+ */
+function EnforcedRules({
+  rules,
+  onChange
+}: {
+  rules?: AiRules
+  onChange: (rules: AiRules) => void
+}): JSX.Element {
+  const current: AiRules = { ...defaultAiRules(), ...(rules ?? {}) }
+  const off = AI_RULES.filter((r) => current[r.id] === false)
+  return (
+    <div className="rounded-xl bg-surface p-4">
+      <div className="flex items-baseline gap-2">
+        <span className="text-[13px] text-text-primary">Enforced when generating</span>
+        <span className="text-[11.5px] text-text-muted">
+          {off.length === 0 ? 'All on' : `${off.length} off`}
+        </span>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {AI_RULES.map((r) => {
+          const on = current[r.id] !== false
+          return (
+            <button
+              key={r.id}
+              type="button"
+              aria-pressed={on}
+              title={r.hint ?? r.description}
+              onClick={() => onChange({ ...current, [r.id]: !on })}
+              className={`rounded-md px-2.5 py-1.5 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                on ? 'bg-elevated text-text-primary' : 'bg-elevated/40 text-text-muted hover:text-text-primary'
+              }`}
+            >
+              {r.label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }
