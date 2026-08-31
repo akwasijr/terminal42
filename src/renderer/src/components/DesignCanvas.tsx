@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { FrameBridge, type FramePick } from '../lib/frameBridge'
+import { computeSelector, readStyles, type ElementStyles, type ProjectToken } from '../../../shared/framePick'
 import type { Design, DesignVersion } from '../../../preload/index'
 import { IconBrain, IconChat, IconCheck, IconChevronRight, IconClose, IconDesktop, IconEdit, IconExternal, IconFluid, IconFolder, IconMobile, IconRefresh, IconShare, IconSparkle, IconTablet } from './icons'
 import { PencilThinking, pickAnimationForKind } from './PencilThinking'
@@ -256,8 +258,7 @@ export function DesignCanvas({
       if (latest) {
         setActiveId((prev) => (stickToLatest ? latest.id : (prev ?? latest.id)))
         if (stickToLatest) {
-          try { pendingScrollRef.current = iframeRef.current?.contentWindow?.scrollY ?? null }
-          catch { pendingScrollRef.current = null }
+          void bridge.scrollY().then((y) => { pendingScrollRef.current = y })
           setReloadKey((k) => k + 1)
         }
       }
@@ -286,6 +287,16 @@ export function DesignCanvas({
   // matches that -- so it is served from a loopback origin instead, where it
   // sits at "/". See src/main/spa.ts.
   const [previewSrc, setPreviewSrc] = useState<string | null>(null)
+  // An app served from its own origin cannot be read from here, so the canvas
+  // asks it instead. Everything the two kinds of preview have in common goes
+  // through the bridge; nothing else in this file needs to know which it has.
+  const served = previewSrc !== null
+  const bridgeRef = useRef<FrameBridge | null>(null)
+  if (!bridgeRef.current || bridgeRef.current.isServed !== served) {
+    bridgeRef.current?.dispose()
+    bridgeRef.current = new FrameBridge(() => iframeRef.current, served)
+  }
+  const bridge = bridgeRef.current
   const [annotate, setAnnotate] = useState(false)
   const [pick, setPick] = useState<{ selector: string; text: string } | null>(null)
   const [pickComment, setPickComment] = useState('')
@@ -350,6 +361,7 @@ export function DesignCanvas({
         if (cancelled) return
         // If it cannot be served it still gets srcDoc: a preview that half
         // works beats no preview and a message about a port.
+        bridge.navigating()
         setPreviewSrc(r.ok ? `${r.url}?v=${encodeURIComponent(String(active.modifiedAt))}` : null)
       })
     })
@@ -369,11 +381,40 @@ export function DesignCanvas({
   // a fresh iframe content loads. Also (re-)attach our click listeners so
   // they survive iframe reloads.
   const handlersRef = useRef<{ click?: (e: Event) => void }>({})
+
+  // What to do with an element, whichever preview reported it. Held in a ref
+  // because the served page reports picks through a listener registered once,
+  // and a listener that closed over the modes would answer with whichever
+  // mode was current when it was made.
+  const applyPickRef = useRef<(p: FramePick) => void>(() => {})
+  applyPickRef.current = (p: FramePick): void => {
+    if (annotate) {
+      setPick({ selector: p.selector, text: p.text })
+      setPickComment('')
+    } else if (editMode) {
+      setEditPick({ selector: p.selector, tag: p.tag, styles: p.styles, html: p.html })
+    } else if (motionMode) {
+      setMotionPick({ selector: p.selector, tag: p.tag })
+    } else if (shaderMode) {
+      setShaderPick({ selector: p.selector, shader: 'grain', color: '#888888', intensity: 0.6 })
+    }
+  }
+
+  useEffect(() => {
+    bridge.picked((p) => applyPickRef.current(p))
+    bridge.slid((i) => setSlideIdx(i))
+    return () => { bridge.picked(null); bridge.slid(null) }
+  }, [bridge])
+
+  useEffect(() => () => { bridgeRef.current?.dispose() }, [])
+
   const refreshIframeBindings = (): void => {
+    void bridge.modes(annotate, editMode || motionMode || shaderMode)
+    // A served page does its own picking and posts the result; there is no
+    // document here to listen on.
+    if (served) return
     const doc = iframeDoc()
     if (!doc) return
-    doc.documentElement.classList.toggle('t42-anno', annotate)
-    doc.documentElement.classList.toggle('t42-edit', editMode || motionMode || shaderMode)
     if (handlersRef.current.click) {
       doc.removeEventListener('click', handlersRef.current.click, true)
     }
@@ -383,25 +424,18 @@ export function DesignCanvas({
       if (!el || el === doc.documentElement || el === doc.body) return
       e.preventDefault()
       e.stopPropagation()
-      const sel = computeSelector(el)
-      const text = (el.innerText || '').trim().slice(0, 120)
-      if (annotate) {
-        setPick({ selector: sel, text })
-        setPickComment('')
-      } else if (editMode) {
-        // Mark as selected for visual ring
+      if (!annotate) {
         doc.querySelectorAll('.t42-selected').forEach((n) => n.classList.remove('t42-selected'))
         el.classList.add('t42-selected')
-        setEditPick({ selector: sel, tag: el.tagName.toLowerCase(), styles: readStyles(el), html: el.outerHTML.slice(0, 1000) })
-      } else if (motionMode) {
-        doc.querySelectorAll('.t42-selected').forEach((n) => n.classList.remove('t42-selected'))
-        el.classList.add('t42-selected')
-        setMotionPick({ selector: sel, tag: el.tagName.toLowerCase() })
-      } else if (shaderMode) {
-        doc.querySelectorAll('.t42-selected').forEach((n) => n.classList.remove('t42-selected'))
-        el.classList.add('t42-selected')
-        setShaderPick({ selector: sel, shader: 'grain', color: '#888888', intensity: 0.6 })
       }
+      const shown = (el.innerText !== undefined ? el.innerText : el.textContent) || ''
+      applyPickRef.current({
+        selector: computeSelector(el),
+        tag: el.tagName.toLowerCase(),
+        text: shown.trim().slice(0, 120),
+        styles: readStyles(el),
+        html: el.outerHTML.slice(0, 1000)
+      })
     }
     doc.addEventListener('click', click, true)
     handlersRef.current.click = click
@@ -410,13 +444,12 @@ export function DesignCanvas({
   // Iframe onLoad: rebind our click handlers and restore the pre-reload scroll
   // position so live updates feel in-place rather than snapping to the top.
   const onIframeLoad = (): void => {
+    bridge.loaded()
     refreshIframeBindings()
     if (pendingScrollRef.current != null) {
       const y = pendingScrollRef.current
       pendingScrollRef.current = null
-      requestAnimationFrame(() => {
-        try { iframeRef.current?.contentWindow?.scrollTo(0, y) } catch { /* cross-origin or gone */ }
-      })
+      requestAnimationFrame(() => { void bridge.scrollTo(y) })
     }
   }
 
@@ -445,32 +478,24 @@ export function DesignCanvas({
   useEffect(() => {
     if (profile.id !== 'slides') return
     let cancelled = false
+    // The slide width is the slide's own, not the viewport's: a 16:9 deck is
+    // typically 1920 wide inside a much narrower frame, and dividing by the
+    // frame makes the index drift. The bridge measures it on either side.
     const update = (): void => {
-      const doc = iframeDoc()
-      if (!doc || !doc.body) return
-      const slides = doc.querySelectorAll<HTMLElement>('section.slide, .slide, [data-slide], body > section')
-      setSlideCount(slides.length)
-      if (!slides.length) { setSlideIdx(0); return }
-      // Scroll container = whichever element actually has horizontal overflow.
-      // A chassis deck keeps its overflow on <main class="deck">.
-      const deck = doc.querySelector<HTMLElement>('main.deck, .deck')
-      const scroller = deck && deck.scrollWidth > deck.clientWidth
-        ? deck
-        : doc.body.scrollWidth > doc.body.clientWidth ? doc.body : doc.documentElement
-      // CRITICAL: each slide has its OWN width (typically 1920px for 16:9).
-      // Don't divide by scroller.clientWidth: that's the iframe viewport,
-      // which is smaller. Use the first slide's offsetWidth.
-      const slideW = slides[0].offsetWidth || scroller.clientWidth || 1
-      const idx = Math.max(0, Math.min(slides.length - 1, Math.round(scroller.scrollLeft / slideW)))
-      setSlideIdx(idx)
+      void bridge.slides().then(({ count, index }) => {
+        if (cancelled) return
+        setSlideCount(count)
+        setSlideIdx(count === 0 ? 0 : Math.max(0, Math.min(count - 1, index)))
+      })
     }
     const tries = [0, 100, 300, 800, 1500]
     tries.forEach((delay) => {
       setTimeout(() => { if (!cancelled) update() }, delay)
     })
     // Listen on the iframe's body (not window) since body is the scroll
-    // container with overflow-x:auto.
-    const doc = iframeDoc()
+    // container with overflow-x:auto. A served page cannot be listened to
+    // from here; its agent reports the move instead.
+    const doc = served ? null : iframeDoc()
     const body = doc?.body
     const onScroll = (): void => update()
     body?.addEventListener('scroll', onScroll, { passive: true } as AddEventListenerOptions)
@@ -480,27 +505,28 @@ export function DesignCanvas({
       body?.removeEventListener('scroll', onScroll)
       iframeRef.current?.contentWindow?.removeEventListener('scroll', onScroll)
     }
-  }, [profile.id, activeContent])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile.id, activeContent, bridge])
 
   // Read :root design tokens from the iframe: for the project-level inspector
   useEffect(() => {
     let cancelled = false
     const read = (): void => {
-      const doc = iframeDoc()
-      if (!doc) return
-      const tokens = readProjectTokens(doc)
-      if (tokens.length) setProjectTokens(tokens)
+      void bridge.tokens().then((tokens) => {
+        if (!cancelled && tokens.length) setProjectTokens(tokens)
+      })
     }
     const tries = [0, 200, 600, 1200]
     tries.forEach((delay) => setTimeout(() => { if (!cancelled) read() }, delay))
     return () => { cancelled = true }
+    // Also on the bridge: a served app gets its own the moment the canvas
+    // learns it is served, which is after the content is in hand, and the
+    // reading taken through the one before it would be of nothing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeContent])
+  }, [activeContent, bridge])
 
   const setProjectToken = (name: string, value: string): void => {
-    const doc = iframeDoc()
-    if (!doc) return
-    doc.documentElement.style.setProperty(name, value)
+    void bridge.setToken(name, value)
     setProjectTokens((tt) => tt.map((t) => t.name === name ? { ...t, value } : t))
     setEditChanges((n) => n + 1)
   }
@@ -523,10 +549,6 @@ export function DesignCanvas({
   }, [])
 
   // Mutually exclusive overlays
-  // An app served from its own origin is out of the canvas's reach. Ask it
-  // in chat instead, which goes through the file rather than the preview.
-  const served = previewSrc !== null
-
   const enterAnnotate = (): void => { setEditMode(false); setCompareMode(false); setMotionMode(false); setShaderMode(false); setAnnotate((a) => !a) }
   const enterEdit     = (): void => { setAnnotate(false); setCompareMode(false); setMotionMode(false); setShaderMode(false); setEditMode((e) => !e) }
   const enterMotion   = (): void => { setAnnotate(false); setEditMode(false); setCompareMode(false); setShaderMode(false); setMotionMode((m) => !m) }
@@ -542,19 +564,17 @@ export function DesignCanvas({
 
   // Apply a style change to the currently selected element directly.
   const setEditStyle = (prop: string, value: string | number, unit?: string): void => {
-    const doc = iframeDoc()
-    if (!doc || !editPick) return
-    const el = (doc.querySelector(`.t42-selected`) as HTMLElement | null) ?? doc.querySelector(editPick.selector) as HTMLElement | null
-    if (!el) return
+    if (!editPick) return
     const v = String(value) + (unit ?? '')
-    if (prop === 'background')      el.style.backgroundColor = String(value)
-    else if (prop === 'color')      el.style.color = String(value)
-    else if (prop === 'fontWeight') el.style.fontWeight = String(value)
-    else if (prop === 'paddingAll') el.style.padding = String(value) + 'px'
-    else {
-      const cssProp = prop.replace(/[A-Z]/g, (m) => '-' + m.toLowerCase())
-      el.style.setProperty(cssProp, v)
-    }
+    // The four named ones are shorthands the inspector offers; everything
+    // else is the CSS property spelled the way CSS spells it.
+    const [cssProp, cssValue] =
+      prop === 'background' ? ['background-color', String(value)]
+      : prop === 'color' ? ['color', String(value)]
+      : prop === 'fontWeight' ? ['font-weight', String(value)]
+      : prop === 'paddingAll' ? ['padding', String(value) + 'px']
+      : [prop.replace(/[A-Z]/g, (m) => '-' + m.toLowerCase()), v]
+    void bridge.setStyle(editPick.selector, cssProp, cssValue)
     setEditChanges((n) => n + 1)
     // Reflect in inspector
     if (editPick) {
@@ -573,26 +593,14 @@ export function DesignCanvas({
   }
 
   const setEditText = (text: string): void => {
-    const doc = iframeDoc()
-    if (!doc || !editPick) return
-    const el = (doc.querySelector(`.t42-selected`) as HTMLElement | null) ?? doc.querySelector(editPick.selector) as HTMLElement | null
-    if (!el) return
-    el.innerText = text
+    if (!editPick) return
+    void bridge.setText(editPick.selector, text)
     setEditChanges((n) => n + 1)
     setEditPick({ ...editPick, styles: { ...editPick.styles, text } })
   }
 
   const syncEdits = async (): Promise<void> => {
-    const doc = iframeDoc()
-    if (!doc) return
-    const all = doc.querySelectorAll('[style]')
-    const changes: Array<{ selector: string; text: string; style: string }> = []
-    all.forEach((node) => {
-      const el = node as HTMLElement
-      const style = el.getAttribute('style') ?? ''
-      if (!style.trim()) return
-      changes.push({ selector: computeSelector(el), text: (el.innerText || '').trim().slice(0, 80), style })
-    })
+    const changes = await bridge.changes()
     if (!changes.length) return
     const lines = changes.map((c) => `- \`${c.selector}\`${c.text ? ` ("${c.text}")` : ''} → \`${c.style}\``).join('\n')
     const text = `Apply these direct edits I made on the canvas: bake them into the next version (you can refactor into proper CSS variables / classes if cleaner):\n\n${lines}`
@@ -607,54 +615,17 @@ export function DesignCanvas({
     }))
   }
 
-  // Slide navigation. Use the iframe's contentWindow scrollBy directly with
-  // Pick the actual horizontal scroll container inside the iframe.
-  // With our slide CSS, body is the flex-row scroller (overflow-x:auto)
-  // but window.scrollBy targets the document scrolling element which may
-  // be <html>: and we set html { overflow:hidden }. So scroll the body
-  // explicitly here.
-  const slideScrollEl = (): HTMLElement | null => {
-    const doc = iframeDoc()
-    if (!doc) return null
-    const body = doc.body
-    if (!body) return null
-    // A chassis deck scrolls inside <main class="deck">, not on the body.
-    const deck = doc.querySelector<HTMLElement>('main.deck, .deck')
-    if (deck && deck.scrollWidth > deck.clientWidth) return deck
-    // If body itself has horizontal overflow, use it. Otherwise fall back
-    // to the document scrolling element (rare).
-    if (body.scrollWidth > body.clientWidth) return body
-    const root = doc.documentElement
-    if (root.scrollWidth > root.clientWidth) return root
-    return body
-  }
-
+  // Slide navigation. The bridge does the arithmetic on whichever side the
+  // page is, since only that side can measure a slide.
   const slideJump = (dir: -1 | 1): void => {
-    const el = slideScrollEl()
-    if (!el) return
-    const doc = iframeDoc()
-    if (!doc) return
-    const slides = doc.querySelectorAll<HTMLElement>('section.slide, .slide, [data-slide], body > section')
-    if (!slides.length) return
-    // Step by the actual slide width (typically 1920px), NOT the iframe
-    // viewport width: otherwise the index drifts and the snap-correct
-    // bounces back to the nearest boundary that isn't where we want.
-    const slideW = slides[0].offsetWidth || el.clientWidth || 1
-    const currentIdx = Math.max(0, Math.min(slides.length - 1, Math.round(el.scrollLeft / slideW)))
-    const nextIdx = Math.max(0, Math.min(slides.length - 1, currentIdx + dir))
-    const targetLeft = nextIdx * slideW
-    el.scrollTo({ left: targetLeft, behavior: 'smooth' })
-    // Reflect immediately in the toolbar counter so it feels responsive
-    // even before the smooth-scroll settles and fires onScroll.
-    setSlideIdx(nextIdx)
-    // Snap-correct after the smooth scroll in case anything got off by 1px.
-    setTimeout(() => {
-      const cur = el.scrollLeft
-      const wanted = nextIdx * slideW
-      if (Math.abs(cur - wanted) > 4) {
-        el.scrollTo({ left: wanted, behavior: 'smooth' })
-      }
-    }, 380)
+    void bridge.slides().then(({ count, index }) => {
+      if (!count) return
+      const next = Math.max(0, Math.min(count - 1, index + dir))
+      // Move the counter now: the smooth scroll takes a moment to settle
+      // and a toolbar that waits for it feels broken.
+      setSlideIdx(next)
+      void bridge.slideTo(next)
+    })
   }
   const slidePrev = (): void => slideJump(-1)
   const slideNext = (): void => slideJump(1)
@@ -1032,20 +1003,19 @@ export function DesignCanvas({
               the rest of the bar off the end of the row. Only the chosen one
               carries its name; the others are their icon, as the viewport
               pills already are. */}
-          {/* Picking an element means reaching into the preview's document,
-              which the app can only do while the preview is its own. An app
-              built around a router is served from a loopback origin instead
-              (see src/main/spa.ts) and is out of reach there, so the modes
-              that pick say so rather than quietly doing nothing. */}
+          {/* An app built around a router is served from a loopback origin
+              (see src/main/spa.ts) whose document this window may not read.
+              The picking modes work there all the same: they go through the
+              agent the served page carries. See src/shared/frameAgent.ts. */}
           <ModePicker
             modes={[
               { id: 'annotate', label: 'Annotate', on: 'Annotating',
-                hint: served ? OUT_OF_REACH : 'Click an element to leave a comment for the AI',
-                active: annotate, disabled: empty || served, onPick: enterAnnotate,
+                hint: 'Click an element to leave a comment for the AI',
+                active: annotate, disabled: empty, onPick: enterAnnotate,
                 icon: <IconChat size={12} /> },
               { id: 'edit', label: 'Edit', on: 'Editing',
-                hint: served ? OUT_OF_REACH : 'Edit elements (granular) or project tokens (global)',
-                active: editMode, disabled: empty || served, onPick: enterEdit,
+                hint: 'Edit elements (granular) or project tokens (global)',
+                active: editMode, disabled: empty, onPick: enterEdit,
                 icon: <IconEdit size={12} /> },
               { id: 'compare', label: 'Compare', on: 'Comparing',
                 hint: versions.length < 2
@@ -1061,8 +1031,8 @@ export function DesignCanvas({
                   </svg>
                 ) },
               { id: 'motion', label: 'Motion', on: 'Motion on',
-                hint: served ? OUT_OF_REACH : 'Click an element to add an animation',
-                active: motionMode, disabled: empty || served || active?.kind === 'pptx',
+                hint: 'Click an element to add an animation',
+                active: motionMode, disabled: empty || active?.kind === 'pptx',
                 onPick: enterMotion,
                 icon: (
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -1070,8 +1040,8 @@ export function DesignCanvas({
                   </svg>
                 ) },
               { id: 'shader', label: 'Shader', on: 'Shader on',
-                hint: served ? OUT_OF_REACH : 'Click an element to add a shader background',
-                active: shaderMode, disabled: empty || served || active?.kind === 'pptx',
+                hint: 'Click an element to add a shader background',
+                active: shaderMode, disabled: empty || active?.kind === 'pptx',
                 onPick: enterShader,
                 icon: (
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -1817,105 +1787,6 @@ function friendlyElementLabel(selector: string): string {
   return `<${tag}> · ${cls}`
 }
 
-const OUT_OF_REACH =
-  'This app runs on its own address so its routes work, which puts it out of reach of the picker. Ask for the change in chat.'
-
-function computeSelector(el: Element | null): string {
-  if (!el || el.nodeType !== 1) return ''
-  const elH = el as HTMLElement
-  if (elH.id) return `#${elH.id}`
-  const path: string[] = []
-  let cur: Element | null = elH
-  while (cur && cur.nodeType === 1 && cur !== document.body && path.length < 4) {
-    let seg = cur.tagName.toLowerCase()
-    if (typeof cur.className === 'string') {
-      const cls = cur.className.trim().split(/\s+/).filter((c) => c && c !== 't42-selected').slice(0, 2).join('.')
-      if (cls) seg += '.' + cls
-    }
-    const parentEl: Element | null = cur.parentElement
-    if (parentEl) {
-      const here: Element = cur
-      const sibs = Array.from(parentEl.children).filter((c: Element) => c.tagName === here.tagName)
-      if (sibs.length > 1) seg += `:nth-of-type(${sibs.indexOf(here) + 1})`
-    }
-    path.unshift(seg)
-    cur = parentEl
-  }
-  return path.join(' > ')
-}
-
-function readStyles(el: HTMLElement): ElementStyles {
-  const s = (el.ownerDocument?.defaultView ?? window).getComputedStyle(el)
-  const px = (v: string): number => { const n = parseFloat(v); return isFinite(n) ? Math.round(n) : 0 }
-  const toHex = (v: string): string => {
-    if (!v) return '#000000'
-    if (v.startsWith('#')) return v
-    const m = v.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/)
-    if (!m) return '#000000'
-    return '#' + [1, 2, 3].map((i) => {
-      const h = parseInt(m[i], 10).toString(16); return h.length < 2 ? '0' + h : h
-    }).join('')
-  }
-  const onlyText = el.children.length === 0 && (el.innerText || '').trim().length > 0
-  return {
-    text: onlyText ? el.innerText : '',
-    isText: onlyText,
-    color: toHex(s.color),
-    background: toHex(s.backgroundColor),
-    fontSize: px(s.fontSize),
-    fontWeight: parseInt(s.fontWeight, 10) || 400,
-    paddingTop: px(s.paddingTop),
-    paddingRight: px(s.paddingRight),
-    paddingBottom: px(s.paddingBottom),
-    paddingLeft: px(s.paddingLeft),
-    borderRadius: px(s.borderTopLeftRadius)
-  }
-}
-
-// Walk every <style> tag in the iframe document, find :root { … } blocks,
-// and pull the --custom-prop declarations out. Classify each by value shape.
-function readProjectTokens(doc: Document): ProjectToken[] {
-  const out: ProjectToken[] = []
-  const seen = new Set<string>()
-  const styleEls = doc.querySelectorAll('style')
-  styleEls.forEach((el) => {
-    const text = el.textContent ?? ''
-    // Match :root { ... } and [data-theme="..."] :root { ... } blocks
-    const rootBlocks = text.match(/(?::root|html)[^{]*\{([^}]*)\}/g)
-    if (!rootBlocks) return
-    rootBlocks.forEach((block) => {
-      const body = block.replace(/^[^{]*\{/, '').replace(/\}$/, '')
-      const decls = body.split(/;/)
-      for (const d of decls) {
-        const m = d.match(/\s*(--[\w-]+)\s*:\s*([^;]+)/)
-        if (!m) continue
-        const name = m[1].trim()
-        if (seen.has(name)) continue
-        seen.add(name)
-        // Resolve via getComputedStyle so var()-references collapse to values.
-        let resolved = ''
-        try { resolved = (doc.defaultView ?? window).getComputedStyle(doc.documentElement).getPropertyValue(name).trim() } catch {}
-        const value = resolved || m[2].trim()
-        out.push({ name, value, kind: classifyToken(value) })
-      }
-    })
-  })
-  // Stable order: colors first, then numbers, then text
-  return out.sort((a, b) => {
-    const ord = { color: 0, number: 1, text: 2 } as const
-    return ord[a.kind] - ord[b.kind]
-  })
-}
-
-function classifyToken(value: string): 'color' | 'number' | 'text' {
-  const v = value.trim()
-  if (/^#[0-9a-f]{3,8}$/i.test(v)) return 'color'
-  if (/^rgba?\(/i.test(v)) return 'color'
-  if (/^hsla?\(/i.test(v)) return 'color'
-  if (/^[\d.+-]+(px|em|rem|%|vw|vh|s|ms)?$/.test(v)) return 'number'
-  return 'text'
-}
-
 function ToolbarDivider(): JSX.Element {
   return <span aria-hidden="true" className="mx-2" />
 }
@@ -2229,20 +2100,6 @@ type TweakSpec = { groups: TweakGroup[] }
 //
 // The user can then 'Sync to design' to send all collected edits to the
 // chat as an instruction for the model to bake them into the next version.
-
-type ElementStyles = {
-  text: string
-  isText: boolean
-  color: string
-  background: string
-  fontSize: number
-  fontWeight: number
-  paddingTop: number
-  paddingRight: number
-  paddingBottom: number
-  paddingLeft: number
-  borderRadius: number
-}
 
 type EditPick = {
   selector: string
@@ -2620,12 +2477,6 @@ function bucketSizes(tokens: ProjectToken[]): Bucket[] {
 function tokenLabel(name: string): string {
   // --color-primary → Color primary, --primary → Primary, --space-4 → Space 4
   return name.replace(/^--/, '').replace(/-/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase())
-}
-
-type ProjectToken = {
-  name: string             // e.g. '--primary'
-  value: string            // e.g. '#dd9b71' or '16px'
-  kind: 'color' | 'number' | 'text'
 }
 
 function Section({ title, children, defaultOpen = true, persist = true }: { title: string; children: React.ReactNode; defaultOpen?: boolean; persist?: boolean }): JSX.Element {

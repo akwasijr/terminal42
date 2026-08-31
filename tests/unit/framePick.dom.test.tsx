@@ -38,9 +38,16 @@ describe('computeSelector', () => {
     expect(computeSelector(doc.querySelector('li'))).toBe('ul > li')
   })
 
-  it('never names our own selection class', () => {
+  it('never names a class the canvas put on itself', () => {
     const doc = page('<div class="t42-selected card"><b>x</b></div>')
     expect(computeSelector(doc.querySelector('b'))).toBe('div.card > b')
+  })
+
+  it('drops the mode classes too, not only the selection one', () => {
+    // These land on <html> while a mode is on, and a selector carrying one
+    // would describe the canvas rather than the page.
+    const doc = page('<div class="t42-edit t42-anno panel"><b>x</b></div>')
+    expect(computeSelector(doc.querySelector('b'))).toBe('div.panel > b')
   })
 
   it('keeps to four levels however deep the element is', () => {

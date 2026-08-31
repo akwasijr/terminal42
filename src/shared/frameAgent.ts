@@ -29,6 +29,7 @@ export type FrameRequest =
   | { id: number; kind: 'setText'; selector: string; text: string }
   | { id: number; kind: 'changes' }
   | { id: number; kind: 'slides' }
+  | { id: number; kind: 'slideTo'; index: number }
   | { id: number; kind: 'scrollBy'; x: number }
   | { id: number; kind: 'scrollY' }
   | { id: number; kind: 'scrollTo'; y: number }
@@ -102,6 +103,24 @@ const AGENT_BODY = `
     return { count: all.length, index: Math.round(scroller.scrollLeft / width) };
   };
 
+  // Jump by whole slides. The step is the slide's own width -- typically
+  // 1920 on a 16:9 deck -- and not the frame's, which is narrower and would
+  // make the index drift a little further with every press.
+  var slideTo = function (index) {
+    var all = document.querySelectorAll('section.slide, .slide, [data-slide], body > section');
+    if (!all.length) return;
+    var s = scroller();
+    var width = all[0].getBoundingClientRect().width || s.clientWidth || 1;
+    var i = Math.max(0, Math.min(all.length - 1, index));
+    var left = i * width;
+    s.scrollTo({ left: left, behavior: 'smooth' });
+    // The smooth scroll can land a pixel or two out and a snap would then
+    // pull it back to the wrong slide, so put it right once it has settled.
+    setTimeout(function () {
+      if (Math.abs(s.scrollLeft - left) > 4) s.scrollTo({ left: left, behavior: 'smooth' });
+    }, 380);
+  };
+
   var scroller = function () {
     var deck = document.querySelector('main.deck, .deck');
     if (deck && deck.scrollWidth > deck.clientWidth) return deck;
@@ -163,6 +182,8 @@ const AGENT_BODY = `
         value = out;
       } else if (m.kind === 'slides') {
         value = slides();
+      } else if (m.kind === 'slideTo') {
+        slideTo(m.index);
       } else if (m.kind === 'scrollBy') {
         scroller().scrollBy({ left: m.x, behavior: 'smooth' });
       } else if (m.kind === 'scrollY') {

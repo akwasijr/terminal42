@@ -17,6 +17,11 @@ describe('agentSource', () => {
     expect(src).toContain('t42-selected')
   })
 
+  it('can be asked to jump to a slide', () => {
+    expect(src).toContain("m.kind === 'slideTo'")
+    expect(src).toContain('var slideTo = function')
+  })
+
   it('refers to nothing it does not define', () => {
     // Anything from module scope would be undefined inside a served page.
     expect(src).not.toContain('import ')

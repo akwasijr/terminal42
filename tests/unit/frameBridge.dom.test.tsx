@@ -106,6 +106,19 @@ describe('FrameBridge on a page it can read', () => {
     document.body.innerHTML = '<section class="slide">1</section><section class="slide">2</section>'
     expect((await direct().slides()).count).toBe(2)
   })
+
+  it('jumps to a slide by index, and no further than the last', async () => {
+    document.body.innerHTML = '<section class="slide">1</section><section class="slide">2</section>'
+    const to: number[] = []
+    document.documentElement.scrollTo = ((o: ScrollToOptions) => { to.push(o.left ?? 0) }) as typeof window.scrollTo
+    document.body.scrollTo = document.documentElement.scrollTo
+    await direct().slideTo(1)
+    await direct().slideTo(9)
+    // jsdom gives every element a zero width, so the step falls back to 1
+    // and the index is what lands in `left`. Two presses, two moves, and
+    // the second is clamped to the last slide rather than running off it.
+    expect(to).toEqual([1, 1])
+  })
 })
 
 describe('FrameBridge on a page it can only ask', () => {
@@ -186,18 +199,31 @@ describe('FrameBridge on a page it can only ask', () => {
     b.dispose()
   })
 
-  it('waits again after a reload, since the new page has its own agent', async () => {
+  it('waits again while navigating, since the new page has its own agent', async () => {
     const { frame, ready, seen } = servedPage()
     const b = new FrameBridge(() => frame, true)
     ready()
     await b.modes(true, false)
     expect(seen).toHaveLength(1)
-    b.reload()
+    b.navigating()
     const p = b.modes(false, true)
     expect(seen).toHaveLength(1)
     ready()
     await p
     expect(seen).toHaveLength(2)
+    b.dispose()
+  })
+
+  it('lets a held request go on load, even if it never heard the agent', async () => {
+    // The agent announces itself while the document is still parsing, so a
+    // bridge made after that point hears nothing. Load is the second chance.
+    const { frame, seen } = servedPage()
+    const b = new FrameBridge(() => frame, true)
+    const p = b.modes(true, false)
+    expect(seen).toHaveLength(0)
+    b.loaded()
+    await p
+    expect(seen).toHaveLength(1)
     b.dispose()
   })
 

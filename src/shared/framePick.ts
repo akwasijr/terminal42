@@ -50,8 +50,11 @@ export function computeSelector(el: Element | null): string {
   while (cur && cur.nodeType === 1 && cur !== body && path.length < 4) {
     let seg = cur.tagName.toLowerCase()
     if (typeof cur.className === 'string') {
+      // Every class the canvas puts on for its own purposes is dropped:
+      // a selector naming one would describe the canvas's state rather
+      // than the page, and it is the page the model is asked to change.
       const cls = cur.className.trim().split(/\s+/)
-        .filter((c) => c && c !== 't42-selected').slice(0, 2).join('.')
+        .filter((c) => c && c.slice(0, 4) !== 't42-').slice(0, 2).join('.')
       if (cls) seg += '.' + cls
     }
     const parentEl: Element | null = cur.parentElement

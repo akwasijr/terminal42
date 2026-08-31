@@ -64,13 +64,7 @@ export class FrameBridge {
     this.listener = (e: MessageEvent): void => {
       const m = e.data as Record<string, unknown> | null
       if (!m || typeof m !== 'object' || m.channel !== FRAME_CHANNEL) return
-      if (m.t42 === 'ready') {
-        this.ready = true
-        const queued = this.queued
-        this.queued = []
-        for (const run of queued) run()
-        return
-      }
+      if (m.t42 === 'ready') { this.arrived(); return }
       if (m.t42 === 'pick') { this.onPick?.(m as unknown as FramePick); return }
       if (m.t42 === 'scrolled') { this.onSlide?.(Number(m.slide) || 0); return }
       if (m.t42 === 'reply') {
@@ -113,8 +107,36 @@ export class FrameBridge {
     })
   }
 
-  /** A fresh document means a fresh agent, and a queue that may run again. */
-  reload(): void {
+  /**
+   * The page is here and anything held back can go.
+   *
+   * Called both when the agent announces itself and when the frame finishes
+   * loading, because only one of the two is guaranteed. The agent announces
+   * while the document is still parsing -- an inline script at the end of
+   * the body runs long before `load` -- so a bridge made after that point
+   * would never hear it. Whichever arrives first wins; the second is a
+   * no-op.
+   */
+  private arrived(): void {
+    this.ready = true
+    const queued = this.queued
+    this.queued = []
+    for (const run of queued) run()
+  }
+
+  /** The frame has finished loading, whether or not its agent spoke up. */
+  loaded(): void {
+    if (!this.served) return
+    this.arrived()
+  }
+
+  /**
+   * A new document is on its way, so hold requests until it arrives.
+   *
+   * Anything already in flight is answered with nothing rather than left
+   * open: the document that was going to answer it has gone.
+   */
+  navigating(): void {
     if (!this.served) return
     this.ready = false
     for (const [, p] of this.pending) { clearTimeout(p.timer); p.resolve(null) }
@@ -196,6 +218,23 @@ export class FrameBridge {
     const s = this.scroller(doc)
     const width = all[0].getBoundingClientRect().width || s.clientWidth || 1
     return { count: all.length, index: Math.round(s.scrollLeft / width) }
+  }
+
+  /** Scroll to a whole slide, by index. */
+  async slideTo(index: number): Promise<void> {
+    if (this.served) { await this.ask({ kind: 'slideTo', index }, null); return }
+    const doc = this.doc()
+    if (!doc) return
+    const all = doc.querySelectorAll<HTMLElement>('section.slide, .slide, [data-slide], body > section')
+    if (!all.length) return
+    const s = this.scroller(doc)
+    const width = all[0].getBoundingClientRect().width || s.clientWidth || 1
+    const i = Math.max(0, Math.min(all.length - 1, index))
+    const left = i * width
+    s.scrollTo({ left, behavior: 'smooth' })
+    setTimeout(() => {
+      if (Math.abs(s.scrollLeft - left) > 4) s.scrollTo({ left, behavior: 'smooth' })
+    }, 380)
   }
 
   async scrollBy(x: number): Promise<void> {
