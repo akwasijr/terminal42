@@ -482,7 +482,7 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
         if (res.ok) {
           const parsed = parseSystemReply(res.text)
           // When the screenshots already gave accurate colours, keep them; only take the docs.
-          if (parsed) sys = applyAiSystem(sys, parsed, { colors: !usedVision })
+          if (parsed) sys = applyAiSystem(sys, parsed, { colors: !usedVision, name: !ans.name.trim() })
         }
       }
     } catch { /* fall back to the deterministic system */ }

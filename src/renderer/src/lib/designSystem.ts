@@ -592,12 +592,17 @@ function cleanDocStr(v: unknown): string | undefined {
 }
 
 /** Merge a parsed AI result onto a deterministic base system. Invalid fields are ignored. */
-export function applyAiSystem(base: DesignSystem, parsed: unknown, opts?: { colors?: boolean }): DesignSystem {
+export function applyAiSystem(base: DesignSystem, parsed: unknown, opts?: { colors?: boolean; name?: boolean }): DesignSystem {
   if (!parsed || typeof parsed !== 'object') return base
   const applyColors = opts?.colors !== false
+  // A name the user typed is an answer, not a gap. Someone who calls their
+  // system "Basis probe" and gets back "Teal" has been told their answer did
+  // not count, and has to rename it by hand to undo a step they never asked
+  // for. The model only gets to name the ones nobody named.
+  const applyName = opts?.name !== false
   const p = parsed as Record<string, unknown>
   const out: DesignSystem = { ...base, colors: { ...base.colors } }
-  if (typeof p.name === 'string' && p.name.trim()) out.name = p.name.trim().slice(0, 60)
+  if (applyName && typeof p.name === 'string' && p.name.trim()) out.name = p.name.trim().slice(0, 60)
   const c = p.colors
   if (applyColors && c && typeof c === 'object') {
     for (const k of ['primary', 'secondary', 'tertiary', 'success', 'warning', 'error', 'info'] as const) {

@@ -59,6 +59,26 @@ describe('design system AI helpers', () => {
     expect(out.docs?.overview).toBe('a - b')
   })
 
+  it('applyAiSystem keeps a name the user typed and still takes the rest', () => {
+    // Typing "Basis probe" and getting back a system called "Teal" is the
+    // model overruling an answer that was already given.
+    const base = generateSystem(A)
+    const out = applyAiSystem(base, {
+      name: 'Teal',
+      colors: { primary: '#aabbcc' },
+      docs: { overview: 'Overview text' }
+    }, { name: false })
+    expect(out.name).toBe('Acme')
+    expect(out.colors.primary).toBe('#aabbcc')
+    expect(out.docs?.overview).toBe('Overview text')
+  })
+
+  it('applyAiSystem still names a system nobody named', () => {
+    const base = generateSystem({ ...DEFAULT_ANSWERS, name: '' })
+    const out = applyAiSystem(base, { name: 'Teal' }, { name: true })
+    expect(out.name).toBe('Teal')
+  })
+
   it('applyAiSystem returns base unchanged on garbage', () => {
     const base = generateSystem(A)
     expect(applyAiSystem(base, null)).toEqual(base)
