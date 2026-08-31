@@ -832,7 +832,7 @@ const IcoBlur = (): JSX.Element => (
 const IcoBox = (): JSX.Element => <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4"><rect x="3" y="3" width="10" height="10" rx="1.5" /></svg>
 const IcoChevron = (): JSX.Element => <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"><path d="M3 4.5l3 3 3-3" /></svg>
 
-interface MenuItem { label: string; active?: boolean; onClick: () => void }
+interface MenuItem { label: string; active?: boolean; onClick: () => void; hint?: string; disabled?: boolean; sep?: boolean }
 
 /** Positions a dropdown as a fixed, viewport-anchored panel beside its trigger
  * (the menu element's parent). It opens downward by default but flips upward when
@@ -869,9 +869,19 @@ function Menu({ open, onClose, items, align = 'right', width = 176 }: { open: bo
       <div className="fixed inset-0 z-[70]" onPointerDown={onClose} />
       <div ref={menuRef} className="z-[71] overflow-y-auto rounded-lg bg-raised p-1 shadow-overlay" style={style}>
         {items.map((it) => (
-          <button key={it.label} type="button" onPointerDown={(e) => { e.preventDefault(); it.onClick(); onClose() }} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[12px] text-text-primary hover:bg-bg/60">
-            <span className="w-3 text-text-primary">{it.active ? '✓' : ''}</span>{it.label}
-          </button>
+          <Fragment key={it.label}>
+            {it.sep && <div className="my-1 h-px bg-bg/60" />}
+            <button
+              type="button"
+              disabled={it.disabled}
+              onPointerDown={(e) => { e.preventDefault(); if (it.disabled) return; it.onClick(); onClose() }}
+              className={['flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[12px]', it.disabled ? 'cursor-default text-text-muted opacity-50' : 'text-text-primary hover:bg-bg/60'].join(' ')}
+            >
+              <span className="w-3 text-text-primary">{it.active ? '✓' : ''}</span>
+              <span className="min-w-0 flex-1 truncate">{it.label}</span>
+              {it.hint && <span className="shrink-0 text-[11px] text-text-muted">{it.hint}</span>}
+            </button>
+          </Fragment>
         ))}
       </div>
     </>
@@ -879,12 +889,12 @@ function Menu({ open, onClose, items, align = 'right', width = 176 }: { open: bo
 }
 
 /** A header sliders icon that opens a small options menu (line style, shadow type). */
-function HeaderMenu({ items }: { items: MenuItem[] }): JSX.Element {
+function HeaderMenu({ items, icon, title = 'Options', width }: { items: MenuItem[]; icon?: React.ReactNode; title?: string; width?: number }): JSX.Element {
   const [open, setOpen] = useState(false)
   return (
     <div className="relative">
-      <button type="button" onClick={() => setOpen((o) => !o)} title="Options" className={['grid h-6 w-6 place-items-center rounded hover:bg-elevated hover:text-text-primary', open ? 'text-text-primary' : 'text-text-muted'].join(' ')}><IcoSliders /></button>
-      <Menu open={open} onClose={() => setOpen(false)} items={items} />
+      <button type="button" onClick={() => setOpen((o) => !o)} title={title} className={['grid h-6 w-6 place-items-center rounded hover:bg-elevated hover:text-text-primary', open ? 'text-text-primary' : 'text-text-muted'].join(' ')}>{icon ?? <IcoSliders />}</button>
+      <Menu open={open} onClose={() => setOpen(false)} items={items} width={width} />
     </div>
   )
 }
@@ -906,6 +916,11 @@ const EFFECT_ICON: Record<EffectType, JSX.Element> = {
 }
 const IcoGrid = (): JSX.Element => <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><circle cx="5" cy="5" r="1.6" /><circle cx="11" cy="5" r="1.6" /><circle cx="5" cy="11" r="1.6" /><circle cx="11" cy="11" r="1.6" /></svg>
 const IcoDroplet = (): JSX.Element => <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"><path d="M8 2.5s4 4.2 4 7a4 4 0 0 1-8 0c0-2.8 4-7 4-7z" /></svg>
+const IcoOpacity = (): JSX.Element => (
+  <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+    {[3, 6, 9, 12].map((y, i) => [3, 6, 9, 12].map((x, j) => ((i + j) % 2 === 0 ? <rect key={`${x}-${y}`} x={x - 1.5} y={y - 1.5} width="3" height="3" /> : null)))}
+  </svg>
+)
 
 const BLEND_MODES: { label: string; value: string }[] = [
   { label: 'Normal', value: 'normal' }, { label: 'Darken', value: 'darken' }, { label: 'Multiply', value: 'multiply' }, { label: 'Color burn', value: 'color-burn' },
@@ -929,18 +944,19 @@ function RangeRow({ label, value, min, max, step = 1, onChange, mul = 1, suffix 
 }
 
 /** The "+" / grid button (or a wide "Add effect" row) that opens the type menu. */
-function EffectAddMenu({ onAdd, variant }: { onAdd: (type: EffectType, anchor: DOMRect) => void; variant: 'plus' | 'grid' | 'wide' }): JSX.Element {
+function EffectAddMenu({ onAdd, variant, types, label = 'Add effect' }: { onAdd: (type: EffectType, anchor: DOMRect) => void; variant: 'plus' | 'grid' | 'wide'; types?: EffectType[]; label?: string }): JSX.Element {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
-  const menuStyle = useAnchoredMenuStyle(open, menuRef, 208, variant === 'wide' ? 'left' : 'right', EFFECT_ORDER.length)
+  const order = types ?? EFFECT_ORDER
+  const menuStyle = useAnchoredMenuStyle(open, menuRef, 208, variant === 'wide' ? 'left' : 'right', order.length)
   const pick = (t: EffectType): void => { const r = ref.current?.getBoundingClientRect(); setOpen(false); if (r) onAdd(t, r) }
   return (
     <div className={variant === 'wide' ? 'relative' : 'relative inline-block'}>
       {variant === 'wide' ? (
-        <button ref={ref} type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-center gap-1.5 rounded-md bg-elevated/60 px-2 py-2 text-[12px] text-text-secondary hover:text-text-primary"><IcoPlus /> Add effect</button>
+        <button ref={ref} type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-center gap-1.5 rounded-md bg-elevated/60 px-2 py-2 text-[12px] text-text-secondary hover:text-text-primary"><IcoPlus /> {label}</button>
       ) : (
-        <button ref={ref} type="button" onClick={() => setOpen((o) => !o)} title="Add effect" className={['grid h-6 w-6 place-items-center rounded hover:bg-elevated hover:text-text-primary', open ? 'text-text-primary' : 'text-text-muted'].join(' ')}>
+        <button ref={ref} type="button" onClick={() => setOpen((o) => !o)} title={label} className={['grid h-6 w-6 place-items-center rounded hover:bg-elevated hover:text-text-primary', open ? 'text-text-primary' : 'text-text-muted'].join(' ')}>
           {variant === 'grid' ? <IcoGrid /> : <IcoPlus />}
         </button>
       )}
@@ -948,7 +964,7 @@ function EffectAddMenu({ onAdd, variant }: { onAdd: (type: EffectType, anchor: D
         <>
           <div className="fixed inset-0 z-[70]" onPointerDown={() => setOpen(false)} />
           <div ref={menuRef} className="z-[71] overflow-y-auto rounded-lg bg-raised p-1 shadow-overlay" style={menuStyle}>
-            {EFFECT_ORDER.map((t) => (
+            {order.map((t) => (
               <div key={t}>
                 {t === 'shader' && <div className="my-1" />}
                 <button type="button" onPointerDown={(e) => { e.preventDefault(); pick(t) }} className="flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left text-[12px] text-text-primary hover:bg-bg/60">
@@ -964,18 +980,13 @@ function EffectAddMenu({ onAdd, variant }: { onAdd: (type: EffectType, anchor: D
 }
 
 /** Effects section body: a row per effect; click a row to open its popover. */
-function EffectsEditor({ sel, patch, pushHistory, onOpenEffect, activeId }: { sel: FObj; patch: (id: string, p: Partial<FObj>) => void; pushHistory: () => void; onOpenEffect: (id: string, anchor: DOMRect) => void; activeId: string | null }): JSX.Element | null {
-  // Lazily migrate legacy shadow/inner/filters into the effects array on select.
-  useEffect(() => {
-    const p = migrateEffects(sel)
-    if (p) patch(sel.id, p)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sel.id])
+function EffectsEditor({ sel, patch, pushHistory, onOpenEffect, activeId, only }: { sel: FObj; patch: (id: string, p: Partial<FObj>) => void; pushHistory: () => void; onOpenEffect: (id: string, anchor: DOMRect) => void; activeId: string | null; only?: EffectType[] }): JSX.Element | null {
   const list = sel.effects ?? []
-  if (!list.length) return null
+  const shownList = only ? list.filter((e) => only.includes(e.type)) : list
+  if (!shownList.length) return null
   return (
     <div className="space-y-1">
-      {list.map((e) => {
+      {shownList.map((e) => {
         const visible = !e.hidden
         return (
           <div key={e.id} className={['flex items-center gap-1.5 rounded-md', activeId === e.id ? 'bg-elevated/40' : ''].join(' ')}>
@@ -2922,6 +2933,35 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
     setObjects((os) => os.map((o) => (map.has(o.id) ? { ...o, x: Math.round(map.get(o.id)!.x), y: Math.round(map.get(o.id)!.y) } : o)))
   }
 
+  /** Figma's "Resize to fill": grow each selected layer to its parent frame's
+   * content box, or to the artboard it sits on when it has no parent frame. */
+  const doResizeToFill = (): void => {
+    const ids = selRef.current
+    if (!ids.length) return
+    const all = objectsRef.current
+    const targets = new Map<string, Box>()
+    for (const id of ids) {
+      const o = all.find((x) => x.id === id)
+      if (!o) continue
+      const parent = o.parent ? all.find((p) => p.id === o.parent) : null
+      if (parent) {
+        const padX = parent.layoutPadX ?? parent.layoutPadding ?? 0
+        const padY = parent.layoutPadY ?? parent.layoutPadding ?? 0
+        targets.set(id, { x: parent.x + padX, y: parent.y + padY, w: Math.max(1, parent.w - padX * 2), h: Math.max(1, parent.h - padY * 2) })
+        continue
+      }
+      const ab = artboardAt(artboardsRef.current, o.x + o.w / 2, o.y + o.h / 2) ?? artboardsRef.current.find((a) => a.id === activeAbRef.current)
+      if (ab) targets.set(id, { x: ab.x, y: ab.y, w: ab.w, h: ab.h })
+    }
+    if (!targets.size) return
+    pushHistory()
+    setObjects((os) => os.map((o) => {
+      const t = targets.get(o.id)
+      if (!t) return o
+      return { ...o, x: Math.round(t.x), y: Math.round(t.y), w: Math.round(t.w), h: Math.round(t.h), widthMode: 'fixed', heightMode: 'fixed' }
+    }))
+  }
+
   // ── Keyboard shortcuts ───────────────────────────────────────────────────────
   useEffect(() => {
     const isField = (el: EventTarget | null): boolean => {
@@ -2933,6 +2973,11 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
       if (isField(e.target)) return
       const meta = e.metaKey || e.ctrlKey
       const k = e.key.toLowerCase()
+      // Layout menu shortcuts: distribute (^⌥V / ^⌥H) and resize to fill (⌥⇧⌘F).
+      // Option-key combos change e.key on macOS, so match the physical key.
+      if (e.ctrlKey && e.altKey && !e.metaKey && (e.code === 'KeyV' || e.code === 'KeyH')) { e.preventDefault(); doDistribute(e.code === 'KeyV' ? 'v' : 'h'); return }
+      if (e.metaKey && e.altKey && e.shiftKey && e.code === 'KeyF') { e.preventDefault(); doResizeToFill(); return }
+      if (meta && e.shiftKey && e.code === 'KeyE' && selRef.current.length) { e.preventDefault(); exportSelection('png', 1); return }
       if (meta && k === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return }
       if (meta && k === 'y') { e.preventDefault(); redo(); return }
       if (meta && k === 'd') { e.preventDefault(); duplicate(); return }
@@ -3121,6 +3166,54 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
       }
     }
     setTimeout(() => setStatus(''), 2500)
+  }
+
+  /** Export just the selected layers (and anything nested inside them), cropped
+   * to their bounding box, on a transparent ground. PNG can be scaled up. */
+  const exportSelection = (format: 'png' | 'svg', scale = 1): void => {
+    const ids = selRef.current
+    if (!ids.length) return
+    const all = objectsRef.current
+    const wanted = new Set(ids)
+    let grew = true
+    while (grew) {
+      grew = false
+      for (const o of all) {
+        if (o.parent && wanted.has(o.parent) && !wanted.has(o.id)) { wanted.add(o.id); grew = true }
+      }
+    }
+    const picked = all.filter((o) => wanted.has(o.id) && o.visible)
+    if (!picked.length) return
+    const minX = Math.min(...picked.map((o) => o.x))
+    const minY = Math.min(...picked.map((o) => o.y))
+    const w = Math.max(1, Math.round(Math.max(...picked.map((o) => o.x + o.w)) - minX))
+    const h = Math.max(1, Math.round(Math.max(...picked.map((o) => o.y + o.h)) - minY))
+    const local = picked.map((o) => ({ ...o, x: o.x - minX, y: o.y - minY }))
+    const first = all.find((o) => o.id === ids[0])
+    const name = (first?.name || 'layer').replace(/\s+/g, '-').toLowerCase()
+    const svg = composeArtboardSvg({ w, h, bg: 'transparent' }, local)
+    if (format === 'svg') {
+      downloadBlob(svg, `${name}.svg`, 'image/svg+xml')
+      setStatus(`Exported ${name}.svg`)
+      setTimeout(() => setStatus(''), 2500)
+      return
+    }
+    setStatus('Rendering PNG…')
+    const img = new Image()
+    img.onload = () => {
+      const c = document.createElement('canvas')
+      c.width = Math.round(w * scale)
+      c.height = Math.round(h * scale)
+      const ctx = c.getContext('2d')
+      if (!ctx) { setStatus('PNG export failed'); return }
+      ctx.drawImage(img, 0, 0, c.width, c.height)
+      c.toBlob((b) => {
+        if (b) { downloadBlob(b, `${name}${scale > 1 ? `@${scale}x` : ''}.png`, 'image/png'); setStatus(`Exported ${name}.png`) } else setStatus('PNG export failed')
+        setTimeout(() => setStatus(''), 2500)
+      }, 'image/png')
+    }
+    img.onerror = () => { setStatus('PNG export failed'); setTimeout(() => setStatus(''), 2500) }
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
   }
 
   // ── Export the animation as a video (MP4 where the browser supports it, else WebM)
@@ -3960,6 +4053,7 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
           wrapInFlex={wrapInFlex}
           doAlign={doAlign}
           doDistribute={doDistribute}
+          doResizeToFill={doResizeToFill}
           artboards={artboards}
           activeAb={activeAb}
           setActiveAb={setActiveAb}
@@ -3967,6 +4061,7 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
           addArtboard={addArtboard}
           removeArtboard={removeArtboard}
           onExport={(f) => { if (f === 'video') void exportVideo(); else exportArtboard(f) }}
+          onExportSelection={exportSelection}
           isKeyed={isKeyed}
           toggleKey={toggleKey}
           autoRecord={autoRecord}
@@ -4869,7 +4964,7 @@ function SelColorRow({ hex, count, ids, onReplaceColor }: { hex: string; count: 
   )
 }
 
-function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gradOpenMode, onToggleGradOpts, onOpenEffect, activeEffectId, pushHistory, removeSel, arrange, groupSelection, wrapInFlex, doAlign, doDistribute, artboards, activeAb, setActiveAb, patchAb, addArtboard, removeArtboard, onExport, isKeyed, toggleKey, autoRecord, motionDur, playhead, recordKey, resetTransform, allObjects, onReplaceColor, timelineOpen , autoKey }: {
+function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gradOpenMode, onToggleGradOpts, onOpenEffect, activeEffectId, pushHistory, removeSel, arrange, groupSelection, wrapInFlex, doAlign, doDistribute, doResizeToFill, artboards, activeAb, setActiveAb, patchAb, addArtboard, removeArtboard, onExport, onExportSelection, isKeyed, toggleKey, autoRecord, motionDur, playhead, recordKey, resetTransform, allObjects, onReplaceColor, timelineOpen , autoKey }: {
   width: number
   tool: Tool
   abSelected: boolean
@@ -4889,6 +4984,7 @@ function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gra
   wrapInFlex: () => void
   doAlign: (m: AlignMode) => void
   doDistribute: (a: 'h' | 'v') => void
+  doResizeToFill: () => void
   artboards: Artboard[]
   activeAb: string
   setActiveAb: (id: string) => void
@@ -4896,6 +4992,7 @@ function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gra
   addArtboard: (w: number, h: number, label: string) => void
   removeArtboard: (id: string) => void
   onExport: (format: 'html' | 'svg' | 'png' | 'video') => void
+  onExportSelection: (format: 'png' | 'svg', scale?: number) => void
   isKeyed: (o: FObj, prop: PropName) => boolean
   toggleKey: (o: FObj, prop: PropName, value: number) => void
   autoRecord: (o: FObj, prop: PropName, value: number) => void
@@ -4910,6 +5007,17 @@ function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gra
   const multi = selObjs.length > 1
   const varBind = useContext(VarBindContext)
   const hasVars = varBind.collections.length > 0
+  const [exportScale, setExportScale] = useState(1)
+  const [exportFormat, setExportFormat] = useState<'png' | 'svg'>('png')
+  // Legacy shadow/blur fields settle into the effects array once per selection, so
+  // the Shadow, Inner shadow and Filters sections all read one list.
+  const selId = sel?.id
+  useEffect(() => {
+    if (!sel) return
+    const p = migrateEffects(sel)
+    if (p) patch(sel.id, p)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selId])
   const varCounts = useMemo(() => ({ cols: varBind.collections.length, vars: varBind.collections.reduce((n, c) => n + c.variables.length, 0) }), [varBind.collections])
   const active = artboards.find((a) => a.id === activeAb) ?? artboards[0]
   // Selection colors: every distinct colour used by the current selection (or the
@@ -5079,7 +5187,18 @@ function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gra
       <aside className="shrink-0 overflow-y-auto bg-surface overflow-x-hidden" style={{ width, minWidth: width, maxWidth: width }}>
         {multi ? (
           <>
-            <Section title="Align">
+            <Section title="Align" right={
+              <HeaderMenu
+                icon={<IcoMore />}
+                title="Layout options"
+                width={228}
+                items={[
+                  { label: 'Distribute vertically', hint: '^⌥V', disabled: selObjs.length < 3, onClick: () => doDistribute('v') },
+                  { label: 'Distribute horizontally', hint: '^⌥H', disabled: selObjs.length < 3, onClick: () => doDistribute('h') },
+                  { label: 'Resize to fill', hint: '⌥⇧⌘F', sep: true, onClick: doResizeToFill }
+                ]}
+              />
+            }>
               <div className="flex items-center gap-0.5">
                 {([
                   ['left', 'Align left', 'M3 2v12M6 5h7v2H6zM6 9h4v2H6z'],
@@ -5095,21 +5214,6 @@ function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gra
                     </button>
                   </Tooltip>
                 ))}
-                {selObjs.length > 2 && (
-                  <>
-                    <span className="mx-1" />
-                    <Tooltip label="Distribute horizontally" side="top">
-                      <button type="button" onClick={() => doDistribute('h')} className="grid h-7 w-7 place-items-center rounded text-text-secondary hover:bg-elevated hover:text-text-primary">
-                        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><rect x="1.5" y="3.5" width="2.6" height="9" rx="0.6" /><rect x="6.7" y="3.5" width="2.6" height="9" rx="0.6" /><rect x="11.9" y="3.5" width="2.6" height="9" rx="0.6" /></svg>
-                      </button>
-                    </Tooltip>
-                    <Tooltip label="Distribute vertically" side="top">
-                      <button type="button" onClick={() => doDistribute('v')} className="grid h-7 w-7 place-items-center rounded text-text-secondary hover:bg-elevated hover:text-text-primary">
-                        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><rect x="3.5" y="1.5" width="9" height="2.6" rx="0.6" /><rect x="3.5" y="6.7" width="9" height="2.6" rx="0.6" /><rect x="3.5" y="11.9" width="9" height="2.6" rx="0.6" /></svg>
-                      </button>
-                    </Tooltip>
-                  </>
-                )}
               </div>
             </Section>
             <Section title="Arrange" defaultOpen={false}>
@@ -5224,7 +5328,18 @@ function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gra
         </Section>
       )}
 
-      <Section title="Position">
+      <Section title="Layout" right={
+        <HeaderMenu
+          icon={<IcoMore />}
+          title="Layout options"
+          width={228}
+          items={[
+            { label: 'Distribute vertically', hint: '^⌥V', disabled: selObjs.length < 3, onClick: () => doDistribute('v') },
+            { label: 'Distribute horizontally', hint: '^⌥H', disabled: selObjs.length < 3, onClick: () => doDistribute('h') },
+            { label: 'Resize to fill', hint: '⌥⇧⌘F', sep: true, onClick: doResizeToFill }
+          ]}
+        />
+      }>
         {(() => {
           const offX = sampleTrack(sel.motion?.tracks.x, playhead, 0)
           const offY = sampleTrack(sel.motion?.tracks.y, playhead, 0)
@@ -5571,6 +5686,45 @@ function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gra
         </Section>
       )}
 
+      {(sel.type === 'rect' || sel.type === 'frame' || sel.type === 'image') && (() => {
+        const boundRadius = sel.bindings?.radius
+        return (
+          <Section title="Radius" defaultOpen={!!boundRadius} right={(hasVars || boundRadius) ? <VarBindButton field="radius" boundVarId={boundRadius} /> : undefined}>
+            {boundRadius
+              ? <BoundChip field="radius" varId={boundRadius} />
+              : <Slider label="Radius" tip="Round the corners" value={sel.radius} min={0} max={120} on={(v) => patch(sel.id, { radius: Math.round(v) })} />}
+          </Section>
+        )
+      })()}
+
+      <Section title="Blending" right={
+        <IconBtn onClick={() => { pushHistory(); patch(sel.id, { visible: !sel.visible }) }} title={sel.visible ? 'Hide layer' : 'Show layer'}><Eye on={sel.visible} /></IconBtn>
+      }>
+        <div className="grid grid-cols-2 gap-1.5">
+          <NumberField
+            icon={<IcoOpacity />}
+            suffix="%"
+            title="Opacity"
+            value={Math.round(sel.opacity * 100)}
+            min={0}
+            max={100}
+            onChange={(v) => { patch(sel.id, { opacity: v / 100 }); autoRecord(sel, 'opacity', v / 100) }}
+            fieldClassName="rounded-lg bg-elevated px-2 py-1.5"
+          />
+          <label className="flex min-w-0 items-center gap-1.5 rounded-lg bg-elevated px-2 py-1.5">
+            <span className="shrink-0 text-text-muted"><IcoDroplet /></span>
+            <span className="sr-only">Blend mode</span>
+            <select
+              value={sel.blendMode ?? 'normal'}
+              onChange={(e) => { pushHistory(); patch(sel.id, { blendMode: e.target.value }) }}
+              className="min-w-0 flex-1 appearance-none bg-transparent text-[12px] text-text-primary focus:outline-none"
+            >
+              {BLEND_MODES.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}
+            </select>
+          </label>
+        </div>
+      </Section>
+
       {(hasFill || sel.type === 'text') && (() => {
         const textFill = sel.type === 'text'
         const present = textFill ? true : sel.fillEnabled
@@ -5631,16 +5785,7 @@ function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gra
         )
       })()}
 
-      {(sel.type === 'rect' || sel.type === 'frame' || sel.type === 'image') && (() => {
-        const boundRadius = sel.bindings?.radius
-        return (
-          <Section title="Corner radius" defaultOpen={!!boundRadius} right={(hasVars || boundRadius) ? <VarBindButton field="radius" boundVarId={boundRadius} /> : undefined}>
-            {boundRadius
-              ? <BoundChip field="radius" varId={boundRadius} />
-              : <Slider label="Radius" tip="Round the corners" value={sel.radius} min={0} max={120} on={(v) => patch(sel.id, { radius: Math.round(v) })} />}
-          </Section>
-        )
-      })()}
+
 
       {(() => {
         const list = sel.effects ?? []
@@ -5650,16 +5795,58 @@ function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gra
           patch(sel.id, { effects: [...(sel.effects ?? []), e] })
           onOpenEffect(e.id!, anchor)
         }
+        const addFixed = (type: EffectType) => (ev: React.MouseEvent<HTMLButtonElement>): void => addEffect(type, ev.currentTarget.getBoundingClientRect())
+        const FILTER_TYPES: EffectType[] = ['layer-blur', 'background-blur', 'noise', 'texture', 'glass', 'shader']
+        const groups: { title: string; types: EffectType[] }[] = [
+          { title: 'Shadow', types: ['drop-shadow'] },
+          { title: 'Inner shadow', types: ['inner-shadow'] },
+          { title: 'Filters', types: FILTER_TYPES }
+        ]
         return (
-          <Section title="Effects" defaultOpen={list.length > 0} right={
-            <div className="flex items-center gap-0.5">
-              <EffectAddMenu onAdd={addEffect} variant="grid" />
-              <EffectAddMenu onAdd={addEffect} variant="plus" />
+          <>
+            {groups.map((g) => {
+              const mine = list.filter((e) => g.types.includes(e.type))
+              const single = g.types.length === 1
+              return (
+                <Section key={g.title} title={g.title} defaultOpen={mine.length > 0} right={
+                  single
+                    ? <button type="button" onClick={addFixed(g.types[0])} title={`Add ${g.title.toLowerCase()}`} className="grid h-6 w-6 place-items-center rounded text-text-muted hover:bg-elevated hover:text-text-primary"><IcoPlus /></button>
+                    : <EffectAddMenu onAdd={addEffect} variant="plus" types={g.types} label="Add filter" />
+                }>
+                  {mine.length > 0
+                    ? <EffectsEditor sel={sel} patch={patch} pushHistory={pushHistory} onOpenEffect={onOpenEffect} activeId={activeEffectId} only={g.types} />
+                    : single
+                      ? <button type="button" onClick={addFixed(g.types[0])} className="flex w-full items-center justify-center gap-1.5 rounded-md bg-elevated/60 px-2 py-2 text-[12px] text-text-secondary hover:text-text-primary"><IcoPlus /> Add {g.title.toLowerCase()}</button>
+                      : <EffectAddMenu onAdd={addEffect} variant="wide" types={g.types} label="Add filter" />}
+                </Section>
+              )
+            })}
+          </>
+        )
+      })()}
+
+      {(() => {
+        const scales = [1, 2, 3, 4]
+        return (
+          <Section title="Export" defaultOpen={false}>
+            <div className="grid grid-cols-2 gap-1.5">
+              <label className="flex min-w-0 items-center gap-1.5 rounded-lg bg-elevated px-2 py-1.5">
+                <span className="sr-only">Export scale</span>
+                <select value={exportScale} onChange={(e) => setExportScale(parseInt(e.target.value))} className="min-w-0 flex-1 appearance-none bg-transparent text-[12px] text-text-primary focus:outline-none">
+                  {scales.map((s) => <option key={s} value={s}>{s}x</option>)}
+                </select>
+              </label>
+              <label className="flex min-w-0 items-center gap-1.5 rounded-lg bg-elevated px-2 py-1.5">
+                <span className="sr-only">Export format</span>
+                <select value={exportFormat} onChange={(e) => setExportFormat(e.target.value as 'png' | 'svg')} className="min-w-0 flex-1 appearance-none bg-transparent text-[12px] text-text-primary focus:outline-none">
+                  <option value="png">PNG</option>
+                  <option value="svg">SVG</option>
+                </select>
+              </label>
             </div>
-          }>
-            {list.length > 0
-              ? <EffectsEditor sel={sel} patch={patch} pushHistory={pushHistory} onOpenEffect={onOpenEffect} activeId={activeEffectId} />
-              : <EffectAddMenu onAdd={addEffect} variant="wide" />}
+            <button type="button" onClick={() => onExportSelection(exportFormat, exportScale)} className="flex w-full items-center justify-center gap-1.5 rounded-md bg-elevated/60 px-2 py-2 text-[12px] text-text-secondary hover:text-text-primary">
+              Export <span className="text-text-muted">⇧⌘E</span>
+            </button>
           </Section>
         )
       })()}
