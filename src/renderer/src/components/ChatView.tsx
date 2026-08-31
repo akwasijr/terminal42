@@ -139,8 +139,10 @@ export function ChatView({
     return (
       <div className="h-full w-full overflow-y-auto">
         <ChatEmptyStateFull
-          onPick={(text) => {
-            window.dispatchEvent(new CustomEvent(COMPOSER_FILL_EVENT, { detail: { sessionId, text } }))
+          onPick={(text, slot) => {
+            window.dispatchEvent(
+              new CustomEvent(COMPOSER_FILL_EVENT, { detail: { sessionId, text, select: slot } })
+            )
           }}
         />
       </div>

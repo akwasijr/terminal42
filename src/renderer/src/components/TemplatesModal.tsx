@@ -21,7 +21,7 @@ export function TemplatesModal({
   onPick,
   onClose
 }: {
-  onPick: (prompt: string) => void
+  onPick: (prompt: string, slot?: string) => void
   onClose: () => void
 }): JSX.Element {
   return (
@@ -52,12 +52,12 @@ function TemplateCard({
   onPick
 }: {
   template: StarterPromptText
-  onPick: (prompt: string) => void
+  onPick: (prompt: string, slot?: string) => void
 }): JSX.Element {
   return (
     <button
       type="button"
-      onClick={() => onPick(template.prompt)}
+      onClick={() => onPick(template.prompt, template.slot)}
       title={template.prompt}
       className="group flex h-full flex-col gap-2 rounded-xl bg-surface p-2.5 text-left transition-colors hover:bg-elevated focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
     >

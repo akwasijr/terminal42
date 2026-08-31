@@ -46,6 +46,18 @@ export type StarterPromptText = {
   id: StarterId
   title: string
   prompt: string
+  /**
+   * The words the person has to replace before this is worth sending.
+   *
+   * A starter cannot know what you want built, so it ends by naming the one
+   * thing it is missing. That phrase is selected when the tile fills the box,
+   * so the first key typed replaces it instead of landing after a sentence
+   * that refers to something nobody has said yet.
+   *
+   * Absent on the starters that need nothing: "Write a README for this
+   * project" already knows what it is about.
+   */
+  slot?: string
 }
 
 /** Every prompt, grouped by kind. Each group is one rotation cycle. */
@@ -54,17 +66,20 @@ export const STARTER_POOL: Record<StarterId, StarterPromptText[]> = {
     {
       id: 'dashboard',
       title: 'Build a dashboard',
-      prompt: 'Build a dashboard from a data file I point you at, with at least 3 charts of the numbers that matter.'
+      prompt: 'Build a dashboard with at least 3 charts of the numbers that matter. The data is: a file I will point you at.',
+      slot: 'a file I will point you at'
     },
     {
       id: 'dashboard',
       title: 'Chart a spreadsheet',
-      prompt: 'Turn a spreadsheet I give you into a page with at least 2 charts and a filter.'
+      prompt: 'Turn a spreadsheet into a page with at least 2 charts and a filter. The spreadsheet is: one I will point you at.',
+      slot: 'one I will point you at'
     },
     {
       id: 'dashboard',
       title: 'Watch some services',
-      prompt: 'Build a status page that checks at least 2 services I name and shows whether each one is up.'
+      prompt: 'Build a status page showing whether each of at least 2 services is up. The services are: ones I will name.',
+      slot: 'ones I will name'
     }
   ],
   tool: [
@@ -76,36 +91,42 @@ export const STARTER_POOL: Record<StarterId, StarterPromptText[]> = {
     {
       id: 'tool',
       title: 'Automate a chore',
-      prompt: 'Write a script that automates a chore I describe, with a dry run that changes 0 files.'
+      prompt: 'Write a script that automates a chore, with a dry run that changes 0 files. The chore is: one I will describe.',
+      slot: 'one I will describe'
     },
     {
       id: 'tool',
       title: 'Make a command-line tool',
-      prompt: 'Build a command-line tool for a job I describe, with --help and at least 2 subcommands.'
+      prompt: 'Build a command-line tool with --help and at least 2 subcommands. The job it does is: one I will describe.',
+      slot: 'one I will describe'
     }
   ],
   site: [
     {
       id: 'site',
       title: 'Build a landing page',
-      prompt: 'Build a landing page for something I describe, with a headline, what it does, and at least 1 call to action.'
+      prompt: 'Build a landing page with a headline, what it does, and at least 1 call to action. It is for: something I will describe.',
+      slot: 'something I will describe'
     },
     {
       id: 'site',
       title: 'Build a portfolio',
-      prompt: 'Build a portfolio page for work I describe, with a short intro and at least 3 project cards.'
+      prompt: 'Build a portfolio page with a short intro and at least 3 project cards. The work it shows is: work I will describe.',
+      slot: 'work I will describe'
     },
     {
       id: 'site',
       title: 'Make a form that works',
-      prompt: 'Build a form for something I describe, with at least 4 fields, inline validation and a clear success state.'
+      prompt: 'Build a form with at least 4 fields, inline validation and a clear success state. It collects: something I will describe.',
+      slot: 'something I will describe'
     }
   ],
   api: [
     {
       id: 'api',
       title: 'Build a small API',
-      prompt: 'Build a small API for something I describe, with at least 3 endpoints and an example request for each.'
+      prompt: 'Build a small API with at least 3 endpoints and an example request for each. It serves: something I will describe.',
+      slot: 'something I will describe'
     },
     {
       id: 'api',
@@ -115,7 +136,8 @@ export const STARTER_POOL: Record<StarterId, StarterPromptText[]> = {
     {
       id: 'api',
       title: 'Wrap a service',
-      prompt: 'Wrap a service I name in a typed client with at least 3 methods and handled errors.'
+      prompt: 'Wrap a service in a typed client with at least 3 methods and handled errors. The service is: one I will name.',
+      slot: 'one I will name'
     }
   ],
   docs: [
@@ -127,7 +149,8 @@ export const STARTER_POOL: Record<StarterId, StarterPromptText[]> = {
     {
       id: 'docs',
       title: 'Document a feature',
-      prompt: 'Document a feature I describe, with a contents list linking to at least 4 sections.'
+      prompt: 'Document a feature with a contents list linking to at least 4 sections. The feature is: one I will describe.',
+      slot: 'one I will describe'
     },
     {
       id: 'docs',

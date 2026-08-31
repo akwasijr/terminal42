@@ -130,7 +130,14 @@ export function Composer({
   // are mounted at once — one per open session.
   useEffect(() => {
     const onFill = (e: Event): void => {
-      const detail = (e as CustomEvent<{ sessionId?: string; text?: string; mode?: 'replace' | 'append' }>).detail
+      const detail = (
+        e as CustomEvent<{
+          sessionId?: string
+          text?: string
+          mode?: 'replace' | 'append'
+          select?: string
+        }>
+      ).detail
       if (!detail?.text || detail.sessionId !== sessionId) return
       initialLoad.current = false
       setBody((prev) => {
@@ -142,7 +149,9 @@ export function Composer({
         const ta = taRef.current
         if (!ta) return
         ta.focus()
-        ta.setSelectionRange(ta.value.length, ta.value.length)
+        const at = detail.select ? ta.value.lastIndexOf(detail.select) : -1
+        if (at >= 0) ta.setSelectionRange(at, at + detail.select!.length)
+        else ta.setSelectionRange(ta.value.length, ta.value.length)
       })
     }
     window.addEventListener(COMPOSER_FILL_EVENT, onFill)

@@ -44,10 +44,24 @@ describe('starter prompts', () => {
     }
   })
 
-  it('is one sentence, so nothing needs trimming before sending', () => {
+  it('is one sentence, plus one only where something has to be filled in', () => {
+    // The second sentence exists to be replaced: it names the one thing the
+    // starter cannot know. Anything longer is a starter doing the thinking
+    // for somebody who has not said what they want yet.
     for (const p of ALL) {
       const sentences = p.prompt.split(/[.!?]\s+/).filter(Boolean)
-      expect(sentences.length, p.title).toBe(1)
+      expect(sentences.length, p.title).toBe(p.slot ? 2 : 1)
+    }
+  })
+
+  it('ends on the words it asks you to replace', () => {
+    // The phrase is selected when the tile fills the box, so it has to be in
+    // the prompt and it has to come last: a caret in the middle of a sentence
+    // that carries on afterwards reads as a cursor bug.
+    for (const p of ALL) {
+      if (!p.slot) continue
+      expect(p.prompt, p.title).toContain(p.slot)
+      expect(p.prompt.trimEnd(), p.title).toBe(`${p.prompt.slice(0, p.prompt.lastIndexOf(p.slot))}${p.slot}.`)
     }
   })
 

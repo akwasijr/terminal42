@@ -35,7 +35,11 @@ function useStarterRotation(): number {
   return rotation
 }
 
-export function ChatEmptyStateFull({ onPick }: { onPick: (prompt: string) => void }): JSX.Element {
+export function ChatEmptyStateFull({
+  onPick
+}: {
+  onPick: (prompt: string, slot?: string) => void
+}): JSX.Element {
   const name = useGreetingName()
   const rotation = useStarterRotation()
   const [templatesOpen, setTemplatesOpen] = useState(false)
@@ -67,7 +71,7 @@ export function ChatEmptyStateFull({ onPick }: { onPick: (prompt: string) => voi
       {templatesOpen && (
         <TemplatesModal
           onClose={() => setTemplatesOpen(false)}
-          onPick={(prompt) => { setTemplatesOpen(false); onPick(prompt) }}
+          onPick={(prompt, slot) => { setTemplatesOpen(false); onPick(prompt, slot) }}
         />
       )}
     </section>
@@ -79,12 +83,12 @@ function StarterCard({
   onPick
 }: {
   prompt: StarterPrompt
-  onPick: (prompt: string) => void
+  onPick: (prompt: string, slot?: string) => void
 }): JSX.Element {
   return (
     <button
       type="button"
-      onClick={() => onPick(prompt.prompt)}
+      onClick={() => onPick(prompt.prompt, prompt.slot)}
       title={prompt.prompt}
       className="group flex h-full flex-col gap-2 rounded-xl bg-surface p-2.5 text-left transition-colors hover:bg-elevated focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
     >
