@@ -1426,6 +1426,12 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
   const [leftW, setLeftW] = useState(244)
   const [rightW, setRightW] = useState(248)
   const [abSelected, setAbSelected] = useState(true)
+  // Undo, delete and load can all take the active artboard away without going
+  // through removeArtboard, and a selection pointing at nothing hides the
+  // panels that would let you make a new one. Clear it wherever it happens.
+  useEffect(() => {
+    if (abSelected && !artboards.some((a) => a.id === activeAb)) setAbSelected(false)
+  }, [abSelected, artboards, activeAb])
   const [aiBusy, setAiBusy] = useState(false)
   const [playhead, setPlayhead] = useState(0)
   const [motionDur, setMotionDur] = useState(2000)
@@ -3772,10 +3778,10 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
   return (
     <EditContext.Provider value={editCtx}>
     <VarBindContext.Provider value={varCtx}>
-    <div className="flex h-full w-full flex-col bg-surface">
+    <div className="flex h-full w-full flex-col gap-1.5 bg-bg p-1.5">
       <input ref={fileRef} type="file" accept="image/*" onChange={onFile} className="hidden" />
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-3 py-2">
+      <div className="flex shrink-0 items-center gap-2 rounded-panel bg-raised px-3 py-2">
         <button type="button" onClick={onClose} className="rounded-md px-2 py-1 text-[12px] text-text-secondary hover:bg-elevated hover:text-text-primary">← Designs</button>
         {renamingTitle && onRename ? (
           <input
@@ -3826,9 +3832,9 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 gap-1.5 overflow-hidden">
         {/* Left pane: tabbed Layers / Assistant */}
-        <aside className="flex shrink-0 flex-col bg-surface" style={{ width: leftW }}>
+        <aside className="flex shrink-0 flex-col overflow-hidden rounded-panel bg-surface" style={{ width: leftW }}>
           <div className="flex shrink-0 items-center gap-0.5 px-1.5 py-1.5">
             {([
               ['layers', 'Layers', <IcoTabLayers key="l" />],
@@ -4057,14 +4063,7 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
             if (top && !selRef.current.includes(top.id)) setSelIds([top.id])
             setCanvasMenu({ x: Math.min(e.clientX, window.innerWidth - 240), y: Math.max(8, Math.min(e.clientY, window.innerHeight - 616)), under })
           }}
-          className="t42-stage relative flex flex-1 items-center justify-center overflow-hidden" style={{ cursor: spaceRef.current ? 'grab' : toolCursor(tool) }}>
-          {artboards.length === 0 && (
-            <div className="pointer-events-none absolute left-1/2 top-1/2 z-30 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-2 text-center text-text-muted">
-              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4"><rect x="4" y="5" width="16" height="14" rx="1.5" /><path d="M12 9v6M9 12h6" /></svg>
-              <div className="text-[13px] text-text-secondary">Nothing here yet</div>
-              <div className="text-[12px]">Press <span className="rounded bg-elevated px-1 text-text-primary">F</span> and drag, or pick a size on the right</div>
-            </div>
-          )}
+          className="t42-stage relative flex flex-1 items-center justify-center overflow-hidden rounded-panel" style={{ cursor: spaceRef.current ? 'grab' : toolCursor(tool) }}>
           {aiBusy && (
             <div className="pointer-events-none absolute bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full bg-raised/90 px-3 py-1.5 text-[12px] text-text-secondary shadow-overlay">
               <BoxesThinking />
@@ -5414,10 +5413,9 @@ function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gra
 
   if (!sel && !multi && !abSelected && tool === 'frame') {
     return (
-      <aside className="shrink-0 overflow-y-auto bg-surface overflow-x-hidden" style={{ width, minWidth: width, maxWidth: width }}>
+      <aside className="shrink-0 overflow-y-auto rounded-panel bg-surface overflow-x-hidden" style={{ width, minWidth: width, maxWidth: width }}>
         <div className="px-4 py-4">
           <div className="text-[15px] font-semibold text-text-primary">New frame</div>
-          <p className="mt-1 text-[12px] leading-relaxed text-text-muted">Pick a size, or drag on the canvas to draw a custom one.</p>
         </div>
         <div className="space-y-4 px-3 pb-6">
           {ARTBOARD_PRESETS.map((g) => (
@@ -5441,7 +5439,7 @@ function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gra
 
   if (!sel && !multi && !abSelected) {
     return (
-      <aside className="shrink-0 overflow-y-auto bg-surface overflow-x-hidden" style={{ width, minWidth: width, maxWidth: width }}>
+      <aside className="shrink-0 overflow-y-auto rounded-panel bg-surface overflow-x-hidden" style={{ width, minWidth: width, maxWidth: width }}>
         <div className="px-4 py-5">
           <div className="text-[15px] font-semibold text-text-primary">Page</div>
           <p className="mt-1 text-[12px] text-text-muted">Select a layer to edit it.</p>
@@ -5484,7 +5482,7 @@ function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gra
 
   if (!sel) {
     return (
-      <aside className="shrink-0 overflow-y-auto bg-surface overflow-x-hidden" style={{ width, minWidth: width, maxWidth: width }}>
+      <aside className="shrink-0 overflow-y-auto rounded-panel bg-surface overflow-x-hidden" style={{ width, minWidth: width, maxWidth: width }}>
         {multi ? (
           <>
             <Section title="Align" right={
@@ -5617,7 +5615,7 @@ function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gra
   const isLine = sel.type === 'line' || sel.type === 'arrow' || sel.type === 'path'
   const hasBorder = sel.type === 'rect' || sel.type === 'ellipse' || sel.type === 'frame' || sel.type === 'image'
   return (
-    <aside className="shrink-0 overflow-y-auto bg-surface text-[12px] overflow-x-hidden" style={{ width, minWidth: width, maxWidth: width }}>
+    <aside className="shrink-0 overflow-y-auto rounded-panel bg-surface text-[12px] overflow-x-hidden" style={{ width, minWidth: width, maxWidth: width }}>
       {sel.componentName && (
         <Section title="Component">
           <div className="space-y-1 text-[11.5px]">
