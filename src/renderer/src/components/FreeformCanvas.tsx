@@ -4249,7 +4249,7 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
         </div>
         )}
         {leftTab !== 'variables' && (
-        <div className="flex shrink-0 flex-col bg-surface" style={{ width: rightW }}>
+        <div className="flex shrink-0 flex-col overflow-hidden rounded-panel bg-surface" style={{ width: rightW }}>
           <div className="flex shrink-0 items-center gap-0.5 rounded-lg bg-elevated/60 p-0.5 mx-1.5 mt-1.5" role="tablist" aria-label="Panel">
             {(['design', 'theme'] as const).map((id) => (
               <button key={id} type="button" role="tab" aria-selected={rightTab === id} onClick={() => setRightTab(id)}
@@ -5413,7 +5413,7 @@ function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gra
 
   if (!sel && !multi && !abSelected && tool === 'frame') {
     return (
-      <aside className="shrink-0 overflow-y-auto rounded-panel bg-surface overflow-x-hidden" style={{ width, minWidth: width, maxWidth: width }}>
+      <aside className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden" style={{ width, minWidth: width, maxWidth: width }}>
         <div className="px-4 py-4">
           <div className="text-[15px] font-semibold text-text-primary">New frame</div>
         </div>
@@ -5439,7 +5439,7 @@ function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gra
 
   if (!sel && !multi && !abSelected) {
     return (
-      <aside className="shrink-0 overflow-y-auto rounded-panel bg-surface overflow-x-hidden" style={{ width, minWidth: width, maxWidth: width }}>
+      <aside className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden" style={{ width, minWidth: width, maxWidth: width }}>
         <div className="px-4 py-5">
           <div className="text-[15px] font-semibold text-text-primary">Page</div>
           <p className="mt-1 text-[12px] text-text-muted">Select a layer to edit it.</p>
@@ -5482,7 +5482,7 @@ function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gra
 
   if (!sel) {
     return (
-      <aside className="shrink-0 overflow-y-auto rounded-panel bg-surface overflow-x-hidden" style={{ width, minWidth: width, maxWidth: width }}>
+      <aside className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden" style={{ width, minWidth: width, maxWidth: width }}>
         {multi ? (
           <>
             <Section title="Align" right={
@@ -5615,7 +5615,7 @@ function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gra
   const isLine = sel.type === 'line' || sel.type === 'arrow' || sel.type === 'path'
   const hasBorder = sel.type === 'rect' || sel.type === 'ellipse' || sel.type === 'frame' || sel.type === 'image'
   return (
-    <aside className="shrink-0 overflow-y-auto rounded-panel bg-surface text-[12px] overflow-x-hidden" style={{ width, minWidth: width, maxWidth: width }}>
+    <aside className="min-h-0 flex-1 overflow-y-auto text-[12px] overflow-x-hidden" style={{ width, minWidth: width, maxWidth: width }}>
       {sel.componentName && (
         <Section title="Component">
           <div className="space-y-1 text-[11.5px]">
