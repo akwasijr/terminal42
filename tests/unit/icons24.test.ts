@@ -84,6 +84,18 @@ describe('resolveIcon', () => {
     expect(resolveIcon(undefined)).toBe('')
     expect(resolveIcon('zzzz-qqqq')).toBe('')
   })
+
+  // The utility dashboard prompt asked for exactly these and got an empty path
+  // back for most of them, so the rows drew no icon at all.
+  it('knows the nouns a real dashboard asks for', () => {
+    const wanted = [
+      'usage', 'billing', 'overview', 'consumption', 'support', 'history',
+      'reports', 'settings', 'account', 'invoice', 'statement', 'meter',
+      'electricity', 'water', 'gas', 'demand', 'emissions', 'data', 'table',
+      'growth', 'decline', 'balance', 'performance',
+    ]
+    for (const w of wanted) expect(resolveIcon(w), w).not.toBe('')
+  })
 })
 
 // The golden examples are what the model copies. An icon name in there that
