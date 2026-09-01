@@ -39,7 +39,7 @@
      than the well, dark mode a shade lighter, just enough to say "type here"
      without cutting the panel into boxes. The state that has to be loud is
      focus, and that is the accent ring. */
-  --field-line: 205 205 212;
+  --field-line: 214 214 220;
   --hairline: 0 0 0 / 0.07; /* opt-in only, via var(--hairline-color) */
   --hairline-color: rgba(0, 0, 0, 0.07);
   --text-primary: 23 23 25;
@@ -100,7 +100,7 @@
   --sunken: 16 16 18;       /* slider tracks, wells, inset fields */
   --border: 24 24 26;       /* ~invisible: matches surface by design */
   --border-strong: 52 52 58;
-  --field-line: 58 58 64;
+  --field-line: 46 46 52;
   --hairline-color: rgba(255, 255, 255, 0.06);
   --text-primary: 240 240 242;
   --text-secondary: 154 154 160;
@@ -263,13 +263,13 @@ input, textarea, [contenteditable] {
    earns its keep: on this near-black ramp no two neighbouring surfaces come
    within 1.4:1 of each other, so tone alone cannot say "type here". */
 .t42-field {
-  background: rgb(var(--sunken));
+  background: rgb(var(--elevated));
   box-shadow: inset 0 0 0 1px rgb(var(--field-line));
   transition: box-shadow 150ms ease, background-color 150ms ease;
 }
 
 .t42-field:hover:not(:disabled):not(:focus-within) {
-  box-shadow: inset 0 0 0 1px rgb(var(--text-muted) / 0.55);
+  box-shadow: inset 0 0 0 1px rgb(var(--text-muted) / 0.35);
 }
 
 .t42-field:focus,
