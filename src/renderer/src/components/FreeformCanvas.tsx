@@ -3495,37 +3495,35 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
   }
-  // The rail down the left edge. Same buttons, stacked, one tool per row.
-  const railBtn = (id: Tool, hint: string): JSX.Element => (
-    <Tooltip label={hint} side="right">
+  const toolBtn = (id: Tool, hint: string): JSX.Element => (
+    <Tooltip label={hint} side="bottom">
       <button
         type="button"
         onClick={() => setTool(id)}
         aria-label={hint}
-        aria-pressed={tool === id}
-        className={['grid h-9 w-9 place-items-center rounded-lg transition-colors', tool === id ? 'bg-action text-action-text' : 'text-text-secondary hover:bg-elevated hover:text-text-primary'].join(' ')}
+        className={['grid h-7 w-7 place-items-center rounded-md transition-colors', tool === id ? 'bg-action text-action-text' : 'text-text-secondary hover:bg-elevated hover:text-text-primary'].join(' ')}
       >{TOOL_ICONS[id]}</button>
     </Tooltip>
   )
+  const shapeTools: Tool[] = ['rect', 'line', 'arrow', 'ellipse', 'polygon', 'star', 'image']
+  const activeShape = shapeTools.includes(tool) ? tool : 'rect'
   const shapeLabel: Record<Tool, string> = {
     select: 'Select', artboard: 'Artboard', frame: 'Frame', rect: 'Rectangle', ellipse: 'Ellipse', line: 'Line', arrow: 'Arrow', polygon: 'Polygon', star: 'Star', text: 'Text', image: 'Image/video…', pencil: 'Pencil', hand: 'Hand'
   }
   const shapeShortcut: Partial<Record<Tool, string>> = { rect: 'R', line: 'L', arrow: '⇧L', ellipse: 'O', image: '⇧⌘K' }
-  const railShapeTools: Tool[] = ['ellipse', 'line', 'arrow', 'polygon', 'star']
-  const railShape = railShapeTools.includes(tool) ? tool : 'polygon'
-  const railShapeDropdown = (): JSX.Element => (
+  const shapeDropdown = (): JSX.Element => (
     <div className="relative">
-      <Tooltip label="More shapes" side="right">
-        <button type="button" onClick={() => setShapeMenuOpen((o) => !o)} aria-label="More shapes"
-          className={['grid h-9 w-9 place-items-center rounded-lg transition-colors', railShapeTools.includes(tool) ? 'bg-action text-action-text' : 'text-text-secondary hover:bg-elevated hover:text-text-primary'].join(' ')}>
-          {TOOL_ICONS[railShape]}
+      <Tooltip label="Shapes" side="bottom">
+        <button type="button" onClick={() => setShapeMenuOpen((o) => !o)} className={['flex h-7 items-center gap-1 rounded-md px-1.5 transition-colors', shapeTools.includes(tool) ? 'bg-action text-action-text' : 'text-text-secondary hover:bg-elevated hover:text-text-primary'].join(' ')}>
+          {TOOL_ICONS[activeShape]}
+          <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 4.5 6 7.5 9 4.5" /></svg>
         </button>
       </Tooltip>
       {shapeMenuOpen && (
         <>
           <div className="fixed inset-0 z-40" onPointerDown={() => setShapeMenuOpen(false)} role="presentation" />
-          <div className="t42-menu absolute left-full top-0 z-50 ml-1 w-52 overflow-hidden rounded-2xl bg-raised py-2 shadow-overlay">
-            {railShapeTools.map((id) => (
+          <div className="t42-menu absolute left-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-2xl bg-raised py-2 shadow-overlay">
+            {shapeTools.map((id) => (
               <button key={id} type="button" onClick={() => { setTool(id); setShapeMenuOpen(false) }} className="flex w-full items-center gap-3 px-4 py-2 text-left text-[13px] text-white/90 hover:bg-white/10">
                 <span className="grid w-4 place-items-center">{tool === id ? '✓' : ''}</span>
                 <span className="grid h-5 w-5 place-items-center">{TOOL_ICONS[id]}</span>
@@ -3791,6 +3789,18 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
           <button type="button" onClick={() => { if (onRename) { setTitleDraft(title || 'Form'); setRenamingTitle(true) } }} title={onRename ? 'Click to rename' : undefined} className="max-w-[200px] truncate rounded px-1 py-0.5 text-[12.5px] font-medium text-text-primary hover:bg-elevated">{title || 'Form'}</button>
         )}
         <div className="mx-1.5" />
+        <div className="flex items-center gap-0.5 rounded-md bg-elevated/60 p-0.5">
+          {toolBtn('select', 'Select / move (V)')}
+          {toolBtn('hand', 'Pan (H / hold space)')}
+          <div className="mx-1" />
+          {toolBtn('frame', 'Frame (F)')}
+          {shapeDropdown()}
+          {toolBtn('pencil', 'Pencil: draw freehand (N)')}
+          {toolBtn('text', 'Text (T)')}
+          <div className="mx-1" />
+          {toolBtn('artboard', 'Artboard: drag to add a new one (B)')}
+        </div>
+        <div className="mx-1.5" />
         <Tooltip label="Undo (⌘Z)" side="bottom"><button type="button" onClick={undo} disabled={!canUndo} aria-label="Undo" className="grid h-7 w-7 place-items-center rounded text-text-secondary enabled:hover:bg-elevated enabled:hover:text-text-primary disabled:opacity-30">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 14L4 9l5-5" /><path d="M4 9h11a5 5 0 0 1 0 10h-1" /></svg>
         </button></Tooltip>
@@ -3818,26 +3828,6 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Tools, one per row */}
-        <nav aria-label="Tools" className="flex w-[52px] shrink-0 flex-col items-center gap-1 bg-sunken py-2">
-          {railBtn('select', 'Select / move (V)')}
-          {railBtn('hand', 'Pan (H / hold space)')}
-          <div className="h-3" />
-          {railBtn('artboard', 'Artboard: drag to add a new one (B)')}
-          {railBtn('frame', 'Frame (F)')}
-          {railBtn('rect', 'Rectangle (R)')}
-          {railBtn('pencil', 'Pencil: draw freehand (N)')}
-          {railBtn('text', 'Text (T)')}
-          <div className="h-3" />
-          {railBtn('image', 'Image or video (⇧⌘K)')}
-          <Tooltip label="Ask for a design" side="right">
-            <button type="button" onClick={() => setLeftTab('assistant')} aria-label="Ask for a design"
-              className={['grid h-9 w-9 place-items-center rounded-lg transition-colors', leftTab === 'assistant' ? 'bg-action text-action-text' : 'text-text-secondary hover:bg-elevated hover:text-text-primary'].join(' ')}>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="m9 14 2-4 2 4" /><path d="M16 8.5 16.7 10.3 18.5 11 16.7 11.7 16 13.5 15.3 11.7 13.5 11 15.3 10.3z" /></svg>
-            </button>
-          </Tooltip>
-          {railShapeDropdown()}
-        </nav>
         {/* Left pane: tabbed Layers / Assistant */}
         <aside className="flex shrink-0 flex-col bg-surface" style={{ width: leftW }}>
           <div className="flex shrink-0 items-center gap-0.5 px-1.5 py-1.5">
