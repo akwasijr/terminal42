@@ -140,9 +140,17 @@ export function buildObject(spec: ObjectSpec, offsetX: number, offsetY: number):
   if (typeof spec.glow === 'number') o.glow = Math.max(0, spec.glow)
   if (typeof spec.glowColor === 'string') o.glowColor = spec.glowColor
   if (typeof spec.parent === 'string') o.parent = spec.parent
-  if (spec.layoutMode === 'none' || spec.layoutMode === 'horizontal' || spec.layoutMode === 'vertical') o.layoutMode = spec.layoutMode
+  if (spec.layoutMode === 'none' || spec.layoutMode === 'horizontal' || spec.layoutMode === 'vertical' || spec.layoutMode === 'grid') o.layoutMode = spec.layoutMode
   if (typeof spec.layoutGap === 'number') o.layoutGap = Math.max(0, spec.layoutGap)
   if (typeof spec.layoutPadding === 'number') o.layoutPadding = Math.max(0, spec.layoutPadding)
+  if (typeof spec.layoutPadX === 'number') o.layoutPadX = Math.max(0, spec.layoutPadX)
+  if (typeof spec.layoutPadY === 'number') o.layoutPadY = Math.max(0, spec.layoutPadY)
+  if (typeof spec.layoutCols === 'number') o.layoutCols = Math.max(1, Math.round(spec.layoutCols))
+  if (typeof spec.layoutWrap === 'boolean') o.layoutWrap = spec.layoutWrap
+  if (spec.layoutJustify === 'start' || spec.layoutJustify === 'center' || spec.layoutJustify === 'end' || spec.layoutJustify === 'space-between') o.layoutJustify = spec.layoutJustify
+  if (spec.layoutAlign === 'start' || spec.layoutAlign === 'center' || spec.layoutAlign === 'end' || spec.layoutAlign === 'baseline') o.layoutAlign = spec.layoutAlign
+  if (spec.widthMode === 'fixed' || spec.widthMode === 'fit' || spec.widthMode === 'fill') o.widthMode = spec.widthMode
+  if (spec.heightMode === 'fixed' || spec.heightMode === 'fit' || spec.heightMode === 'fill') o.heightMode = spec.heightMode
   if (typeof spec.componentName === 'string') o.componentName = spec.componentName
   if (typeof spec.componentSource === 'string') o.componentSource = spec.componentSource
   if (typeof spec.componentVariant === 'string') o.componentVariant = spec.componentVariant

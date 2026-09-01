@@ -83,6 +83,13 @@ function leafText(node: UINode, x: number, y: number, w: number, k: Kit): Compil
   }
 }
 
+// The compiler already knows the layout intent for every container it emits, so
+// it stamps the auto-layout fields the canvas engine reads. Generated frames then
+// behave like hand-built ones: change a label, everything reflows. Values are
+// always explicit, never left undefined, because the engine falls back to gap 12
+// and pad 16 and that would shift the geometry the compiler just computed.
+const LAYOUT_MODE = { x: 'horizontal', y: 'vertical', grid: 'grid' } as const
+
 function compile(node: UINode, x: number, y: number, w: number, k: Kit): Compiled {
   // Component leaf — kit owns its internal geometry.
   if (node.component && isComponent(node.component)) {
@@ -100,7 +107,15 @@ function compile(node: UINode, x: number, y: number, w: number, k: Kit): Compile
   const pad = node.pad ?? 0
   const gap = node.gap ?? 0
   const kids = node.children
-  const frame: ObjectSpec = { type: 'frame', ref, name: node.name || 'Frame', x, y, w, h: 0, fillEnabled: !!node.bg, ...(node.bg ? { fill: resolveColor(node.bg, k) } : {}), strokeEnabled: false, ...(typeof node.radius === 'number' ? { radius: node.radius } : {}) }
+  const mode = LAYOUT_MODE[node.stack ?? 'y']
+  const frame: ObjectSpec = {
+    type: 'frame', ref, name: node.name || 'Frame', x, y, w, h: 0,
+    fillEnabled: !!node.bg, ...(node.bg ? { fill: resolveColor(node.bg, k) } : {}), strokeEnabled: false,
+    ...(typeof node.radius === 'number' ? { radius: node.radius } : {}),
+    layoutMode: mode, layoutGap: gap, layoutPadX: pad, layoutPadY: pad, layoutAlign: 'start', layoutJustify: 'start',
+    ...(mode === 'grid' ? { layoutCols: Math.max(1, node.cols ?? 2) } : {}),
+    widthMode: 'fixed', heightMode: 'fit'
+  }
   const out: ObjectSpec[] = [frame]
   const innerX = x + pad, innerY = y + pad, innerW = w - pad * 2
 
@@ -114,29 +129,32 @@ function compile(node: UINode, x: number, y: number, w: number, k: Kit): Compile
     for (const child of kids) {
       const cw = child.w || flexW
       const r = compile(child, cx, innerY, cw, k)
-      attach(r.specs, ref); out.push(...r.specs)
+      attach(r.specs, ref, { widthMode: child.w ? 'fixed' : 'fill', heightMode: 'fixed' }); out.push(...r.specs)
       cx += cw + gap; maxH = Math.max(maxH, r.h)
     }
     frame.h = maxH + pad * 2
   } else if (node.stack === 'grid') {
     const cols = Math.max(1, node.cols ?? 2)
     const cellW = (innerW - gap * (cols - 1)) / cols
-    let cx = innerX, cy = innerY, rowH = 0, col = 0
-    for (const child of kids) {
-      const r = compile(child, cx, cy, cellW, k)
-      attach(r.specs, ref); out.push(...r.specs)
-      rowH = Math.max(rowH, r.h); col++
-      if (col >= cols) { col = 0; cx = innerX; cy += rowH + gap; rowH = 0 } else { cx += cellW + gap }
-    }
-    if (col !== 0) cy += rowH
-    frame.h = (cy - innerY) + pad * 2 + (col === 0 ? -gap : 0)
+    // Two passes: measure every cell, then place on a uniform row height. Ragged
+    // rows would put the compiler and the reflow engine at odds, and equal cards
+    // read better anyway.
+    const cells = kids.map((child, i) => compile(child, innerX + (i % cols) * (cellW + gap), innerY, cellW, k))
+    const cellH = cells.reduce((m, c) => Math.max(m, c.h), 0)
+    const rows = Math.max(1, Math.ceil(kids.length / cols))
+    cells.forEach((r, i) => {
+      const dy = Math.floor(i / cols) * (cellH + gap)
+      const moved = dy ? r.specs.map((sp) => ({ ...sp, y: (sp.y ?? 0) + dy })) : r.specs
+      attach(moved, ref, { widthMode: 'fixed', heightMode: 'fixed' }); out.push(...moved)
+    })
+    frame.h = rows * cellH + gap * (rows - 1) + pad * 2
     if (frame.h < pad * 2) frame.h = pad * 2
   } else {
     // vertical stack (default)
     let cy = innerY
     for (const child of kids) {
       const r = compile(child, innerX, cy, innerW, k)
-      attach(r.specs, ref); out.push(...r.specs)
+      attach(r.specs, ref, { widthMode: 'fill', heightMode: 'fixed' }); out.push(...r.specs)
       cy += r.h + gap
     }
     frame.h = (cy - gap - innerY) + pad * 2
@@ -145,9 +163,15 @@ function compile(node: UINode, x: number, y: number, w: number, k: Kit): Compile
   return { specs: out, w, h: frame.h }
 }
 
-/** Parent each child's ROOT spec to the container; nested children keep their parent. */
-function attach(specs: ObjectSpec[], parentRef: string): void {
-  if (specs.length) specs[0] = { ...specs[0], parent: parentRef }
+/** Parent each child's ROOT spec to the container; nested children keep their parent.
+ *  The sizing modes go on at the same time: only the container knows whether a
+ *  child was given a fixed width or told to share what was left. A nested
+ *  container hugs its own content, so its heightMode is never overwritten. */
+function attach(specs: ObjectSpec[], parentRef: string, sizing?: { widthMode: 'fixed' | 'fill'; heightMode: 'fixed' }): void {
+  if (!specs.length) return
+  const root = specs[0]
+  const hugs = root.type === 'frame' && root.heightMode === 'fit'
+  specs[0] = { ...root, parent: parentRef, ...(sizing ? { widthMode: sizing.widthMode, ...(hugs ? {} : { heightMode: sizing.heightMode }) } : {}) }
 }
 
 function resolveColor(v: string, k: Kit): string {
