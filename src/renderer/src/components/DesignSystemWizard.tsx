@@ -5,6 +5,7 @@ import {
   type SystemBasis
 } from '../lib/designSystem'
 import { AI_RULE_GROUPS, type AiRuleId } from '../lib/aiRules'
+import { vibeFromWords } from '../lib/vibeFromWords'
 import { FONT_OPTIONS } from '../lib/brief'
 import { DsIcon } from './dsIcons'
 import { Modal, ModalHeader, ModalBody, ModalFooter, ModalSteps, ModalButton } from './Modal'
@@ -18,66 +19,6 @@ function fontStack(name: string): string {
 }
 function cap(s: string): string { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s }
 function labelOf<T extends string>(opts: { id: T; label: string }[], id: T): string { return opts.find((o) => o.id === id)?.label ?? id }
-
-const FEELS: Vibe[] = ['minimal', 'professional', 'bold', 'playful', 'soft', 'elegant', 'brutalist', 'technical', 'luxe']
-
-const CORNER_PX: Record<CornerStyle, number> = {
-  angular: 0, slight: 3, rounded: 6, squircle: 8, curved: 10, full: 999
-}
-
-// The feel used to be a dropdown, so choosing between nine visual identities
-// meant reading nine words. Each tile now renders the preset it stands for --
-// its own corners, borders, brand colours, button treatment and heading face --
-// so you are looking at the thing you are picking.
-function FeelSwatch({ vibe }: { vibe: Vibe }): JSX.Element {
-  const f = FEEL_PRESETS[vibe]
-  const r = CORNER_PX[f.cornerStyle]
-  const border = f.borderStyle === 'none'
-    ? 'none'
-    : `${f.borderStyle === 'outlined' ? 1.5 : 1}px solid ${f.borderStyle === 'outlined' ? '#1c1917' : '#d6d3d1'}`
-  const btn = f.fill === 'outline'
-    ? { background: 'transparent', border: `1.5px solid ${f.primary}`, color: f.primary }
-    : f.fill === 'tint'
-      ? { background: `${f.primary}26`, border: 'none', color: f.primary }
-      : { background: f.primary, border: 'none', color: '#fff' }
-  return (
-    <div
-      className="flex h-[92px] w-full flex-col justify-between overflow-hidden p-3"
-      style={{ background: '#fafaf9', borderRadius: Math.min(r, 12), border }}
-    >
-      <div
-        style={{
-          fontFamily: fontStack(f.headingFont),
-          fontWeight: f.headingWeight,
-          fontSize: f.scale === 'expressive' ? 20 : f.scale === 'compact' ? 14 : 17,
-          color: '#1c1917',
-          lineHeight: 1
-        }}
-      >
-        Aa
-      </div>
-      <div className="flex items-end justify-between gap-2">
-        <div
-          style={{
-            ...btn,
-            borderRadius: Math.min(r, 999),
-            fontFamily: fontStack(f.bodyFont),
-            fontWeight: f.btnWeight,
-            fontSize: 9,
-            padding: f.density === 'compact' ? '3px 8px' : f.density === 'spacious' ? '6px 14px' : '4px 11px'
-          }}
-        >
-          Button
-        </div>
-        <div className="flex gap-1">
-          {[f.primary, f.secondary, f.tertiary].map((c) => (
-            <span key={c} className="h-3 w-3" style={{ background: c, borderRadius: Math.min(r, 999) }} />
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
 
 function FeelTile(
   { label, blurb, selected, onClick, children }:
@@ -447,8 +388,15 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
   const [a, setA] = useState<SystemAnswers>(initial ?? DEFAULT_ANSWERS)
   const set = <K extends keyof SystemAnswers>(k: K, v: SystemAnswers[K]): void => setA((p) => ({ ...p, [k]: v }))
   const [idx, setIdx] = useState(0)
-  const [customFeel, setCustomFeel] = useState(!!initial?.style)
   const [refMode, setRefMode] = useState(!!initial?.shots?.length)
+  // The feel used to come off nine tiles. Now the words carry it, so every
+  // keystroke re-reads the description and folds the matching preset in.
+  const onStyleWords = (v: string): void => {
+    setA((p) => {
+      const next = vibeFromWords(v, p.vibe)
+      return next === p.vibe ? { ...p, style: v } : { ...applyFeel(p, next), style: v }
+    })
+  }
   const [, setRefProfile] = useState<RefProfile | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
   const [analysisNote, setAnalysisNote] = useState<string | null>(null)
@@ -639,23 +587,12 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
               </div>
               <div>
                 <FieldLabel>Feel</FieldLabel>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-                  {FEELS.map((id) => (
-                    <FeelTile
-                      key={id}
-                      label={FEEL_PRESETS[id].label}
-                      blurb={FEEL_PRESETS[id].blurb}
-                      selected={!refMode && !customFeel && a.vibe === id}
-                      onClick={() => { setA((p) => applyFeel(p, id)); setCustomFeel(false); setRefMode(false) }}
-                    >
-                      <FeelSwatch vibe={id} />
-                    </FeelTile>
-                  ))}
+                <div className="grid max-w-md grid-cols-2 gap-2">
                   <FeelTile
                     label="Describe your own"
                     blurb="Write the tone in your words"
-                    selected={customFeel}
-                    onClick={() => { setCustomFeel(true); setRefMode(false) }}
+                    selected={!refMode}
+                    onClick={() => { setRefMode(false) }}
                   >
                     <WriteItSwatch />
                   </FeelTile>
@@ -663,16 +600,16 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
                     label="Match a screenshot"
                     blurb="Pull the look from an image"
                     selected={refMode}
-                    onClick={() => { setRefMode(true); setCustomFeel(false) }}
+                    onClick={() => { setRefMode(true) }}
                   >
                     <ScreenshotSwatch />
                   </FeelTile>
                 </div>
               </div>
-              {customFeel && (
+              {!refMode && (
                 <div>
                   <FieldLabel>Describe your style</FieldLabel>
-                  <textarea autoFocus value={a.style} onChange={(e) => set('style', e.target.value)} rows={3} placeholder="Tone, references, fonts or feel to lean into." className="w-full resize-none rounded-lg bg-elevated/40 px-3.5 py-3 text-[13.5px] leading-relaxed text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40" />
+                  <textarea autoFocus value={a.style} onChange={(e) => onStyleWords(e.target.value)} rows={3} placeholder="Tone, references, fonts or feel to lean into." className="w-full resize-none rounded-lg bg-elevated/40 px-3.5 py-3 text-[13.5px] leading-relaxed text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40" />
                 </div>
               )}
               {refMode && (
