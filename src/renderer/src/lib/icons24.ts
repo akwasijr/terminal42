@@ -79,7 +79,10 @@ export const ICON_PATHS: Record<string, string> = {
   'log-out': 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
   camera: 'M3 8a1 1 0 0 1 1-1h3l2-2h6l2 2h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8zM12 17a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z',
   sun: 'M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zM12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4',
-  moon: 'M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z'
+  moon: 'M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z',
+  flame: 'M12 22a6 6 0 0 0 6-6c0-4-3-5.5-3.5-10C13 7 11.5 9 11.5 11c0 1.4-1 2-1.8 1.4C9 12 8.6 11 8.6 11 7.4 12.4 6 14 6 16a6 6 0 0 0 6 6z',
+  book: 'M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2V5zM19 19H6',
+  drop: 'M12 21a6 6 0 0 0 6-6c0-4-6-11-6-11S6 11 6 15a6 6 0 0 0 6 6z'
 }
 
 export const ICON_NAMES = Object.keys(ICON_PATHS)
@@ -141,6 +144,32 @@ const ICON_ALIASES: Record<string, string> = {
   note: 'music', notes: 'music', playlist: 'queue', 'up-next': 'queue', upnext: 'queue', tracks: 'queue',
   microphone: 'mic', record: 'mic', logout: 'log-out', 'sign-out': 'log-out', signout: 'log-out',
   exit: 'log-out', adjust: 'sliders', equalizer: 'sliders', controls: 'sliders', mixer: 'sliders',
+  fire: 'flame', streak: 'flame', hot: 'flame', trending2: 'flame',
+  reading: 'book', library: 'book', guide: 'book', docs: 'book', manual: 'book',
+  droplet: 'drop', water: 'drop', humidity: 'drop', liquid: 'drop', rain: 'drop',
+}
+
+// Words that name the CONTAINER an icon sits in rather than the icon itself.
+// "nav-dashboard" is a dashboard icon inside a nav, not a nav icon. Before this
+// existed the resolver took the FIRST word, so nav-dashboard, nav-usage and
+// nav-billing all came back as the hamburger and an entire sidebar drew the same
+// glyph on every row.
+const WRAPPER_WORDS = new Set([
+  'nav', 'navigation', 'navbar', 'sidebar', 'side', 'drawer', 'rail', 'menu',
+  'item', 'items', 'entry', 'row', 'tab', 'button', 'btn', 'field', 'input',
+  'box', 'panel', 'section', 'group', 'wrapper', 'container',
+])
+
+/** Exact key, alias, or singular form of one word. '' when the word is unknown. */
+function resolveWord(w: string): string {
+  if (ICON_PATHS[w]) return w
+  if (ICON_ALIASES[w]) return ICON_ALIASES[w]
+  if (w.endsWith('s')) {
+    const s = w.slice(0, -1)
+    if (ICON_PATHS[s]) return s
+    if (ICON_ALIASES[s]) return ICON_ALIASES[s]
+  }
+  return ''
 }
 
 /** Resolve any icon name (synonyms, plurals, "-icon" suffixes, separators) to a
@@ -153,14 +182,21 @@ export function resolveIcon(name?: string): string {
     .replace(/-(icon|outline|line|solid|filled|24|stroke|svg)$/g, '')
     .replace(/^(icon|ic)-/g, '')
     .trim()
-  if (ICON_PATHS[k]) return k
-  if (ICON_ALIASES[k]) return ICON_ALIASES[k]
-  // simple singularisation
-  if (k.endsWith('s') && ICON_PATHS[k.slice(0, -1)]) return k.slice(0, -1)
-  if (k.endsWith('s') && ICON_ALIASES[k.slice(0, -1)]) return ICON_ALIASES[k.slice(0, -1)]
-  // first token (e.g. "search-field" → "search")
-  const first = k.split('-')[0]
-  if (ICON_PATHS[first]) return first
-  if (ICON_ALIASES[first]) return ICON_ALIASES[first]
+  const whole = resolveWord(k)
+  if (whole) return whole
+  // Multi-word: read right to left, because English puts the subject last
+  // ("credit-card", "nav-dashboard"). Container words are skipped on the first
+  // pass and only considered if nothing else in the name is known.
+  const words = k.split('-').filter(Boolean)
+  if (words.length < 2) return ''
+  const reversed = [...words].reverse()
+  for (const w of reversed.filter((x) => !WRAPPER_WORDS.has(x))) {
+    const hit = resolveWord(w)
+    if (hit) return hit
+  }
+  for (const w of reversed) {
+    const hit = resolveWord(w)
+    if (hit) return hit
+  }
   return ''
 }
