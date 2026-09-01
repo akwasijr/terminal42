@@ -187,18 +187,29 @@ export function barChart(x: number, y: number, w: number, props: Record<string, 
   const barW = (w - 2 * pad - gap * (n - 1)) / n
   vals.forEach((v, i) => {
     const bh = Math.max(4, (v / maxV) * plotH), bx = x + pad + i * (barW + gap), by = y + top + (plotH - bh)
-    o.push({ type: 'rect', parent: ref, name: 'Bar', x: bx, y: by, w: barW, h: bh, radius: 6, fill: k.accent, fillEnabled: true, fillOpacity: i === n - 1 ? 1 : 0.32, strokeEnabled: false })
-    if (labels[i]) o.push({ type: 'text', parent: ref, name: 'Bar label', x: bx, y: y + h - 22, w: barW, h: 16, text: String(labels[i]), color: k.muted, fontSize: 12, align: 'center' })
+    const name = labels[i] ? String(labels[i]) : `Bar ${i + 1}`
+    // A bar and the label under it are one column, and read as one in the
+    // layers panel too.
+    const col = rid('col')
+    o.push({ type: 'frame', ref: col, parent: ref, name: `Column · ${name}`, x: bx, y: y + top, w: barW, h: plotH + bottom, fillEnabled: false, strokeEnabled: false })
+    o.push({ type: 'rect', parent: col, name: 'Bar', x: bx, y: by, w: barW, h: bh, radius: 6, fill: k.accent, fillEnabled: true, fillOpacity: i === n - 1 ? 1 : 0.32, strokeEnabled: false })
+    if (labels[i]) o.push({ type: 'text', parent: col, name: 'Label', x: bx, y: y + h - 22, w: barW, h: 16, text: String(labels[i]), color: k.muted, fontSize: 12, align: 'center' })
   })
   return o
 }
 
 export function tabBar(x: number, y: number, w: number, props: Record<string, unknown>, k: Kit): ObjectSpec[] {
   const ref = rid('tab')
-  const items = (Array.isArray(props.items) && props.items.length ? props.items : [{ icon: 'home', active: true }, { icon: 'chart' }, { icon: 'calendar' }, { icon: 'user' }]) as { icon?: string; active?: boolean }[]
+  const items = (Array.isArray(props.items) && props.items.length ? props.items : [{ icon: 'home', active: true }, { icon: 'chart' }, { icon: 'calendar' }, { icon: 'user' }]) as { icon?: string; label?: string; active?: boolean }[]
   const o: ObjectSpec[] = [{ type: 'frame', ref, name: 'Tab bar', x, y, w, h: 64, fill: k.card, fillEnabled: true, strokeEnabled: false, shadow: true, shadowColor: '#0f172a', shadowOpacity: 0.05, shadowX: 0, shadowY: -1, shadowBlur: 6, shadowSpread: 0 }]
   const cell = w / items.length
-  items.forEach((it, i) => o.push({ type: 'path', icon: String(it.icon || 'home'), parent: ref, name: `Tab ${i}`, x: x + i * cell + cell / 2 - 12, y: y + 14, w: 24, h: 24, stroke: it.active ? k.accent : k.faint, strokeWidth: 1.9 }))
+  items.forEach((it, i) => {
+    const icon = String(it.icon || 'home')
+    const tab = rid('tab')
+    o.push({ type: 'frame', ref: tab, parent: ref, name: `Tab · ${it.label || icon}`, x: x + i * cell, y, w: cell, h: 64, fillEnabled: false, strokeEnabled: false })
+    o.push({ type: 'path', icon, parent: tab, name: 'Icon', x: x + i * cell + cell / 2 - 12, y: y + 14, w: 24, h: 24, stroke: it.active ? k.accent : k.faint, strokeWidth: 1.9 })
+    if (it.label) o.push({ type: 'text', parent: tab, name: 'Label', x: x + i * cell, y: y + 42, w: cell, h: 14, text: String(it.label), color: it.active ? k.accent : k.faint, fontSize: 11, fontWeight: it.active ? 600 : 500, align: 'center' })
+  })
   return o
 }
 
@@ -206,16 +217,34 @@ export function sidebar(x: number, y: number, w: number, props: Record<string, u
   const ref = rid('side')
   const h = Number(props.h) || 640
   const o: ObjectSpec[] = [{ type: 'frame', ref, name: 'Sidebar', x, y, w, h, fill: k.card, fillEnabled: true, strokeEnabled: false, shadow: true, shadowColor: '#0f172a', shadowOpacity: 0.04, shadowX: 1, shadowY: 0, shadowBlur: 6, shadowSpread: 0 }]
-  o.push({ type: 'rect', parent: ref, name: 'Logo', x: x + 18, y: y + 22, w: 32, h: 32, radius: 8, fill: k.accent, fillEnabled: true, strokeEnabled: false })
-  if (props.brandIcon) o.push({ type: 'path', icon: String(props.brandIcon), parent: ref, name: 'Logo icon', x: x + 25, y: y + 29, w: 18, h: 18, stroke: k.onAccent, strokeWidth: 2 })
-  o.push({ type: 'text', parent: ref, name: 'Brand', x: x + 58, y: y + 30, w: w - 70, h: 24, text: String(props.brand || 'App'), color: k.ink, fontSize: 18, fontWeight: 700 })
-  const items = (Array.isArray(props.items) ? props.items : []) as { icon?: string; label?: string; active?: boolean }[]
-  items.forEach((it, i) => {
-    const iy = y + 84 + i * 46
-    if (it.active) o.push({ type: 'rect', parent: ref, name: 'Active', x: x + 12, y: iy, w: w - 24, h: 38, radius: 9, fill: k.accent, fillEnabled: true, fillOpacity: 0.1, strokeEnabled: false })
-    o.push({ type: 'path', icon: String(it.icon || 'home'), parent: ref, name: 'Nav icon', x: x + 24, y: iy + 9, w: 20, h: 20, stroke: it.active ? k.accent : k.muted, strokeWidth: 1.9 })
-    o.push({ type: 'text', parent: ref, name: 'Nav label', x: x + 56, y: iy + 10, w: w - 70, h: 18, text: String(it.label || ''), color: it.active ? k.accent : k.muted, fontSize: 14, fontWeight: it.active ? 600 : 500 })
+  // Brand block: logo and wordmark move together, so they live together.
+  const brand = rid('brand')
+  o.push({ type: 'frame', ref: brand, parent: ref, name: 'Brand', x: x + 18, y: y + 22, w: w - 36, h: 32, fillEnabled: false, strokeEnabled: false })
+  o.push({ type: 'rect', parent: brand, name: 'Logo', x: x + 18, y: y + 22, w: 32, h: 32, radius: 8, fill: k.accent, fillEnabled: true, strokeEnabled: false })
+  if (props.brandIcon) o.push({ type: 'path', icon: String(props.brandIcon), parent: brand, name: 'Logo icon', x: x + 25, y: y + 29, w: 18, h: 18, stroke: k.onAccent, strokeWidth: 2 })
+  o.push({ type: 'text', parent: brand, name: 'Brand name', x: x + 58, y: y + 26, w: w - 76, h: 24, text: String(props.brand || 'App'), color: k.ink, fontSize: 18, fontWeight: 700 })
+
+  const items = (Array.isArray(props.items) ? props.items : []) as { icon?: string; label?: string; active?: boolean; section?: string }[]
+  // One frame per row, named after the row. A group of loose icons and labels
+  // is unusable in the layers panel and cannot be moved or restyled as a unit.
+  let cy = y + 84
+  const nav = rid('nav')
+  o.push({ type: 'frame', ref: nav, parent: ref, name: 'Nav', x: x + 12, y: cy, w: w - 24, h: 0, fillEnabled: false, strokeEnabled: false })
+  items.forEach((it) => {
+    if (it.section) {
+      o.push({ type: 'text', parent: nav, name: `Section · ${it.section}`, x: x + 24, y: cy + 8, w: w - 48, h: 14, text: it.section, color: k.faint, fontSize: 11, fontWeight: 600 })
+      cy += 30
+      return
+    }
+    const label = String(it.label || 'Item')
+    const row = rid('navrow')
+    o.push({ type: 'frame', ref: row, parent: nav, name: `Nav item · ${label}`, x: x + 12, y: cy, w: w - 24, h: 38, radius: 9, fill: k.accent, fillEnabled: !!it.active, fillOpacity: it.active ? 0.1 : undefined, strokeEnabled: false })
+    o.push({ type: 'path', icon: String(it.icon || 'home'), parent: row, name: 'Icon', x: x + 24, y: cy + 9, w: 20, h: 20, stroke: it.active ? k.accent : k.muted, strokeWidth: 1.9 })
+    o.push({ type: 'text', parent: row, name: 'Label', x: x + 56, y: cy + 10, w: w - 70, h: 18, text: label, color: it.active ? k.accent : k.muted, fontSize: 14, fontWeight: it.active ? 600 : 500 })
+    cy += 46
   })
+  const navFrame = o.find((n) => n.ref === nav)
+  if (navFrame) navFrame.h = Math.max(0, cy - (y + 84))
   return o
 }
 

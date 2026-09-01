@@ -101,9 +101,12 @@ const checkout: UINode = {
 const dashboard: UINode = {
   stack: 'x', bg: 'surface', name: 'Dashboard', children: [
     { w: 240, component: 'sidebar', props: { brand: 'Streak', brandIcon: 'flame', h: 900, items: [
-      { icon: 'home', label: 'Dashboard', active: true }, { icon: 'check', label: 'Habits' }, { icon: 'chart', label: 'Statistics' }, { icon: 'calendar', label: 'Calendar' }, { icon: 'settings', label: 'Settings' }] } },
+      { section: 'Track' },
+      { icon: 'home', label: 'Dashboard', active: true }, { icon: 'check', label: 'Habits' }, { icon: 'chart', label: 'Statistics' }, { icon: 'calendar', label: 'Calendar' },
+      { section: 'Account' },
+      { icon: 'settings', label: 'Settings' }] } },
     { stack: 'y', pad: 32, gap: 22, children: [
-      { component: 'topBar', props: { title: 'Good morning, Akwasi', subtitle: "You're on a 12-day streak — keep going.", action: 'New habit' } },
+      { component: 'topBar', props: { title: 'Good morning, Akwasi', subtitle: "You're on a 12-day streak, keep going.", action: 'New habit' } },
       { stack: 'x', gap: 20, children: [
         { component: 'statTile', props: { label: 'Current streak', value: '12 days', delta: '+2 vs last week', icon: 'flame' } },
         { component: 'statTile', props: { label: 'Completion rate', value: '84%', delta: '+6% this month', icon: 'chart' } },

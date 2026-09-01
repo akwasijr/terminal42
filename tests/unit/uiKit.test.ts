@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { writeFileSync } from 'fs'
 import { expandComponentSpec, expandComponents, addExpenseScreen, DEFAULT_KIT, resolveComponent, repairComponentSpec, kitFromDesignSystem } from '../../src/renderer/src/lib/uiKit'
-import { buildObject } from '../../src/renderer/src/lib/canvasAgent'
+import { buildObject, type ObjectSpec } from '../../src/renderer/src/lib/canvasAgent'
 import { compileTree, type UINode } from '../../src/renderer/src/lib/uiTree'
 import { lintObjects } from '../../src/renderer/src/lib/designQA'
 import { scoreDesign } from '../../src/renderer/src/lib/designEval'
@@ -131,5 +131,42 @@ describe('uiKit — reference screen export (visual proof)', () => {
     const linted: FObj[] = lintObjects(built, { artboardBg: '#ffffff' })
     expect(linted.length).toBeGreaterThan(15)
     try { writeFileSync('/tmp/t42-screen.json', JSON.stringify(linted)) } catch { /* ignore in CI */ }
+  })
+})
+
+describe('uiKit — every repeated item is its own frame', () => {
+  const kids = (out: ObjectSpec[], ref?: string): ObjectSpec[] => out.filter((o) => o.parent === ref)
+
+  it('gives each sidebar row a frame named after the row', () => {
+    const out = expandComponentSpec({
+      type: 'frame', component: 'sidebar', x: 0, y: 0, w: 240, accent: '#0f766e',
+      props: { brand: 'Utility', items: [{ icon: 'gauge', label: 'Overview', active: true }, { icon: 'bolt', label: 'Usage' }, { icon: 'receipt', label: 'Billing' }] }
+    })!
+    const rows = out.filter((o) => String(o.name || '').startsWith('Nav item · '))
+    expect(rows.map((r) => r.name)).toEqual(['Nav item · Overview', 'Nav item · Usage', 'Nav item · Billing'])
+    // icon and label belong to the row, not to the sidebar
+    for (const r of rows) {
+      const c = kids(out, r.ref)
+      expect(c.map((x) => x.name).sort()).toEqual(['Icon', 'Label'])
+    }
+    // nothing loose: no icon or text hangs directly off the sidebar frame
+    const side = out[0]
+    expect(kids(out, side.ref).every((o) => o.type === 'frame')).toBe(true)
+  })
+
+  it('keeps section headers out of the row list', () => {
+    const out = expandComponentSpec({
+      type: 'frame', component: 'sidebar', x: 0, y: 0, w: 240, accent: '#0f766e',
+      props: { items: [{ section: 'Main' }, { icon: 'home', label: 'Home' }, { section: 'Account' }, { icon: 'user', label: 'Profile' }] }
+    })!
+    expect(out.filter((o) => String(o.name || '').startsWith('Section · ')).length).toBe(2)
+    expect(out.filter((o) => String(o.name || '').startsWith('Nav item · ')).length).toBe(2)
+  })
+
+  it('gives each tab and each chart column a frame', () => {
+    const tabs = expandComponentSpec({ type: 'frame', component: 'tabBar', x: 0, y: 0, w: 400, accent: '#0f766e', props: { items: [{ icon: 'home', label: 'Home', active: true }, { icon: 'user', label: 'You' }] } })!
+    expect(tabs.filter((o) => String(o.name || '').startsWith('Tab · ')).map((o) => o.name)).toEqual(['Tab · Home', 'Tab · You'])
+    const chart = expandComponentSpec({ type: 'frame', component: 'barChart', x: 0, y: 0, w: 400, accent: '#0f766e', props: { values: [1, 2, 3], labels: ['Jan', 'Feb', 'Mar'] } })!
+    expect(chart.filter((o) => String(o.name || '').startsWith('Column · ')).map((o) => o.name)).toEqual(['Column · Jan', 'Column · Feb', 'Column · Mar'])
   })
 })
