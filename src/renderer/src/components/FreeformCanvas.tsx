@@ -1445,6 +1445,12 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameVal, setRenameVal] = useState('')
   const [renamingAbId, setRenamingAbId] = useState<string | null>(null)
+  const abRenameCancel = useRef(false)
+  const abRenameRef = useRef<HTMLInputElement | null>(null)
+  // The rename box loses focus to whatever was focused before it during the
+  // commit that mounts it, so focus lands a tick later and blur is ignored
+  // until it has. Same shape as the text-edit path below.
+  const abRenameReady = useRef(false)
   const [abRenameVal, setAbRenameVal] = useState('')
   const [layerMenu, setLayerMenu] = useState<{ id: string; x: number; y: number } | null>(null)
   const [canvasMenu, setCanvasMenu] = useState<{ x: number; y: number; under: FObj[] } | null>(null)
@@ -1525,6 +1531,12 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
     const t = setTimeout(() => { editRef.current?.focus(); editRef.current?.select() }, 0)
     return () => clearTimeout(t)
   }, [editingId])
+  useEffect(() => {
+    abRenameReady.current = false
+    if (!renamingAbId) return
+    const t = setTimeout(() => { abRenameRef.current?.focus(); abRenameRef.current?.select(); abRenameReady.current = true }, 0)
+    return () => clearTimeout(t)
+  }, [renamingAbId])
 
   // ── Auto-save / restore (per design, localStorage) ───────────────────────────
   const saveKey = `t42-freeform:${designId}`
@@ -3572,7 +3584,7 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
       mixBlendMode: o.blendMode as React.CSSProperties['mixBlendMode'],
       overflow: effectsClipsShape(o) ? 'hidden' : undefined,
       pointerEvents: tool === 'select' && !o.locked ? 'auto' : 'none',
-      cursor: tool === 'select' ? 'move' : toolCursor(tool),
+      cursor: toolCursor(tool),
     }
     const overlayEls = overlays.length ? overlays.map((ov) => (
       <span key={ov.key} aria-hidden style={{
@@ -4079,12 +4091,12 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
               <div key={ab.id}>
                 {renamingAbId === ab.id ? (
                   <input
-                    autoFocus
+                    ref={abRenameRef}
                     value={abRenameVal}
                     onChange={(e) => setAbRenameVal(e.target.value)}
                     onPointerDown={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { const v = abRenameVal.trim(); if (v) { pushHistory(); patchAb(ab.id, { name: v }) } setRenamingAbId(null) } if (e.key === 'Escape') setRenamingAbId(null) }}
-                    onBlur={() => { const v = abRenameVal.trim(); if (v) { pushHistory(); patchAb(ab.id, { name: v }) } setRenamingAbId(null) }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.currentTarget.blur() } if (e.key === 'Escape') { abRenameCancel.current = true; setRenamingAbId(null) } }}
+                    onBlur={() => { if (!abRenameReady.current) return; if (abRenameCancel.current) { abRenameCancel.current = false; setRenamingAbId(null); return } const v = abRenameVal.trim(); if (v && v !== ab.name) { pushHistory(); patchAb(ab.id, { name: v }) } setRenamingAbId(null) }}
                     style={{ position: 'absolute', left: ab.x, top: ab.y - 24 * inv, fontSize: 13 * inv, lineHeight: 1, padding: `${2 * inv}px ${5 * inv}px`, width: 180 * inv, background: '#16161a', color: '#f5f5f5', border: `${1 * inv}px solid ${SELC}`, borderRadius: 4 * inv, outline: 'none' }}
                   />
                 ) : (
@@ -4093,7 +4105,7 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
                     title="Drag to move · double-click to rename"
                     onPointerDown={(e) => onAbLabelDown(e, ab)}
                     onDoubleClick={(e) => { e.stopPropagation(); setRenamingAbId(ab.id); setAbRenameVal(ab.name) }}
-                    style={{ position: 'absolute', left: ab.x, top: ab.y - 22 * inv, fontSize: 13 * inv, lineHeight: 1, color: activeAb === ab.id && abSelected ? SELB : '#9ca3af', background: 'transparent', padding: 0, whiteSpace: 'nowrap', cursor: 'grab' }}
+                    style={{ position: 'absolute', left: ab.x, top: ab.y - 22 * inv, fontSize: 13 * inv, lineHeight: 1, color: activeAb === ab.id && abSelected ? SELB : '#9ca3af', background: 'transparent', padding: 0, whiteSpace: 'nowrap', cursor: 'default' }}
                   >{ab.name} · {ab.w}×{ab.h}</button>
                 )}
                 <div style={{ position: 'absolute', left: ab.x, top: ab.y, width: ab.w, height: ab.h, background: ab.bg, boxShadow: '0 1px 3px rgba(0,0,0,0.4)', outline: activeAb === ab.id && abSelected ? `${1 * inv}px solid #2f6fed` : 'none', outlineOffset: `${1 * inv}px` }} />
