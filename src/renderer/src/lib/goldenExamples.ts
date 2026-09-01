@@ -117,7 +117,9 @@ const dashboard: UINode = {
           { text: "Today's habits", fontSize: 16, fontWeight: 600 }, { h: 6 },
           { component: 'listRow', props: { icon: 'flame', label: 'Morning run', value: '12d' } },
           { component: 'listRow', props: { icon: 'book', label: 'Read 20 pages', value: '5d' } },
-          { component: 'listRow', props: { icon: 'drop', label: 'Drink water', value: '6/8', divider: false } }] }] }] }]
+          { component: 'listRow', props: { icon: 'drop', label: 'Drink water', value: '6/8', divider: false } }] }] },
+      { component: 'table', props: { title: 'Recent activity', columns: ['Date', 'Habit', 'Minutes', 'Status'], rows: [
+        ['12 Aug', 'Morning run', '32', 'Done'], ['11 Aug', 'Read 20 pages', '18', 'Done'], ['10 Aug', 'Morning run', '0', 'Missed']] } }] }]
 }
 
 // — Mobile: music player "now playing" (media / player) —

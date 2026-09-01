@@ -170,3 +170,48 @@ describe('uiKit — every repeated item is its own frame', () => {
     expect(chart.filter((o) => String(o.name || '').startsWith('Column · ')).map((o) => o.name)).toEqual(['Column · Jan', 'Column · Feb', 'Column · Mar'])
   })
 })
+
+describe('uiKit — table', () => {
+  const out = (): ObjectSpec[] => expandComponentSpec({
+    type: 'frame', component: 'table', x: 0, y: 0, w: 720, accent: '#0f766e',
+    props: { title: 'Usage history', columns: ['Date', 'Usage', 'Cost', 'Status'], rows: [
+      ['12 Aug', '18.2', '4.10', 'Paid'], ['11 Aug', '21.6', '4.90', 'Pending'], ['10 Aug', '17.0', '3.80', 'Overdue']] }
+  })!
+
+  it('gives every row its own frame, named after the row', () => {
+    expect(out().filter((o) => String(o.name || '').startsWith('Row · ')).map((o) => o.name))
+      .toEqual(['Row · 12 Aug', 'Row · 11 Aug', 'Row · 10 Aug'])
+  })
+
+  it('draws status words as badges, and colours them by meaning', () => {
+    const o = out()
+    const paid = o.find((s) => s.name === 'Cell · Paid')!
+    const overdue = o.find((s) => s.name === 'Cell · Overdue')!
+    expect(paid.fill).toBe('#dcfce7')
+    expect(overdue.fill).toBe('#fee2e2')
+    // and a plain cell stays plain text
+    expect(o.find((s) => s.type === 'text' && s.text === '12 Aug')).toBeTruthy()
+  })
+
+  it('right-aligns the number columns and leaves words alone', () => {
+    const o = out()
+    expect(o.find((s) => s.name === 'Column · Usage')!.align).toBe('right')
+    expect(o.find((s) => s.name === 'Column · Date')!.align).toBe('left')
+    expect(o.find((s) => s.name === 'Column · Status')!.align).toBe('left')
+  })
+
+  it('is reachable by the words a model actually uses', () => {
+    for (const n of ['table', 'dataTable', 'history', 'transactions', 'records', 'Data Table']) {
+      expect(resolveComponent(n), n).toBe('table')
+    }
+    const repaired = repairComponentSpec({ type: 'frame', component: 'history', props: { headers: ['A'], data: [['1']] } })!
+    expect(repaired.props).toMatchObject({ columns: ['A'], rows: [['1']] })
+  })
+
+  it('reserves the height it actually draws', () => {
+    const o = out()
+    const rows = o.filter((s) => String(s.name || '').startsWith('Row · '))
+    const last = rows[rows.length - 1]
+    expect(Number(o[0].h)).toBeGreaterThanOrEqual(Number(last.y) + Number(last.h) - Number(o[0].y))
+  })
+})

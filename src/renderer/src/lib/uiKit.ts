@@ -403,6 +403,71 @@ export function badge(x: number, y: number, w: number, props: Record<string, unk
     { type: 'text', parent: ref, name: 'Label', x: x + 22, y: y + 4, w: bw - 28, h: 16, text: label, color: t.fg, fontSize: 12, fontWeight: 600 }]
 }
 
+/** Guess a status tone from the cell text, so "Paid" is green and "Overdue" red
+ *  without the model having to say so. */
+function toneOf(v: string): string | undefined {
+  const t = v.trim().toLowerCase()
+  if (/^(paid|active|complete|completed|done|delivered|approved|on track|normal|ok|success)$/.test(t)) return 'success'
+  if (/^(pending|processing|due|scheduled|in progress|review|estimated|partial)$/.test(t)) return 'warning'
+  if (/^(overdue|failed|error|late|missed|cancelled|canceled|rejected|high|over limit)$/.test(t)) return 'error'
+  if (/^(new|draft|info|sent|open)$/.test(t)) return 'info'
+  return undefined
+}
+
+const TABLE_ROW_H = 52
+const TABLE_HEAD_H = 44
+
+/** A data table: header, one frame per row, right-aligned numbers, status cells
+ *  drawn as badges. Rows are borderless and separated by a hairline, matching
+ *  the rest of the kit. */
+export function table(x: number, y: number, w: number, props: Record<string, unknown>, k: Kit): ObjectSpec[] {
+  const ref = rid('table')
+  const title = props.title ? String(props.title) : ''
+  const columns = (Array.isArray(props.columns) ? props.columns : []).map(String)
+  const rows = (Array.isArray(props.rows) ? props.rows : []) as unknown[][]
+  const cols = Math.max(1, columns.length || (rows[0]?.length ?? 1))
+  const titleH = title ? 52 : 0
+  const h = titleH + TABLE_HEAD_H + rows.length * TABLE_ROW_H + 12
+  const pad = 20
+  const inner = w - pad * 2
+  // Numbers sit right, words sit left, and the first column is the label.
+  const numeric = Array.from({ length: cols }, (_, c) => c > 0 && rows.length > 0 && rows.every((r) => /^[^a-zA-Z]*[\d.,]+[^a-zA-Z]*$/.test(String(r?.[c] ?? ''))))
+  const colW = inner / cols
+  const cellX = (c: number): number => x + pad + c * colW
+
+  const o: ObjectSpec[] = [{ type: 'frame', ref, name: title || 'Table', x, y, w, h, radius: 14, fill: k.card, fillEnabled: true, strokeEnabled: false, shadow: true, shadowColor: '#0f172a', shadowOpacity: 0.06, shadowX: 0, shadowY: 1, shadowBlur: 4, shadowSpread: 0 }]
+  if (title) o.push({ type: 'text', parent: ref, name: 'Table title', x: x + pad, y: y + 18, w: inner, h: 22, text: title, color: k.ink, fontSize: 16, fontWeight: 600 })
+
+  const headY = y + titleH
+  const head = rid('thead')
+  o.push({ type: 'frame', ref: head, parent: ref, name: 'Header', x: x + pad, y: headY, w: inner, h: TABLE_HEAD_H, fillEnabled: false, strokeEnabled: false })
+  columns.forEach((c, i) => o.push({ type: 'text', parent: head, name: `Column · ${c}`, x: cellX(i), y: headY + 14, w: colW - 12, h: 16, text: c, color: k.muted, fontSize: 12, fontWeight: 600, align: numeric[i] ? 'right' : 'left' }))
+  o.push({ type: 'rect', parent: head, name: 'Divider', x: x + pad, y: headY + TABLE_HEAD_H - 1, w: inner, h: 1, fill: k.border, fillEnabled: true, strokeEnabled: false })
+
+  rows.forEach((r, ri) => {
+    const ry = headY + TABLE_HEAD_H + ri * TABLE_ROW_H
+    const name = String(r?.[0] ?? `Row ${ri + 1}`)
+    const row = rid('trow')
+    o.push({ type: 'frame', ref: row, parent: ref, name: `Row · ${name}`, x: x + pad, y: ry, w: inner, h: TABLE_ROW_H, fillEnabled: false, strokeEnabled: false })
+    for (let c = 0; c < cols; c++) {
+      const v = String(r?.[c] ?? '')
+      const tone = c > 0 ? toneOf(v) : undefined
+      if (tone) {
+        const t = TONES[tone]
+        const bw = Math.max(56, 26 + v.length * 7.5)
+        const bref = rid('cell')
+        o.push({ type: 'frame', ref: bref, parent: row, name: `Cell · ${v}`, x: cellX(c), y: ry + 14, w: bw, h: 24, radius: 12, fill: t.bg, fillEnabled: true, strokeEnabled: false })
+        o.push({ type: 'ellipse', parent: bref, name: 'Dot', x: cellX(c) + 10, y: ry + 23, w: 6, h: 6, fill: t.dot, fillEnabled: true, strokeEnabled: false })
+        o.push({ type: 'text', parent: bref, name: 'Label', x: cellX(c) + 22, y: ry + 18, w: bw - 28, h: 16, text: v, color: t.fg, fontSize: 12, fontWeight: 600 })
+        continue
+      }
+      o.push({ type: 'text', parent: row, name: `Cell · ${columns[c] || c + 1}`, x: cellX(c), y: ry + 17, w: colW - 12, h: 18, text: v, color: c === 0 ? k.ink : k.muted, fontSize: 13.5, fontWeight: c === 0 ? 500 : 400, align: numeric[c] ? 'right' : 'left' })
+    }
+    if (ri < rows.length - 1) o.push({ type: 'rect', parent: row, name: 'Divider', x: x + pad, y: ry + TABLE_ROW_H - 1, w: inner, h: 1, fill: k.border, fillEnabled: true, strokeEnabled: false })
+  })
+  return o
+}
+
 export function divider(x: number, y: number, w: number, _props: Record<string, unknown>, k: Kit): ObjectSpec[] {
   return [{ type: 'rect', name: 'Divider', x, y: y + 11, w, h: 1, fill: k.border, fillEnabled: true, strokeEnabled: false }]
 }
@@ -418,7 +483,7 @@ const COMPONENTS: Record<string, Builder> = {
   homeIndicator: (x, y, w, _p, k) => homeIndicator(x, y, w, k),
   avatar, topBar, statTile, barChart, tabBar, sidebar, progressRing,
   albumArt, trackInfo, scrubber, transport, volumeRow,
-  slider, iconButton, field, chip, badge, divider
+  slider, iconButton, field, chip, badge, divider, table
 }
 
 export const COMPONENT_NAMES = Object.keys(COMPONENTS)
@@ -453,7 +518,10 @@ const COMPONENT_ALIASES: Record<string, string> = {
   profile: 'avatar', useravatar: 'avatar', photo: 'avatar', userpic: 'avatar',
   notch: 'statusBar', iosstatusbar: 'statusBar',
   homebar: 'homeIndicator', handle: 'homeIndicator', homehandle: 'homeIndicator',
-  songinfo: 'trackInfo', nowplaying: 'trackInfo', tracktitle: 'trackInfo', metadata: 'trackInfo'
+  songinfo: 'trackInfo', nowplaying: 'trackInfo', tracktitle: 'trackInfo', metadata: 'trackInfo',
+  datatable: 'table', datagrid: 'table', history: 'table', historytable: 'table', log: 'table',
+  transactions: 'table', transactionlist: 'table', ledger: 'table', records: 'table', report: 'table',
+  activitytable: 'table', tablelist: 'table', rows: 'table', spreadsheet: 'table', invoices: 'table'
 }
 /** Resolve any component name (synonym, typo, suffix) to a real component key, or ''. */
 export function resolveComponent(name?: string): string {
@@ -485,7 +553,8 @@ const PROP_ALIASES: Record<string, Record<string, string>> = {
   slider: { title: 'label', name: 'label', current: 'value', val: 'value', maximum: 'max', maxvalue: 'max' },
   trackInfo: { song: 'title', name: 'title', track: 'title', subtitle: 'artist', author: 'artist', by: 'artist' },
   avatar: { text: 'initials', name: 'initials', label: 'initials' },
-  scrubber: { current: 'value', position: 'value', duration: 'max', elapsed: 'leftLabel', remaining: 'rightLabel' }
+  scrubber: { current: 'value', position: 'value', duration: 'max', elapsed: 'leftLabel', remaining: 'rightLabel' },
+  table: { heading: 'title', name: 'title', label: 'title', headers: 'columns', header: 'columns', cols: 'columns', fields: 'columns', data: 'rows', items: 'rows', records: 'rows', values: 'rows', body: 'rows' }
 }
 function repairProps(name: string, props: Record<string, unknown>): Record<string, unknown> {
   const map = PROP_ALIASES[name]
@@ -531,7 +600,8 @@ export const COMPONENT_HEIGHT: Record<string, (props: Record<string, unknown>, w
   field: (p) => (p.label ? 24 : 0) + 48,
   chip: () => 34,
   badge: () => 24,
-  divider: () => 24
+  divider: () => 24,
+  table: (p) => (p.title ? 52 : 0) + 44 + (Array.isArray(p.rows) ? p.rows.length : 0) * 52 + 12
 }
 export function componentHeight(name: string, props: Record<string, unknown>, w: number): number {
   const canon = resolveComponent(name)
