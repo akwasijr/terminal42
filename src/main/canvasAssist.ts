@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow, clipboard } from 'electron'
+import { ipcMain, BrowserWindow, clipboard, nativeImage } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { mkdirSync, writeFileSync, unlinkSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
@@ -128,6 +128,19 @@ export function registerCanvasAssistIpc(_getWin: () => BrowserWindow | null): vo
   // 'paste' event doesn't fire reliably on a non-editable canvas).
   ipcMain.handle('canvas:readClipboardHTML', () => {
     try { return clipboard.readHTML() } catch { return '' }
+  })
+  // Writes to the OS clipboard from the main process. navigator.clipboard needs
+  // the document focused, which it often is not when a menu has just closed.
+  ipcMain.handle('canvas:writeClipboardText', (_e, text: string) => {
+    try { clipboard.writeText(String(text ?? '')); return true } catch { return false }
+  })
+  ipcMain.handle('canvas:writeClipboardImage', (_e, dataUrl: string) => {
+    try {
+      const img = nativeImage.createFromDataURL(String(dataUrl ?? ''))
+      if (img.isEmpty()) return false
+      clipboard.writeImage(img)
+      return true
+    } catch { return false }
   })
   ipcMain.handle('canvas:assist', async (_e, args: { prompt: string; model?: string | null }) => {
     const prompt = (args?.prompt ?? '').toString()

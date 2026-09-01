@@ -753,6 +753,8 @@ const api = {
     assistVision: (prompt: string, images: string[], model?: string | null) =>
       ipcRenderer.invoke('canvas:assistVision', { prompt, images, model }) as Promise<{ ok: true; text: string } | { ok: false; error: string }>,
     readClipboardHTML: () => ipcRenderer.invoke('canvas:readClipboardHTML') as Promise<string>,
+    writeClipboardText: (text: string) => ipcRenderer.invoke('canvas:writeClipboardText', text) as Promise<boolean>,
+    writeClipboardImage: (dataUrl: string) => ipcRenderer.invoke('canvas:writeClipboardImage', dataUrl) as Promise<boolean>,
   },
   motion: {
     list: () => ipcRenderer.invoke('motion:list') as Promise<MotionRecord[]>,

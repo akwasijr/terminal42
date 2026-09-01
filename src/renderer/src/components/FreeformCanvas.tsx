@@ -17,6 +17,8 @@ import { CANVAS_DS_COMPONENTS, componentToObjects, designSystemSummary, type Can
 import { type LayerMotion, type PropName, hasAnyKeys as motionHasKeys, sampleTrack, setKey, removeKey, emptyMotion } from '../lib/timelineModel'
 import { composeArtboardHtml } from '../lib/freeformExport'
 import { composeArtboardSvg, frameSvg } from '../lib/svgExport'
+import { toTailwind, toReactCss } from '../lib/layerCode'
+import { docIsEmpty, readDoc } from '../lib/freeformDoc'
 import {
   type FObj,
   type Shape,
@@ -1432,6 +1434,8 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
   const [renamingAbId, setRenamingAbId] = useState<string | null>(null)
   const [abRenameVal, setAbRenameVal] = useState('')
   const [layerMenu, setLayerMenu] = useState<{ id: string; x: number; y: number } | null>(null)
+  const [canvasMenu, setCanvasMenu] = useState<{ x: number; y: number; under: FObj[] } | null>(null)
+  const [subMenu, setSubMenu] = useState<{ name: 'layer' | 'copyas'; y: number } | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
   const [collapsedLayers, setCollapsedLayers] = useState<Set<string>>(new Set())
   const dragLayerRef = useRef<string | null>(null)
@@ -1512,6 +1516,11 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
   // ── Auto-save / restore (per design, localStorage) ───────────────────────────
   const saveKey = `t42-freeform:${designId}`
   const restoredRef = useRef(false)
+  // Saving waits on this matching saveKey, so the first write of a session can
+  // only happen once the restored content is actually in state. A ref would go
+  // true during the same commit that reads it and let empty state save over a
+  // full file.
+  const [hydratedKey, setHydratedKey] = useState<string | null>(null)
   const [savedTick, setSavedTick] = useState(0)
   useEffect(() => {
     try {
@@ -1546,6 +1555,7 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
       }
     } catch { /* ignore a corrupt save */ }
     restoredRef.current = true
+    setHydratedKey(saveKey)
   }, [saveKey])
 
   // ── The token library this file is bound to ──────────────────────────────────
@@ -1580,13 +1590,22 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
     return () => { alive = false }
   }, [tokensBinding])
   useEffect(() => {
-    if (!restoredRef.current) return
+    if (hydratedKey !== saveKey) return
     const t = setTimeout(() => {
       const perPage = { ...pageStoreRef.current, [activePage]: { objects, artboards, activeAb } }
-      try { localStorage.setItem(saveKey, JSON.stringify({ pages, activePage, perPage, variables: collections, styles, v: 2 })); setSavedTick((n) => n + 1) } catch { /* quota / private mode */ }
+      const doc = { pages, activePage, perPage, variables: collections, styles, v: 2 }
+      try {
+        // Emptying a file is a real edit, so it saves. It also keeps a copy of
+        // the last version that had something in it.
+        if (docIsEmpty(doc)) {
+          const prev = localStorage.getItem(saveKey)
+          if (prev && !docIsEmpty(readDoc(saveKey))) localStorage.setItem(`${saveKey}:last-nonempty`, prev)
+        }
+        localStorage.setItem(saveKey, JSON.stringify(doc)); setSavedTick((n) => n + 1)
+      } catch { /* quota / private mode */ }
     }, 700)
     return () => clearTimeout(t)
-  }, [objects, artboards, activeAb, pages, activePage, saveKey, collections, styles])
+  }, [objects, artboards, activeAb, pages, activePage, saveKey, hydratedKey, collections, styles])
 
   // ── Pages ────────────────────────────────────────────────────────────────────
   const switchPage = (id: string): void => {
@@ -2551,6 +2570,138 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
     setObjects((os) => [...os, ...copies])
     setSelIds(copies.map((c) => c.id))
   }
+
+  /** Paste over the selection instead of beside it: the copies land on the
+   * selection's top-left corner, so one layer can be swapped for another. */
+  const pasteOnTop = (): void => {
+    if (!clipRef.current.length) return
+    const target = objectsRef.current.filter((o) => selRef.current.includes(o.id))
+    const anchor = target.length ? { x: Math.min(...target.map((o) => o.x)), y: Math.min(...target.map((o) => o.y)) } : null
+    const src = { x: Math.min(...clipRef.current.map((o) => o.x)), y: Math.min(...clipRef.current.map((o) => o.y)) }
+    pushHistory()
+    const dx = anchor ? anchor.x - src.x : 0
+    const dy = anchor ? anchor.y - src.y : 0
+    const copies = clipRef.current.map((o) => ({ ...o, id: makeObject(o.type, 0, 0).id, x: o.x + dx, y: o.y + dy }))
+    setObjects((os) => [...os, ...copies])
+    setSelIds(copies.map((c) => c.id))
+  }
+
+  /** Paste on top and delete what was under it. */
+  const pasteToReplace = (): void => {
+    if (!clipRef.current.length || !selRef.current.length) return
+    const gone = selRef.current
+    const target = objectsRef.current.filter((o) => gone.includes(o.id))
+    const anchor = { x: Math.min(...target.map((o) => o.x)), y: Math.min(...target.map((o) => o.y)) }
+    const src = { x: Math.min(...clipRef.current.map((o) => o.x)), y: Math.min(...clipRef.current.map((o) => o.y)) }
+    pushHistory()
+    const copies = clipRef.current.map((o) => ({ ...o, id: makeObject(o.type, 0, 0).id, x: o.x + anchor.x - src.x, y: o.y + anchor.y - src.y }))
+    setObjects((os) => [...os.filter((o) => !gone.includes(o.id)), ...copies])
+    setSelIds(copies.map((c) => c.id))
+  }
+
+  // Copy/paste styles: the look of a layer without its box or its place.
+  const styleClipRef = useRef<Partial<FObj> | null>(null)
+  const STYLE_KEYS = [
+    'fill', 'fillEnabled', 'fillHidden', 'fillMode', 'fillOpacity', 'fillImage',
+    'gradientFrom', 'gradientTo', 'gradientAngle', 'gradientType', 'gradientStops', 'gradientInterpolation',
+    'stroke', 'strokeWidth', 'strokeEnabled', 'strokeHidden', 'strokeOffset', 'strokeStyle', 'strokeMode', 'strokeOpacity',
+    'borderEnabled', 'borderHidden', 'borderWidth', 'borderColor', 'borderOpacity', 'borderSides', 'borderStyle', 'borderMode',
+    'radius', 'opacity', 'blendMode', 'effects', 'filters',
+    'color', 'fontSize', 'fontFamily', 'fontWeight', 'italic', 'underline', 'align', 'lineHeight', 'letterSpacing'
+  ] as const
+  const copyStyles = (): void => {
+    const o = objectsRef.current.find((x) => x.id === selRef.current[0])
+    if (!o) return
+    const picked: Record<string, unknown> = {}
+    for (const k of STYLE_KEYS) if (o[k] !== undefined) picked[k] = o[k]
+    styleClipRef.current = picked as Partial<FObj>
+    setStatus('Styles copied')
+    setTimeout(() => setStatus(''), 1500)
+  }
+  const pasteStyles = (): void => {
+    const s = styleClipRef.current
+    if (!s || !selRef.current.length) return
+    const ids = selRef.current
+    pushHistory()
+    setObjects((os) => os.map((o) => (ids.includes(o.id) ? { ...o, ...s } : o)))
+  }
+
+  /** Select the frame this layer sits in, or the layers sitting in it. */
+  const selectParent = (): void => {
+    const o = objectsRef.current.find((x) => x.id === selRef.current[0])
+    if (o?.parent) setSelIds([o.parent])
+  }
+  const selectChildren = (): void => {
+    const ids = selRef.current
+    const kids = objectsRef.current.filter((o) => o.parent && ids.includes(o.parent)).map((o) => o.id)
+    if (kids.length) setSelIds(kids)
+  }
+
+  /** Every layer whose box covers this point, topmost first. */
+  const layersUnder = (clientX: number, clientY: number): FObj[] => {
+    const p = toArt(clientX, clientY)
+    return objectsRef.current
+      .filter((o) => o.visible && p.x >= o.x && p.x <= o.x + o.w && p.y >= o.y && p.y <= o.y + o.h)
+      .reverse()
+  }
+
+  const writeClipboard = (text: string, said: string): void => {
+    const say = (ok: boolean): void => { setStatus(ok ? said : 'Clipboard blocked'); setTimeout(() => setStatus(''), 1800) }
+    const api = (window as { terminal42?: { canvas?: { writeClipboardText?: (t: string) => Promise<boolean> } } }).terminal42?.canvas?.writeClipboardText
+    if (api) { void api(text).then(say, () => say(false)); return }
+    void navigator.clipboard.writeText(text).then(() => say(true), () => say(false))
+  }
+  const copyAsTailwind = (): void => {
+    const o = objectsRef.current.find((x) => x.id === selRef.current[0])
+    if (o) writeClipboard(toTailwind(o), 'Tailwind copied')
+  }
+  const copyAsReactCss = (): void => {
+    const o = objectsRef.current.find((x) => x.id === selRef.current[0])
+    if (o) writeClipboard(toReactCss(o), 'React CSS copied')
+  }
+  /** A link that reopens this design with the layer selected. */
+  const copyLink = (): void => {
+    const id = selRef.current[0]
+    if (id) writeClipboard(`terminal42://design/${designId}?layer=${id}`, 'Link copied')
+  }
+  /** Put the layer on the clipboard as a picture. */
+  const copyAsPng = (): void => {
+    const ids = selRef.current
+    if (!ids.length) return
+    const wanted = new Set(ids)
+    let grew = true
+    while (grew) {
+      grew = false
+      for (const o of objectsRef.current) if (o.parent && wanted.has(o.parent) && !wanted.has(o.id)) { wanted.add(o.id); grew = true }
+    }
+    const picked = objectsRef.current.filter((o) => wanted.has(o.id) && o.visible)
+    if (!picked.length) return
+    const minX = Math.min(...picked.map((o) => o.x))
+    const minY = Math.min(...picked.map((o) => o.y))
+    const w = Math.max(1, Math.round(Math.max(...picked.map((o) => o.x + o.w)) - minX))
+    const h = Math.max(1, Math.round(Math.max(...picked.map((o) => o.y + o.h)) - minY))
+    const svg = composeArtboardSvg({ w, h, bg: 'transparent' }, picked.map((o) => ({ ...o, x: o.x - minX, y: o.y - minY })))
+    const img = new Image()
+    img.onload = () => {
+      const c = document.createElement('canvas')
+      c.width = w
+      c.height = h
+      const ctx = c.getContext('2d')
+      if (!ctx) return
+      ctx.drawImage(img, 0, 0)
+      const say = (ok: boolean): void => { setStatus(ok ? 'PNG copied' : 'Clipboard blocked'); setTimeout(() => setStatus(''), 1800) }
+      const api = (window as { terminal42?: { canvas?: { writeClipboardImage?: (d: string) => Promise<boolean> } } }).terminal42?.canvas?.writeClipboardImage
+      if (api) { void api(c.toDataURL('image/png')).then(say, () => say(false)); return }
+      c.toBlob((b) => {
+        if (!b) { say(false); return }
+        if (!navigator.clipboard.write) { say(false); return }
+        void navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]).then(() => say(true), () => say(false))
+      }, 'image/png')
+    }
+    img.onerror = () => setStatus('Copy as PNG failed')
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
+  }
+
   const removeSel = (): void => {
     if (!selRef.current.length) return
     pushHistory()
@@ -2978,6 +3129,16 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
       if (e.ctrlKey && e.altKey && !e.metaKey && (e.code === 'KeyV' || e.code === 'KeyH')) { e.preventDefault(); doDistribute(e.code === 'KeyV' ? 'v' : 'h'); return }
       if (e.metaKey && e.altKey && e.shiftKey && e.code === 'KeyF') { e.preventDefault(); doResizeToFill(); return }
       if (meta && e.shiftKey && e.code === 'KeyE' && selRef.current.length) { e.preventDefault(); exportSelection('png', 1); return }
+      // Context menu shortcuts. Option combos change e.key on macOS, so match the physical key.
+      if (meta && e.shiftKey && e.code === 'KeyC') { e.preventDefault(); copyAsPng(); return }
+      if (e.altKey && !meta && !e.shiftKey && e.code === 'KeyT' && selRef.current.length) { e.preventDefault(); copyAsTailwind(); return }
+      if (e.altKey && !meta && !e.shiftKey && e.code === 'KeyR' && selRef.current.length) { e.preventDefault(); copyAsReactCss(); return }
+      if (meta && e.altKey && e.code === 'KeyC') { e.preventDefault(); copyStyles(); return }
+      if (meta && e.altKey && e.code === 'KeyV') { e.preventDefault(); pasteStyles(); return }
+      if (meta && e.shiftKey && e.code === 'KeyV') { e.preventDefault(); pasteOnTop(); return }
+      if (meta && e.shiftKey && e.code === 'KeyR') { e.preventDefault(); pasteToReplace(); return }
+      if (meta && e.shiftKey && e.code === 'KeyH') { e.preventDefault(); { const ids = selRef.current; const o = objectsRef.current.find((x) => x.id === ids[0]); const v = !(o?.visible ?? true); ids.forEach((id) => patch(id, { visible: v })) } return }
+      if (meta && e.shiftKey && e.code === 'KeyL') { e.preventDefault(); { const ids = selRef.current; const o = objectsRef.current.find((x) => x.id === ids[0]); const l = !(o?.locked ?? false); ids.forEach((id) => patch(id, { locked: l })) } return }
       if (meta && k === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return }
       if (meta && k === 'y') { e.preventDefault(); redo(); return }
       if (meta && k === 'd') { e.preventDefault(); duplicate(); return }
@@ -3009,10 +3170,14 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
         }
         return
       }
-      if (e.key === 'Escape') { setSelIds([]); setAbSelected(false); setEditingId(null); setLayerMenu(null); setTool('select'); return }
+      if (e.key === 'Escape') { if (selRef.current.length === 1 && objectsRef.current.find((x) => x.id === selRef.current[0])?.parent) { selectParent(); return } setSelIds([]); setAbSelected(false); setEditingId(null); setLayerMenu(null); setCanvasMenu(null); setTool('select'); return }
+      if (e.key === 'Enter' && !meta && selRef.current.length && !editingRef.current) { const ids = selRef.current; if (objectsRef.current.some((o) => o.parent && ids.includes(o.parent))) { e.preventDefault(); selectChildren(); return } }
+      if (!meta && !e.altKey && e.key === ']') { e.preventDefault(); arrange('front'); return }
+      if (!meta && !e.altKey && e.key === '[') { e.preventDefault(); arrange('back'); return }
       if (e.key === 'F2' && selRef.current.length === 1) { e.preventDefault(); const o = objectsRef.current.find((x) => x.id === selRef.current[0]); if (o) startRename(o); return }
       if (e.shiftKey && k === 'k') { e.preventDefault(); setAutoKey((v) => !v); return }
       if (e.shiftKey && k === 'a') { e.preventDefault(); wrapInFlex(); return }
+      if (e.shiftKey && k === 'f' && selRef.current.length > 1) { e.preventDefault(); groupSelection('none'); return }
       if (!meta && k === 'v') setTool('select')
       else if (!meta && k === 'b') setTool('artboard')
       else if (!meta && k === 'a') setTool('artboard')
@@ -3841,7 +4006,15 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
         </div>
 
         {/* Stage */}
-        <div ref={stageRef} onPointerDown={onArtDown} onPointerMove={onStageHover} onPointerLeave={() => setHoverId(null)} className="t42-stage relative flex flex-1 items-center justify-center overflow-hidden" style={{ cursor: spaceRef.current ? 'grab' : toolCursor(tool) }}>
+        <div ref={stageRef} onPointerDown={onArtDown} onPointerMove={onStageHover} onPointerLeave={() => setHoverId(null)}
+          onContextMenu={(e) => {
+            e.preventDefault()
+            const under = layersUnder(e.clientX, e.clientY)
+            const top = under.find((o) => !o.locked)
+            if (top && !selRef.current.includes(top.id)) setSelIds([top.id])
+            setCanvasMenu({ x: Math.min(e.clientX, window.innerWidth - 240), y: Math.max(8, Math.min(e.clientY, window.innerHeight - 616)), under })
+          }}
+          className="t42-stage relative flex flex-1 items-center justify-center overflow-hidden" style={{ cursor: spaceRef.current ? 'grab' : toolCursor(tool) }}>
           {artboards.length === 0 && (
             <div className="pointer-events-none absolute left-1/2 top-1/2 z-30 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-2 text-center text-text-muted">
               <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4"><rect x="4" y="5" width="16" height="14" rx="1.5" /><path d="M12 9v6M9 12h6" /></svg>
@@ -4123,6 +4296,69 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
               <div className="my-1" />
               <Item onClick={() => deleteId(lo.id)} danger shortcut="⌫">Delete</Item>
             </div>
+          </>
+        )
+      })()}
+
+      {canvasMenu && (() => {
+        const one = selIds.length === 1 ? objects.find((o) => o.id === selIds[0]) : null
+        const any = selIds.length > 0
+        const close = (): void => { setCanvasMenu(null); setSubMenu(null) }
+        const Item = ({ onClick, children, shortcut, disabled }: { onClick: () => void; children: React.ReactNode; shortcut?: string; disabled?: boolean }): JSX.Element => (
+          <button type="button" disabled={disabled} onMouseEnter={() => setSubMenu(null)} onClick={() => { onClick(); close() }}
+            className={['flex w-full items-center justify-between gap-4 px-2.5 py-1.5 text-left text-[12px]', disabled ? 'cursor-default text-text-muted opacity-50' : 'text-text-secondary hover:bg-elevated hover:text-text-primary'].join(' ')}>
+            <span>{children}</span>{shortcut && <span className="text-[10.5px] text-text-muted">{shortcut}</span>}
+          </button>
+        )
+        const Sub = ({ name, children, disabled }: { name: 'layer' | 'copyas'; children: React.ReactNode; disabled?: boolean }): JSX.Element => (
+          <button type="button" disabled={disabled} onMouseEnter={(ev) => !disabled && setSubMenu({ name, y: ev.currentTarget.getBoundingClientRect().top })}
+            className={['flex w-full items-center justify-between gap-4 px-2.5 py-1.5 text-left text-[12px]', disabled ? 'cursor-default text-text-muted opacity-50' : 'text-text-secondary hover:bg-elevated hover:text-text-primary'].join(' ')}>
+            <span>{children}</span><span className="text-[10.5px] text-text-muted">›</span>
+          </button>
+        )
+        const subStyle = { left: canvasMenu.x + 194, top: Math.max(8, Math.min(subMenu?.y ?? 0, window.innerHeight - 200)) }
+        return (
+          <>
+            <div className="fixed inset-0 z-[60]" onPointerDown={close} onContextMenu={(e) => { e.preventDefault(); close() }} />
+            <div className="t42-menu fixed z-[61] w-48 overflow-auto rounded-md bg-raised py-1 shadow-overlay" style={{ left: canvasMenu.x, top: canvasMenu.y, maxHeight: 'calc(100vh - 16px)' }} onMouseLeave={() => setSubMenu(null)}>
+              <Sub name="layer" disabled={canvasMenu.under.length === 0}>Select layer…</Sub>
+              <Item onClick={selectParent} shortcut="Escape" disabled={!one?.parent}>Select parent</Item>
+              <Item onClick={selectChildren} shortcut="Enter" disabled={!objects.some((o) => o.parent && selIds.includes(o.parent))}>Select children</Item>
+              <div className="my-1" />
+              <Item onClick={copy} shortcut="⌘C" disabled={!any}>Copy</Item>
+              <Item onClick={copyLink} disabled={!one}>Copy link</Item>
+              <Sub name="copyas" disabled={!one}>Copy as…</Sub>
+              <Item onClick={paste} shortcut="⌘V" disabled={!clipRef.current.length}>Paste</Item>
+              <Item onClick={pasteOnTop} shortcut="⇧⌘V" disabled={!clipRef.current.length}>Paste on top</Item>
+              <Item onClick={pasteToReplace} shortcut="⇧⌘R" disabled={!clipRef.current.length || !any}>Paste to replace</Item>
+              <Item onClick={duplicate} shortcut="⌘D" disabled={!any}>Duplicate</Item>
+              <div className="my-1" />
+              <Item onClick={copyStyles} shortcut="⌥⌘C" disabled={!one}>Copy styles</Item>
+              <Item onClick={pasteStyles} shortcut="⌥⌘V" disabled={!styleClipRef.current || !any}>Paste styles</Item>
+              <div className="my-1" />
+              <Item onClick={() => groupSelection('none')} shortcut="⇧F" disabled={selIds.length < 2}>Frame selection</Item>
+              <Item onClick={wrapInFlex} shortcut="⇧A" disabled={selIds.length < 2}>Wrap in flex</Item>
+              <div className="my-1" />
+              <Item onClick={() => arrange('front')} shortcut="]" disabled={!any}>Bring to front</Item>
+              <Item onClick={() => arrange('back')} shortcut="[" disabled={!any}>Send to back</Item>
+              <div className="my-1" />
+              <Item onClick={() => { const v = !(one?.visible ?? true); selIds.forEach((id) => patch(id, { visible: v })) }} shortcut="⇧⌘H" disabled={!any}>{one && !one.visible ? 'Show' : 'Hide'}</Item>
+              <Item onClick={() => { const l = !(one?.locked ?? false); selIds.forEach((id) => patch(id, { locked: l })) }} shortcut="⇧⌘L" disabled={!any}>{one?.locked ? 'Unlock' : 'Lock'}</Item>
+            </div>
+            {subMenu?.name === 'layer' && (
+              <div className="t42-menu fixed z-[62] max-h-72 w-44 overflow-auto rounded-md bg-raised py-1 shadow-overlay" style={subStyle} onMouseEnter={() => setSubMenu(subMenu)}>
+                {canvasMenu.under.map((o) => (
+                  <button key={o.id} type="button" onClick={() => { setSelIds([o.id]); close() }} className="block w-full truncate px-2.5 py-1.5 text-left text-[12px] text-text-secondary hover:bg-elevated hover:text-text-primary">{o.name}</button>
+                ))}
+              </div>
+            )}
+            {subMenu?.name === 'copyas' && (
+              <div className="t42-menu fixed z-[62] w-48 rounded-md bg-raised py-1 shadow-overlay" style={subStyle} onMouseEnter={() => setSubMenu(subMenu)}>
+                <Item onClick={copyAsPng} shortcut="⇧⌘C">Copy as PNG</Item>
+                <Item onClick={copyAsTailwind} shortcut="⌥T">Copy as Tailwind</Item>
+                <Item onClick={copyAsReactCss} shortcut="⌥R">Copy as React CSS</Item>
+              </div>
+            )}
           </>
         )
       })()}
