@@ -123,6 +123,7 @@ import {
   abBox,
   worldBounds,
   artboardAt,
+  frameIntent,
   ownerArtboard,
   placeNewArtboard,
   newArtboardId,
@@ -133,7 +134,7 @@ const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.m
 type Snapshot = { objects: FObj[]; artboards: Artboard[] }
 const boxOf = (o: FObj): Box => ({ x: o.x, y: o.y, w: o.w, h: o.h })
 
-type Tool = 'select' | 'artboard' | 'frame' | 'rect' | 'ellipse' | 'line' | 'arrow' | 'polygon' | 'star' | 'text' | 'image' | 'pencil' | 'hand'
+type Tool = 'select' | 'frame' | 'rect' | 'ellipse' | 'line' | 'arrow' | 'polygon' | 'star' | 'text' | 'image' | 'pencil' | 'hand'
 const CREATE_TOOLS: Tool[] = ['frame', 'rect', 'ellipse', 'line', 'arrow', 'polygon', 'star', 'text', 'image']
 
 type Drag =
@@ -191,7 +192,6 @@ function layerKind(o: FObj, hasChildren = false): { label: string; icon: JSX.Ele
 // Figma-style tool glyphs (stroked, 18px). No emoji, no boxes behind them.
 const TOOL_ICONS: Record<Tool, JSX.Element> = {
   select: <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 7-6 1.6L9 18z" /></svg>,
-  artboard: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><rect x="4" y="5" width="16" height="14" rx="1.5" /><path d="M12 9v6M9 12h6" /></svg>,
   frame: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M7 3v18M17 3v18M3 7h18M3 17h18" /></svg>,
   rect: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="4" y="4" width="16" height="16" rx="2" /></svg>,
   ellipse: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="8.5" /></svg>,
@@ -2204,7 +2204,8 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
     // activate the artboard under the pointer (for export + snapping)
     const hit = artboardAt(artboardsRef.current, p.x, p.y)
     if (hit) { setActiveAb(hit.id); setAbSelected(true) }
-    if (t === 'artboard') {
+    if (t === 'frame' && frameIntent(artboardsRef.current, p.x, p.y) === 'artboard') {
+      // bare canvas → this is a new artboard, not a nested frame
       const id = newArtboardId()
       setArtboards((as) => [...as, { id, name: `Artboard ${as.length + 1}`, x: Math.round(p.x), y: Math.round(p.y), w: 1, h: 1, bg: '#ffffff' }])
       setActiveAb(id); setSelIds([])
@@ -3223,8 +3224,8 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
       if (e.shiftKey && k === 'a') { e.preventDefault(); wrapInFlex(); return }
       if (e.shiftKey && k === 'f' && selRef.current.length > 1) { e.preventDefault(); groupSelection('none'); return }
       if (!meta && k === 'v') setTool('select')
-      else if (!meta && k === 'b') setTool('artboard')
-      else if (!meta && k === 'a') setTool('artboard')
+      else if (!meta && k === 'b') setTool('frame')
+      else if (!meta && k === 'a') setTool('frame')
       else if (!meta && k === 'f') setTool('frame')
       else if (!meta && k === 'r') setTool('rect')
       else if (!meta && k === 'o') setTool('ellipse')
@@ -3508,7 +3509,7 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
   const shapeTools: Tool[] = ['rect', 'line', 'arrow', 'ellipse', 'polygon', 'star', 'image']
   const activeShape = shapeTools.includes(tool) ? tool : 'rect'
   const shapeLabel: Record<Tool, string> = {
-    select: 'Select', artboard: 'Artboard', frame: 'Frame', rect: 'Rectangle', ellipse: 'Ellipse', line: 'Line', arrow: 'Arrow', polygon: 'Polygon', star: 'Star', text: 'Text', image: 'Image/video…', pencil: 'Pencil', hand: 'Hand'
+    select: 'Select', frame: 'Frame', rect: 'Rectangle', ellipse: 'Ellipse', line: 'Line', arrow: 'Arrow', polygon: 'Polygon', star: 'Star', text: 'Text', image: 'Image/video…', pencil: 'Pencil', hand: 'Hand'
   }
   const shapeShortcut: Partial<Record<Tool, string>> = { rect: 'R', line: 'L', arrow: '⇧L', ellipse: 'O', image: '⇧⌘K' }
   const shapeDropdown = (): JSX.Element => (
@@ -3793,12 +3794,10 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
           {toolBtn('select', 'Select / move (V)')}
           {toolBtn('hand', 'Pan (H / hold space)')}
           <div className="mx-1" />
-          {toolBtn('frame', 'Frame (F)')}
+          {toolBtn('frame', 'Frame (F): drag on the canvas for a new artboard, drag inside one to nest a frame')}
           {shapeDropdown()}
           {toolBtn('pencil', 'Pencil: draw freehand (N)')}
           {toolBtn('text', 'Text (T)')}
-          <div className="mx-1" />
-          {toolBtn('artboard', 'Artboard: drag to add a new one (B)')}
         </div>
         <div className="mx-1.5" />
         <Tooltip label="Undo (⌘Z)" side="bottom"><button type="button" onClick={undo} disabled={!canUndo} aria-label="Undo" className="grid h-7 w-7 place-items-center rounded text-text-secondary enabled:hover:bg-elevated enabled:hover:text-text-primary disabled:opacity-30">
@@ -3945,7 +3944,7 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
             {/* Objects */}
             <div className={`flex items-center justify-between ${PANEL_HEADER_ROW}`}>
               <span className={PANEL_HEADER_TEXT}>Layers</span>
-              <button type="button" onClick={() => setTool('artboard')} title="Add artboard: drag on the canvas (B)" className="text-text-muted hover:text-text-primary">
+              <button type="button" onClick={() => setTool('frame')} title="Add a frame: drag on the canvas (F)" className="text-text-muted hover:text-text-primary">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
               </button>
             </div>
@@ -4062,8 +4061,8 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
           {artboards.length === 0 && (
             <div className="pointer-events-none absolute left-1/2 top-1/2 z-30 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-2 text-center text-text-muted">
               <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4"><rect x="4" y="5" width="16" height="14" rx="1.5" /><path d="M12 9v6M9 12h6" /></svg>
-              <div className="text-[13px] text-text-secondary">No artboards</div>
-              <div className="text-[12px]">Press <span className="rounded bg-elevated px-1 text-text-primary">B</span> and drag, or use Add artboard in the side panel</div>
+              <div className="text-[13px] text-text-secondary">Nothing here yet</div>
+              <div className="text-[12px]">Press <span className="rounded bg-elevated px-1 text-text-primary">F</span> and drag, or pick a size on the right</div>
             </div>
           )}
           {aiBusy && (
@@ -5413,11 +5412,11 @@ function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gra
     </Section>
   ) : null
 
-  if (!sel && !multi && !abSelected && (tool === 'artboard' || tool === 'frame')) {
+  if (!sel && !multi && !abSelected && tool === 'frame') {
     return (
       <aside className="shrink-0 overflow-y-auto bg-surface overflow-x-hidden" style={{ width, minWidth: width, maxWidth: width }}>
         <div className="px-4 py-4">
-          <div className="text-[15px] font-semibold text-text-primary">{tool === 'frame' ? 'New frame' : 'New artboard'}</div>
+          <div className="text-[15px] font-semibold text-text-primary">New frame</div>
           <p className="mt-1 text-[12px] leading-relaxed text-text-muted">Pick a size, or drag on the canvas to draw a custom one.</p>
         </div>
         <div className="space-y-4 px-3 pb-6">

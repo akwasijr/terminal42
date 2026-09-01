@@ -93,6 +93,14 @@ export function artboardAt(artboards: Artboard[], x: number, y: number): Artboar
   return null
 }
 
+/**
+ * What the frame tool should make at a world point. Dragging on bare canvas
+ * starts a new artboard; dragging inside one nests a frame in it.
+ */
+export function frameIntent(artboards: Artboard[], x: number, y: number): 'artboard' | 'frame' {
+  return artboardAt(artboards, x, y) ? 'frame' : 'artboard'
+}
+
 /** The artboard whose rect contains a box's center, if any. */
 export function ownerArtboard(artboards: Artboard[], box: Box): Artboard | null {
   return artboardAt(artboards, box.x + box.w / 2, box.y + box.h / 2)
