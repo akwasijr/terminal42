@@ -1,5 +1,5 @@
 import { type ObjectSpec } from './canvasAgent'
-import { readableInk } from './designQA'
+import { readablePair } from './designQA'
 import { type DesignSystem } from './designSystem'
 
 // ── UI Kit ───────────────────────────────────────────────────────────────────
@@ -39,9 +39,9 @@ function mix(a: string, b: string, t: number): string {
  *  render ON-BRAND (and in dark mode automatically when the DS bg/text are dark). */
 export function kitFromDesignSystem(ds: DesignSystem): Kit {
   const c = ds.colors
-  const accent = vibrantAccent(c.primary)
+  const pair = readablePair(vibrantAccent(c.primary))
   return {
-    accent, onAccent: readableInk(accent),
+    accent: pair.bg, onAccent: pair.ink,
     ink: c.text, muted: c.textMuted, faint: mix(c.textMuted, c.bg, 0.4),
     surface: mix(c.surface, c.text, 0.06), card: c.surface, border: c.border, bg: c.bg
   }
@@ -154,8 +154,9 @@ export function topBar(x: number, y: number, w: number, props: Record<string, un
   if (props.subtitle) o.push({ type: 'text', parent: ref, name: 'Subtitle', x, y: y + 36, w: w * 0.6, h: 18, text: String(props.subtitle), color: k.muted, fontSize: 13.5 })
   if (props.action) {
     const bw = 150, bx = x + w - bw
-    o.push({ type: 'frame', parent: ref, name: 'Action', x: bx, y: y + 8, w: bw, h: 44, radius: 10, fill: k.accent, fillEnabled: true, strokeEnabled: false })
-    o.push({ type: 'text', parent: ref, name: 'Action label', x: bx, y: y + 22, w: bw, h: 18, text: String(props.action), color: k.onAccent, fontSize: 14, fontWeight: 600, align: 'center' })
+    const btn = rid('action')
+    o.push({ type: 'frame', ref: btn, parent: ref, name: 'Action', x: bx, y: y + 8, w: bw, h: 44, radius: 10, fill: k.accent, fillEnabled: true, strokeEnabled: false })
+    o.push({ type: 'text', parent: btn, name: 'Action label', x: bx, y: y + 22, w: bw, h: 18, text: String(props.action), color: k.onAccent, fontSize: 14, fontWeight: 600, align: 'center' })
   }
   return o
 }
@@ -522,7 +523,8 @@ export function expandComponentSpec(spec: ObjectSpec, baseKit: Kit = DEFAULT_KIT
   const fn = COMPONENTS[repaired.component as string]
   if (!fn) return null
   const accent = vibrantAccent(typeof repaired.accent === 'string' ? repaired.accent : baseKit.accent)
-  const k: Kit = { ...baseKit, accent, onAccent: readableInk(accent) }
+  const pair = readablePair(accent)
+  const k: Kit = { ...baseKit, accent: pair.bg, onAccent: pair.ink }
   return fn(repaired.x ?? 0, repaired.y ?? 0, repaired.w ?? 350, (repaired.props && typeof repaired.props === 'object' ? repaired.props : {}) as Record<string, unknown>, k)
 }
 

@@ -7,6 +7,7 @@ import { lintObjects } from '../../src/renderer/src/lib/designQA'
 import { scoreDesign } from '../../src/renderer/src/lib/designEval'
 import { type DesignSystem } from '../../src/renderer/src/lib/designSystem'
 import { type FObj } from '../../src/renderer/src/lib/freeformTypes'
+import { contrastRatio } from '../../src/renderer/src/lib/designQA'
 
 describe('uiKit — component expansion', () => {
   it('expands a listRow into a grouped, polished row', () => {
@@ -22,9 +23,13 @@ describe('uiKit — component expansion', () => {
     const frame = out[0]
     expect(out.slice(1).every((o) => o.parent === frame.ref)).toBe(true)
   })
-  it('paints the primary button in the accent and nothing else', () => {
+  it('paints the primary button in the accent, and keeps the label readable on it', () => {
     const out = expandComponentSpec({ type: 'frame', component: 'primaryButton', x: 0, y: 0, w: 320, accent: '#6366f1', props: { label: 'Save', icon: 'check' } })!
-    expect(out[0]).toMatchObject({ fill: '#6366f1', fillEnabled: true })
+    expect(out[0].fillEnabled).toBe(true)
+    // #6366f1 lands a hair under 4.5:1 against white, so the fill is nudged a
+    // couple of percent darker rather than the label being flipped to black.
+    expect(contrastRatio(String(out[0].fill), String(out[1].color))).toBeGreaterThanOrEqual(4.5)
+    expect(contrastRatio(String(out[0].fill), '#6366f1')).toBeLessThan(1.2)
   })
   it('returns null for unknown components and passes raw specs through', () => {
     expect(expandComponentSpec({ type: 'rect', component: 'nope' })).toBeNull()

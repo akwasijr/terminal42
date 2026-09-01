@@ -36,6 +36,51 @@ export function readableInk(bg: string): string {
   return contrastRatio('#111827', bg) >= contrastRatio('#f9fafb', bg) ? '#111827' : '#f9fafb'
 }
 
+const INK_DARK = '#111827'
+const INK_LIGHT = '#f9fafb'
+
+/** Move a colour toward black (t < 0) or white (t > 0) by |t|, keeping its hue. */
+function shade(hex: string, t: number): string {
+  const rgb = hexToRgb(hex)
+  if (!rgb) return hex
+  const target = t > 0 ? 255 : 0
+  const k = Math.min(1, Math.abs(t))
+  const out = rgb.map((c) => Math.round(c + (target - c) * k))
+  return `#${out.map((c) => c.toString(16).padStart(2, '0')).join('')}`
+}
+
+export interface ReadablePair { bg: string; ink: string }
+
+/**
+ * A background and an ink that are guaranteed to clear `min` (WCAG 2.2 SC 1.4.3
+ * asks for 4.5:1 on normal text). readableInk on its own only picks the better
+ * of two inks, with no floor, which is how a mid-tone green button ended up
+ * carrying near-black text at about 3:1.
+ *
+ * When neither ink clears the bar the BACKGROUND moves, not the text, because a
+ * filled control has to keep looking like the brand. Both directions are tried
+ * and the smaller shift wins, so the colour travels as little as it can.
+ */
+export function readablePair(bg: string, min = 4.5): ReadablePair {
+  const ink = readableInk(bg)
+  if (!hexToRgb(bg) || contrastRatio(ink, bg) >= min) return { bg, ink }
+  let darker: ReadablePair | null = null
+  let lighter: ReadablePair | null = null
+  for (let t = 0.02; t <= 1.0001; t += 0.02) {
+    if (!darker) { const c = shade(bg, -t); if (contrastRatio(INK_LIGHT, c) >= min) darker = { bg: c, ink: INK_LIGHT } }
+    if (!lighter) { const c = shade(bg, t); if (contrastRatio(INK_DARK, c) >= min) lighter = { bg: c, ink: INK_DARK } }
+    if (darker && lighter) break
+  }
+  // Whichever direction got there first is the smaller move. Darkening is
+  // preferred on a tie because a washed-out primary reads as disabled.
+  if (darker && lighter) {
+    const dd = Math.abs(relLuminance(hexToRgb(darker.bg)!) - relLuminance(hexToRgb(bg)!))
+    const dl = Math.abs(relLuminance(hexToRgb(lighter.bg)!) - relLuminance(hexToRgb(bg)!))
+    return dd <= dl ? darker : lighter
+  }
+  return darker ?? lighter ?? { bg, ink }
+}
+
 /** HSL saturation of a hex colour (0..1). Greys/near-black/near-white ≈ 0. */
 function saturation(hex?: string): number {
   const rgb = hex ? hexToRgb(hex) : null
@@ -51,13 +96,42 @@ function luminanceOf(hex?: string): number {
   return rgb ? relLuminance(rgb) : 1
 }
 
-/** Solid colour sitting behind an object: nearest ancestor with a solid fill, else the artboard bg. */function bgBehind(o: FObj, byId: Map<string, FObj>, artboardBg?: string, fillOf?: (o: FObj) => string | undefined): string | undefined {
+const paints = (o: FObj, fill: (o: FObj) => string | undefined): string | undefined => {
+  const cf = fill(o)
+  if (!o.fillEnabled || o.fillMode === 'gradient' || o.fillMode === 'image') return undefined
+  if (o.visible === false) return undefined
+  if (typeof cf !== 'string' || !hexToRgb(cf)) return undefined
+  return cf
+}
+const contains = (outer: FObj, inner: FObj): boolean =>
+  outer.x <= inner.x + 1 && outer.y <= inner.y + 1 &&
+  outer.x + outer.w >= inner.x + inner.w - 1 && outer.y + outer.h >= inner.y + inner.h - 1
+
+/**
+ * The solid colour actually visible behind an object.
+ *
+ * The ancestor chain alone is not enough: a kit component may park a label on
+ * the component frame while a filled button sits between the two, which is how
+ * a white "Download report" label was judged against the white page and flipped
+ * to black. So the topmost thing painted UNDER the object that also encloses it
+ * wins, whether or not it is an ancestor. Later in the array means nearer the
+ * front.
+ */
+function bgBehind(o: FObj, byId: Map<string, FObj>, artboardBg?: string, fillOf?: (o: FObj) => string | undefined, order?: FObj[], index?: number): string | undefined {
   const fill = fillOf ?? ((x: FObj) => x.fill)
+  if (order && typeof index === 'number') {
+    for (let i = index - 1; i >= 0; i--) {
+      const c = order[i]
+      if (c.id === o.id || !contains(c, o)) continue
+      const cf = paints(c, fill)
+      if (cf) return cf
+    }
+  }
   let cur: FObj | undefined = o.parent ? byId.get(o.parent) : undefined
   let guard = 0
   while (cur && guard++ < 8) {
-    const cf = fill(cur)
-    if (cur.fillEnabled && cur.fillMode !== 'gradient' && cur.fillMode !== 'image' && typeof cf === 'string' && hexToRgb(cf)) return cf
+    const cf = paints(cur, fill)
+    if (cf) return cf
     cur = cur.parent ? byId.get(cur.parent) : undefined
   }
   return artboardBg
@@ -147,7 +221,7 @@ export function lintObjects(objs: FObj[], opts: LintOptions = {}): FObj[] {
   }
   const fillOf = (o: FObj): string | undefined => recolor.get(o.id) ?? o.fill
 
-  const out = objs.map((o) => {
+  const out = objs.map((o, oi) => {
     const n: FObj = { ...o }
     if (!isLocked(o.id, 'x')) n.x = snap(o.x, grid)
     if (!isLocked(o.id, 'y')) n.y = snap(o.y, grid)
@@ -161,7 +235,7 @@ export function lintObjects(objs: FObj[], opts: LintOptions = {}): FObj[] {
     if (o.type === 'text') {
       if (typeof o.fontSize === 'number' && !isLocked(o.id, 'fontSize')) n.fontSize = nearest(o.fontSize, TYPE_SCALE)
       if (!isLocked(o.id, 'color')) {
-        const bg = bgBehind(o, byId, opts.artboardBg, fillOf)
+        const bg = bgBehind(o, byId, opts.artboardBg, fillOf, objs, oi)
         const ink = o.color
         if (bg && hexToRgb(bg) && (!ink || !hexToRgb(ink) || contrastRatio(ink, bg) < 4.5)) n.color = readableInk(bg)
       }

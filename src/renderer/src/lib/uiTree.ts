@@ -1,6 +1,6 @@
 import { type ObjectSpec } from './canvasAgent'
 import { type Kit, DEFAULT_KIT, buildComponent, componentHeight, isComponent, vibrantAccent } from './uiKit'
-import { readableInk } from './designQA'
+import { readablePair } from './designQA'
 
 // ── Semantic UI tree → deterministic layout ──────────────────────────────────
 // The assistant emits INTENT only: a tree of auto-layout containers (stack/row/
@@ -161,7 +161,8 @@ export function compileTree(root: UINode, opts: CompileOpts = {}): ObjectSpec[] 
   // Enforce a confident accent: a missing or near-grey accent (the monochrome
   // failure mode) is swapped for a tasteful default so the primary is never grey.
   const accent = vibrantAccent(opts.accent ?? baseKit.accent)
-  const kit: Kit = { ...baseKit, accent, onAccent: readableInk(accent) }
+  const pair = readablePair(accent)
+  const kit: Kit = { ...baseKit, accent: pair.bg, onAccent: pair.ink }
   const w = opts.width ?? 390
   return compile(root, 0, 0, w, kit).specs
 }
