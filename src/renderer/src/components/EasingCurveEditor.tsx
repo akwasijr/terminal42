@@ -151,7 +151,7 @@ export function EasingCurveEditor({ value, onChange, size = 150 }: {
             </div>
             {naming && (
               <div className="flex items-center gap-1">
-                <input autoFocus type="text" value={varName} onChange={(e) => setVarName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { setVars(saveEasingVar(varName, value)); setNaming(false) } if (e.key === 'Escape') setNaming(false) }} placeholder="Curve name" className="min-w-0 flex-1 rounded bg-bg/60 px-1.5 py-1 text-[11px] text-text-primary focus:outline-none" />
+                <input autoFocus type="text" value={varName} onChange={(e) => setVarName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { setVars(saveEasingVar(varName, value)); setNaming(false) } if (e.key === 'Escape') setNaming(false) }} placeholder="Curve name" className="min-w-0 flex-1 rounded t42-field px-1.5 py-1 text-[11px] text-text-primary" />
                 <button type="button" onClick={() => { setVars(saveEasingVar(varName, value)); setNaming(false) }} className="rounded bg-action px-2 py-1 text-[10.5px] text-action-text hover:opacity-90">Save</button>
                 <button type="button" onClick={() => setNaming(false)} className="rounded px-1.5 py-1 text-[10.5px] text-text-muted hover:text-text-primary">Cancel</button>
               </div>

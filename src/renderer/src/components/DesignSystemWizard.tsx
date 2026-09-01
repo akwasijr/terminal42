@@ -29,12 +29,15 @@ function FeelTile(
       type="button"
       onClick={onClick}
       aria-pressed={selected}
-      className={`rounded-xl p-2 text-left transition-colors ${selected ? 'bg-accent/15' : 'hover:bg-elevated/40'}`}
+      className={`rounded-xl p-2 text-left transition-shadow ${selected ? 'bg-sunken shadow-[inset_0_0_0_2px_rgb(var(--accent))]' : 'bg-sunken/60 hover:shadow-[inset_0_0_0_1px_rgb(var(--field-line))]'}`}
     >
       {children}
       <div className="mt-2 px-1">
-        <div className={`text-[12.5px] ${selected ? 'text-text-primary' : 'text-text-secondary'}`}>{label}</div>
-        <div className="text-[11px] leading-snug text-text-muted">{blurb}</div>
+        <div className={`flex items-center gap-1.5 text-[12.5px] ${selected ? 'font-medium text-text-primary' : 'text-text-secondary'}`}>
+          {selected && <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="rgb(var(--accent))" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" aria-hidden="true"><path d="M3 8.5l3.4 3.4L13 4.5" /></svg>}
+          {label}
+        </div>
+        <div className="mt-0.5 text-[11px] leading-snug text-text-muted">{blurb}</div>
       </div>
     </button>
   )
@@ -228,7 +231,7 @@ function analyzeShots(urls: string[]): Promise<RefProfile> {
 
 function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }): JSX.Element {
   return (
-    <div className="flex items-center gap-2.5 rounded-lg bg-elevated/40 p-2.5">
+    <div className="flex items-center gap-2.5 rounded-lg bg-sunken p-2.5">
       <label className="t42-swatch relative h-10 w-10 overflow-hidden rounded-md" style={{ background: value }}><input type="color" value={/^#[0-9a-f]{6}$/i.test(value) ? value : '#000000'} onChange={(e) => onChange(e.target.value)} className="h-full w-full cursor-pointer opacity-0" /></label>
       <div className="min-w-0 flex-1">
         <div className="text-[12.5px] font-medium text-text-primary">{label}</div>
@@ -245,10 +248,10 @@ function FontField({ label, value, onChange, sample }: { label: string; value: s
     return [...out.entries()]
   }, [])
   return (
-    <div className="rounded-lg bg-elevated/40 p-3">
+    <div className="rounded-lg bg-sunken p-3">
       <div className="mb-2 text-[12.5px] font-medium text-text-primary">{label}</div>
       <div className="relative">
-        <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full appearance-none rounded-md bg-surface px-3 py-2 pr-8 text-[13px] text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/40">
+        <select value={value} onChange={(e) => onChange(e.target.value)} className="t42-field w-full appearance-none rounded-md px-3 py-2 pr-8 text-[13px] text-text-primary">
           {groups.map(([g, opts]) => <optgroup key={g} label={g}>{opts.map((o) => <option key={o.id} value={o.id}>{o.id}</option>)}</optgroup>)}
         </select>
         <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-text-muted"><path d="M4 6l4 4 4-4" /></svg>
@@ -583,7 +586,7 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
             <div className="space-y-5">
               <div>
                 <FieldLabel>Name</FieldLabel>
-                <input autoFocus value={a.name} onChange={(e) => set('name', e.target.value)} placeholder="My design system" className="w-full max-w-sm rounded-lg bg-elevated/40 px-3.5 py-2.5 text-[14px] text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/40" />
+                <input autoFocus value={a.name} onChange={(e) => set('name', e.target.value)} placeholder="My design system" className="w-full max-w-sm rounded-lg t42-field px-3.5 py-2.5 text-[14px] text-text-primary" />
               </div>
               <div>
                 <FieldLabel>Feel</FieldLabel>
@@ -609,7 +612,7 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
               {!refMode && (
                 <div>
                   <FieldLabel>Describe your style</FieldLabel>
-                  <textarea autoFocus value={a.style} onChange={(e) => onStyleWords(e.target.value)} rows={3} placeholder="Tone, references, fonts or feel to lean into." className="w-full resize-none rounded-lg bg-elevated/40 px-3.5 py-3 text-[13.5px] leading-relaxed text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40" />
+                  <textarea autoFocus value={a.style} onChange={(e) => onStyleWords(e.target.value)} rows={3} placeholder="Tone, references, fonts or feel to lean into." className="w-full resize-none rounded-lg t42-field px-3.5 py-3 text-[13.5px] leading-relaxed text-text-primary placeholder:text-text-muted" />
                 </div>
               )}
               {refMode && (
@@ -617,7 +620,7 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
                   <div>
                     <FieldLabel>Reference screenshots</FieldLabel>
                     <input ref={shotsInput} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { void onShots(e.target.files); e.target.value = '' }} />
-                    <div className="flex flex-wrap items-center gap-2 rounded-lg bg-elevated/40 p-2.5">
+                    <div className="flex flex-wrap items-center gap-2 rounded-lg bg-sunken p-2.5">
                       {(a.shots ?? []).map((src, i) => (
                         <span key={i} className="relative">
                           <img src={src} alt={`Reference ${i + 1}`} className="h-14 w-20 rounded-md object-cover" />
@@ -630,7 +633,7 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
                     </div>
                   </div>
                   {(a.shots?.length ?? 0) > 0 && (
-                    <div className="space-y-3 rounded-lg bg-elevated/40 p-3">
+                    <div className="space-y-3 rounded-lg bg-sunken p-3">
                       <div className="flex items-center justify-between gap-2">
                         <span className="flex items-center gap-2 text-[12px] font-medium text-text-primary">
                           {analyzing && <svg className="h-3.5 w-3.5 animate-spin text-text-muted" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" opacity="0.3" /><path d="M21 12a9 9 0 0 1-9 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>}
@@ -662,7 +665,7 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
                   )}
                   <div>
                     <FieldLabel>What UI is this? (optional)</FieldLabel>
-                    <input value={a.refName} onChange={(e) => set('refName', e.target.value)} placeholder="e.g. Stripe dashboard, Notion, Linear" className="w-full max-w-sm rounded-lg bg-elevated/40 px-3.5 py-2.5 text-[13.5px] text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40" />
+                    <input value={a.refName} onChange={(e) => set('refName', e.target.value)} placeholder="e.g. Stripe dashboard, Notion, Linear" className="w-full max-w-sm rounded-lg t42-field px-3.5 py-2.5 text-[13.5px] text-text-primary placeholder:text-text-muted" />
                   </div>
                 </div>
               )}
@@ -710,11 +713,11 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
             <div className="space-y-5">
               <div>
                 <FieldLabel>Brand name</FieldLabel>
-                <input value={a.brandName} onChange={(e) => set('brandName', e.target.value)} placeholder="Your company or product name" className="w-full max-w-sm rounded-lg bg-elevated/40 px-3.5 py-2.5 text-[13.5px] text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40" />
+                <input value={a.brandName} onChange={(e) => set('brandName', e.target.value)} placeholder="Your company or product name" className="w-full max-w-sm rounded-lg t42-field px-3.5 py-2.5 text-[13.5px] text-text-primary placeholder:text-text-muted" />
               </div>
               <div>
                 <FieldLabel>Branding notes</FieldLabel>
-                <textarea value={a.branding} onChange={(e) => set('branding', e.target.value)} rows={3} placeholder="Brand rules to respect (optional)." className="w-full resize-none rounded-lg bg-elevated/40 px-3.5 py-3 text-[13.5px] leading-relaxed text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40" />
+                <textarea value={a.branding} onChange={(e) => set('branding', e.target.value)} rows={3} placeholder="Brand rules to respect (optional)." className="w-full resize-none rounded-lg t42-field px-3.5 py-3 text-[13.5px] leading-relaxed text-text-primary placeholder:text-text-muted" />
               </div>
             </div>
           )}
@@ -773,7 +776,7 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
                 return (
                   <section key={g.id} className="space-y-1.5">
                     <div className="text-[10.5px] font-medium text-text-muted">{g.label}</div>
-                    <div className="overflow-hidden rounded-lg bg-elevated/40">
+                    <div className="overflow-hidden rounded-lg bg-sunken">
                       {rules.map((r, i) => {
                         const on = a.rules[r.id] !== false
                         return (
@@ -798,7 +801,7 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
 
           {page === 'context' && (
             <div className="space-y-4">
-              <div className="rounded-lg bg-elevated/40 p-4">
+              <div className="rounded-lg bg-sunken p-4">
                 <div className="flex items-start gap-3">
                   {a.logo && <img src={a.logo} alt="Logo" className="h-11 w-11 rounded-md bg-bg/50 object-contain" />}
                   <div className="min-w-0 flex-1">
@@ -810,11 +813,11 @@ export function DesignSystemWizard({ initial, onCancel, onComplete }: {
               </div>
               <div>
                 <FieldLabel>What is this design system for?</FieldLabel>
-                <textarea autoFocus value={a.purpose} onChange={(e) => set('purpose', e.target.value)} rows={5} placeholder="The product, who uses it, and what it should do." className="w-full resize-none rounded-lg bg-elevated/40 px-3.5 py-3 text-[13.5px] leading-relaxed text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40" />
+                <textarea autoFocus value={a.purpose} onChange={(e) => set('purpose', e.target.value)} rows={5} placeholder="The product, who uses it, and what it should do." className="w-full resize-none rounded-lg t42-field px-3.5 py-3 text-[13.5px] leading-relaxed text-text-primary placeholder:text-text-muted" />
               </div>
               <div>
                 <FieldLabel>Anything else to add?</FieldLabel>
-                <textarea value={a.notes} onChange={(e) => set('notes', e.target.value)} rows={2} placeholder="Anything else (optional)." className="w-full resize-none rounded-lg bg-elevated/40 px-3.5 py-3 text-[13.5px] leading-relaxed text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40" />
+                <textarea value={a.notes} onChange={(e) => set('notes', e.target.value)} rows={2} placeholder="Anything else (optional)." className="w-full resize-none rounded-lg t42-field px-3.5 py-3 text-[13.5px] leading-relaxed text-text-primary placeholder:text-text-muted" />
               </div>
             </div>
           )}

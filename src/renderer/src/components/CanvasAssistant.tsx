@@ -277,7 +277,7 @@ export function CanvasAssistant({ getContext, onCreate, onAnimate, onEdit, onDel
               <div className="flex w-1/2 flex-col overflow-hidden p-3">
                 <div className="mb-1 text-[11px] font-medium text-text-muted">Tree playground</div>
                 <p className="mb-2 text-[11px] leading-relaxed text-text-muted">Paste a screen tree (the exact format the assistant targets) and render it on the canvas — no model needed. Lets you study/iterate the substrate directly.</p>
-                <textarea value={treeInput} onChange={(e) => setTreeInput(e.target.value)} spellCheck={false} className="min-h-0 flex-1 resize-none rounded-lg bg-elevated/40 p-2.5 font-mono text-[11px] leading-snug text-text-primary focus:outline-none" />
+                <textarea value={treeInput} onChange={(e) => setTreeInput(e.target.value)} spellCheck={false} className="min-h-0 flex-1 resize-none rounded-lg t42-field p-2.5 font-mono text-[11px] leading-snug text-text-primary focus:outline-none" />
                 {treeErr && <div className="mt-1.5 text-[11px] text-error">{treeErr}</div>}
                 <div className="mt-2 flex items-center gap-3">
                   <button type="button" onClick={renderTree} className="rounded-md bg-action px-3 py-1.5 text-[12px] font-medium text-action-text hover:opacity-90">Render on canvas</button>
@@ -365,8 +365,8 @@ export function CanvasAssistant({ getContext, onCreate, onAnimate, onEdit, onDel
                             })}
                             {isAdding ? (
                               <div className="space-y-1.5 rounded-md bg-bg/40 p-2">
-                                <input autoFocus value={prefLabel} onChange={(e) => setPrefLabel(e.target.value)} placeholder="Preference name" className="w-full rounded bg-elevated px-2 py-1.5 text-[12px] text-text-primary placeholder:text-text-muted focus:outline-none" />
-                                <input value={prefText} onChange={(e) => setPrefText(e.target.value)} placeholder="Short instruction" className="w-full rounded bg-elevated px-2 py-1.5 text-[12px] text-text-primary placeholder:text-text-muted focus:outline-none" />
+                                <input autoFocus value={prefLabel} onChange={(e) => setPrefLabel(e.target.value)} placeholder="Preference name" className="w-full rounded t42-field px-2 py-1.5 text-[12px] text-text-primary placeholder:text-text-muted" />
+                                <input value={prefText} onChange={(e) => setPrefText(e.target.value)} placeholder="Short instruction" className="w-full rounded t42-field px-2 py-1.5 text-[12px] text-text-primary placeholder:text-text-muted" />
                                 <div className="flex gap-1.5">
                                   <button type="button" onClick={() => { if (!prefLabel.trim() && !prefText.trim()) return; setBrain(addBrainPreference(brain, g.id, prefLabel, prefText)); setPrefLabel(''); setPrefText(''); setAddingPrefFor(null) }} className="rounded-md bg-elevated px-2.5 py-1 text-[11.5px] font-medium text-text-primary hover:opacity-90">Add</button>
                                   <button type="button" onClick={() => { setPrefLabel(''); setPrefText(''); setAddingPrefFor(null) }} className="rounded-md px-2.5 py-1 text-[11.5px] text-text-muted hover:text-text-primary">Cancel</button>
@@ -426,8 +426,8 @@ export function CanvasAssistant({ getContext, onCreate, onAnimate, onEdit, onDel
                             </div>
                             {open && (
                               <div className="space-y-1.5 px-3 pb-3">
-                                <input value={s.title} onChange={(e) => setBrain(saveAssistantBrain({ ...brain, skills: brain.skills.map((x) => x.id === s.id ? { ...x, title: e.target.value } : x) }))} placeholder="Skill title" className="w-full rounded-md bg-bg/50 px-2.5 py-1.5 text-[12px] text-text-primary placeholder:text-text-muted focus:outline-none" />
-                                <textarea value={s.content} onChange={(e) => setBrain(saveAssistantBrain({ ...brain, skills: brain.skills.map((x) => x.id === s.id ? { ...x, content: e.target.value } : x) }))} rows={8} placeholder="Markdown instructions or examples…" className="w-full resize-none rounded-md bg-bg/50 px-2.5 py-2 font-mono text-[11px] leading-snug text-text-primary placeholder:text-text-muted focus:outline-none" />
+                                <input value={s.title} onChange={(e) => setBrain(saveAssistantBrain({ ...brain, skills: brain.skills.map((x) => x.id === s.id ? { ...x, title: e.target.value } : x) }))} placeholder="Skill title" className="w-full rounded-md t42-field px-2.5 py-1.5 text-[12px] text-text-primary placeholder:text-text-muted" />
+                                <textarea value={s.content} onChange={(e) => setBrain(saveAssistantBrain({ ...brain, skills: brain.skills.map((x) => x.id === s.id ? { ...x, content: e.target.value } : x) }))} rows={8} placeholder="Markdown instructions or examples…" className="w-full resize-none rounded-md t42-field px-2.5 py-2 font-mono text-[11px] leading-snug text-text-primary placeholder:text-text-muted" />
                                 <button type="button" onClick={() => { setBrain(saveAssistantBrain({ ...brain, skills: brain.skills.filter((x) => x.id !== s.id) })); setExpandedSkill(null) }} className="text-[11px] text-error/80 hover:text-error">Delete skill</button>
                               </div>
                             )}

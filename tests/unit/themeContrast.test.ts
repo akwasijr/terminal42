@@ -119,6 +119,29 @@ describe.each(THEMES)('$name theme', ({ selector, order }) => {
     expect(contrast(accent, onAccent)).toBeGreaterThanOrEqual(4.5)
   })
 
+  it('draws the edge of a field so it is present but never harsh', () => {
+    // A field has to be findable at rest without carving the panel into
+    // boxes, so the edge is held in a band: below 1.12 it disappears, above
+    // 2.2 it reads as a drawn line. The loud state is focus, asserted below.
+    const line = tokens.get('field-line')
+    expect(line, '--field-line').toBeDefined()
+    for (const [sn, s] of surfaces) {
+      const r = contrast(line!, s)
+      expect(r, `--field-line on --${sn} = ${r.toFixed(2)}`).toBeGreaterThanOrEqual(1.12)
+      expect(r, `--field-line on --${sn} = ${r.toFixed(2)}`).toBeLessThanOrEqual(2.2)
+    }
+  })
+
+  it('keeps the focus ring at 3:1 against every surface', () => {
+    // WCAG 1.4.11. The resting edge is deliberately quiet, so this is the
+    // one that has to carry the requirement.
+    const accent = tokens.get('accent')!
+    for (const [sn, s] of surfaces) {
+      const r = contrast(accent, s)
+      expect(r, `--accent on --${sn} = ${r.toFixed(2)}`).toBeGreaterThanOrEqual(3)
+    }
+  })
+
   it('pairs the action colour with text that can be read on it', () => {
     expect(contrast(tokens.get('action')!, tokens.get('action-text')!)).toBeGreaterThanOrEqual(4.5)
   })

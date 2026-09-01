@@ -3891,7 +3891,7 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
               <div className="px-3 pt-1">
               {designSystems.length ? (
                 <>
-                  <select value={activeDs?.id ?? ''} onChange={(e) => setActiveDsId(e.target.value)} className="mb-3 w-full rounded bg-elevated px-2 py-1.5 text-[12px] text-text-primary focus:outline-none">
+                  <select value={activeDs?.id ?? ''} onChange={(e) => setActiveDsId(e.target.value)} className="mb-3 w-full rounded t42-field px-2 py-1.5 text-[12px] text-text-primary">
                     {designSystems.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                   <div className={`mb-2 ${PANEL_HEADER_TEXT}`}>Insert component</div>
@@ -4650,7 +4650,7 @@ function VarValueEditor({ collections, col, v, modeId, setVarValue }: { collecti
   const s = typeof raw === 'string' ? raw : ''
   return (
     <div className="flex min-w-0 flex-1 items-center gap-1.5">
-      <input value={s} onChange={(e) => set(e.target.value)} placeholder="value" className="min-w-0 flex-1 rounded-md bg-elevated px-2 py-1.5 text-[12px] text-text-primary placeholder:text-text-muted focus:outline-none" />
+      <input value={s} onChange={(e) => set(e.target.value)} placeholder="value" className="min-w-0 flex-1 rounded-md t42-field px-2 py-1.5 text-[12px] text-text-primary placeholder:text-text-muted" />
       {aliasBtn}
     </div>
   )
@@ -4815,14 +4815,14 @@ function StylesPanel(props: StylesPanelProps): JSX.Element {
               <button type="button" onClick={() => removeStyle('text', s.id)} className="hidden h-5 w-5 shrink-0 place-items-center rounded text-text-muted hover:text-text-primary group-hover:grid" title="Delete style"><IcoClose /></button>
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <select value={s.fontFamily} onChange={(e) => updateTextStyle(s.id, { fontFamily: e.target.value })} className="rounded bg-elevated px-1.5 py-1 text-[11px] text-text-primary focus:outline-none">
+              <select value={s.fontFamily} onChange={(e) => updateTextStyle(s.id, { fontFamily: e.target.value })} className="rounded t42-field px-1.5 py-1 text-[11px] text-text-primary">
                 {FONTS.map((f) => <option key={f.label} value={f.label}>{f.label}</option>)}
               </select>
-              <select value={s.fontWeight} onChange={(e) => updateTextStyle(s.id, { fontWeight: Number(e.target.value) })} className="rounded bg-elevated px-1.5 py-1 text-[11px] text-text-primary focus:outline-none">
+              <select value={s.fontWeight} onChange={(e) => updateTextStyle(s.id, { fontWeight: Number(e.target.value) })} className="rounded t42-field px-1.5 py-1 text-[11px] text-text-primary">
                 {WEIGHTS.map((w) => <option key={w.value} value={w.value}>{w.label}</option>)}
               </select>
-              <label className="flex items-center gap-1 text-[11px] text-text-muted">size<input type="number" value={s.fontSize} min={1} onChange={(e) => updateTextStyle(s.id, { fontSize: Number(e.target.value) || s.fontSize })} className="w-12 rounded bg-elevated px-1.5 py-1 text-[11px] tabular-nums text-text-primary focus:outline-none" /></label>
-              <label className="flex items-center gap-1 text-[11px] text-text-muted">line<input type="number" step="0.1" value={s.lineHeight} min={0} onChange={(e) => updateTextStyle(s.id, { lineHeight: Number(e.target.value) || s.lineHeight })} className="w-12 rounded bg-elevated px-1.5 py-1 text-[11px] tabular-nums text-text-primary focus:outline-none" /></label>
+              <label className="flex items-center gap-1 text-[11px] text-text-muted">size<input type="number" value={s.fontSize} min={1} onChange={(e) => updateTextStyle(s.id, { fontSize: Number(e.target.value) || s.fontSize })} className="w-12 rounded t42-field px-1.5 py-1 text-[11px] tabular-nums text-text-primary" /></label>
+              <label className="flex items-center gap-1 text-[11px] text-text-muted">line<input type="number" step="0.1" value={s.lineHeight} min={0} onChange={(e) => updateTextStyle(s.id, { lineHeight: Number(e.target.value) || s.lineHeight })} className="w-12 rounded t42-field px-1.5 py-1 text-[11px] tabular-nums text-text-primary" /></label>
             </div>
           </div>
         ))}
@@ -5374,7 +5374,7 @@ function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gra
       <div className="flex items-center justify-between gap-2">
         <Tooltip label={tip ?? ''} side="left"><span className="text-[12px] text-text-muted">{label}</span></Tooltip>
         <div className="flex items-center gap-1">
-          <input type="text" value={color} onFocus={pushHistory} onChange={(e) => on(e.target.value)} className="w-[80px] rounded bg-elevated px-1.5 py-1 text-[11.5px] text-text-primary focus:outline-none" />
+          <input type="text" value={color} onFocus={pushHistory} onChange={(e) => on(e.target.value)} className="w-[80px] rounded t42-field px-1.5 py-1 text-[11.5px] text-text-primary" />
           <ColorWell value={color} onChange={on} />
         </div>
       </div>
@@ -5391,7 +5391,7 @@ function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gra
       <div className="flex items-center gap-2">
         <Tooltip label={tip ?? ''} side="left" className="inline-flex w-[58px] shrink-0"><span className="text-[12px] text-text-muted">{label}</span></Tooltip>
         <input type="range" min={min} max={max} step={step} value={value} onPointerDown={pushHistory} onChange={(e) => on(parseFloat(e.target.value))} className="t42-range min-w-0 flex-1" style={{ background: `linear-gradient(to right, rgb(var(--accent)) ${pct}%, rgb(var(--border-strong)) ${pct}%)` }} />
-        <input type="number" min={min} max={max} step={step} value={value} onFocus={pushHistory} onChange={(e) => on(parseFloat(e.target.value) || 0)} className="w-12 shrink-0 rounded bg-elevated px-1 py-0.5 text-[11.5px] text-text-primary focus:outline-none" />
+        <input type="number" min={min} max={max} step={step} value={value} onFocus={pushHistory} onChange={(e) => on(parseFloat(e.target.value) || 0)} className="w-12 shrink-0 rounded t42-field px-1 py-0.5 text-[11.5px] text-text-primary" />
         {kf && (
           <Tooltip label={`${kf.keyed ? 'Remove' : 'Add'} keyframe at playhead`} side="left"><button type="button" onClick={kf.toggle} className="grid h-4 w-4 shrink-0 place-items-center">
             <span className="block h-2 w-2 rotate-45 rounded-[1px]" style={{ background: kf.keyed ? 'rgb(var(--accent,34 197 94))' : 'transparent', border: `1px solid ${kf.keyed ? 'rgb(var(--accent,34 197 94))' : '#6b7280'}` }} />
@@ -5576,7 +5576,7 @@ function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gra
             </Section>
             {active && abSelected && (
               <Section title="Page">
-                <input type="text" value={active.name} onFocus={pushHistory} onChange={(e) => patchAb(active.id, { name: e.target.value })} className="w-full rounded bg-elevated px-1.5 py-1 text-text-primary focus:outline-none" />
+                <input type="text" value={active.name} onFocus={pushHistory} onChange={(e) => patchAb(active.id, { name: e.target.value })} className="w-full rounded t42-field px-1.5 py-1 text-text-primary" />
                 <div className="grid grid-cols-2 gap-1.5">
                   <Num label="X" value={active.x} on={(v) => patchAb(active.id, { x: Math.round(v) })} />
                   <Num label="Y" value={active.y} on={(v) => patchAb(active.id, { y: Math.round(v) })} />
@@ -5884,7 +5884,7 @@ function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gra
                 <span className="pt-2 text-[12px] text-text-muted">Text</span>
                 {boundText
                   ? <BoundChip field="text" varId={boundText} />
-                  : <textarea value={sel.text} onFocus={pushHistory} onChange={(e) => patch(sel.id, { text: e.target.value })} rows={2} className="w-full resize-none rounded-xl bg-elevated px-3 py-2 text-[13px] text-text-primary focus:outline-none" />}
+                  : <textarea value={sel.text} onFocus={pushHistory} onChange={(e) => patch(sel.id, { text: e.target.value })} rows={2} className="w-full resize-none rounded-xl t42-field px-3 py-2 text-[13px] text-text-primary" />}
                 <div className="pt-1"><VarBindButton field="text" boundVarId={boundText} /></div>
               </div>
             )
@@ -5896,7 +5896,7 @@ function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gra
                 <span className="text-[12px] text-text-muted">Font</span>
                 {boundFont
                   ? <BoundChip field="fontFamily" varId={boundFont} />
-                  : <select value={sel.fontFamily} onChange={(e) => { pushHistory(); patch(sel.id, { fontFamily: e.target.value }) }} className="w-full rounded-lg bg-elevated px-3 py-1.5 text-[13px] font-medium text-text-primary focus:outline-none">
+                  : <select value={sel.fontFamily} onChange={(e) => { pushHistory(); patch(sel.id, { fontFamily: e.target.value }) }} className="w-full rounded-lg t42-field px-3 py-1.5 text-[13px] font-medium text-text-primary">
                       {FONTS.map((f) => <option key={f.label} value={f.label}>{f.label}</option>)}
                     </select>}
                 <VarBindButton field="fontFamily" boundVarId={boundFont} />
@@ -5905,7 +5905,7 @@ function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gra
           })()}
           <label className="grid grid-cols-[70px_1fr] items-center gap-2">
             <span className="text-[12px] text-text-muted">Weight</span>
-            <select value={sel.fontWeight} onChange={(e) => { pushHistory(); patch(sel.id, { fontWeight: parseInt(e.target.value) }) }} className="w-full rounded-lg bg-elevated px-3 py-1.5 text-[13px] font-medium text-text-primary focus:outline-none">
+            <select value={sel.fontWeight} onChange={(e) => { pushHistory(); patch(sel.id, { fontWeight: parseInt(e.target.value) }) }} className="w-full rounded-lg t42-field px-3 py-1.5 text-[13px] font-medium text-text-primary">
               {WEIGHTS.map((w) => <option key={w.value} value={w.value}>{w.label}</option>)}
             </select>
           </label>
@@ -5965,7 +5965,7 @@ function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gra
         <Section title="Polygon" defaultOpen={false}>
           <div className="flex items-center gap-2">
             <Tooltip label="Number of sides" side="left" className="inline-flex w-[58px] shrink-0"><span className="text-[12px] text-text-muted">Sides</span></Tooltip>
-            <select value={sel.sides ?? 3} onChange={(e) => { pushHistory(); patch(sel.id, { sides: parseInt(e.target.value) }) }} className="min-w-0 flex-1 rounded bg-elevated px-1.5 py-1 text-[12px] text-text-primary focus:outline-none">
+            <select value={sel.sides ?? 3} onChange={(e) => { pushHistory(); patch(sel.id, { sides: parseInt(e.target.value) }) }} className="min-w-0 flex-1 rounded t42-field px-1.5 py-1 text-[12px] text-text-primary">
               {[3, 4, 5, 6, 7, 8, 10, 12].map((n) => <option key={n} value={n}>{n} sides</option>)}
             </select>
           </div>
@@ -5976,7 +5976,7 @@ function Inspector({ width, tool, abSelected, selObjs, sel, patch, patchObj, gra
         <Section title="Star" defaultOpen={false}>
           <div className="flex items-center gap-2">
             <Tooltip label="Number of star points" side="left" className="inline-flex w-[58px] shrink-0"><span className="text-[12px] text-text-muted">Points</span></Tooltip>
-            <select value={sel.points ?? 5} onChange={(e) => { pushHistory(); patch(sel.id, { points: parseInt(e.target.value) }) }} className="min-w-0 flex-1 rounded bg-elevated px-1.5 py-1 text-[12px] text-text-primary focus:outline-none">
+            <select value={sel.points ?? 5} onChange={(e) => { pushHistory(); patch(sel.id, { points: parseInt(e.target.value) }) }} className="min-w-0 flex-1 rounded t42-field px-1.5 py-1 text-[12px] text-text-primary">
               {[3, 4, 5, 6, 7, 8, 10, 12].map((n) => <option key={n} value={n}>{n} points</option>)}
             </select>
           </div>

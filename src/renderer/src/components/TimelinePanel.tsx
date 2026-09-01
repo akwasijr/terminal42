@@ -465,7 +465,7 @@ export function TimelinePanel({ objects, selIds, onSelect, setMotion, getDoc, on
         <span className="text-text-muted">/</span>
         <label className="flex items-center gap-1">
           <span className="text-text-muted">Duration</span>
-          <input type="number" value={duration} step={100} min={100} onChange={(e) => setDuration(Math.max(100, parseInt(e.target.value) || 100))} className="w-20 rounded bg-bg/60 px-1.5 py-1 text-[11.5px] text-text-primary focus:outline-none" />
+          <input type="number" value={duration} step={100} min={100} onChange={(e) => setDuration(Math.max(100, parseInt(e.target.value) || 100))} className="w-20 rounded t42-field px-1.5 py-1 text-[11.5px] text-text-primary" />
           <span className="text-text-muted">ms</span>
         </label>
         <button type="button" onClick={() => setPlayback((p) => PB_MODES[p].next)} className="grid h-7 w-7 place-items-center rounded-md text-text-secondary transition-colors hover:bg-bg/60 hover:text-text-primary" title={PB_MODES[playback].desc}>{PB_MODES[playback].icon}</button>
@@ -597,8 +597,8 @@ export function TimelinePanel({ objects, selIds, onSelect, setMotion, getDoc, on
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 text-[11px] text-text-muted">
-                <label className="flex items-center gap-1">Time<input type="number" value={Math.round(selKey.t)} onChange={(e) => { const t = clamp(parseInt(e.target.value) || 0, 0, duration); setMotion(selObj.id, { ...selObj.motion!, tracks: { ...selObj.motion!.tracks, [sel!.prop]: selObj.motion!.tracks[sel!.prop]!.map((k) => (k.id === selKey.id ? { ...k, t } : k)).sort((a, b) => a.t - b.t) } }) }} className="w-full rounded bg-bg/60 px-1 py-0.5 text-text-primary focus:outline-none" /></label>
-                <label className="flex items-center gap-1">Value<input type="number" step={PROP_META[sel!.prop].step} value={Math.round(selKey.v * 100) / 100} onChange={(e) => editKeyVal(selObj, sel!.prop, selKey.id, parseFloat(e.target.value) || 0)} className="w-full rounded bg-bg/60 px-1 py-0.5 text-text-primary focus:outline-none" /></label>
+                <label className="flex items-center gap-1">Time<input type="number" value={Math.round(selKey.t)} onChange={(e) => { const t = clamp(parseInt(e.target.value) || 0, 0, duration); setMotion(selObj.id, { ...selObj.motion!, tracks: { ...selObj.motion!.tracks, [sel!.prop]: selObj.motion!.tracks[sel!.prop]!.map((k) => (k.id === selKey.id ? { ...k, t } : k)).sort((a, b) => a.t - b.t) } }) }} className="w-full rounded t42-field px-1 py-0.5 text-text-primary" /></label>
+                <label className="flex items-center gap-1">Value<input type="number" step={PROP_META[sel!.prop].step} value={Math.round(selKey.v * 100) / 100} onChange={(e) => editKeyVal(selObj, sel!.prop, selKey.id, parseFloat(e.target.value) || 0)} className="w-full rounded t42-field px-1 py-0.5 text-text-primary" /></label>
               </div>
               <div className="flex items-center justify-between text-[10.5px] text-text-muted">
                 <span>{hasSegment ? (isLastKey ? 'Incoming segment easing' : 'Outgoing segment easing') : 'Add another keyframe to ease between them'}</span>

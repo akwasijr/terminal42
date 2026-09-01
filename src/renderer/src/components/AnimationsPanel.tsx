@@ -96,7 +96,7 @@ export function AnimationsPanel({ obj, duration, patch, pushHistory }: {
         <div className="space-y-2 rounded bg-bg/40 p-2">
           <label className="flex items-center justify-between gap-2 text-[11.5px] text-text-muted">
             <span className="shrink-0">Type</span>
-            <select value={draft.kind} onChange={(e) => setDraft(defaultSpec(e.target.value as AnimKind))} className="min-w-0 flex-1 rounded bg-elevated px-2 py-1 text-[12px] text-text-primary focus:outline-none">
+            <select value={draft.kind} onChange={(e) => setDraft(defaultSpec(e.target.value as AnimKind))} className="min-w-0 flex-1 rounded t42-field px-2 py-1 text-[12px] text-text-primary">
               {GROUPS.map((g, i) => (
                 <optgroup key={i} label={['Entrance', 'Emphasis', 'Exit'][i]}>
                   {g.map((k) => <option key={k} value={k}>{ANIM_KINDS[k].label}</option>)}
@@ -108,7 +108,7 @@ export function AnimationsPanel({ obj, duration, patch, pushHistory }: {
           {meta.fields.includes('dir') && (
             <label className="flex items-center justify-between gap-2 text-[11.5px] text-text-muted">
               <span className="shrink-0">Direction</span>
-              <select value={draft.dir ?? 'left'} onChange={(e) => setDraft({ ...draft, dir: e.target.value as AnimSpec['dir'] })} className="min-w-0 flex-1 rounded bg-elevated px-2 py-1 text-[12px] text-text-primary focus:outline-none">
+              <select value={draft.dir ?? 'left'} onChange={(e) => setDraft({ ...draft, dir: e.target.value as AnimSpec['dir'] })} className="min-w-0 flex-1 rounded t42-field px-2 py-1 text-[12px] text-text-primary">
                 <option value="left">From left</option>
                 <option value="right">From right</option>
                 <option value="up">From top</option>
@@ -141,7 +141,7 @@ export function AnimationsPanel({ obj, duration, patch, pushHistory }: {
           </div>
           <label className="flex items-center justify-between gap-2 text-[11.5px] text-text-muted">
             <span className="shrink-0">Easing</span>
-            <select value={draft.easing} onChange={(e) => setDraft({ ...draft, easing: e.target.value })} className="min-w-0 flex-1 rounded bg-elevated px-2 py-1 text-[12px] text-text-primary focus:outline-none">
+            <select value={draft.easing} onChange={(e) => setDraft({ ...draft, easing: e.target.value })} className="min-w-0 flex-1 rounded t42-field px-2 py-1 text-[12px] text-text-primary">
               {EASINGS.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
             </select>
           </label>

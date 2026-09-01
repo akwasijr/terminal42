@@ -572,7 +572,7 @@ export function DesignSystemView({ openSystemId, onConsumeOpen }: { openSystemId
           Design systems
         </button>
         <div className="flex items-center gap-3">
-          <input value={s.name} onChange={(e) => update({ name: e.target.value })} className="min-w-0 flex-1 rounded-md bg-transparent px-1 py-0.5 text-[20px] font-semibold text-text-primary hover:bg-elevated focus:bg-elevated focus:outline-none" />
+          <input value={s.name} onChange={(e) => update({ name: e.target.value })} className="min-w-0 flex-1 rounded-md bg-transparent px-1 py-0.5 text-[20px] font-semibold text-text-primary hover:t42-field focus:bg-elevated" />
           <div className="relative">
             <button type="button" onClick={() => setMenuOpen((o) => !o)} aria-label="Actions" className="grid h-8 w-8 place-items-center rounded-lg text-text-secondary hover:bg-elevated hover:text-text-primary"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="3" r="1.4" /><circle cx="8" cy="8" r="1.4" /><circle cx="8" cy="13" r="1.4" /></svg></button>
             {menuOpen && (

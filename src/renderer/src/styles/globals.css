@@ -35,6 +35,11 @@
   --sunken: 220 220 224;    /* slider tracks, wells, inset fields */
   --border: 246 246 248;    /* ~invisible: matches surface by design */
   --border-strong: 210 210 216;
+  /* Field edges are a whisper, not a shout: light mode goes a shade darker
+     than the well, dark mode a shade lighter, just enough to say "type here"
+     without cutting the panel into boxes. The state that has to be loud is
+     focus, and that is the accent ring. */
+  --field-line: 205 205 212;
   --hairline: 0 0 0 / 0.07; /* opt-in only, via var(--hairline-color) */
   --hairline-color: rgba(0, 0, 0, 0.07);
   --text-primary: 23 23 25;
@@ -95,6 +100,7 @@
   --sunken: 16 16 18;       /* slider tracks, wells, inset fields */
   --border: 24 24 26;       /* ~invisible: matches surface by design */
   --border-strong: 52 52 58;
+  --field-line: 58 58 64;
   --hairline-color: rgba(255, 255, 255, 0.06);
   --text-primary: 240 240 242;
   --text-secondary: 154 154 160;
@@ -250,6 +256,34 @@ input, textarea, [contenteditable] {
 
 *:focus-visible {
   outline: none;
+}
+
+/* A field you can find without hunting for it. The fill is a well, one tone
+   below whatever it sits on, and the edge is the one line in the app that
+   earns its keep: on this near-black ramp no two neighbouring surfaces come
+   within 1.4:1 of each other, so tone alone cannot say "type here". */
+.t42-field {
+  background: rgb(var(--sunken));
+  box-shadow: inset 0 0 0 1px rgb(var(--field-line));
+  transition: box-shadow 150ms ease, background-color 150ms ease;
+}
+
+.t42-field:hover:not(:disabled):not(:focus-within) {
+  box-shadow: inset 0 0 0 1px rgb(var(--text-muted) / 0.55);
+}
+
+.t42-field:focus,
+.t42-field:focus-within,
+.t42-field:focus-visible {
+  box-shadow: inset 0 0 0 1px rgb(var(--accent)), 0 0 0 2px rgb(var(--accent) / 0.55);
+}
+
+.t42-field:disabled {
+  opacity: 0.5;
+}
+
+.t42-field::placeholder {
+  color: rgb(var(--text-muted));
 }
 
 /* Fields read as sunken wells, and focus is expressed as a ring rather than
