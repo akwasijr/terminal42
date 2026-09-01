@@ -19,6 +19,11 @@ import { composeArtboardHtml } from '../lib/freeformExport'
 import { composeArtboardSvg, frameSvg } from '../lib/svgExport'
 import { toTailwind, toReactCss } from '../lib/layerCode'
 import { docIsEmpty, readDoc } from '../lib/freeformDoc'
+import { ThemePanel } from './tokens/ThemePanel'
+import type { TokenKind } from '../lib/tokens/themeRows'
+import { addToken } from '../../../shared/tokens/edit'
+import { emptyStudio, studioFromFeel } from '../../../shared/tokens/scaffold'
+import { feelFromVibe } from '../lib/tokens/feelFromVibe'
 import {
   type FObj,
   type Shape,
@@ -96,6 +101,7 @@ import { type PublishedLibrary, loadLibraries, publishLibrary, deleteLibrary, me
 import { syncTokensCollection, sameCollections } from '../lib/tokens/toForm'
 import { TokensPicker } from './tokens/TokensPicker'
 import { hydrateStudio } from '../../../shared/tokens/types'
+import type { TokenStudio } from '../../../shared/tokens/types'
 import { timelineKeyframeSel } from '../lib/timelineSelection'
 import { SHADERS, SHADER_CATEGORIES, shaderById, defaultShaderParams, ShaderLayer, type ShaderDef, type ShaderParam } from '../lib/shaders'
 import {
@@ -1390,6 +1396,7 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
   const [guides, setGuides] = useState<SnapGuide[]>([])
   const [timelineOpen, setTimelineOpen] = useState(false)
   const [leftTab, setLeftTab] = useState<'layers' | 'assistant' | 'system' | 'variables'>('layers')
+  const [rightTab, setRightTab] = useState<'design' | 'theme'>('design')
   const [varColId, setVarColId] = useState<string>('')
   const [varQuery, setVarQuery] = useState('')
   const [varGroupFilter, setVarGroupFilter] = useState<string | null>(null)
@@ -1574,6 +1581,7 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
     return () => { alive = false }
   }, [designId])
 
+  const [tokenStudio, setTokenStudio] = useState<TokenStudio | null>(null)
   useEffect(() => {
     if (!restoredRef.current) return
     let alive = true
@@ -1582,6 +1590,7 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
       if (!alive) return
       const studio = record ? hydrateStudio(record.studio) : null
       if (studio && tokensBinding?.themeId) studio.activeTheme = tokensBinding.themeId
+      setTokenStudio(studio)
       setCollections((cols) => {
         const next = syncTokensCollection(cols, studio, tokensBinding?.id ?? null)
         return sameCollections(cols, next) ? cols : next
@@ -1589,6 +1598,41 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
     })()
     return () => { alive = false }
   }, [tokensBinding])
+
+  // ── The Theme tab ────────────────────────────────────────────────────────────
+  // Everything here edits the library the design is bound to. A design with no
+  // library gets one on its first token, so nothing is ever written to a second
+  // store that only this screen can see.
+  const bindStudio = async (studio: TokenStudio): Promise<{ id: string; studio: TokenStudio }> => {
+    const rec = await window.terminal42.tokens.create(studio.name, studio)
+    await window.terminal42.designs.setTokens(designId, rec.id, studio.activeTheme ?? null)
+    setTokensBinding({ id: rec.id, themeId: studio.activeTheme ?? null })
+    return { id: rec.id, studio }
+  }
+  const createToken = async (kind: TokenKind): Promise<void> => {
+    let id = tokensBinding?.id ?? null
+    let studio = tokenStudio
+    if (!id || !studio) {
+      const made = await bindStudio(emptyStudio(title || 'Theme'))
+      id = made.id
+      studio = made.studio
+    }
+    // The set the active theme stacks last, because that is the one whose
+    // values win, and a new token nobody can see is not a new token.
+    const theme = studio.themes.find((t) => t.id === studio?.activeTheme) ?? studio.themes[0]
+    const enabled = [...studio.sets].sort((a, b) => a.order - b.order).filter((s) => !theme || theme.sets[s.id] !== 'off')
+    const setId = enabled[enabled.length - 1]?.id ?? studio.sets[0]?.id
+    if (!setId) return
+    const next = addToken(studio, setId, kind.type, kind.tier, kind.path).studio
+    setTokenStudio(next)
+    await window.terminal42.tokens.save(id, next)
+    setTokensBinding((b) => (b ? { ...b } : b))
+  }
+  const applyStarterTheme = async (): Promise<void> => {
+    const studio = studioFromFeel(title || 'Theme', feelFromVibe('minimal'))
+    const made = await bindStudio(studio)
+    setTokenStudio(made.studio)
+  }
   useEffect(() => {
     if (hydratedKey !== saveKey) return
     const t = setTimeout(() => {
@@ -4217,6 +4261,24 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
         </div>
         )}
         {leftTab !== 'variables' && (
+        <div className="flex shrink-0 flex-col bg-surface" style={{ width: rightW }}>
+          <div className="flex shrink-0 items-center gap-0.5 rounded-lg bg-elevated/60 p-0.5 mx-1.5 mt-1.5" role="tablist" aria-label="Panel">
+            {(['design', 'theme'] as const).map((id) => (
+              <button key={id} type="button" role="tab" aria-selected={rightTab === id} onClick={() => setRightTab(id)}
+                className={['flex-1 rounded-md py-1 text-[12.5px] capitalize transition-colors', rightTab === id ? 'bg-raised text-text-primary' : 'text-text-secondary hover:text-text-primary'].join(' ')}>
+                {id}
+              </button>
+            ))}
+          </div>
+          {rightTab === 'theme' ? (
+            <ThemePanel
+              studio={tokenStudio}
+              themeId={tokenStudio?.activeTheme ?? null}
+              onCreate={(k) => void createToken(k)}
+              onStarter={() => void applyStarterTheme()}
+            />
+          ) : (
+          <div className="flex min-h-0 flex-1">
         <Inspector
           width={rightW}
           tool={tool}
@@ -4257,6 +4319,9 @@ export function FreeformCanvas({ designId, title, onClose, onRename }: {
           timelineOpen={timelineOpen}
           autoKey={autoKey}
         />
+          </div>
+          )}
+        </div>
         )}
       </div>
 
